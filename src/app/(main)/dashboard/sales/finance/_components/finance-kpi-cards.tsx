@@ -1,6 +1,6 @@
 "use client";
 
-import { DollarSign, GitPullRequest, Target, TrendingUp } from "lucide-react";
+import { DollarSign, GitPullRequest, ShoppingCart, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import type { FinanceDashboardData } from "@/actions/finance";
@@ -46,11 +46,17 @@ export function FinanceKPICards({ data }: { data: FinanceDashboardData }) {
         trend={momDelta === null ? "neutral" : momDelta >= 0 ? "up" : "down"}
       />
       <MetricCard
-        icon={Target}
-        label={t("winRate")}
-        value={`${data.winRate}%`}
-        description={t("winRateDesc", { won: data.dealsWon, lost: data.dealsLost })}
-        trend={data.winRate >= 50 ? "up" : data.winRate > 0 ? "down" : "neutral"}
+        icon={ShoppingCart}
+        label={t("ordersThisMonth")}
+        value={formatAmount(data.ordersThisMonth.revenue, { noDecimals: true })}
+        description={
+          data.ordersThisMonth.unconverted > 0
+            ? t("ordersThisMonthUnconverted", {
+                count: data.ordersThisMonth.count,
+                unconverted: data.ordersThisMonth.unconverted,
+              })
+            : t("ordersThisMonthDesc", { count: data.ordersThisMonth.count })
+        }
       />
     </div>
   );

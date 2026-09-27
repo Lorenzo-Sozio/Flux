@@ -26,6 +26,9 @@ type Notification = {
   type: string;
   title: string;
   message: string | null;
+  /** Set on everything the product composes itself: composed again here, in the reader's language. */
+  titleKey?: string | null;
+  params?: Record<string, string | number> | null;
   link: string | null;
   isRead: boolean;
   createdAt: Date;
@@ -37,10 +40,17 @@ const TYPE_ICONS: Record<string, string> = {
   lead_assigned: "👤",
   email_sent: "📧",
   chat_message: "💬",
+  chat_mention: "@",
   sla_warning: "⏳",
   sla_breach: "⏰",
   contract_renewal: "📄",
   sequence_reply: "↩️",
+  email_reply: "✉️",
+  quote_viewed: "👀",
+  quote_accepted: "✅",
+  quote_declined: "❌",
+  appointment_reminder: "📅",
+  booking_received: "🗓️",
   system: "ℹ️",
 };
 
@@ -62,6 +72,23 @@ export function NotificationCenter({ notifications: initial }: Props) {
   // product, so an Italian workspace got "Mark all read" in the middle of its
   // own language — in the panel people open most often.
   const t = useTranslations("notificationCenter");
+  const tn = useTranslations("notificationTexts");
+  /**
+   * The text in the reader's language when the row says how it was composed; otherwise the
+   * text stored with it — an automation's own words, or a row older than the key.
+   */
+  const textOf = (n: Notification) => {
+    if (n.titleKey && tn.has(`${n.titleKey}.title` as never)) {
+      const params = n.params ?? {};
+      return {
+        title: tn(`${n.titleKey}.title` as never, params as never),
+        message: tn.has(`${n.titleKey}.message` as never)
+          ? tn(`${n.titleKey}.message` as never, params as never)
+          : n.message,
+      };
+    }
+    return { title: n.title, message: n.message };
+  };
   const [isPending, startTransition] = useTransition();
 
   /**
@@ -186,8 +213,10 @@ export function NotificationCenter({ notifications: initial }: Props) {
                     title={n.isRead ? undefined : t("markRead")}
                     className={cn("min-w-0 flex-1 text-left", !n.isRead && "cursor-pointer")}
                   >
-                    <p className={cn("text-sm leading-tight", !n.isRead && "font-medium")}>{n.title}</p>
-                    {n.message && <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{n.message}</p>}
+                    <p className={cn("text-sm leading-tight", !n.isRead && "font-medium")}>{textOf(n).title}</p>
+                    {textOf(n).message && (
+                      <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{textOf(n).message}</p>
+                    )}
                     <p className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</p>
                   </button>
                   <div className="flex flex-col items-center gap-1">

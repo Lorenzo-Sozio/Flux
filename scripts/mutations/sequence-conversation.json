@@ -1,0 +1,110 @@
+[
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ i giorni lavorativi contano anche sabato e domenica",
+    "find": "      if (!isWeekend(day)) left--;",
+    "replace": "      left--;"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ un passo iscritto di sabato parte di sabato",
+    "find": "    while (isWeekend(day)) day = addDaysToDate(day, 1);\n  } else {",
+    "replace": "  } else {"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ un orario prima della finestra non viene spostato all'apertura",
+    "find": "    if (time < schedule.sendFrom) time = schedule.sendFrom;",
+    "replace": "    if (false) time = schedule.sendFrom;"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ un'email alle 18:00 esatte parte con la finestra già chiusa",
+    "find": "    else if (time >= schedule.sendUntil) {",
+    "replace": "    else if (time > schedule.sendUntil) {"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ la finestra chiusa il venerdì sera rimanda al sabato anche coi giorni lavorativi",
+    "find": "      if (schedule.businessDays) while (isWeekend(day)) day = addDaysToDate(day, 1);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ la prima email non porta il Message-ID: nessuna risposta può agganciarsi",
+    "find": "  if (!thread.id) return { subject, messageHeaderId: newId, inReplyTo: null, startsThread: true };",
+    "replace": "  if (!thread.id) return { subject, messageHeaderId: null, inReplyTo: null, startsThread: true };"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ la risposta diventa \"Re: Re: …\"",
+    "find": "    const base = (thread.subject ?? subject).replace(/^(re:\\s*)+/i, \"\");",
+    "replace": "    const base = thread.subject ?? subject;"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ la prima email può essere una risposta senza oggetto, a niente",
+    "find": "    const replyInThread = kind === \"email\" && emailsBefore > 0 && Boolean(step.replyInThread);",
+    "replace": "    const replyInThread = kind === \"email\" && Boolean(step.replyInThread);"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ una finestra che finisce prima di cominciare viene salvata",
+    "find": "    sendFrom && sendUntil && sendFrom < sendUntil ? { sendFrom, sendUntil } : { sendFrom: null, sendUntil: null };",
+    "replace": "    sendFrom && sendUntil ? { sendFrom, sendUntil } : { sendFrom: null, sendUntil: null };"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ un passo attività manda un'email invece di creare l'attività",
+    "find": "    const isTask = step.kind === \"task\";",
+    "replace": "    const isTask = false;"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ l'attività non è assegnata a nessuno: nessuno la vede fra le sue",
+    "find": "          assigneeId: enrollment.ownerId,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ il thread non viene registrato: le risposte non rispondono a niente",
+    "find": "        ...(thread?.startsThread ? { threadMessageId: thread.messageHeaderId, threadSubject: thread.subject } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ la risposta non porta In-Reply-To",
+    "find": "          inReplyTo: thread?.inReplyTo ?? null,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ un passo restituito dopo un errore si tiene il thread di un'email mai partita",
+    "find": "          threadMessageId: enrollment.threadMessageId ?? null,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ una risposta senza thread registrato parte senza oggetto",
+    "find": "    const ownSubject = step.subject.trim()\n      ? step.subject",
+    "replace": "    const ownSubject = true\n      ? step.subject"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ l'orario è quello del server, non quello dello spazio di lavoro",
+    "find": "    return row?.timeZone ?? FALLBACK_CALENDAR.timeZone;\n  } catch {\n    return FALLBACK_CALENDAR.timeZone;\n  }\n}",
+    "replace": "    return \"UTC\";\n  } catch {\n    return \"UTC\";\n  }\n}"
+  },
+  {
+    "file": "src/app/api/cron/email-worker/route.ts",
+    "description": "⚠️⚠️ il worker non passa il Message-ID al provider",
+    "find": "          ...(job.messageHeaderId ? { messageId: job.messageHeaderId } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-provider.ts",
+    "description": "⚠️⚠️ Resend non riceve il Message-ID scelto",
+    "find": "    if (options.messageId) threadHeaders[\"Message-ID\"] = options.messageId;",
+    "replace": ""
+  }
+]

@@ -13,6 +13,7 @@ import { BulkActionBar } from "@/components/crm/bulk-action-bar";
 import { EmptyState } from "@/components/crm/empty-state";
 import { LeadScoreBadge } from "@/components/crm/lead-score-badge";
 import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
+import { SortableHead } from "@/components/crm/sortable-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -197,12 +198,12 @@ export function ContactsTable({ contacts, users, canEdit, narrowed }: Props) {
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label={tc("selectAll")} />
                     </TableHead>
                   )}
-                  <TableHead>{t("columns.name")}</TableHead>
-                  <TableHead>{tc("email")}</TableHead>
-                  <TableHead>{t("jobTitle")}</TableHead>
-                  <TableHead>{tc("address")}</TableHead>
-                  <TableHead>{tc("status")}</TableHead>
-                  <TableHead>{t("columns.score")}</TableHead>
+                  <SortableHead field="lastName">{t("columns.name")}</SortableHead>
+                  <SortableHead field="email">{tc("email")}</SortableHead>
+                  <SortableHead field="jobTitle">{t("jobTitle")}</SortableHead>
+                  <SortableHead field="city">{tc("address")}</SortableHead>
+                  <SortableHead field="status">{tc("status")}</SortableHead>
+                  <SortableHead field="leadScore">{t("columns.score")}</SortableHead>
                   <TableHead>{t("columns.assignedTo")}</TableHead>
                   {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
                 </TableRow>

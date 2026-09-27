@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/components/crm/automation/webhook-service.ts",
+    "description": "⚠️⚠️ il webhook di una regola torna a non essere validato: chi scrive una regola fa chiamare alla piattaforma i suoi indirizzi interni",
+    "find": "  if (refusal) return { success: false, message: `Webhook refused: ${refusal}`, retryCount: 0 };",
+    "replace": "  void refusal;"
+  },
+  {
+    "file": "src/components/crm/automation/webhook-service.ts",
+    "description": "⚠️ il webhook torna a seguire i reindirizzamenti verso destinazioni non validate",
+    "find": "    redirect: \"manual\",\n  };",
+    "replace": "  };"
+  },
+  {
+    "file": "src/lib/webhook-validator.ts",
+    "description": "⚠️⚠️ localhost torna ad essere accettato in produzione",
+    "find": "  if (!isDev && (host === \"localhost\" || host.endsWith(\".localhost\"))) {",
+    "replace": "  if (!isDev && host === \"never\") {"
+  },
+  {
+    "file": "src/actions/automation.ts",
+    "description": "⚠️⚠️ un editor torna a poter creare regole che scrivono ai clienti per tutto il workspace",
+    "find": "export async function createAutomationRule(data: AutomationRuleFormData) {\n  const actor = await requireCapability(\"automation:manage\");",
+    "replace": "export async function createAutomationRule(data: AutomationRuleFormData) {\n  const actor = await requireCapability(\"record:write\");"
+  }
+]

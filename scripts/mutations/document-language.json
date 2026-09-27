@@ -30,7 +30,7 @@
     "replace": "    documentTitle: \"Preventivo\","
   },
   {
-    "file": "src/app/api/quotes/public/route.ts",
+    "file": "src/lib/quote-public.ts",
     "description": "⚠️⚠️ la pagina pubblica riceve tutta la scheda aziendale",
     "find": "      company: { columns: { name: true, country: true, language: true, vatNumber: true } },",
     "replace": "      company: true,"

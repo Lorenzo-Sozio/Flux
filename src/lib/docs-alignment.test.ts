@@ -22,11 +22,16 @@ const read = (p: string) => readFileSync(p, "utf8").split("\r\n").join("\n");
 
 const HELP = "src/app/(main)/dashboard/help/page.tsx";
 const API_DOCS = "src/app/(main)/admin/api-docs/_components/api-docs-client.tsx";
+/** The public API, written once: the admin page, /developers and openapi.json all read it. */
+const PUBLIC_DOCS = "src/lib/api-docs/public-api.ts";
+const OPENAPI_SPEC = "src/lib/openapi/spec.ts";
+/** Both halves of the reference, as one text: the staff page's own entries and the public ones. */
+const docs = () => `${read(API_DOCS)}\n${read(PUBLIC_DOCS)}`;
 const API_ROOT = "src/app/api";
 
 /** Every `METHOD /api/…` the documentation lists. */
 function documentedEndpoints(): { method: string; path: string }[] {
-  const src = read(API_DOCS);
+  const src = docs();
   const re = /method:\s*"(GET|POST|PUT|PATCH|DELETE)",\s*\n\s*path:\s*"([^"]+)"/g;
   return [...src.matchAll(re)].map((m) => ({ method: m[1], path: m[2] }));
 }
@@ -62,7 +67,7 @@ function realEndpoints(): { method: string; path: string }[] {
 
 /** The paths the documentation claims accept `Idempotency-Key`. */
 function idempotentPaths(): string[] {
-  const block = read(API_DOCS).match(/const IDEMPOTENT_PATHS = \[([\s\S]*?)\] as const;/);
+  const block = docs().match(/const IDEMPOTENT_PATHS = \[([\s\S]*?)\] as const;/);
   if (!block) throw new Error("IDEMPOTENT_PATHS not found in the API documentation");
   return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
@@ -165,7 +170,7 @@ describe("the API documentation", () => {
     // a different body. That second one is the same status the validation error
     // uses and means something else entirely, which is why the component gives it
     // its own wording rather than letting it inherit.
-    const CRM_COMMON = [400, 401, 404, 422, 429];
+    const CRM_COMMON = [400, 401, 403, 404, 422, 429];
     const IDEMPOTENCY_COMMON = [409, 422];
     const IDEMPOTENT = idempotentPaths();
     const CRON_COMMON = [401, 500];
@@ -173,7 +178,7 @@ describe("the API documentation", () => {
     /** Statuses a route answers with through a shared helper rather than inline. */
     const VIA_HELPER: Record<string, number[]> = { "/api/cron/": [401, 500] };
 
-    const src = read(API_DOCS);
+    const src = docs();
     const drift: string[] = [];
 
     for (const raw of src.split(/\n {6}\{\n {8}id: "/).slice(1)) {
@@ -227,7 +232,7 @@ describe("the API documentation", () => {
     //
     // Checks for a *workspace* subdomain, not for the domain: `app.fluxcrm.com`
     // is the right example and has to stay usable.
-    const src = read(API_DOCS);
+    const src = docs();
     const offenders = [...src.matchAll(/https:\/\/([a-z0-9-]+)\.fluxcrm\.com/g)]
       .map((m) => m[1])
       .filter((host) => host !== "app");
@@ -237,8 +242,40 @@ describe("the API documentation", () => {
   it("⚠️ says out loud where the workspace does come from", () => {
     // The correction is worth pinning: if somebody rewrites this section, the
     // one sentence that must survive is the one naming the credential.
-    const src = read(API_DOCS);
+    const src = docs();
     expect(src).toContain("X-Tenant-ID");
     expect(src.toLowerCase()).toContain("chiave del workspace");
+  });
+});
+
+describe("⚠️⚠️ the public API is written in one place", () => {
+  it("/api/crm appears in the public module and nowhere else — not the staff page, not the spec", () => {
+    expect(read(PUBLIC_DOCS)).toContain('path: "/api/crm/');
+    expect(read(API_DOCS)).not.toMatch(/path:\s*"\/api\/crm\//);
+    // The spec used to describe the same routes a second time, in another language, and
+    // covered seventeen of twenty-three. Its /api/crm half is now generated from the module.
+    expect(read(OPENAPI_SPEC)).not.toContain('"/api/crm/');
+  });
+
+  it("⚠️⚠️ every entry names the scope its route actually requires", () => {
+    const wrong: string[] = [];
+    const src = read(PUBLIC_DOCS);
+    for (const m of src.matchAll(
+      /method: "(GET|POST|PUT|PATCH|DELETE)",\n\s*path: "(\/api\/crm\/[^"]+)",[\s\S]*?\n\s*auth: "\w+",\n\s*scope: "([\w:]+)",/g,
+    )) {
+      const [, method, path, scope] = m;
+      const route = read(`src/app${path.replace(/\{(\w+)\}/g, "[$1]")}/route.ts`);
+      const name = method === "GET" ? "READ_SCOPE" : "SCOPE";
+      const real = route.match(
+        new RegExp(`const ${name} = \\{ entity: "(\\w+)", access: "(read|write)" \\} as const;`),
+      );
+      const actual = real ? `${real[1]}:${real[2]}` : "none";
+      if (actual !== scope) wrong.push(`${method} ${path}: documented ${scope}, route ${actual}`);
+    }
+    expect(wrong).toEqual([]);
+    // And none is missing its scope.
+    const withScope = [...src.matchAll(/\n\s*scope: "/g)].length;
+    const crm = [...src.matchAll(/path: "\/api\/crm\//g)].length;
+    expect(withScope).toBe(crm);
   });
 });

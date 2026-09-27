@@ -14,35 +14,14 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-import { extname } from "node:path";
-
-import { sql } from "drizzle-orm";
-
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
 import { EntitlementError, requirePlanLimit } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
 import { getStorage, newStorageKey } from "@/lib/storage";
+import { storageBytesUsed } from "@/lib/storage-usage";
 import { getDb } from "@/lib/tenant-context";
-
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
-
-/** Strict whitelist: declared MIME → allowed file extensions */
-const ALLOWED: Record<string, string[]> = {
-  "application/pdf": [".pdf"],
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/gif": [".gif"],
-  "image/webp": [".webp"],
-  "application/msword": [".doc"],
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-  "application/vnd.ms-powerpoint": [".ppt"],
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
-  "text/plain": [".txt"],
-  "text/csv": [".csv"],
-};
+import { checkUpload } from "@/lib/upload-validation";
 
 /**
  * Entities a document can be attached to.
@@ -53,58 +32,6 @@ const ALLOWED: Record<string, string[]> = {
  * (audit rilievo B-06).
  */
 const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket", "quote", "order"]);
-
-/**
- * Verify file magic bytes against the declared MIME type.
- * Returns false if the content does not match the claimed type.
- */
-function verifyMagicBytes(buf: Buffer, mimeType: string): boolean {
-  if (buf.length < 12) return false;
-
-  switch (mimeType) {
-    case "application/pdf":
-      // %PDF
-      return buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46;
-
-    case "image/jpeg":
-      // FF D8 FF
-      return buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
-
-    case "image/png":
-      // 89 50 4E 47 0D 0A 1A 0A
-      return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
-
-    case "image/gif":
-      // GIF87a or GIF89a
-      return buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46;
-
-    case "image/webp":
-      // RIFF....WEBP
-      return buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP";
-
-    // OOXML formats (docx / xlsx / pptx) are ZIP archives
-    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    case "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-    case "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      // PK\x03\x04
-      return buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
-
-    // Legacy Office formats (OLE Compound Document)
-    case "application/msword":
-    case "application/vnd.ms-excel":
-    case "application/vnd.ms-powerpoint":
-      // D0 CF 11 E0
-      return buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0;
-
-    // Text formats — no reliable magic bytes; rely on extension + MIME whitelist
-    case "text/plain":
-    case "text/csv":
-      return true;
-
-    default:
-      return false;
-  }
-}
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
@@ -128,15 +55,6 @@ export async function POST(req: NextRequest) {
   const entityId = (formData.get("entityId") as string | null)?.trim();
 
   // ── Validate inputs ─────────────────────────────────────────────────────────
-  if (!file) {
-    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("noFile") }, { status: 400 });
-  }
-  if (file.size === 0) {
-    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("emptyFile") }, { status: 400 });
-  }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("tooLarge") }, { status: 413 });
-  }
   if (!entityType || !VALID_ENTITY_TYPES.has(entityType)) {
     return NextResponse.json(
       { error: (await serverT("serverErrors.documents"))("invalidEntityType") },
@@ -147,31 +65,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (await serverT("serverErrors.documents"))("invalidEntityId") }, { status: 400 });
   }
 
-  // ── MIME type check ─────────────────────────────────────────────────────────
-  const declaredMime = file.type.toLowerCase().split(";")[0].trim();
-  const allowedExts = ALLOWED[declaredMime];
-  if (!allowedExts) {
+  // ── Type, extension and magic bytes: the checks every upload shares ─────────
+  const checked = await checkUpload(file);
+  if (!checked.ok) {
     return NextResponse.json(
-      { error: (await serverT("serverErrors.documents"))("typeNotAllowed", { type: declaredMime }) },
-      { status: 415 },
+      { error: (await serverT("serverErrors.documents"))(checked.error, checked.values) },
+      { status: checked.status },
     );
   }
-
-  // ── Extension check (cross-validate against MIME) ───────────────────────────
-  const originalExt = extname(file.name).toLowerCase();
-  if (!allowedExts.includes(originalExt)) {
-    return NextResponse.json(
-      { error: (await serverT("serverErrors.documents"))("extensionMismatch", { extension: originalExt }) },
-      { status: 415 },
-    );
-  }
-
-  // ── Magic bytes check ────────────────────────────────────────────────────────
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  if (!verifyMagicBytes(buffer, declaredMime)) {
-    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("contentMismatch") }, { status: 415 });
-  }
+  const declaredMime = checked.mime;
+  const buffer = checked.bytes;
+  // Narrowed by the check above: a file that passed it exists.
+  const upload = file as File;
 
   // ── Plan storage quota ──────────────────────────────────────────────────────
   //
@@ -180,9 +85,9 @@ export async function POST(req: NextRequest) {
   // rows rather than from the bucket: the rows are what the customer can reach,
   // and an orphaned object is our problem, not theirs.
   try {
-    const [used] = await db.select({ bytes: sql<number>`coalesce(sum(${documents.size}), 0)::bigint` }).from(documents);
-    const usedGb = Number(used?.bytes ?? 0) / 1_000_000_000;
-    await requirePlanLimit("storageGb", usedGb + file.size / 1_000_000_000);
+    // Documents and chat files together: one quota, whichever way the bytes came in.
+    const usedGb = (await storageBytesUsed(db)) / 1_000_000_000;
+    await requirePlanLimit("storageGb", usedGb + upload.size / 1_000_000_000);
   } catch (err) {
     if (err instanceof EntitlementError) {
       return NextResponse.json({ error: err.message }, { status: 402 });
@@ -200,10 +105,10 @@ export async function POST(req: NextRequest) {
   // The key carries nothing from the uploaded filename except a validated
   // extension, so an attacker-controlled name never reaches a path.
   const storage = await getStorage();
-  const storageKey = newStorageKey(file.name);
+  const storageKey = newStorageKey(upload.name);
 
   try {
-    await storage.put(storageKey, new Uint8Array(buffer), declaredMime);
+    await storage.put(storageKey, buffer, declaredMime);
   } catch (err) {
     console.error("[documents] upload failed", { driver: storage.name, err });
     return NextResponse.json({ error: (await serverT("serverErrors.documents"))("uploadFailed") }, { status: 500 });
@@ -216,10 +121,10 @@ export async function POST(req: NextRequest) {
     const [doc] = await db
       .insert(documents)
       .values({
-        name: file.name, // original display name
+        name: upload.name, // original display name
         url: storageKey,
         mimeType: declaredMime,
-        size: file.size,
+        size: upload.size,
         entityType,
         entityId,
         ownerId: userId,

@@ -1,15 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import Link from "next/link";
 
 import { CheckCircle2, CheckSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 
-import { updateTaskStatus } from "@/actions/tasks";
 import { FormattedTime } from "@/components/crm/formatted-time";
+import { TaskOutcomeDialog } from "@/components/crm/task-outcome-dialog";
 import { cn } from "@/lib/utils";
 
 const PILL_STYLE = "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500";
@@ -21,26 +20,19 @@ export interface CalendarTaskEvent {
   entityName: string;
   link: string;
   status: string;
+  taskType?: string | null;
 }
 
 export function CalendarTaskPill({ event, compact = false }: { event: CalendarTaskEvent; compact?: boolean }) {
   const t = useTranslations("calendar");
   const [done, setDone] = useState(event.status === "done");
-  const [isPending, startTransition] = useTransition();
+  // Completing asks "how did it go?" (outcome, note, next step) before it counts as done.
+  const [asking, setAsking] = useState(false);
 
   const handleComplete = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (done || isPending) return;
-    setDone(true);
-    startTransition(async () => {
-      try {
-        await updateTaskStatus(event.id, "done");
-      } catch {
-        setDone(false);
-        toast.error(t("taskDoneError"));
-      }
-    });
+    if (!done) setAsking(true);
   };
 
   return (
@@ -49,8 +41,9 @@ export function CalendarTaskPill({ event, compact = false }: { event: CalendarTa
       <button
         type="button"
         onClick={handleComplete}
-        disabled={done || isPending}
+        disabled={done}
         title={t("markDone")}
+        aria-label={t("markDone")}
         className={cn(
           "shrink-0 flex h-4 w-4 items-center justify-center rounded-full border transition-all",
           done
@@ -84,6 +77,15 @@ export function CalendarTaskPill({ event, compact = false }: { event: CalendarTa
           <span className={cn("truncate font-medium", done && "line-through")}>{event.displayTitle}</span>
         </div>
       </Link>
+      {asking && (
+        <TaskOutcomeDialog
+          task={{ id: event.id, title: event.displayTitle, type: event.taskType }}
+          open
+          onOpenChange={setAsking}
+          revalidate="/dashboard/calendar"
+          onCompleted={() => setDone(true)}
+        />
+      )}
     </div>
   );
 }

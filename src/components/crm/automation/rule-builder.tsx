@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { createAutomationRule, updateAutomationRule } from "@/actions/automation";
 import { getAllUsers } from "@/actions/crm";
 import { getEmailTemplates } from "@/actions/marketing";
+import { getPipelineStages } from "@/actions/pipeline";
 import { getSequencesForEnrolling } from "@/actions/sequences";
 import { getTerritories } from "@/actions/territories";
 import {
@@ -50,9 +51,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { isOwnedEntity } from "@/lib/round-robin";
+import { NO_VALUE_OPERATORS } from "@/lib/rule-conditions";
 import { cn } from "@/lib/utils";
 
 import { ConditionExpressionEditor } from "./condition-expression-editor";
+import { RuleTestPanel } from "./rule-test-panel";
 import { parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-utils";
 
 // ── Update-field options per entity ──────────────────────────────────────────
@@ -235,7 +238,7 @@ const MERGE_TOKEN = "{{merge.fields}}";
  */
 const RACCOLTO = "customFields.";
 
-const NO_VALUE_OPERATORS = new Set(["is_empty", "is_not_empty", "changed"]);
+// One list for the builder and the engine: src/lib/rule-conditions.ts
 
 // ── Field Helper (identical style to LeadModal) ───────────────────────────────
 
@@ -405,6 +408,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const formMessage = useRuleFormMessage();
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [stageList, setStageList] = useState<{ id: string; name: string; pipelineName?: string | null }[]>([]);
   const [territoryList, setTerritoryList] = useState<{ id: string; name: string }[]>([]);
   const [sequenceList, setSequenceList] = useState<{ id: string; name: string; entity: "lead" | "contact" }[]>([]);
   const [templateList, setTemplateList] = useState<
@@ -415,6 +419,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   useEffect(() => {
     if (open) {
       getAllUsers().then(setUserList);
+      getPipelineStages()
+        .then((rows) => setStageList(rows.map((r) => ({ id: r.id, name: r.name, pipelineName: r.pipelineName }))))
+        .catch(() => setStageList([]));
       // Routes by territory need the names; a workspace without the table yet just has none.
       getTerritories()
         .then((rows) => setTerritoryList(rows.map((r) => ({ id: r.id, name: r.name }))))
@@ -477,7 +484,20 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
   const targetEntity = watch("targetEntity");
   const _conditionLogic = watch("conditionLogic");
-  const entityFields = ENTITY_FIELDS[targetEntity] ?? [];
+  // Stage and owner by name: their options are the workspace's own stages and people.
+  const entityFields = (ENTITY_FIELDS[targetEntity] ?? []).map((f) =>
+    f.key === "stageId" && f.type === "enum"
+      ? {
+          ...f,
+          options: stageList.map((s) => ({
+            value: s.id,
+            label: s.pipelineName ? `${s.pipelineName} · ${s.name}` : s.name,
+          })),
+        }
+      : f.key === "ownerId" && f.type === "enum"
+        ? { ...f, options: userList.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })) }
+        : f,
+  );
 
   // Labels: the registry in types.ts carries English labels; a translation wins when one exists.
   const fieldLabel = (key: string, fallback?: string) =>
@@ -541,24 +561,26 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
             <Tabs defaultValue="details">
-              <TabsList className="mb-5 w-full">
+              {/* Icons drop below `sm` so the four labels fit a phone; the row
+                  scrolls rather than squeezes if a language's words are longer. */}
+              <TabsList className="mb-5 w-full justify-start overflow-x-auto sm:justify-center">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
-                  <Zap className="h-3.5 w-3.5" />
+                  <Zap className="hidden h-3.5 w-3.5 sm:block" />
                   {t("tabs.details")}
                   <TabDot has={tabErrors.details} />
                 </TabsTrigger>
                 <TabsTrigger value="trigger" className="relative flex-1 gap-1.5">
-                  <RocketIcon className="h-3.5 w-3.5" />
+                  <RocketIcon className="hidden h-3.5 w-3.5 sm:block" />
                   {t("tabs.trigger")}
                   <TabDot has={tabErrors.trigger} />
                 </TabsTrigger>
                 <TabsTrigger value="conditions" className="relative flex-1 gap-1.5">
-                  <GitMergeIcon className="h-3.5 w-3.5" />
+                  <GitMergeIcon className="hidden h-3.5 w-3.5 sm:block" />
                   {t("tabs.conditions")}
                   <TabDot has={tabErrors.conditions} />
                 </TabsTrigger>
                 <TabsTrigger value="actions" className="relative flex-1 gap-1.5">
-                  <CheckSquare className="h-3.5 w-3.5" />
+                  <CheckSquare className="hidden h-3.5 w-3.5 sm:block" />
                   {t("tabs.actions")}
                   <TabDot has={tabErrors.actions} />
                 </TabsTrigger>
@@ -663,7 +685,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 ? t("trigger.onCreate")
                                 : ev === "onUpdate"
                                   ? t("trigger.onUpdate")
-                                  : t("trigger.slaBreach")}
+                                  : ev === "onSchedule"
+                                    ? t("trigger.onSchedule")
+                                    : t("trigger.slaBreach")}
                             </button>
                           );
                         }}
@@ -672,72 +696,41 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   </div>
                 </F>
 
-                {/* ── Scheduled Triggers ── */}
-                <div className="mt-4 border-t pt-4">
-                  <p className="mb-3 font-semibold text-muted-foreground text-xs">{t("trigger.orSchedule")}</p>
-                  <div className="space-y-3">
-                    <Controller
-                      control={control}
-                      name="triggerOn"
-                      render={({ field }) => {
-                        const scheduledTrigger = field.value?.find((t: string) =>
-                          t.startsWith(SCHEDULED_TRIGGER_PREFIX),
-                        );
-                        const cronExpr = scheduledTrigger ? parseScheduledTrigger(scheduledTrigger) : null;
-
-                        // Derive HH:MM from stored cron ("30 9 * * *" → "09:30")
-                        const timeValue = (() => {
-                          if (!cronExpr) return "08:00";
-                          const parts = cronExpr.split(" ");
-                          const h = parts[1]?.padStart(2, "0") ?? "08";
-                          const m = parts[0]?.padStart(2, "0") ?? "00";
-                          return `${h}:${m}`;
-                        })();
-
-                        return (
-                          <div className="space-y-2">
-                            <span className="font-medium text-xs">{t("trigger.dailySchedule")}</span>
-                            <div className="flex gap-2">
-                              <Input
-                                type="time"
-                                value={timeValue}
-                                className="h-8 flex-1 text-sm"
-                                onChange={(ev) => {
-                                  const [hours, minutes] = ev.target.value.split(":");
-                                  const cron = `${parseInt(minutes, 10)} ${parseInt(hours, 10)} * * *`;
-                                  const encoded = `${SCHEDULED_TRIGGER_PREFIX}${cron}`;
-                                  const next =
-                                    field.value?.filter((t: string) => !t.startsWith(SCHEDULED_TRIGGER_PREFIX)) ?? [];
-                                  field.onChange([...next, encoded]);
-                                }}
-                              />
-                              {scheduledTrigger && (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="text-destructive"
-                                  onClick={() => {
-                                    field.onChange(
-                                      field.value?.filter((t: string) => !t.startsWith(SCHEDULED_TRIGGER_PREFIX)) ?? [],
-                                    );
-                                  }}
-                                >
-                                  {tCommon("remove")}
-                                </Button>
-                              )}
-                            </div>
-                            {scheduledTrigger && (
-                              <p className="text-emerald-600 text-xs dark:text-emerald-400">
-                                {t("trigger.scheduledAt", { time: timeValue })}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                  </div>
-                </div>
+                {/* ── Scheduled Triggers ──
+                    ⚠️⚠️ Not offered: nothing runs them. The node-cron scheduler read the rules
+                    once at boot, outside any workspace, never ran on Workers, and where it did
+                    fire it sent `onCreate` — re-running every creation rule over up to a
+                    thousand records. The builder said "Scheduled daily at 08:00" in green
+                    all the same. A rule that already carries a schedule says what is true
+                    and offers to drop it; scheduled rules come back on the cron jobs (V2.7). */}
+                <Controller
+                  control={control}
+                  name="triggerOn"
+                  render={({ field }) => {
+                    const scheduledTrigger = field.value?.find((t: string) => t.startsWith(SCHEDULED_TRIGGER_PREFIX));
+                    if (!scheduledTrigger) return <></>;
+                    const cronExpr = parseScheduledTrigger(scheduledTrigger);
+                    const parts = cronExpr?.split(" ") ?? [];
+                    const time = `${(parts[1] ?? "8").padStart(2, "0")}:${(parts[0] ?? "0").padStart(2, "0")}`;
+                    return (
+                      <div className="mt-4 flex flex-wrap items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 text-xs dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+                        <p className="min-w-0 flex-1">{t("trigger.scheduleUnavailable", { time })}</p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            field.onChange(
+                              field.value?.filter((t: string) => !t.startsWith(SCHEDULED_TRIGGER_PREFIX)) ?? [],
+                            )
+                          }
+                        >
+                          {tCommon("remove")}
+                        </Button>
+                      </div>
+                    );
+                  }}
+                />
               </TabsContent>
               {/* ── Tab 3: Conditions ───────────────────────────────────── */}
               <TabsContent value="conditions" className="mt-0 space-y-3">
@@ -790,7 +783,11 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                           )}
 
                           {/* Condition controls */}
-                          <div className="flex items-center gap-2 rounded-lg border bg-card p-3 shadow-sm">
+                          {/* ⚠️ Field, a 160px operator, a 128px value and a button do not
+                              fit 300px. Below `sm` the row wraps: field and delete on the
+                              first line (`order-1` on the button), operator and value
+                              sharing the second. From `sm` up it is one line as before. */}
+                          <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 shadow-sm sm:flex-nowrap">
                             <span className="min-w-fit font-bold font-mono text-muted-foreground text-xs">
                               C{index}
                             </span>
@@ -809,7 +806,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               render={({ field: f }) => {
                                 const raccolto = String(f.value ?? "").startsWith(RACCOLTO);
                                 return (
-                                  <div className="flex flex-1 items-center gap-2">
+                                  <div className="flex min-w-0 flex-1 basis-[60%] items-center gap-2 sm:basis-0">
                                     <Select
                                       value={raccolto ? RACCOLTO : f.value}
                                       onValueChange={(v) => f.onChange(v === RACCOLTO ? RACCOLTO : v)}
@@ -851,7 +848,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     if (NO_VALUE_OPERATORS.has(v)) setValue(`conditions.${index}.value`, undefined);
                                   }}
                                 >
-                                  <SelectTrigger className="h-8 w-40 flex-shrink-0 text-xs">
+                                  <SelectTrigger className="order-2 h-8 w-[calc(50%-0.25rem)] flex-shrink-0 grow text-xs sm:order-none sm:w-40 sm:grow-0">
                                     <SelectValue placeholder={t("conditions.operatorPlaceholder")} />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -873,7 +870,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   name={`conditions.${index}.value`}
                                   render={({ field: f }) => (
                                     <Select value={String(f.value ?? "")} onValueChange={f.onChange}>
-                                      <SelectTrigger className="h-8 w-32 flex-shrink-0 text-xs">
+                                      <SelectTrigger className="order-2 h-8 w-[calc(50%-0.25rem)] flex-shrink-0 grow text-xs sm:order-none sm:w-32 sm:grow-0">
                                         <SelectValue placeholder={t("conditions.valuePlaceholder")} />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -888,9 +885,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 />
                               ) : (
                                 <Input
-                                  className="h-8 w-32 flex-shrink-0 text-xs"
+                                  className="order-2 h-8 w-[calc(50%-0.25rem)] flex-shrink-0 grow text-xs sm:order-none sm:w-32 sm:grow-0"
                                   placeholder={t("conditions.valuePlaceholder")}
-                                  type={fieldDef?.type === "number" ? "number" : "text"}
+                                  // Days, for the relative date operators; a number or text otherwise.
+                                  type={fieldDef?.type === "number" || fieldDef?.type === "date" ? "number" : "text"}
                                   {...register(`conditions.${index}.value`)}
                                 />
                               ))}
@@ -900,8 +898,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 flex-shrink-0 text-destructive hover:text-destructive"
+                              className="order-1 size-9 flex-shrink-0 text-destructive hover:text-destructive sm:order-none sm:size-8"
                               onClick={() => removeCondition(index)}
+                              aria-label={tCommon("remove")}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -955,6 +954,14 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                     </div>
                   </details>
                 </div>
+
+                <RuleTestPanel
+                  entity={targetEntity}
+                  conditions={watch("conditions")}
+                  logic={(watch("conditionLogic") ?? "AND") as "AND" | "OR"}
+                  expression={watch("conditionExpression") ?? ""}
+                  fieldLabel={(key) => fieldLabel(key, entityFields.find((f) => f.key === key)?.label)}
+                />
               </TabsContent>
 
               {/* ── Tab 4: Actions ──────────────────────────────────────── */}
@@ -975,7 +982,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   const updFieldDef = updFields.find((f) => f.value === selectedUpd) ?? updFields[0];
 
                   return (
-                    <div key={field.id} className={cn("space-y-3 rounded-xl border-2 p-4", meta?.bg)}>
+                    <div key={field.id} className={cn("space-y-3 rounded-xl border-2 p-3 sm:p-4", meta?.bg)}>
                       {/* ── Card header: index + type selector + delete ── */}
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -1056,8 +1063,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 flex-shrink-0 text-muted-foreground hover:text-destructive"
+                          className="size-9 flex-shrink-0 text-muted-foreground hover:text-destructive sm:size-7"
                           onClick={() => removeAction(index)}
+                          aria-label={tCommon("remove")}
                           disabled={actionFields.length === 1}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -1484,7 +1492,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               type="button"
                                               variant="ghost"
                                               size="icon"
-                                              className="h-6 w-6"
+                                              className="size-9 sm:size-6"
                                               disabled={i === 0}
                                               onClick={() => move(i, -1)}
                                               aria-label={t("assign.moveUp")}
@@ -1495,7 +1503,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               type="button"
                                               variant="ghost"
                                               size="icon"
-                                              className="h-6 w-6"
+                                              className="size-9 sm:size-6"
                                               disabled={i === routes.length - 1}
                                               onClick={() => move(i, 1)}
                                               aria-label={t("assign.moveDown")}
@@ -1506,7 +1514,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               type="button"
                                               variant="ghost"
                                               size="icon"
-                                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                              className="size-9 text-muted-foreground hover:text-destructive sm:size-6"
                                               onClick={() => f.onChange(routes.filter((_, j) => j !== i))}
                                               aria-label={t("assign.remove")}
                                             >

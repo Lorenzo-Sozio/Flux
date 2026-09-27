@@ -26,7 +26,7 @@
   {
     "file": "src/lib/api-import-auth.ts",
     "description": "⚠️⚠️ la guardia torna a leggere il ruolo di piattaforma: un membro in sola lettura scrive attraverso le API",
-    "find": "  if (!can(actor, \"record:write\")) return null;",
+    "find": "  if (access === \"read\" ? !can(actor, \"record:read\") : !can(actor, \"record:write\")) return null;",
     "replace": "  if (user.role === \"viewer\") return null;"
   },
   {

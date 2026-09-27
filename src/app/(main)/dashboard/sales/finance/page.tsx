@@ -3,13 +3,13 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 import { getFinanceDashboard } from "@/actions/finance";
+import { getReceivables } from "@/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { requirePageCapability } from "@/lib/page-guard";
 
 import { CashFlowOverview } from "./_components/cash-flow-overview";
 import { FinanceKPICards } from "./_components/finance-kpi-cards";
-import { IncomeReliability } from "./_components/income-reliability";
-import { SpendingBreakdown } from "./_components/spending-breakdown";
+import { ReceivablesCard } from "./_components/receivables-card";
 
 export default async function FinancePage() {
   // The dashboard underneath has always required an administrator, and the page
@@ -18,7 +18,12 @@ export default async function FinancePage() {
   // the way of being told changes.
   await requirePageCapability("settings:manage", "/dashboard/sales/finance");
 
-  const [data, t] = await Promise.all([getFinanceDashboard(), getTranslations("finance")]);
+  const [data, t, receivables] = await Promise.all([
+    getFinanceDashboard(),
+    getTranslations("finance"),
+    // Without the sales module there are no invoices to chase: the card is simply absent.
+    getReceivables().catch(() => null),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -38,15 +43,9 @@ export default async function FinancePage() {
 
       <FinanceKPICards data={data} />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <CashFlowOverview revenueTrend={data.revenueTrend} />
-          <SpendingBreakdown revenueBreakdown={data.revenueBreakdown} />
-        </div>
-        <div>
-          <IncomeReliability pipelineByStage={data.pipelineByStage} />
-        </div>
-      </div>
+      {receivables && <ReceivablesCard schedule={JSON.parse(JSON.stringify(receivables))} />}
+
+      <CashFlowOverview revenueTrend={data.revenueTrend} />
     </div>
   );
 }

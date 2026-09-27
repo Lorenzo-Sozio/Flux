@@ -1,10 +1,13 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 import { z } from "zod";
 
 import { automationLogs, automationRules } from "@/db/schema";
 import { assertLimit, EntitlementError } from "@/lib/billing/licensing";
 import { getUsage, incrementUsage } from "@/lib/billing/usage";
+import { notifyMany } from "@/lib/notify";
+import { evaluateCondition, getNestedFieldValue } from "@/lib/rule-conditions";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
+import { membersWith } from "@/lib/workspace-members";
 
 import type { Condition, RuleContext } from "../../crm/automation/types";
 import { ActionSchema, ConditionSchema } from "../../crm/automation/types";
@@ -79,79 +82,6 @@ function evaluateSimpleConditions(
 }
 
 /**
- * Evaluates a single condition.
- */
-function evaluateCondition(
-  condition: Condition,
-  entityData: Record<string, unknown>,
-  oldData?: Record<string, unknown>,
-): boolean {
-  const fieldValue = getNestedFieldValue(entityData, condition.field);
-  const oldValue = oldData ? getNestedFieldValue(oldData, condition.field) : undefined;
-  const conditionValue = condition.value;
-
-  switch (condition.operator) {
-    case "equals":
-      return fieldValue === conditionValue;
-
-    case "not_equals":
-      return fieldValue !== conditionValue;
-
-    case "greater_than":
-      return Number(fieldValue) > Number(conditionValue);
-
-    case "less_than":
-      return Number(fieldValue) < Number(conditionValue);
-
-    case "greater_than_or_equal":
-      return Number(fieldValue) >= Number(conditionValue);
-
-    case "less_than_or_equal":
-      return Number(fieldValue) <= Number(conditionValue);
-
-    case "contains":
-      return String(fieldValue).includes(String(conditionValue));
-
-    case "not_contains":
-      return !String(fieldValue).includes(String(conditionValue));
-
-    case "is_empty":
-      return !fieldValue || fieldValue === "" || (Array.isArray(fieldValue) && fieldValue.length === 0);
-
-    case "is_not_empty":
-      return !!fieldValue && fieldValue !== "" && (!Array.isArray(fieldValue) || fieldValue.length > 0);
-
-    case "changed":
-      return oldValue !== fieldValue;
-
-    case "changed_to":
-      return fieldValue === conditionValue && oldValue !== fieldValue;
-
-    case "changed_from":
-      return oldValue === conditionValue && fieldValue !== oldValue;
-
-    default:
-      console.warn(`[RuleEngine] Unknown operator: ${condition.operator}`);
-      return false;
-  }
-}
-
-/**
- * Helper per leggere valori nested (es: "company.name")
- */
-function getNestedFieldValue(data: Record<string, unknown>, fieldPath: string): unknown {
-  const parts = fieldPath.split(".");
-  let value: unknown = data;
-
-  for (const part of parts) {
-    if (value == null || typeof value !== "object") return undefined;
-    value = (value as Record<string, unknown>)[part];
-  }
-
-  return value;
-}
-
-/**
  * Fetches all active rules for the given entity + event, evaluates conditions,
  * and dispatches matching actions. Errors are caught per-rule — one bad rule
  * never blocks the rest.
@@ -162,14 +92,33 @@ export async function runAutomations(context: RuleContext, executionCtx?: Execut
   const execCtx = executionCtx || createExecutionContext(context.currentUserId);
 
   // Resolve the tenant to track and enforce automation quota.
-  // getCurrentTenantId() may return null when called from cron jobs or the
-  // scheduler — in those cases we skip quota tracking rather than blocking.
   let tenantId: string | null = null;
   try {
     tenantId = await getCurrentTenantId();
   } catch {
-    // Outside request context (e.g. scheduled jobs) — skip quota enforcement
+    // Outside request context — skip quota enforcement
   }
+
+  const db = await getDb();
+  let matching: (typeof automationRules.$inferSelect)[] = [];
+  try {
+    const rules = await db
+      .select()
+      .from(automationRules)
+      .where(and(eq(automationRules.targetEntity, context.entityType), eq(automationRules.isActive, true)));
+
+    // Filter by triggerOn client-side (array contains check is cleaner in TS); the daily run
+    // names the rules it has already decided on.
+    matching = rules.filter((r) => {
+      const triggers = r.triggerOn as string[] | null;
+      if (!Array.isArray(triggers) || !triggers.includes(context.event)) return false;
+      return !context.ruleIds || context.ruleIds.includes(r.id);
+    });
+  } catch (err) {
+    console.error("[RuleEngine] Failed to fetch rules:", err);
+    return;
+  }
+  if (matching.length === 0) return;
 
   if (tenantId) {
     try {
@@ -177,7 +126,10 @@ export async function runAutomations(context: RuleContext, executionCtx?: Execut
       await assertLimit(tenantId, "automationRunsPerMonth", current);
     } catch (err) {
       if (err instanceof EntitlementError) {
-        console.warn(`[RuleEngine] automationRunsPerMonth limit reached for tenant ${tenantId} — skipping rules`);
+        // ⚠️⚠️ Said where somebody will look (§8.2): the rules were skipped with one
+        // `console.warn` nobody reads, so a workspace over its quota simply had automations
+        // that stopped, with nothing in the log and nothing on anybody's screen.
+        await recordQuotaExhausted(db, tenantId, matching, context);
         return;
       }
       // DB/network errors: log and continue rather than silently blocking automations
@@ -185,24 +137,80 @@ export async function runAutomations(context: RuleContext, executionCtx?: Execut
     }
   }
 
-  const db = await getDb();
+  // Process rules in parallel — each rule is independent
+  await Promise.allSettled(matching.map((rule) => executeRule(rule, context, execCtx, tenantId)));
+}
+
+const QUOTA_MESSAGE = "Skipped: the workspace has used its automation runs for this month.";
+
+/** One log line per rule per day, and one notice per day to whoever manages automations. */
+async function recordQuotaExhausted(
+  db: Awaited<ReturnType<typeof getDb>>,
+  tenantId: string,
+  rules: (typeof automationRules.$inferSelect)[],
+  context: RuleContext,
+): Promise<void> {
   try {
-    const rules = await db
-      .select()
-      .from(automationRules)
-      .where(and(eq(automationRules.targetEntity, context.entityType), eq(automationRules.isActive, true)));
-
-    // Filter by triggerOn client-side (array contains check is cleaner in TS)
-    const matching = rules.filter((r) => {
-      const triggers = r.triggerOn as string[] | null;
-      return Array.isArray(triggers) && triggers.includes(context.event);
-    });
-
-    // Process rules in parallel — each rule is independent
-    await Promise.allSettled(matching.map((rule) => executeRule(rule, context, execCtx, tenantId)));
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const already = await db
+      .select({ ruleId: automationLogs.ruleId })
+      .from(automationLogs)
+      .where(and(eq(automationLogs.errorMessage, QUOTA_MESSAGE), gte(automationLogs.createdAt, midnight)));
+    const logged = new Set(already.map((r) => r.ruleId));
+    const fresh = rules.filter((r) => !logged.has(r.id));
+    if (fresh.length === 0) return;
+    await db.insert(automationLogs).values(
+      fresh.map((rule) => ({
+        ruleId: rule.id,
+        entityType: context.entityType,
+        entityId: context.entityId,
+        event: context.event,
+        success: false,
+        actionsExecuted: 0,
+        errorMessage: QUOTA_MESSAGE,
+      })),
+    );
+    // The first line of the day is also the moment to tell a person.
+    if (logged.size === 0) {
+      const managers = await membersWith(tenantId, "automation:manage");
+      await notifyMany(
+        managers.map((userId) => ({
+          userId,
+          type: "system",
+          key: "automationQuota" as const,
+          params: { rules: fresh.length },
+          link: "/dashboard/automation",
+        })),
+      );
+    }
   } catch (err) {
-    console.error("[RuleEngine] Failed to fetch rules:", err);
+    console.error("[RuleEngine] quota exhausted, and it could not be recorded:", err);
   }
+}
+
+/** Whether a stored rule's conditions hold for this data — for the daily run and the dry run. */
+export function ruleConditionsHold(
+  rule: Pick<typeof automationRules.$inferSelect, "conditions" | "conditionLogic" | "conditionExpression">,
+  newData: Record<string, unknown>,
+  oldData?: Record<string, unknown>,
+): boolean {
+  const conditions = z.array(ConditionSchema).parse(JSON.parse(rule.conditions));
+  const logic = (rule.conditionLogic ?? "AND") as "AND" | "OR";
+  return evaluateConditions(conditions, logic, rule.conditionExpression ?? "", oldData, newData);
+}
+
+/** Each condition of a rule, with whether it holds for this data: what "test on this record" shows. */
+export function explainConditions(
+  conditions: Condition[],
+  newData: Record<string, unknown>,
+  oldData?: Record<string, unknown>,
+): { condition: Condition; holds: boolean; actual: unknown }[] {
+  return conditions.map((condition) => ({
+    condition,
+    holds: evaluateCondition(condition, newData, oldData),
+    actual: getNestedFieldValue(newData, condition.field),
+  }));
 }
 
 // ─── Per-rule execution ───────────────────────────────────────────────────────

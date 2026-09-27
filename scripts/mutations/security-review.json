@@ -1,0 +1,170 @@
+[
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️⚠️ con la sessione un editor si iscrive a ogni evento o cancella una persona via API, cose da amministratore nel dashboard",
+    "find": "  if (who.via === \"session\" && sessionNeeds && !can(who.role, sessionNeeds)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️ il workspace dichiarato con X-Tenant-ID si legge dall'header che il proxy imposta per la sessione",
+    "find": "  return req.headers.get(CLAIMED_TENANT_HEADER)?.trim() || null;",
+    "replace": "  return req.headers.get(\"x-tenant-id\")?.trim() || null;"
+  },
+  {
+    "file": "src/app/api/crm/webhooks/[id]/route.ts",
+    "description": "⚠️ una chiave rimuove le iscrizioni fatte da un'altra integrazione",
+    "find": "        ...(authResult.via === \"apikey\" ? [eq(webhooks.apiKeyId, authResult.key?.id ?? \"\")] : []),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/tenant-api-key.ts",
+    "description": "⚠️⚠️ revocare una chiave trapelata non ferma gli eventi che riceve",
+    "find": "    .where(and(eq(webhooks.apiKeyId, id), isNull(webhooks.ownerId)));",
+    "replace": "    .where(eq(webhooks.apiKeyId, \"never\"));"
+  },
+  {
+    "file": "src/actions/tenant-api-key.ts",
+    "description": "⚠️ revocare una chiave spegne anche le iscrizioni di un'altra",
+    "find": "    .where(and(eq(webhooks.apiKeyId, id), isNull(webhooks.ownerId)));",
+    "replace": "    .where(isNull(webhooks.ownerId));"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ cinquanta iscrizioni scadute in sequenze in pausa riempiono la pagina: nessuna sequenza attiva manda più nulla",
+    "find": "        inArray(emailSequenceEnrollments.sequenceId, running),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ un messaggio scritto prima dell'iscrizione ferma la sequenza come risposta",
+    "find": "        ...(before ? [lt(emailSequenceEnrollments.enrolledAt, before)] : []),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/client-ip.ts",
+    "description": "⚠️⚠️ fuori da Vercel x-vercel-forwarded-for è creduto: si firma «da» qualunque IP e si aggirano i limiti",
+    "find": "  if (env.VERCEL) {",
+    "replace": "  if (true) {"
+  },
+  {
+    "file": "src/lib/client-ip.ts",
+    "description": "⚠️ cf-connecting-ip è creduto anche dove Cloudflare non c'è",
+    "find": "  if (workers) {",
+    "replace": "  if (true) {"
+  },
+  {
+    "file": "src/lib/webhook-response.ts",
+    "description": "⚠️ la risposta di un ricevente si legge e si salva tutta, di qualunque dimensione",
+    "find": "    while (out.length < max) {",
+    "replace": "    while (true) {"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ un preventivo inviato si modifica sotto gli occhi del cliente: firma righe che non ha visto",
+    "find": "    if (quote.status !== \"draft\" && CONTENT.some((k) => validated[k] !== undefined)) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "una quantità frazionaria arriva alla colonna intera e risponde 500",
+    "find": "    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > 1_000_000) {",
+    "replace": "    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 1_000_000) {"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "⚠️ la bozza si intesta a un contatto di un'altra azienda, o inesistente",
+    "find": "    if (!contact) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "una data inesistente (31 febbraio) diventa la data di un pagamento",
+    "find": "  return d && !Number.isNaN(d.getTime()) && toWallDate(d, zone) === value ? d : null;",
+    "replace": "  return d;"
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️⚠️ eliminare un ordine annullato cancella i pagamenti della sua fattura: torna da incassare",
+    "find": "      .where(and(eq(orderPayments.orderId, id), isNotNull(orderPayments.invoiceId))),",
+    "replace": "      .where(eq(orderPayments.orderId, \"never\")),"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️ con più fatture sull'ordine, l'emissione aggancia gli acconti a una a caso",
+    "find": "      having count(*) = 1",
+    "replace": "      having count(*) >= 1"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️⚠️ la casella di chi ha lasciato il workspace continua a essere letta",
+    "find": "    if (!writers.has(conn.userId)) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️ un workspace consuma tutto il budget della corsa e gli altri non vengono mai letti",
+    "find": "  const budget = cappedBudget(input.budget, MAIL_SYNC_PER_WORKSPACE);",
+    "replace": "  const budget = input.budget;"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️ una risposta letta in ritardo ferma sequenze iniziate dopo",
+    "find": "stopOnReply(db, m.from, now, m.date)",
+    "replace": "stopOnReply(db, m.from, now)"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "senza accesso al calendario si chiede comunque la disponibilità, e l'errore si ripete a ogni giro",
+    "find": "  if (conn.scopes && !/calendar/i.test(conn.scopes)) return 0;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️⚠️ un client secret sbagliato scollega tutte le caselle di tutti i workspace",
+    "find": "  return (err.status === 400 || err.status === 401) && /invalid_grant|interaction_required/.test(err.message);",
+    "replace": "  return err.status === 400 || err.status === 401;"
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️ ricollegata dopo una revoca, la casella rilegge settimane di posta",
+    "find": "existing.status === \"active\" ? (existing.mailCursor ?? input.cursor) : input.cursor",
+    "replace": "existing.mailCursor ?? input.cursor"
+  },
+  {
+    "file": "src/lib/mailbox-send.ts",
+    "description": "⚠️⚠️ un intoppo momentaneo del fornitore fa partire l'email dall'indirizzo del workspace",
+    "find": "    if (after?.status !== \"active\") return { used: false };",
+    "replace": "    return { used: false };"
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️ un intoppo del token fa dimenticare l'evento: resta nel calendario per sempre",
+    "find": "    if (conn?.status === \"active\") return;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/microsoft.ts",
+    "description": "⚠️⚠️ senza Mail.ReadWrite ogni invio da Outlook risponde 403",
+    "find": "  \"Mail.ReadWrite\",\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/microsoft.ts",
+    "description": "⚠️ un appuntamento di un giorno intero torna dal calendario come giornata occupata",
+    "find": "    ...(e.allDay ? { showAs: \"free\" } : {}),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/google.ts",
+    "description": "⚠️ un appuntamento di un giorno intero torna da Google come giornata occupata",
+    "find": "    ...(e.allDay ? { transparency: \"transparent\" } : {}),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/google.ts",
+    "description": "un messaggio Latin-1 arriva con le lettere accentate rotte",
+    "find": "  if (!charset || charset === \"utf-8\" || charset === \"us-ascii\") return base64UrlDecode(data);",
+    "replace": "  return base64UrlDecode(data);"
+  }
+]

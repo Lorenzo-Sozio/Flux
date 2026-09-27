@@ -112,10 +112,16 @@ export function CreatableLookupCombobox({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      {/* ⚠️ `w-(--var)`, not `w-[--var]`. Tailwind v4 no longer wraps a bare
+          custom property in `var()`, so the bracket form compiled to an invalid
+          width and the list fell back to the popover's fixed 288px — wider than
+          the field in a phone's form, and past the screen's edge beside it.
+          The list is also capped at the room Radix measured, so an open
+          keyboard does not push its last rows out of reach. */}
+      <PopoverContent className="w-(--radix-popover-trigger-width) max-w-[calc(100vw-2rem)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
-          <CommandList>
+          <CommandList className="max-h-[min(18rem,calc(var(--radix-popover-content-available-height)-3rem))]">
             {filtered.length === 0 && !showCreate && <CommandEmpty>{t("noResults")}</CommandEmpty>}
             <CommandGroup>
               {value && (
@@ -128,7 +134,12 @@ export function CreatableLookupCombobox({
                 </CommandItem>
               )}
               {filtered.map((item) => (
-                <CommandItem key={item.id} value={item.id} onSelect={() => handleSelect(item.id)}>
+                <CommandItem
+                  key={item.id}
+                  value={item.id}
+                  onSelect={() => handleSelect(item.id)}
+                  className="max-md:py-2.5"
+                >
                   <Check className={cn("mr-2 h-4 w-4 shrink-0", value === item.id ? "opacity-100" : "opacity-0")} />
                   {item.name}
                 </CommandItem>

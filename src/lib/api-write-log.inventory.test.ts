@@ -47,7 +47,10 @@ function nomeAtteso(file: string): string {
 }
 
 describe("ogni rotta CRM registra chi ha scritto", () => {
-  const files = rotte(RADICE);
+  // Every route that writes. A read-only route (GET /api/crm/deals) records nothing: the
+  // log is what integrations *did*, and a read did nothing. A route gaining a POST joins
+  // this list by that alone.
+  const files = rotte(RADICE).filter((f) => leggi(f).includes("export async function POST("));
 
   it("le rotte esistono, e sono quelle che ci si aspetta", () => {
     // ⚠️ A guard on the guard: a broken path would make every check below pass over an

@@ -12,6 +12,7 @@ import { bulkAssignCompanies, bulkDeleteCompanies, bulkUpdateCompanyStatus } fro
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
 import { EmptyState } from "@/components/crm/empty-state";
 import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
+import { SortableHead } from "@/components/crm/sortable-head";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -221,12 +222,12 @@ export function CompaniesTable({
                       <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label={tc("selectAll")} />
                     </TableHead>
                   )}
-                  <TableHead>{t("columns.name")}</TableHead>
-                  <TableHead>{t("columns.industry")}</TableHead>
-                  <TableHead>{t("columns.city")}</TableHead>
+                  <SortableHead field="name">{t("columns.name")}</SortableHead>
+                  <SortableHead field="industry">{t("columns.industry")}</SortableHead>
+                  <SortableHead field="city">{t("columns.city")}</SortableHead>
                   <TableHead>{t("columns.type")}</TableHead>
-                  <TableHead>{t("columns.status")}</TableHead>
-                  <TableHead>{t("columns.employees")}</TableHead>
+                  <SortableHead field="status">{t("columns.status")}</SortableHead>
+                  <SortableHead field="employeeCount">{t("columns.employees")}</SortableHead>
                   <TableHead>{t("columns.assignedTo")}</TableHead>
                   {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
                 </TableRow>

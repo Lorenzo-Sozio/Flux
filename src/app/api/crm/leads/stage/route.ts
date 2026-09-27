@@ -2,28 +2,27 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { leads } from "@/db/schema";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { LEAD_STATUSES } from "@/lib/api-import-validators";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/**
- * ⚠️ Every event leaving this route declares that a **machine** caused it, so the
- * integration that wrote it can drop its own echo.
- */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the write log records it, and two literals that
  * have to agree are one literal too many.
  */
 const ENDPOINT = "/api/crm/leads/stage";
+
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "leads", access: "write" } as const;
 
 /**
  * Move a lead to the stage an assistant has brought it to.
@@ -62,10 +61,12 @@ const ENDPOINT = "/api/crm/leads/stage";
  * fail — a lock left open blocking the retry — in exchange for nothing.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
   if (!authResult.tenantId) {
     return NextResponse.json(
       { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
@@ -135,9 +136,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No lead reachable at that contact point" }, { status: 404 });
   }
 
+  // Read before writing: a rule on «status changed to qualified» compares the two, and
+  // the old value is gone once the update has run. One record, one extra statement.
+  const [before] = await db.select().from(leads).where(eq(leads.id, leadId));
   const [updated] = await db.update(leads).set({ status }).where(eq(leads.id, leadId)).returning();
 
   dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);
+  // The same rules a stage moved from the dashboard runs.
+  runRulesAfterApiWrite(tenant.id, {
+    entityType: "lead",
+    entityId: leadId,
+    event: "onUpdate",
+    oldData: (before ?? {}) as Record<string, unknown>,
+    newData: updated as Record<string, unknown>,
+  });
   await logApiWrite(db, authResult, { entity: "lead", endpoint: ENDPOINT, recordId: leadId });
   return NextResponse.json({ status: "moved", moved: true, id: leadId, data: updated });
 }

@@ -9,7 +9,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, PDFName, PDFRawStream } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 
 import { createCanvas } from "./canvas";
@@ -96,5 +96,45 @@ describe("no WebAssembly in the PDF path", () => {
     for (const file of ["src/lib/invoice-archive.ts", "src/app/api/quotes/[id]/pdf/route.ts"]) {
       expect(readFileSync(file, "utf8"), file).not.toContain("@react-pdf");
     }
+  });
+});
+
+describe("⚠️ the workspace logo on the quote", () => {
+  // A one-pixel PNG: the smallest real image pdf-lib will embed.
+  const PNG = Uint8Array.from(
+    atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="),
+    (c) => c.charCodeAt(0),
+  );
+  const images = async (bytes: Uint8Array) => {
+    const doc = await PDFDocument.load(bytes);
+    return doc.context
+      .enumerateIndirectObjects()
+      .filter(([, o]) => o instanceof PDFRawStream && o.dict.get(PDFName.of("Subtype")) === PDFName.of("Image")).length;
+  };
+
+  it("is drawn when there is one", async () => {
+    const bytes = await renderQuotePdf({
+      quote: quote(1),
+      seller,
+      lang: "it",
+      logo: { bytes: PNG, contentType: "image/png" },
+    });
+    // At least one: a PNG with transparency is embedded as the image and its mask.
+    expect(await images(bytes)).toBeGreaterThan(0);
+  });
+
+  it("⚠️ is skipped, not fatal, when the bytes are not the image they claim to be", async () => {
+    const bytes = await renderQuotePdf({
+      quote: quote(1),
+      seller,
+      lang: "it",
+      logo: { bytes: new Uint8Array([1, 2, 3]), contentType: "image/png" },
+    });
+    expect(await images(bytes)).toBe(0);
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
+  });
+
+  it("leaves the quote as it was without one", async () => {
+    expect(await images(await renderQuotePdf({ quote: quote(1), seller, lang: "it" }))).toBe(0);
   });
 });

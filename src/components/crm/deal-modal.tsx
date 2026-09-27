@@ -22,13 +22,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { deals } from "@/db/schema";
+import { dealAmountForEditing } from "@/lib/deal-amount";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 const dealSchema = z.object({
   name: z.string().min(1, "Name is required"),
   amount: z.string().optional(),
   currency: z.string().default("EUR"),
-  status: z.string().default("open"),
   stageId: z.string().min(1, "Stage is required"),
   probability: z.coerce.number().min(0).max(100).optional().nullable(),
   expectedCloseDate: z.string().optional(),
@@ -84,7 +84,16 @@ export function DealModal({
   // The row as the board holds it. Partial because the modal is also the create
   // form, where there is no row yet.
   deal?: Partial<typeof deals.$inferSelect> & { id: string };
-  stages: { id: string; name: string; color?: string | null; defaultProbability?: number | null }[];
+  stages: {
+    id: string;
+    name: string;
+    color?: string | null;
+    defaultProbability?: number | null;
+    isWon?: boolean | null;
+    isLost?: boolean | null;
+    /** Set when there is more than one pipeline: whose stage this is. */
+    pipelineName?: string | null;
+  }[];
   // Only what the two selects draw. `any[]` here meant a typo in either list
   // compiled fine and produced empty options at runtime.
   companies?: { id: string; name: string }[];
@@ -96,12 +105,6 @@ export function DealModal({
   const [open, setOpen] = useState(false);
   const isEditing = !!deal;
   const searchParams = useSearchParams();
-
-  const DEAL_STATUSES = [
-    { value: "open", label: t("modal.statusOpen") },
-    { value: "won", label: t("modal.statusWon") },
-    { value: "lost", label: t("modal.statusLost") },
-  ];
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -117,9 +120,15 @@ export function DealModal({
     resolver: zodResolver(dealSchema),
     defaultValues: {
       name: deal?.name || "",
-      amount: deal?.amount || "",
-      currency: deal?.currency || "EUR",
-      status: deal?.status || "open",
+      // The figure as typed and its currency, never the EUR figure beside the deal's own
+      // currency: saving that converted it again. See src/lib/deal-amount.ts.
+      ...(deal
+        ? dealAmountForEditing({
+            amount: deal.amount ?? null,
+            amountOriginal: deal.amountOriginal,
+            currency: deal.currency ?? null,
+          })
+        : { amount: "", currency: "EUR" }),
       stageId: deal?.stageId || (stages.length > 0 ? stages[0].id : ""),
       probability: deal?.probability ?? null,
       expectedCloseDate: toDateInput(deal?.expectedCloseDate),
@@ -141,7 +150,7 @@ export function DealModal({
   const e = errors;
 
   const tabErrors = {
-    deal: !!(e.name || e.amount || e.currency || e.status),
+    deal: !!(e.name || e.amount || e.currency),
     details: !!(e.stageId || e.probability || e.expectedCloseDate || e.companyId || e.contactId),
     notes: !!e.notes,
   };
@@ -194,9 +203,12 @@ export function DealModal({
       </DialogTrigger>
 
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[640px]">
-        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
+        {/* ⚠️ `pr-12`: the dialog's own close button is absolutely placed in this
+            corner, and the "open full record" button used to sit right under it —
+            two targets in one spot, and on a phone the one you hit is a guess. */}
+        <DialogHeader className="border-b px-4 pt-6 pr-12 pb-4 md:px-6 md:pr-12">
           <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="text-lg">
+            <DialogTitle className="min-w-0 break-words text-lg">
               {isEditing ? t("modal.editTitle", { name: deal.name ?? "" }) : t("modal.newTitle")}
             </DialogTitle>
             {isEditing && deal && (
@@ -206,7 +218,8 @@ export function DealModal({
                   size="icon"
                   type="button"
                   title={t("dealModal.openFullRecord")}
-                  className="h-8 w-8 shrink-0"
+                  aria-label={t("dealModal.openFullRecord")}
+                  className="h-8 w-8 shrink-0 max-md:size-9"
                 >
                   <ArrowUpRightIcon className="h-4 w-4" />
                 </Button>
@@ -266,38 +279,6 @@ export function DealModal({
                     )}
                   />
                 </F>
-                <div className="col-span-1 sm:col-span-2">
-                  <F label={t("modal.fieldStatus")} error={e.status?.message}>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Controller
-                        control={control}
-                        name="status"
-                        render={({ field }) => (
-                          <>
-                            {DEAL_STATUSES.map((s) => (
-                              <button
-                                key={s.value}
-                                type="button"
-                                onClick={() => field.onChange(s.value)}
-                                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 font-medium text-sm transition-all ${
-                                  field.value === s.value
-                                    ? s.value === "won"
-                                      ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
-                                      : s.value === "lost"
-                                        ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400"
-                                        : "border-primary bg-primary/10 text-primary"
-                                    : "border-border bg-background hover:bg-accent"
-                                }`}
-                              >
-                                {s.label}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                      />
-                    </div>
-                  </F>
-                </div>
               </TabsContent>
 
               {/* ── Pipeline Tab ──────────────────────────────────────────── */}
@@ -317,17 +298,24 @@ export function DealModal({
                             <SelectValue placeholder={t("form.selectStage")} />
                           </SelectTrigger>
                           <SelectContent>
-                            {stages.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="h-2 w-2 shrink-0 rounded-full"
-                                    style={{ background: s.color ?? "#94a3b8" }}
-                                  />
-                                  {s.name}
-                                </div>
-                              </SelectItem>
-                            ))}
+                            {/* ⚠️ Open stages only (and the one the deal is in). Closing is the
+                                Won / Lost action, which moves stage and status together and asks
+                                why a deal was lost; a status field beside this select let the two
+                                disagree, and a lost column picked here would have skipped the
+                                reason. */}
+                            {stages
+                              .filter((s) => (!s.isWon && !s.isLost) || s.id === deal?.stageId)
+                              .map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="h-2 w-2 shrink-0 rounded-full"
+                                      style={{ background: s.color ?? "#94a3b8" }}
+                                    />
+                                    {s.pipelineName ? `${s.pipelineName} · ${s.name}` : s.name}
+                                  </div>
+                                </SelectItem>
+                              ))}
                           </SelectContent>
                         </Select>
                       )}

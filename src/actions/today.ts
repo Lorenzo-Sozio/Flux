@@ -8,6 +8,8 @@ import { activities, companies, contacts, deals, leads, tasks, tickets } from "@
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
+import { dayBounds, dayStart } from "@/lib/workspace-day";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 /**
  * The day's agenda, in one place.
@@ -46,7 +48,7 @@ function entityHrefFrom(row: {
   leadId?: string | null;
   companyId?: string | null;
 }): string | null {
-  if (row.dealId) return "/dashboard/pipeline";
+  if (row.dealId) return `/dashboard/pipeline/${row.dealId}`;
   if (row.contactId) return `/dashboard/contacts/${row.contactId}`;
   if (row.leadId) return `/dashboard/leads/${row.leadId}`;
   if (row.companyId) return `/dashboard/companies/${row.companyId}`;
@@ -81,12 +83,15 @@ export async function getTodayView(): Promise<TodayView> {
   const userId = actor?.userId;
   const db = await getDb();
 
+  // The workspace's day, not the server's: on Workers the server is UTC, and between
+  // midnight and two in Rome this agenda showed yesterday (src/lib/workspace-day.ts).
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const timeZone = await getWorkspaceTimeZone();
+  const { start: todayStart, end: nextDayStart } = dayBounds(now, timeZone);
+  const todayEnd = new Date(nextDayStart.getTime() - 1);
   // Overdue tasks are worth showing, but not for ever: a task three months late
   // is a backlog problem, and putting it on today's list buries today.
-  const lookBack = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
+  const lookBack = dayStart(now, timeZone, -30);
 
   if (!userId) return { agenda: [], tickets: [], dayStartISO: todayStart.toISOString() };
 
@@ -103,6 +108,7 @@ export async function getTodayView(): Promise<TodayView> {
       .select({
         id: tasks.id,
         title: tasks.title,
+        type: tasks.type,
         dueDate: tasks.dueDate,
         startDate: tasks.startDate,
         allDay: tasks.allDay,
@@ -203,6 +209,7 @@ export async function getTodayView(): Promise<TodayView> {
       return {
         id: task.id,
         kind: "task",
+        taskType: task.type,
         title: task.title,
         allDay: isAllDay,
         timeISO: isAllDay

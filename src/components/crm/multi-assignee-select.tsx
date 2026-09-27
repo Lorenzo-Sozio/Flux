@@ -126,7 +126,8 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
             <button
               type="button"
               onClick={() => handleRemove(a.userId)}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-all shrink-0"
+              aria-label={tc("remove")}
+              className="opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-all shrink-0 max-md:-m-3 max-md:p-3"
             >
               <X className="h-3 w-3" />
             </button>
@@ -151,7 +152,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
               />
             </div>
             <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger className="h-9 w-32 shrink-0">
+              <SelectTrigger className="h-9 w-28 shrink-0 sm:w-32">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

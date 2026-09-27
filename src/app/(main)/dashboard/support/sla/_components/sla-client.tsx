@@ -11,6 +11,7 @@ import type { z } from "zod";
 
 import { createSlaAction, deleteSlaAction, toggleSlaAction, updateSlaAction } from "@/actions/sla";
 import { SlaSchema } from "@/actions/sla-validation";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -181,14 +182,14 @@ export function SlaClient({ slas: initial, groups }: Props) {
     <>
       <Card className="border-0 shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-primary" />
               {t("policies")}
             </CardTitle>
             <CardDescription className="text-sm mt-1">{t("policiesDescription")}</CardDescription>
           </div>
-          <Button size="sm" onClick={openCreate}>
+          <Button size="sm" className="shrink-0" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
             {t("newSla")}
           </Button>
@@ -205,66 +206,149 @@ export function SlaClient({ slas: initial, groups }: Props) {
               </Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs font-semibold">{t("columns.name")}</TableHead>
-                  <TableHead className="text-xs font-semibold">{t("columns.priority")}</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">{t("columns.firstResponse")}</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">{t("columns.resolution")}</TableHead>
-                  <TableHead className="text-xs font-semibold text-center">{t("columns.active")}</TableHead>
-                  <TableHead className="w-20" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {slas.map((sla) => {
-                  const className = PRIORITY_CLASSNAMES[sla.priority] ?? PRIORITY_CLASSNAMES.normal;
-                  return (
-                    <TableRow key={sla.id}>
-                      <TableCell>
-                        <div className="font-medium text-sm">{sla.name}</div>
-                        {sla.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{sla.description}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs ${className}`}>
-                          {t(`priorities.${sla.priority as PriorityKey}`)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums font-medium">
-                        {formatMinutes(sla.firstResponseTimeMinutes)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums font-medium">
-                        {formatMinutes(sla.resolutionTimeMinutes)}
-                      </TableCell>
-                      <TableCell className="text-center">
+            // Six columns with two switches and two icon buttons: below md each
+            // policy is a card, its toggle along the bottom and its actions in
+            // the corner, where a thumb can tell them apart.
+            <ResponsiveRecordList
+              cards={
+                <RecordCards
+                  className="p-3"
+                  items={slas.map((sla) => ({
+                    id: sla.id,
+                    title: sla.name,
+                    subtitle: sla.description ?? undefined,
+                    badge: (
+                      <Badge
+                        variant="outline"
+                        className={`text-xs ${PRIORITY_CLASSNAMES[sla.priority] ?? PRIORITY_CLASSNAMES.normal}`}
+                      >
+                        {t(`priorities.${sla.priority as PriorityKey}`)}
+                      </Badge>
+                    ),
+                    meta: (
+                      <>
+                        <span className="text-muted-foreground text-xs">
+                          {t("columns.firstResponse")}{" "}
+                          <span className="font-medium text-foreground tabular-nums">
+                            {formatMinutes(sla.firstResponseTimeMinutes)}
+                          </span>
+                        </span>
+                        <span className="text-muted-foreground text-xs">
+                          {t("columns.resolution")}{" "}
+                          <span className="font-medium text-foreground tabular-nums">
+                            {formatMinutes(sla.resolutionTimeMinutes)}
+                          </span>
+                        </span>
+                      </>
+                    ),
+                    actions: (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-9"
+                          onClick={() => openEdit(sla)}
+                          aria-label={tc("edit")}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-9 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget(sla)}
+                          aria-label={tc("delete")}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ),
+                    footer: (
+                      <>
                         <Switch
+                          id={`sla-active-${sla.id}`}
                           checked={sla.isActive}
                           disabled={isPending}
                           onCheckedChange={(v) => handleToggle(sla, v)}
                         />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(sla)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeleteTarget(sla)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                        <Label htmlFor={`sla-active-${sla.id}`} className="font-normal text-sm">
+                          {t("columns.active")}
+                        </Label>
+                      </>
+                    ),
+                  }))}
+                />
+              }
+              table={
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40 hover:bg-muted/40">
+                      <TableHead className="text-xs font-semibold">{t("columns.name")}</TableHead>
+                      <TableHead className="text-xs font-semibold">{t("columns.priority")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("columns.firstResponse")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("columns.resolution")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-center">{t("columns.active")}</TableHead>
+                      <TableHead className="w-20" />
                     </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {slas.map((sla) => {
+                      const className = PRIORITY_CLASSNAMES[sla.priority] ?? PRIORITY_CLASSNAMES.normal;
+                      return (
+                        <TableRow key={sla.id}>
+                          <TableCell>
+                            <div className="font-medium text-sm">{sla.name}</div>
+                            {sla.description && (
+                              <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{sla.description}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={`text-xs ${className}`}>
+                              {t(`priorities.${sla.priority as PriorityKey}`)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums font-medium">
+                            {formatMinutes(sla.firstResponseTimeMinutes)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums font-medium">
+                            {formatMinutes(sla.resolutionTimeMinutes)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Switch
+                              checked={sla.isActive}
+                              disabled={isPending}
+                              onCheckedChange={(v) => handleToggle(sla, v)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => openEdit(sla)}
+                                aria-label={tc("edit")}
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteTarget(sla)}
+                                aria-label={tc("delete")}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              }
+            />
           )}
         </CardContent>
       </Card>
@@ -291,7 +375,7 @@ export function SlaClient({ slas: initial, groups }: Props) {
               <Textarea
                 placeholder={t("dialog.descPlaceholder")}
                 rows={2}
-                className="resize-none text-sm"
+                className="resize-none"
                 {...form.register("description")}
               />
             </div>

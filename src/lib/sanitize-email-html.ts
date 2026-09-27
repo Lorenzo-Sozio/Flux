@@ -52,14 +52,16 @@ export function sanitizeEmailHtml(html: string): string {
   for (const tag of VOID_DANGEROUS) out = out.replace(new RegExp(`<\\/?${tag}\\b[^>]*>`, "gi"), "");
 
   // Event handlers, in every spelling: quoted, single-quoted, and bare.
-  out = out.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, "");
-  out = out.replace(/\son[a-z]+\s*=\s*'[^']*'/gi, "");
-  out = out.replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, "");
+  // ⚠️ `[\s/]`, not `\s`: a slash separates attributes too, and `<img src=x/onerror=…>`
+  // is an image with a handler in every browser. The same for the URLs and the style below.
+  out = out.replace(/[\s/]on[a-z]+\s*=\s*"[^"]*"/gi, "");
+  out = out.replace(/[\s/]on[a-z]+\s*=\s*'[^']*'/gi, "");
+  out = out.replace(/[\s/]on[a-z]+\s*=\s*[^\s>]+/gi, "");
 
   // Anything pointing somewhere, checked against the allowed schemes. An href
   // that is not clearly safe is dropped rather than rewritten: a link that does
   // nothing is a visible bug, and a link that runs code is not.
-  out = out.replace(/\s(href|src|action|formaction|xlink:href)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (whole) => {
+  out = out.replace(/[\s/](href|src|action|formaction|xlink:href)\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/gi, (whole) => {
     const value = /=\s*"([^"]*)"|=\s*'([^']*)'|=\s*([^\s>]+)/.exec(whole);
     // Trimmed, then matched against the allowlist. Anything with a control
     // character or a smuggled scheme simply fails to match, which is the outcome
@@ -70,8 +72,8 @@ export function sanitizeEmailHtml(html: string): string {
 
   // `style` can load and position things; `expression()` still runs in old
   // Outlook, and `position:fixed` lets a mail overlay the application's own UI.
-  out = out.replace(/\sstyle\s*=\s*"([^"]*)"/gi, (whole, css: string) => (isSafeCss(css) ? whole : ""));
-  out = out.replace(/\sstyle\s*=\s*'([^']*)'/gi, (whole, css: string) => (isSafeCss(css) ? whole : ""));
+  out = out.replace(/[\s/]style\s*=\s*"([^"]*)"/gi, (whole, css: string) => (isSafeCss(css) ? whole : ""));
+  out = out.replace(/[\s/]style\s*=\s*'([^']*)'/gi, (whole, css: string) => (isSafeCss(css) ? whole : ""));
 
   return out;
 }

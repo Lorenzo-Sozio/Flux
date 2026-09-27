@@ -23,6 +23,7 @@ import {
   accountPlacement,
   MOBILE_TAB_PREFERENCE,
   MOBILE_TAB_SLOTS,
+  mobileTabCandidates,
   type NavGroup,
   pickMobileTabs,
   sidebarItems,
@@ -68,9 +69,10 @@ describe("what crosses the server/client boundary", () => {
     expect(functions).toEqual([]);
   });
 
-  it("says only which urls are hidden and which are locked", () => {
+  it("says only which urls are hidden, locked or secondary", () => {
     const access = computeNavAccess(sidebarItems, { actor: viewer, enabledModules: ALL_MODULES });
-    expect(Object.keys(access).sort()).toEqual(["hidden", "locked"]);
+    expect(Object.keys(access).sort()).toEqual(["hidden", "locked", "secondary"]);
+    expect(access.secondary.every((u) => typeof u === "string")).toBe(true);
     expect(access.hidden.every((u) => typeof u === "string")).toBe(true);
     expect(Object.values(access.locked).every((m) => typeof m === "string")).toBe(true);
   });
@@ -114,10 +116,15 @@ describe("role decides what is in the menu", () => {
     const labels = menuFor(viewer).map((g) => g.labelKey);
     expect(labels).toContain("work");
 
-    // Administration survives for a viewer, but only because the help centre is
-    // in it and open to everybody: the group is what is left, not what was there.
+    // Administration survives for a viewer, but only because of what in it is personal —
+    // their profile and notification preferences — and the help centre, all open to everybody:
+    // the group is what is left, not what was there.
     const administration = menuFor(viewer).find((g) => g.labelKey === "administration");
-    expect(administration?.items.map((i) => i.url)).toEqual(["/dashboard/help"]);
+    expect(administration?.items.map((i) => i.url)).toEqual([
+      "/dashboard/profile",
+      "/dashboard/settings/notifications",
+      "/dashboard/help",
+    ]);
   });
 });
 
@@ -202,7 +209,7 @@ describe("a sub-item is judged on its own", () => {
 
 describe("applyNavAccess", () => {
   it("returns the whole menu when nothing is hidden or locked", () => {
-    const empty: NavAccess = { hidden: [], locked: {} };
+    const empty: NavAccess = { hidden: [], locked: {}, secondary: [] };
     expect(urlsOf(applyNavAccess(sidebarItems, empty))).toEqual(urlsOf([...sidebarItems]));
   });
 
@@ -286,16 +293,20 @@ describe("the bottom bar on a phone", () => {
     expect(pickMobileTabs(menuFor(owner))).toHaveLength(MOBILE_TAB_SLOTS);
   });
 
-  it("offers no menu button of its own", () => {
-    // The menu is the header trigger, on the left, where its panel comes from.
-    // A sixth slot here would be a second control for it, on the wrong side.
+  it("spends no shortcut on Settings", () => {
+    // Administration lives in the Menu hub; a shortcut slot is for a place
+    // somebody moves between all day.
     expect(MOBILE_TAB_PREFERENCE).not.toContain("/dashboard/settings");
     expect(pickMobileTabs(menuFor(owner)).every((tab) => tab.url.startsWith("/dashboard/"))).toBe(true);
   });
 
   it("skips a module the plan excludes, and fills the slot from further down", () => {
     // Support and sales are out of the plan, so tickets and orders are locked.
-    const tabs = pickMobileTabs(menuFor(admin, ["crm", "reporting"]));
+    // ⚠️ Asked for first: with three slots the default list is filled before it reaches
+    // either, and this test passed just as well with the lock ignored.
+    const tabs = pickMobileTabs(menuFor(admin, ["crm", "reporting"]), {
+      preference: ["/dashboard/support/tickets", "/dashboard/pipeline", ...MOBILE_TAB_PREFERENCE],
+    });
     const urls = tabs.map((tab) => tab.url);
 
     expect(urls).not.toContain("/dashboard/support/tickets");
@@ -303,6 +314,29 @@ describe("the bottom bar on a phone", () => {
     // Still full: a locked entry costs a fifth of the bar for a page that does
     // not open, so the preference list runs longer than the bar on purpose.
     expect(tabs).toHaveLength(MOBILE_TAB_SLOTS);
+  });
+
+  it("⚠️ passes a person's own shortcuts through the same filter", () => {
+    // Somebody pinned Users while they were an admin, then became a viewer: the
+    // stored choice must not become a way back in.
+    const pinned = ["/dashboard/users", "/dashboard/support/sla", "/dashboard/leads", "/dashboard/settings"];
+    const urls = pickMobileTabs(menuFor(viewer), { preference: [...pinned, ...MOBILE_TAB_PREFERENCE] }).map(
+      (tab) => tab.url,
+    );
+    expect(urls).not.toContain("/dashboard/users");
+    expect(urls).not.toContain("/dashboard/support/sla");
+    expect(urls).not.toContain("/dashboard/settings");
+    expect(urls[0]).toBe("/dashboard/leads");
+    expect(urls).toHaveLength(MOBILE_TAB_SLOTS);
+  });
+
+  it("offers as choices exactly what it would accept", () => {
+    for (const actor of [viewer, owner]) {
+      const menu = menuFor(actor, ["crm"]);
+      const candidates = mobileTabCandidates(menu).map((tab) => tab.url);
+      expect(candidates).not.toContain("/dashboard/settings");
+      expect(pickMobileTabs(menu, { preference: candidates, limit: 99 }).map((tab) => tab.url)).toEqual(candidates);
+    }
   });
 
   it("keeps the preference order rather than the menu order", () => {
@@ -337,5 +371,49 @@ describe("the bottom bar on a phone", () => {
       expect(item.icon, `${url} has no icon`).toBeDefined();
       expect(item.titleKey, `${url} has no label`).toBeTruthy();
     }
+  });
+});
+
+describe("⚠️⚠️ the menu a salesperson sees (§4.1)", () => {
+  const focusedFor = (actor: Actor) =>
+    urlsOf(
+      applyNavAccess(sidebarItems, computeNavAccess(sidebarItems, { actor, enabledModules: ALL_MODULES }), {
+        focused: true,
+      }),
+    );
+
+  it("an editor's menu is the day's work: the catalogue, contracts and the analysis tabs wait behind 'show all'", () => {
+    const menu = focusedFor(editor);
+    for (const url of [
+      "/dashboard/crm",
+      "/dashboard/calendar",
+      "/dashboard/contacts",
+      "/dashboard/pipeline",
+      "/dashboard/sales/quotes",
+      "/dashboard/sales/orders",
+    ]) {
+      expect(menu).toContain(url);
+    }
+    for (const url of [
+      "/dashboard/sales/products",
+      "/dashboard/sales/contracts",
+      "/dashboard/pipeline/forecast",
+      "/dashboard/marketing/campaigns",
+    ]) {
+      expect(menu).not.toContain(url);
+    }
+    // Secondary, not forbidden: the whole menu still has them.
+    expect(urlsOf(menuFor(editor))).toContain("/dashboard/sales/products");
+  });
+
+  it("whoever runs the workspace gets all of it, and nothing is secondary for them", () => {
+    const access = computeNavAccess(sidebarItems, { actor: admin, enabledModules: ALL_MODULES });
+    expect(access.secondary).toEqual([]);
+    expect(focusedFor(admin)).toContain("/dashboard/sales/products");
+  });
+
+  it("⚠️ Finance is an administrator's page, and an editor no longer sees an entry that bounces them", () => {
+    expect(urlsOf(menuFor(editor))).not.toContain("/dashboard/sales/finance");
+    expect(urlsOf(menuFor(admin))).toContain("/dashboard/sales/finance");
   });
 });

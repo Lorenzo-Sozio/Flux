@@ -50,9 +50,12 @@ export function TaskGantt({ tasks, dependencies, users }: Props) {
         onToggleWorkload={() => setShowWorkload((v) => !v)}
         conflictCount={conflictCount}
       />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ⚠️ A column below lg, not a row. The workload panel is full width there
+          (see WorkloadPanel), and beside the chart in a row it took the whole
+          width and squeezed the chart to nothing. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         <GanttView key={ganttKey} viewMode={viewMode} viewDate={viewDate} users={users} />
-        {showWorkload && <WorkloadPanel viewDate={viewDate} onClose={() => setShowWorkload(false)} />}
+        {showWorkload && <WorkloadPanel viewDate={viewDate} onClose={() => setShowWorkload(false)} users={users} />}
       </div>
     </div>
   );

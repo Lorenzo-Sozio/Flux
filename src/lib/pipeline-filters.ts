@@ -12,11 +12,18 @@
  *   period=90         days back, from PERIOD_OPTIONS.
  *   status=open       board only: open, won, lost. Absent means all.
  *   q=text            board only: deal name.
+ *   pipeline=<id>     which pipeline (src/lib/pipelines.ts); absent means the first. The
+ *                     board also takes `all`: every pipeline's columns side by side.
+ *   closed=2026-09    board only: closed in that month, quarter (2026-Q3) or year, on the
+ *                     workspace's clock — how a number on the scorecard opens the deals it
+ *                     counted (src/lib/calendar-period.ts).
  *
  * Pure: imported by server actions and by the client bar alike.
  */
 
 import { type AnyColumn, inArray, isNull, or, type SQL } from "drizzle-orm";
+
+import { parsePeriodKey, periodKey } from "@/lib/calendar-period";
 
 /** The owner token for "nobody". Not a valid user id, so it cannot collide with one. */
 export const UNASSIGNED = "none";
@@ -30,13 +37,17 @@ export const DEAL_STATUS_FILTERS = ["open", "won", "lost"] as const;
 export type DealStatusFilter = (typeof DEAL_STATUS_FILTERS)[number];
 
 /** Which controls a page shows. Territory, funnel and win/loss have a period; the board has status and search. */
-export type PipelineFilterControl = "owners" | "period" | "status" | "q";
+export type PipelineFilterControl = "owners" | "period" | "status" | "q" | "closed" | "pipeline";
 
 export interface PipelineFilters {
   owners: string[];
   period: PeriodDays;
   status: DealStatusFilter | null;
   q: string;
+  /** A calendar period key, normalised; null when absent or not a period. */
+  closed: string | null;
+  /** A pipeline id, or "all"; null for the first pipeline. */
+  pipeline: string | null;
 }
 
 type Params = Record<string, string | string[] | undefined> | URLSearchParams;
@@ -62,6 +73,16 @@ export function parseOwners(raw: string | undefined | null): string[] {
   return [...out];
 }
 
+function pipelineParam(raw: string | undefined): string | null {
+  const v = (raw ?? "").trim();
+  return v === "all" || ID.test(v) ? v : null;
+}
+
+function closedParam(raw: string | undefined): string | null {
+  const p = parsePeriodKey(raw);
+  return p ? periodKey(p) : null;
+}
+
 export function parsePipelineFilters(params: Params, defaults: { period?: PeriodDays } = {}): PipelineFilters {
   const period = Number(first(params, "period"));
   const status = first(params, "status");
@@ -70,6 +91,8 @@ export function parsePipelineFilters(params: Params, defaults: { period?: Period
     period: (PERIOD_OPTIONS as readonly number[]).includes(period) ? (period as PeriodDays) : (defaults.period ?? 90),
     status: (DEAL_STATUS_FILTERS as readonly string[]).includes(status ?? "") ? (status as DealStatusFilter) : null,
     q: (first(params, "q") ?? "").trim().slice(0, 100),
+    closed: closedParam(first(params, "closed")),
+    pipeline: pipelineParam(first(params, "pipeline")),
   };
 }
 
@@ -106,7 +129,7 @@ export function periodStart(days: number, now = Date.now()): Date {
 }
 
 export interface PipelineView {
-  key: "board" | "forecast" | "funnel" | "winLoss" | "targets" | "territories" | "report";
+  key: "board" | "forecast" | "funnel" | "winLoss" | "targets" | "commissions" | "territories" | "report";
   path: string;
   controls: readonly PipelineFilterControl[];
   /** The period shown when the URL names none. */
@@ -119,13 +142,19 @@ export interface PipelineView {
  * closed for win/loss and the report; the forecast looks forward and has none.
  */
 export const PIPELINE_VIEWS: readonly PipelineView[] = [
-  { key: "board", path: "/dashboard/pipeline", controls: ["owners", "status", "q"] },
-  { key: "forecast", path: "/dashboard/pipeline/forecast", controls: ["owners"] },
+  { key: "board", path: "/dashboard/pipeline", controls: ["pipeline", "owners", "status", "q", "closed"] },
+  { key: "forecast", path: "/dashboard/pipeline/forecast", controls: ["pipeline", "owners"] },
   { key: "funnel", path: "/dashboard/pipeline/funnel", controls: ["owners", "period"], defaultPeriod: 90 },
-  { key: "winLoss", path: "/dashboard/pipeline/win-loss", controls: ["owners", "period"], defaultPeriod: 365 },
+  {
+    key: "winLoss",
+    path: "/dashboard/pipeline/win-loss",
+    controls: ["pipeline", "owners", "period"],
+    defaultPeriod: 365,
+  },
   { key: "targets", path: "/dashboard/pipeline/targets", controls: ["owners"] },
+  { key: "commissions", path: "/dashboard/pipeline/commissions", controls: ["owners"] },
   { key: "territories", path: "/dashboard/pipeline/territories", controls: ["owners", "period"], defaultPeriod: 90 },
-  { key: "report", path: "/dashboard/pipeline/report", controls: ["owners", "period"], defaultPeriod: 365 },
+  { key: "report", path: "/dashboard/pipeline/report", controls: ["pipeline", "owners", "period"], defaultPeriod: 365 },
 ];
 
 export function pipelineView(key: PipelineView["key"]): PipelineView {

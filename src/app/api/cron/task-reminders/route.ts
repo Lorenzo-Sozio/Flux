@@ -12,13 +12,17 @@
  */
 import { and, eq, gte, inArray } from "drizzle-orm";
 
-import { getActivitiesDueToday } from "@/actions/activities";
 import { notifications, users } from "@/db/schema";
+import { activitiesDueToday } from "@/lib/activity-reminders";
+import { sendDueAppointmentReminders } from "@/lib/appointment-reminders";
+import { loadBusinessCalendar } from "@/lib/business-calendar";
 import { runCronJob } from "@/lib/cron-runner";
-import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
+import { sendActivityReminderEmail } from "@/lib/email";
+import { composeNotification } from "@/lib/notification-text";
 import { notify } from "@/lib/notify";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import type { TenantDb } from "@/lib/tenant-resolve";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 // Runs once per workspace, with the active tenant set around the call so the
 // dashboard actions it reuses resolve to the right database (rilievo B-02).
@@ -29,7 +33,7 @@ export async function GET(req: Request) {
 async function runForTenant(db: TenantDb) {
   // The shared query, not the server action: this runs with no session, and the
   // action is guarded so the screens cannot be read by a stranger.
-  const dueTasks = await selectTasksDueToday(db);
+  const dueTasks = await selectTasksDueToday(db, await getWorkspaceTimeZone());
   let notified = 0;
 
   // ⚠️⚠️ **This job runs every fifteen minutes and had no memory.**
@@ -65,7 +69,7 @@ async function runForTenant(db: TenantDb) {
   // used to be a lookup per due task and another per due activity — on a driver
   // where every statement is its own request, inside a job that runs every
   // fifteen minutes in every workspace.
-  const dueActivities = await getActivitiesDueToday();
+  const dueActivities = await activitiesDueToday(db, await getWorkspaceTimeZone());
   const people = new Map<string, { email: string | null; name: string | null }>();
   const wanted = [
     ...new Set(
@@ -97,27 +101,19 @@ async function runForTenant(db: TenantDb) {
     else if (task.leadId) link = `/dashboard/leads/${task.leadId}`;
     else if (task.companyId) link = `/dashboard/companies/${task.companyId}`;
 
-    const title = `Task due today: "${task.title}"`;
+    // The stored title doubles as the memory of what was sent today, so it is composed the
+    // same way the notification is.
+    const params = { title: task.title };
+    const { title } = await composeNotification("taskDueToday", params);
     const key = `${userId}\u0000${title}`;
     // Already reminded on this run or an earlier one today.
     if (toldToday.has(key)) continue;
     toldToday.add(key);
 
-    // In-app notification
-    await notify({
-      userId,
-      type: "task_due",
-      title,
-      message: "This task is due today. Don't forget to complete it.",
-      link,
-    });
-
-    // Email notification
-    if (user.email) {
-      // One recipient whose mail bounces must not stop the sweep for everyone else.
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
-      await sendTaskDueEmail(user.email, task.title, link).catch(() => {});
-    }
+    // In-app notification, and the push behind it. ⚠️ No email per task any more: they
+    // arrive together in the morning digest (src/lib/morning-digest.ts), which a person can
+    // turn off — a dozen identical emails on a busy day could only be filtered away.
+    await notify({ userId, type: "task_due", key: "taskDueToday", params, link });
 
     notified++;
   }
@@ -140,7 +136,8 @@ async function runForTenant(db: TenantDb) {
     else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
     else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
 
-    const title = `${typeLabel} today: "${description}"`;
+    const params = { kind: activity.type, description };
+    const { title } = await composeNotification("activityToday", params);
     const key = `${activity.ownerId}\u0000${title}`;
     if (toldToday.has(key)) continue;
     toldToday.add(key);
@@ -148,8 +145,8 @@ async function runForTenant(db: TenantDb) {
     await notify({
       userId: activity.ownerId,
       type: "task_due",
-      title,
-      message: `You have a ${typeLabel.toLowerCase()} scheduled today.`,
+      key: "activityToday",
+      params,
       link,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
@@ -163,10 +160,21 @@ async function runForTenant(db: TenantDb) {
     activitiesNotified++;
   }
 
+  // ── Appointment reminders (the lead time set on each appointment) ────────
+  // Remembered on the appointment itself (`reminder_sent_for`, the occurrence it
+  // rang for), not by title, so it rings once per occurrence however often this
+  // job runs.
+  const { timeZone } = await loadBusinessCalendar(db);
+  const appointmentReminders = await sendDueAppointmentReminders(db, new Date(), timeZone).catch((err) => {
+    console.error("[task-reminders] appointment reminders failed:", err);
+    return 0;
+  });
+
   return {
     tasksFound: dueTasks.length,
     notified,
     activitiesFound: dueActivities.length,
     activitiesNotified,
+    appointmentReminders,
   };
 }

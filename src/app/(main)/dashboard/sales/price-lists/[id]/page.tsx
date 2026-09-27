@@ -5,6 +5,7 @@ import { asc, eq } from "drizzle-orm";
 import { getCompaniesForSelect } from "@/actions/crm";
 import { getPriceList } from "@/actions/price-lists";
 import { getProductsForSelect } from "@/actions/products";
+import { RecordPage } from "@/components/crm/record/record-page";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { companies } from "@/db/schema";
 import { hasCapability } from "@/lib/auth-guard";
@@ -36,7 +37,7 @@ export default async function PriceListPage({ params }: { params: Promise<{ id: 
   ]);
 
   return (
-    <div className="space-y-6">
+    <RecordPage>
       <RecordVisit type="priceList" id={data.list.id} label={data.list.name} />
       <PriceListDetail
         list={{
@@ -52,6 +53,6 @@ export default async function PriceListPage({ params }: { params: Promise<{ id: 
         allCompanies={allCompanies}
         canManage={canManage}
       />
-    </div>
+    </RecordPage>
   );
 }

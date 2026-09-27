@@ -54,13 +54,17 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-center gap-2">
-        <span
-          className={`cursor-pointer text-sm ${cycle === "monthly" ? "font-semibold" : "text-muted-foreground"}`}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {/* Buttons, not clickable spans: a span can be neither reached nor
+            pressed from a keyboard. */}
+        <button
+          type="button"
+          aria-pressed={cycle === "monthly"}
+          className={`min-h-9 text-sm ${cycle === "monthly" ? "font-semibold" : "text-muted-foreground"}`}
           onClick={() => setCycle("monthly")}
         >
           {t("plans.monthly")}
-        </span>
+        </button>
         <button
           type="button"
           onClick={() => setCycle(cycle === "monthly" ? "annual" : "monthly")}
@@ -75,8 +79,10 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
             }`}
           />
         </button>
-        <span
-          className={`cursor-pointer text-sm ${cycle === "annual" ? "font-semibold" : "text-muted-foreground"}`}
+        <button
+          type="button"
+          aria-pressed={cycle === "annual"}
+          className={`min-h-9 text-sm ${cycle === "annual" ? "font-semibold" : "text-muted-foreground"}`}
           onClick={() => setCycle("annual")}
         >
           {t("plans.annual")}
@@ -85,7 +91,7 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
               {t("plans.save", { percent: plans[1].annualDiscountPercent })}
             </Badge>
           )}
-        </span>
+        </button>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

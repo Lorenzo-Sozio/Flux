@@ -11,16 +11,21 @@
 
 import { and, eq, gte, sql } from "drizzle-orm";
 
-import { getActivitiesWithPendingReminder } from "@/actions/activities";
 import { campaignLogs, emailJobs, marketingCampaigns, notifications, users } from "@/db/schema";
+import { activitiesDueForReminder } from "@/lib/activity-reminders";
+import { getAppUrlOrNull } from "@/lib/app-url";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
 import { claimDueJobs } from "@/lib/email-queue";
+import { type SyncBudget, syncBudget, syncMailboxes } from "@/lib/mail-sync";
+import { composeNotification } from "@/lib/notification-text";
 import { notify } from "@/lib/notify";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
-import { advanceSequences } from "@/lib/sequence-runner";
+import { advanceSequences, SEQUENCE_TOKEN_PREFIX } from "@/lib/sequence-runner";
 import type { TenantDb } from "@/lib/tenant-resolve";
+import { unsubscribeUrlFor } from "@/lib/unsubscribe-token";
+import { membersWith } from "@/lib/workspace-members";
 
 const BATCH_SIZE = Number.parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30", 10);
 
@@ -37,7 +42,29 @@ const RETRY_DELAYS_MS = [5 * 60 * 1000, 30 * 60 * 1000];
  * starve the others.
  */
 export async function GET(req: Request) {
-  return runCronJob("email-worker", req, runForTenant);
+  // One budget for every workspace this run opens: see src/lib/mail-sync.ts.
+  const budget = syncBudget();
+  return runCronJob("email-worker", req, async (db, tenant) => ({
+    ...(await runForTenant(db)),
+    mailboxes: await readMailboxes(db, tenant.id, budget),
+  }));
+}
+
+/**
+ * The connected mailboxes (V3.2), after the queue: sending what is owed comes first. A
+ * failure here is logged and costs the queue nothing.
+ */
+async function readMailboxes(db: TenantDb, tenantId: string, budget: SyncBudget) {
+  // Asked of the registry only when the workspace has a mailbox to read.
+  const writers = () => membersWith(tenantId, "record:write");
+  return tolerateUnmigrated("mailboxes", () => syncMailboxes(db, { budget, writers }), null).catch((err) => {
+    console.error("[email-worker] mailbox sync failed:", err instanceof Error ? err.message : err);
+    return null;
+  });
+}
+
+function unsubscribeFor(job: { toEmail: string; campaignLogId: string | null; sequenceEnrollmentId: string | null }) {
+  return unsubscribeUrlFor(job, getAppUrlOrNull(), SEQUENCE_TOKEN_PREFIX);
 }
 
 async function runForTenant(db: TenantDb) {
@@ -64,7 +91,22 @@ async function runForTenant(db: TenantDb) {
 
   for (const job of jobs) {
     try {
-      const result = await sendEmail({ to: job.toEmail, subject: job.subject, html: job.htmlBody }, config);
+      const result = await sendEmail(
+        {
+          to: job.toEmail,
+          subject: job.subject,
+          html: job.htmlBody,
+          ...(job.cc ? { cc: job.cc } : {}),
+          ...(job.bcc ? { bcc: job.bcc } : {}),
+          // A sequence's thread (src/lib/sequence-plan.ts): the first email's id, and a reply to it.
+          ...(job.messageHeaderId ? { messageId: job.messageHeaderId } : {}),
+          ...(job.inReplyTo ? { inReplyTo: job.inReplyTo, references: job.inReplyTo } : {}),
+          // The mail client's own unsubscribe button, in one click (RFC 8058): campaigns, rules'
+          // emails and sequence steps — everything this queue sends that has a way out.
+          ...(unsubscribeFor(job) ? { listUnsubscribe: unsubscribeFor(job) as string } : {}),
+        },
+        config,
+      );
 
       if (result.success) {
         // Mark job sent
@@ -117,7 +159,7 @@ async function runForTenant(db: TenantDb) {
 
 // ── Activity reminder notifications ──────────────────────────────────────────
 async function dispatchActivityReminders(db: TenantDb): Promise<number> {
-  const pendingReminders = await getActivitiesWithPendingReminder(2);
+  const pendingReminders = await activitiesDueForReminder(db);
   let remindersDispatched = 0;
 
   // ⚠️ The window is two minutes wide and this job runs every minute, so every
@@ -158,7 +200,13 @@ async function dispatchActivityReminders(db: TenantDb): Promise<number> {
     else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
     else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
 
-    const title = `Upcoming ${typeLabel}: "${description}"`;
+    const params = {
+      kind: activity.type,
+      description,
+      time: activity.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+    };
+    // The stored title doubles as the memory of what was sent today.
+    const { title } = await composeNotification("activityReminder", params);
     const key = `${activity.ownerId}\u0000${title}`;
     // Already sent on this run or an earlier one today.
     if (toldToday.has(key)) continue;
@@ -167,8 +215,8 @@ async function dispatchActivityReminders(db: TenantDb): Promise<number> {
     await notify({
       userId: activity.ownerId,
       type: "task_due",
-      title,
-      message: `Scheduled for ${activity.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
+      key: "activityReminder",
+      params,
       link,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});

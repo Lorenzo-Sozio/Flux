@@ -5,15 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePipelineFilters } from "@/lib/pipeline-filters";
 
 import { ForecastBarChart, OwnerPieChart } from "./_components/forecast-charts";
-import { ForecastKPI, ForecastOwnerTable } from "./_components/forecast-kpi";
+import { ForecastKPI, ForecastOutside, ForecastOwnerTable } from "./_components/forecast-kpi";
 
 export default async function ForecastPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { owners } = parsePipelineFilters(await searchParams);
-  const [data, t] = await Promise.all([getForecastData({ owners }), getTranslations("pipeline.forecast")]);
+  const { owners, pipeline } = parsePipelineFilters(await searchParams);
+  const [data, t] = await Promise.all([getForecastData({ owners, pipeline }), getTranslations("pipeline.forecast")]);
 
   return (
     <div className="space-y-6">
@@ -30,15 +30,19 @@ export default async function ForecastPage({
         bestCase={data.bestCase}
         committed={data.committed}
         currentMonthTarget={data.currentMonthTarget}
+        currentMonthCommitted={data.currentMonthCommitted}
+        wonThisMonth={data.wonThisMonth}
       />
+      <ForecastOutside unscheduled={data.unscheduled} overdue={data.overdue} />
 
       {/* Monthly bar chart */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t("monthlyChart")}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex flex-wrap items-center gap-4 text-muted-foreground text-xs">
+        {/* On a phone the card's side padding is a sixth of the chart's width. */}
+        <CardContent className="max-sm:px-3">
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-muted-foreground text-xs">
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-sm bg-[#bfdbfe]" /> {t("legendAll")}
             </span>
@@ -62,7 +66,7 @@ export default async function ForecastPage({
           <CardHeader>
             <CardTitle className="text-base">{t("pipelineByOwner")}</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-sm:px-3">
             <OwnerPieChart byOwner={data.byOwner} currency={data.currency} />
           </CardContent>
         </Card>

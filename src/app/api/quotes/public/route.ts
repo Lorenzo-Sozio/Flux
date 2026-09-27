@@ -4,106 +4,53 @@
  * It used to call `getDb()`, which reads the `x-tenant-id` header the proxy only
  * injects for authenticated dashboard requests. The proxy explicitly excludes
  * this path, so every customer who opened a quote link got a 500 (audit rilievo
- * B-01). The tenant is now derived from the token itself.
+ * B-01). The tenant is now derived from the token itself (src/lib/quote-public.ts).
  */
 import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { quoteActivities, quotes } from "@/db/schema";
-import { documentLanguage } from "@/lib/document-language";
-import { announceQuoteDecision } from "@/lib/quote-events";
+import { clientIp } from "@/lib/client-ip";
+import { announceQuoteDecision, tellQuoteOwner } from "@/lib/quote-events";
+import { isExpired, OPEN_QUOTE, readPublicQuote, resolveQuoteTenant } from "@/lib/quote-public";
+import { readSignature, signQuote } from "@/lib/quote-signature";
 import { checkRateLimit } from "@/lib/rate-limiter";
-import { sellerIdentity } from "@/lib/seller-identity";
-import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
-import { PUBLIC_CONTACT_COLUMNS } from "@/lib/user-columns";
+import { runWithTenant } from "@/lib/tenant-context";
 
-/** Locates the workspace that issued this quote token. */
-async function resolveQuoteTenant(token: string): Promise<{ db: TenantDb; name: string } | null> {
-  const resolved = await resolveTenantByProbe(`quote:${token}`, async (db) => {
-    const row = await db.query.quotes.findFirst({
-      where: eq(quotes.publicToken, token),
-      columns: { id: true },
-    });
-    return Boolean(row);
-  });
-  return resolved ? { db: resolved.db, name: resolved.tenant.name } : null;
-}
-
-function clientIp(h: Headers): string {
-  return h.get("x-vercel-forwarded-for") ?? h.get("x-forwarded-for")?.split(",").at(-1)?.trim() ?? "unknown";
-}
-
-/** True when a quote is past its expiry date. */
-function isExpired(expiresAt: Date | null): boolean {
-  return Boolean(expiresAt && expiresAt.getTime() < Date.now());
-}
+/** A decline reason is a sentence or a paragraph, not a document. */
+const MAX_REASON = 2000;
 
 // GET /api/quotes/public?token=xxx  — fetch quote by public token (no auth)
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
-
-  const headersList = await headers();
-
-  // The token is the only credential here, so guessing has to cost something.
-  if (!(await checkRateLimit(`quote_public:${clientIp(headersList)}`, 60, 60_000))) {
-    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
-  }
-
-  const tenant = await resolveQuoteTenant(token);
-  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const { db } = tenant;
-
-  const quote = await db.query.quotes.findFirst({
-    where: eq(quotes.publicToken, token),
-    with: {
-      // ⚠️ Only what the page shows. `company: true` sent the whole record to anyone
-      // holding the link: annual revenue, lead score, owner, tags, internal notes.
-      company: { columns: { name: true, country: true, language: true, vatNumber: true } },
-      contact: { columns: { firstName: true, lastName: true } },
-      owner: { columns: PUBLIC_CONTACT_COLUMNS },
-      items: { with: { product: { columns: { name: true } } } },
-    },
-  });
-
-  if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  const seller = await sellerIdentity(db, tenant.name);
-  const extra = { language: documentLanguage(quote.company), sellerName: seller.name };
-
-  // An expired quote is still readable — the customer should see why they can no
-  // longer accept it — but it is recorded as expired rather than left claiming to
-  // be open. Nothing set this status before, so `expired` was an unreachable state.
-  if (isExpired(quote.expiresAt) && ["sent", "viewed"].includes(quote.status)) {
-    await db.update(quotes).set({ status: "expired", updatedAt: new Date() }).where(eq(quotes.id, quote.id));
-    return NextResponse.json({ quote: { ...quote, ...extra, status: "expired" } });
-  }
-
-  // Mark as viewed the first time the recipient opens it
-  if (quote.status === "sent") {
-    const ip = headersList.get("x-forwarded-for") ?? undefined;
-    await db.update(quotes).set({ viewedAt: new Date(), status: "viewed" }).where(eq(quotes.id, quote.id));
-    await db.insert(quoteActivities).values({ quoteId: quote.id, type: "viewed", ipAddress: ip ?? undefined });
-    return NextResponse.json({ quote: { ...quote, ...extra, status: "viewed", viewedAt: new Date() } });
-  }
-
-  return NextResponse.json({ quote: { ...quote, ...extra } });
+  const read = await readPublicQuote(token, clientIp(await headers()));
+  if (read.status === 429) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  if (read.status !== 200) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ quote: read.quote });
 }
 
 // POST /api/quotes/public  — accept or decline quote by public token
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { token, action, reason } = body as { token: string; action: "accepted" | "declined"; reason?: string };
-
-  if (!token || !["accepted", "declined"].includes(action)) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+  const notActionable = () =>
+    NextResponse.json(
+      { error: "Quote cannot be actioned in its current status", code: "not_actionable" },
+      { status: 409 },
+    );
+  const body = ((await req.json().catch(() => null)) ?? {}) as Record<string, unknown>;
+  // Strings, or nothing: an object where a token goes is a request, not a token.
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  const action = body.action === "accepted" || body.action === "declined" ? body.action : null;
+  const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, MAX_REASON) || null : null;
+  if (!token || !action) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
   const headersList = await headers();
+  const ip = clientIp(headersList);
+  const userAgent = headersList.get("user-agent")?.slice(0, 500) ?? null;
 
-  if (!(await checkRateLimit(`quote_decide:${clientIp(headersList)}`, 20, 60_000))) {
+  if (!(await checkRateLimit(`quote_decide:${ip}`, 20, 60_000))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
@@ -113,33 +60,61 @@ export async function POST(req: NextRequest) {
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.publicToken, token) });
   if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-  if (!["sent", "viewed"].includes(quote.status)) {
-    return NextResponse.json(
-      { error: "Quote cannot be actioned in its current status", code: "not_actionable" },
-      { status: 409 },
-    );
-  }
+  if (!OPEN_QUOTE.includes(quote.status)) return notActionable();
 
   // An expiry date that is never checked is decoration: a quote could be accepted
   // months after it lapsed, at a price nobody still honours.
   if (isExpired(quote.expiresAt)) {
-    await db.update(quotes).set({ status: "expired", updatedAt: new Date() }).where(eq(quotes.id, quote.id));
+    await db
+      .update(quotes)
+      .set({ status: "expired", updatedAt: new Date() })
+      .where(and(eq(quotes.id, quote.id), inArray(quotes.status, OPEN_QUOTE)));
     return NextResponse.json(
       { error: "This quote has expired. Please ask for an updated one.", code: "expired" },
       { status: 409 },
     );
   }
 
-  const ip = headersList.get("x-forwarded-for") ?? undefined;
-
-  const updateData =
-    action === "accepted"
-      ? { status: "accepted" as const, acceptedAt: new Date() }
-      : { status: "declined" as const, declinedAt: new Date(), declineReason: reason ?? null };
-
-  await db.update(quotes).set(updateData).where(eq(quotes.id, quote.id));
-  await db.insert(quoteActivities).values({ quoteId: quote.id, type: action, ipAddress: ip ?? undefined });
+  const now = new Date();
+  let updateData:
+    | { status: "accepted"; acceptedAt: Date }
+    | { status: "declined"; declinedAt: Date; declineReason: string | null };
+  if (action === "accepted") {
+    // ⚠️⚠️ Accepting is signing (src/lib/quote-signature.ts): a typed name, a ticked consent,
+    // and the fingerprint of the PDF being accepted. A click alone is not an acceptance.
+    const signature = readSignature(body);
+    if (!signature) {
+      return NextResponse.json(
+        { error: "Type your name and tick the consent to sign.", code: "signature_required" },
+        { status: 422 },
+      );
+    }
+    const signed = await signQuote(
+      db,
+      quote.id,
+      // The address the platform saw (src/lib/client-ip.ts), never one the client wrote.
+      { name: signature.name, ip, userAgent, workspaceName: tenant.name },
+      now,
+    );
+    if (!signed.ok) return notActionable();
+    updateData = { status: "accepted", acceptedAt: now };
+  } else {
+    updateData = { status: "declined", declinedAt: now, declineReason: reason };
+    // ⚠️⚠️ Only while it is still open: a decline racing a signature must not overwrite an
+    // accepted, signed quote — and two declines at once decline, notify and announce once.
+    const declined = await db
+      .update(quotes)
+      .set(updateData)
+      .where(and(eq(quotes.id, quote.id), inArray(quotes.status, OPEN_QUOTE)))
+      .returning({ id: quotes.id });
+    if (declined.length === 0) return notActionable();
+  }
+  await db.insert(quoteActivities).values({
+    quoteId: quote.id,
+    type: action,
+    ipAddress: ip,
+    userAgent: userAgent ?? undefined,
+  });
 
   // ⚠️⚠️ The customer's own answer, which until now stayed inside this database. An
   // assistant that delivered the quote had no way to learn it, and kept chasing someone who
@@ -147,6 +122,7 @@ export async function POST(req: NextRequest) {
   // still running after the response can be killed, and there would be nothing to retry
   // from. The actor is null because whoever clicked has no account here.
   await announceQuoteDecision({ ...quote, ...updateData }, action, null, db);
+  await runWithTenant(tenant.id, () => tellQuoteOwner(quote, action, action === "declined" ? reason : null));
 
   return NextResponse.json({ success: true });
 }

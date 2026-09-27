@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "⚠️⚠️ chi è già nel CRM scrive dal sito e diventa un secondo record",
+    "find": "  if (contact || lead) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "⚠️ un contatto con l'indirizzo in maiuscolo non viene riconosciuto e nasce un lead doppione",
+    "find": "    .select({ id: contacts.id, ownerId: contacts.ownerId, companyId: contacts.companyId })\n    .from(contacts)\n    .where(sql`lower(${contacts.email}) = ${s.email}`)",
+    "replace": "    .select({ id: contacts.id, ownerId: contacts.ownerId, companyId: contacts.companyId })\n    .from(contacts)\n    .where(eq(contacts.email, s.email))"
+  },
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "⚠️⚠️ chi scrive dal sito risulta iscritto al marketing senza averlo spuntato",
+    "find": "    consent: body.consent === true || body.consent === \"on\" || body.consent === \"true\",",
+    "replace": "    consent: true,"
+  },
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "il consenso dato dal sito non dice da dove viene",
+    "find": "      ...consentPatch(null, s.consent, \"web\", now),",
+    "replace": "      ...consentPatch(null, s.consent, \"form\", now),"
+  },
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "⚠️⚠️ il testo di uno sconosciuto arriva nello schermo dell'operatore come HTML",
+    "find": "escapeHtml(s.description)",
+    "replace": "s.description"
+  },
+  {
+    "file": "src/lib/turnstile.ts",
+    "description": "⚠️ senza Turnstile configurato i moduli rifiutano ogni persona",
+    "find": "  if (!secret) return true;",
+    "replace": "  if (!secret) return false;"
+  },
+  {
+    "file": "src/lib/turnstile.ts",
+    "description": "⚠️ con Turnstile configurato un invio senza verifica passa",
+    "find": "  if (!token) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/forms/route.ts",
+    "description": "⚠️⚠️ il campo redirect accetta javascript: e qualunque schema",
+    "find": "    return url.protocol === \"https:\" || url.protocol === \"http:\" ? url.toString() : null;",
+    "replace": "    return url.toString();"
+  },
+  {
+    "file": "src/app/api/forms/route.ts",
+    "description": "⚠️ un modulo sul sito del cliente non può inviare: manca l'intestazione CORS",
+    "find": "  \"Access-Control-Allow-Origin\": \"*\",",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/forms/route.ts",
+    "description": "⚠️⚠️ un robot che compila il campo nascosto invia davvero",
+    "find": "  if (typeof body.website === \"string\" && body.website.trim()) {",
+    "replace": "  if (false) {"
+  }
+]

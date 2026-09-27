@@ -126,7 +126,7 @@ vi.mock("../../crm/automation/rule-engine", () => ({
     cascaded.push(c);
   },
 }));
-vi.mock("@/actions/webhooks", () => ({ dispatchWebhook: async () => undefined }));
+vi.mock("@/lib/webhook-dispatch", () => ({ dispatchWebhook: async () => undefined }));
 vi.mock("../../crm/automation/webhook-service", () => ({ sendWebhook: async () => ({}) }));
 vi.mock("../../crm/automation/email-service", () => ({ sendAutomationEmailWithContext: async () => ({}) }));
 vi.mock("../../crm/automation/loop-detector", () => ({}));
@@ -198,7 +198,8 @@ describe("sharing out new leads", () => {
       expect.objectContaining({
         userId: "anna",
         type: "lead_assigned",
-        message: "Mario Rossi has been assigned to you.",
+        key: "leadAssigned",
+        params: { name: "Mario Rossi" },
         link: "/dashboard/leads/l1",
       }),
     ]);

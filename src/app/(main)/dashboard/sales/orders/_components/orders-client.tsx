@@ -222,8 +222,9 @@ export function OrdersClient({
             )}
           >
             <Icon className={cn("h-5 w-5 shrink-0", color)} />
-            <div>
-              <p className="font-bold text-xl leading-none">{value}</p>
+            <div className="min-w-0">
+              {/* Revenue joins one figure per currency; on a half-width phone card it wraps rather than overflows. */}
+              <p className="break-words font-bold text-xl leading-tight">{value}</p>
               <p className="mt-0.5 text-muted-foreground text-xs">{t(labelKey)}</p>
             </div>
           </button>

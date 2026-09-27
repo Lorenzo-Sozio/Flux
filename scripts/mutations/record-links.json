@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ la trattativa ferma nella lista di lavoro torna a portare alla board generica: il commerciale non sa quale delle quaranta schede aprire",
+    "find": "        detailKey: \"noContactFor\",\n        detailValue: quiet,\n        href: `/dashboard/pipeline/${d.id}`,",
+    "replace": "        detailKey: \"noContactFor\",\n        detailValue: quiet,\n        href: `/dashboard/pipeline?deal=${d.id}`,"
+  },
+  {
+    "file": "src/app/(main)/dashboard/leads/[id]/page.tsx",
+    "description": "⚠️ il contatto nato dalla conversione torna a essere un link alla lista, che ignora contactId",
+    "find": "href={`/dashboard/contacts/${lead.convertedToContactId}`}",
+    "replace": "href={`/dashboard/contacts?contactId=${lead.convertedToContactId}`}"
+  }
+]

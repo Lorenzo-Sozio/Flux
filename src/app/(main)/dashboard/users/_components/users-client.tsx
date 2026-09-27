@@ -30,6 +30,7 @@ import {
   updateUserRoleAction,
 } from "@/actions/auth";
 import { getUserGroups } from "@/actions/user-groups";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +53,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { assignableRoles, normalizeTenantRole, type TenantRole } from "@/lib/permissions";
+import { assignableRoles, can, canWrite, normalizeTenantRole, outranks, type TenantRole } from "@/lib/permissions";
 import { getInitials } from "@/lib/utils";
 
 import { GroupModal } from "./group-modal";
@@ -320,6 +321,55 @@ export function UsersClient({
   // Nobody may hand out a role above their own — enforced again server-side.
   const availableRoles = assignableRoles(currentUserRole);
 
+  // Nobody changes the role of someone who outranks them: an admin cannot demote the owner.
+  const canChangeRole = (user: User) =>
+    can(currentUserRole, "user:manage") && user.id !== currentUserId && !outranks(user.role, currentUserRole);
+
+  // One definition for the table row and the phone card, so the two cannot come
+  // to disagree about who may reset or delete whom. Only the size differs: 28px
+  // beside a mouse, 36px under a thumb.
+  const rowActions = (user: User, size: string) =>
+    user.id === currentUserId ? (
+      // Own row: change password
+      <Button
+        variant="ghost"
+        size="icon"
+        className={size}
+        title={tu("changePassword")}
+        aria-label={tu("changePassword")}
+        onClick={() => setChangePwOpen(true)}
+      >
+        <KeyRound className="h-3.5 w-3.5" />
+      </Button>
+    ) : (
+      <>
+        {/* Admin: send password reset */}
+        {can(currentUserRole, "user:manage") && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`${size} text-muted-foreground hover:text-foreground`}
+            title={tu("sendPasswordReset")}
+            aria-label={tu("sendPasswordReset")}
+            onClick={() => handleAdminSendReset(user)}
+            disabled={isSendingReset && resetTarget?.id === user.id}
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={`${size} text-destructive hover:text-destructive`}
+          onClick={() => handleDelete(user.id)}
+          title={tu("deleteUser")}
+          aria-label={tu("deleteUser")}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </>
+    );
+
   return (
     <div className="space-y-6">
       {/* ⚠️ Wrapping, not shrinking. `min-w-0` stopped the button being pushed off
@@ -338,7 +388,7 @@ export function UsersClient({
       </div>
 
       {/* Role management notice for non-admins */}
-      {currentUserRole === "editor" || currentUserRole === "viewer" ? (
+      {!can(currentUserRole, "user:manage") ? (
         <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 text-sm dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{t("roleManagementNotice")}</span>
@@ -354,97 +404,85 @@ export function UsersClient({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("columns.user")}</TableHead>
-                <TableHead>{t("columns.role")}</TableHead>
-                <TableHead>{t("columns.status")}</TableHead>
-                {currentUserRole !== "viewer" && <TableHead className="text-right">{t("columns.actions")}</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={user.image ?? undefined} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(user.name ?? user.email ?? "?")}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-sm">{user.name ?? "—"}</p>
-                        <p className="text-muted-foreground text-xs">{user.email}</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <RoleSelector
-                      userId={user.id}
-                      role={user.role}
-                      canChange={
-                        (currentUserRole === "owner" || currentUserRole === "admin") &&
-                        user.id !== currentUserId &&
-                        !(user.role === "owner" && currentUserRole !== "owner")
-                      }
-                      availableRoles={availableRoles}
-                      onRoleChange={handleRoleChange}
-                    />
-                  </TableCell>
-                  <TableCell>
+          <ResponsiveRecordList
+            cards={
+              <RecordCards
+                items={users.map((user) => ({
+                  id: user.id,
+                  title: user.name ?? "—",
+                  subtitle: user.email,
+                  badge: (
                     <Badge variant={user.emailVerified ? "default" : "secondary"}>
                       {user.emailVerified ? t("verified") : t("unverified")}
                     </Badge>
-                  </TableCell>
-                  {currentUserRole !== "viewer" && (
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {user.id === currentUserId ? (
-                          // Own row: change password
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            title={tu("changePassword")}
-                            onClick={() => setChangePwOpen(true)}
-                          >
-                            <KeyRound className="h-3.5 w-3.5" />
-                          </Button>
-                        ) : (
-                          <>
-                            {/* Admin: send password reset */}
-                            {(currentUserRole === "owner" || currentUserRole === "admin") && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                title={tu("sendPasswordReset")}
-                                onClick={() => handleAdminSendReset(user)}
-                                disabled={isSendingReset && resetTarget?.id === user.id}
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => handleDelete(user.id)}
-                              title={tu("deleteUser")}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  ),
+                  // The role is changed from the list itself, so it sits in the
+                  // footer, outside anything that could be mistaken for a link.
+                  footer: (
+                    <RoleSelector
+                      userId={user.id}
+                      role={user.role}
+                      canChange={canChangeRole(user)}
+                      availableRoles={availableRoles}
+                      onRoleChange={handleRoleChange}
+                    />
+                  ),
+                  actions: canWrite(currentUserRole) ? rowActions(user, "size-9") : undefined,
+                }))}
+              />
+            }
+            table={
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("columns.user")}</TableHead>
+                    <TableHead>{t("columns.role")}</TableHead>
+                    <TableHead>{t("columns.status")}</TableHead>
+                    {canWrite(currentUserRole) && <TableHead className="text-right">{t("columns.actions")}</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.image ?? undefined} />
+                            <AvatarFallback className="text-xs">
+                              {getInitials(user.name ?? user.email ?? "?")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm">{user.name ?? "—"}</p>
+                            <p className="text-muted-foreground text-xs">{user.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <RoleSelector
+                          userId={user.id}
+                          role={user.role}
+                          canChange={canChangeRole(user)}
+                          availableRoles={availableRoles}
+                          onRoleChange={handleRoleChange}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.emailVerified ? "default" : "secondary"}>
+                          {user.emailVerified ? t("verified") : t("unverified")}
+                        </Badge>
+                      </TableCell>
+                      {canWrite(currentUserRole) && (
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">{rowActions(user, "h-7 w-7")}</div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            }
+          />
         </CardContent>
       </Card>
 
@@ -459,30 +497,52 @@ export function UsersClient({
             <CardDescription>{t("pendingInvitationsDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("columns.email")}</TableHead>
-                  <TableHead>{t("columns.role")}</TableHead>
-                  <TableHead>{t("columns.expires")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invitations.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="font-medium">{inv.email}</TableCell>
-                    <TableCell>
+            <ResponsiveRecordList
+              cards={
+                <RecordCards
+                  items={invitations.map((inv) => ({
+                    id: inv.id,
+                    title: inv.email,
+                    badge: (
                       <Badge variant="outline" className="capitalize">
                         {tr.has(`roleLabel.${inv.role}`) ? tr(`roleLabel.${inv.role}`) : inv.role}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {format.dateTime(new Date(inv.expiresAt), { dateStyle: "short" })}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    ),
+                    meta: (
+                      <span className="text-muted-foreground text-xs">
+                        {t("columns.expires")}: {format.dateTime(new Date(inv.expiresAt), { dateStyle: "short" })}
+                      </span>
+                    ),
+                  }))}
+                />
+              }
+              table={
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("columns.email")}</TableHead>
+                      <TableHead>{t("columns.role")}</TableHead>
+                      <TableHead>{t("columns.expires")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invitations.map((inv) => (
+                      <TableRow key={inv.id}>
+                        <TableCell className="font-medium">{inv.email}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="capitalize">
+                            {tr.has(`roleLabel.${inv.role}`) ? tr(`roleLabel.${inv.role}`) : inv.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {format.dateTime(new Date(inv.expiresAt), { dateStyle: "short" })}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              }
+            />
           </CardContent>
         </Card>
       )}
@@ -524,9 +584,9 @@ export function UsersClient({
       {/* ── User Groups ───────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="flex min-w-0 items-center gap-2">
+              <Users className="h-5 w-5 shrink-0" />
               {t("userGroups", { count: groups.length })}
             </CardTitle>
             {["admin", "owner"].includes(currentUserRole) && (
@@ -555,7 +615,12 @@ export function UsersClient({
                         group={{ ...g, description: g.description ?? null }}
                         onSaved={() => getUserGroups().then(setGroups)}
                       >
-                        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" aria-label={tc("edit")}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-9 shrink-0 sm:size-6"
+                          aria-label={tc("edit")}
+                        >
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </GroupModal>
@@ -643,7 +708,7 @@ export function UsersClient({
                   <Button
                     size="icon"
                     variant="outline"
-                    className="h-8 w-8 shrink-0"
+                    className="size-9 shrink-0 sm:size-8"
                     onClick={() => {
                       navigator.clipboard.writeText(fallbackInviteUrl);
                       toast.success(tc("copy"));
@@ -761,7 +826,8 @@ export function UsersClient({
               <Button
                 size="icon"
                 variant="outline"
-                className="h-8 w-8 shrink-0"
+                className="size-9 shrink-0 sm:size-8"
+                aria-label={tc("copy")}
                 onClick={() => {
                   navigator.clipboard.writeText(resetFallbackUrl!);
                   toast.success(tc("copy"));

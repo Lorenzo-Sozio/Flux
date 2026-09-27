@@ -36,10 +36,27 @@ export interface SendOptions {
   subject: string;
   html: string;
   replyTo?: string;
+  /** Comma-separated copies. */
+  cc?: string;
+  bcc?: string;
   fromOverride?: string;
+  /** The Message-ID this email carries, when a later one will reply to it (a sequence's thread). */
+  messageId?: string;
   inReplyTo?: string; // Message-ID of the message being replied to
   references?: string; // Space-separated chain of Message-IDs for thread history
   attachments?: EmailAttachment[];
+  /**
+   * The unsubscribe address of a marketing email: sent as `List-Unsubscribe` with RFC 8058's
+   * `List-Unsubscribe-Post`, so the mail client's own button unsubscribes in one click — and
+   * Gmail and Yahoo require it of anybody sending in bulk since 2024.
+   */
+  listUnsubscribe?: string;
+}
+
+/** The two headers of RFC 8058 one-click unsubscribe, for an address. */
+export function listUnsubscribeHeaders(url: string | undefined): Record<string, string> {
+  if (!url || !/^https:\/\//.test(url)) return {};
+  return { "List-Unsubscribe": `<${url}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" };
 }
 
 export interface SendResult {
@@ -184,8 +201,10 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
     const from = options.fromOverride ?? `${config.fromName} <${config.fromEmail}>`;
 
     const threadHeaders: Record<string, string> = {};
+    if (options.messageId) threadHeaders["Message-ID"] = options.messageId;
     if (options.inReplyTo) threadHeaders["In-Reply-To"] = options.inReplyTo;
     if (options.references) threadHeaders.References = options.references;
+    Object.assign(threadHeaders, listUnsubscribeHeaders(options.listUnsubscribe));
 
     const resendAttachments = options.attachments?.map((a) => ({
       filename: a.filename,
@@ -198,6 +217,8 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
       subject: options.subject,
       html: options.html,
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.cc ? { cc: splitAddresses(options.cc) } : {}),
+      ...(options.bcc ? { bcc: splitAddresses(options.bcc) } : {}),
       ...(Object.keys(threadHeaders).length ? { headers: threadHeaders } : {}),
       ...(resendAttachments?.length ? { attachments: resendAttachments } : {}),
     });
@@ -238,8 +259,12 @@ async function sendViaSMTP(options: SendOptions, config: EmailConfig): Promise<S
       subject: options.subject,
       html: options.html,
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.cc ? { cc: splitAddresses(options.cc) } : {}),
+      ...(options.bcc ? { bcc: splitAddresses(options.bcc) } : {}),
+      ...(options.messageId ? { messageId: options.messageId } : {}),
       ...(options.inReplyTo ? { inReplyTo: options.inReplyTo } : {}),
       ...(options.references ? { references: options.references } : {}),
+      ...(options.listUnsubscribe ? { headers: listUnsubscribeHeaders(options.listUnsubscribe) } : {}),
       ...(smtpAttachments?.length ? { attachments: smtpAttachments } : {}),
     });
 
@@ -280,4 +305,12 @@ export async function testEmailConfig(config: EmailConfig, testTo: string): Prom
     },
     config,
   );
+}
+
+/** "a@x.it, b@y.it" as the list both providers take. */
+function splitAddresses(list: string): string[] {
+  return list
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
 }

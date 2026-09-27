@@ -1,6 +1,5 @@
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { platformDb } from "@/db";
 import {
   companies,
@@ -24,12 +23,14 @@ import { enroll } from "@/lib/sequence-runner";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import type { Located } from "@/lib/territory";
 import { placeOfDeal } from "@/lib/territory-report";
+import { dispatchRuleEvent } from "@/lib/webhook-dispatch";
 
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service";
 import type { ExecutionContext } from "../../crm/automation/loop-detector";
 import { runAutomations } from "../../crm/automation/rule-engine";
 import type { AutomationAction, RuleContext } from "../../crm/automation/types";
 import { sendWebhook } from "../../crm/automation/webhook-service";
+import { loadMergeData } from "./merge-data";
 
 /**
  * Executes validated AutomationActions.
@@ -193,8 +194,8 @@ export class ActionDispatcher {
       await notify({
         userId: ownerId,
         type: "lead_assigned",
-        title: "Lead assigned to you",
-        message: `${[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "A lead"} has been assigned to you.`,
+        key: "leadAssigned",
+        params: { name: [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "—" },
         link: `/dashboard/leads/${context.entityId}`,
       });
     }
@@ -278,7 +279,7 @@ export class ActionDispatcher {
     context: RuleContext,
   ): Promise<void> {
     const { event, payload } = action.params;
-    await dispatchWebhook(
+    await dispatchRuleEvent(
       event,
       {
         // The entity as it is **after** the change: a rule reacts to the new state, and
@@ -415,11 +416,9 @@ export class ActionDispatcher {
   ): Promise<number> {
     const { url, method, headers, body, retryCount, timeoutMs } = action.params;
 
-    const mergeContext: Record<string, unknown> = {
-      [context.entityType]: context.newData,
-      entityId: context.entityId,
-      entityType: context.entityType,
-    };
+    // The same fields the email action resolves: `{{deal.name}}`, and on a deal its
+    // `{{contact.email}}` and `{{owner.name}}`, which the builder suggests for both.
+    const mergeContext = await loadMergeData(context);
 
     const result = await sendWebhook(
       {

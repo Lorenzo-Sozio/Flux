@@ -54,9 +54,9 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
         toast.success(t("convertSuccessToast"));
         setOpen(false);
         if (result.dealId) {
-          router.push(`/dashboard/pipeline?dealId=${result.dealId}`);
+          router.push(`/dashboard/pipeline/${result.dealId}`);
         } else {
-          router.push(`/dashboard/contacts?contactId=${result.contactId}`);
+          router.push(`/dashboard/contacts/${result.contactId}`);
         }
       } catch (error) {
         console.error("Failed to convert lead:", error);
@@ -69,9 +69,16 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
+      {/* The page's key action while the lead is open, so it is the one filled
+          button in the hero — and the same height as the outlined Call and Email
+          beside it, which is what `size="sm"` is for. */}
       <DialogTrigger asChild>
-        <Button className="flex items-center gap-2" disabled={isPending}>
-          {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+        <Button size="sm" disabled={isPending}>
+          {isPending ? (
+            <Loader2Icon className="size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <SparklesIcon className="size-3.5" aria-hidden />
+          )}
           {t("convertLead")}
         </Button>
       </DialogTrigger>
@@ -84,11 +91,11 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
 
         {/* What will be created */}
         <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
             {t("convert.willCreate")}
           </p>
           <div className="flex items-center gap-2">
-            <UserIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             <span>
               {t.rich("convert.contactLine", {
                 name: leadName,
@@ -98,7 +105,7 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
           </div>
           {companyName && (
             <div className="flex items-center gap-2">
-              <BuildingIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               <span>
                 {t.rich("convert.companyLine", {
                   name: companyName,
@@ -111,8 +118,8 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
 
         {/* History migration notice */}
         {hasHistory && (
-          <div className="space-y-1.5 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 p-3 text-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+          <div className="space-y-1.5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30">
+            <p className="font-semibold text-blue-600 text-xs uppercase tracking-wider dark:text-blue-400">
               {t("convert.historyMigrated")}
             </p>
             {activityCount > 0 && (
@@ -134,11 +141,11 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
 
         {/* Deal toggle */}
         <div className="flex items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="create-deal" className="text-sm font-medium">
+          <div className="min-w-0 space-y-0.5">
+            <Label htmlFor="create-deal" className="font-medium text-sm">
               {t("convertCreateDeal")}
             </Label>
-            <p className="text-xs text-muted-foreground">{t("convert.createDealHint")}</p>
+            <p className="text-muted-foreground text-xs">{t("convert.createDealHint")}</p>
           </div>
           <Switch
             id="create-deal"

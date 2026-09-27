@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/api-automations.ts",
+    "description": "⚠️⚠️ le regole di una scrittura via API tornano a girare fuori dal workspace: getDb() lancia e l'errore sparisce dietro after()",
+    "find": "    runWithTenant(tenantId, () => runAutomations(context)).catch((err) => {",
+    "replace": "    runAutomations(context).catch((err) => {"
+  },
+  {
+    "file": "src/lib/api-automations.ts",
+    "description": "⚠️ un fallimento delle regole torna a essere un rifiuto non gestito invece di una riga nel log",
+    "find": "    runWithTenant(tenantId, () => runAutomations(context)).catch((err) => {\n      console.error(`[api] rules for ${context.entityType} ${context.entityId} did not run:`, err);\n    }),",
+    "replace": "    runWithTenant(tenantId, () => runAutomations(context)),"
+  },
+  {
+    "file": "src/app/api/crm/leads/route.ts",
+    "description": "⚠️⚠️ un lead creato dall'assistente torna a non far partire nessuna regola: niente titolare a rotazione, niente sequenza, nessuno avvisato",
+    "find": "      runRulesAfterApiWrite(tenant.id, {\n        entityType: \"lead\",\n        entityId: created.id,\n        event: \"onCreate\",",
+    "replace": "      void ({\n        entityType: \"lead\",\n        entityId: created.id,\n        event: \"onCreate\","
+  },
+  {
+    "file": "src/app/api/crm/leads/stage/route.ts",
+    "description": "⚠️ lo stadio mosso via API passa alle regole senza lo stato di prima: «cambiato in qualificato» non scatta mai",
+    "find": "    oldData: (before ?? {}) as Record<string, unknown>,",
+    "replace": "    oldData: {} as Record<string, unknown>,"
+  },
+  {
+    "file": "src/app/api/crm/companies/route.ts",
+    "description": "⚠️⚠️ il nome dell'azienda torna a essere un pattern: «%» con onDuplicate update sovrascrive ogni azienda del workspace",
+    "find": "        .where(sql`lower(${companies.name}) = lower(${data.name})`)",
+    "replace": "        .where(sql`${companies.name} ilike ${data.name}`)"
+  },
+  {
+    "file": "src/app/api/crm/companies/route.ts",
+    "description": "⚠️⚠️ l'aggiornamento torna a scegliere le righe per nome invece che per id",
+    "find": "            .where(eq(companies.id, existing.id))",
+    "replace": "            .where(sql`${companies.name} ilike ${data.name}`)"
+  }
+]

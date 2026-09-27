@@ -49,7 +49,8 @@ export function PriceListNote({
     <div className={`flex min-w-0 flex-wrap items-center gap-2 ${className ?? ""}`}>
       <span className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs">
         <Tag className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">{label}</span>
+        {/* Wraps on a phone: elided there, the one part that matters (the percentage) is what got cut. */}
+        <span className="sm:truncate">{label}</span>
       </span>
       {onApply && (
         // The button says what it does; the title says why it has to be pressed

@@ -93,11 +93,11 @@ export function UsageOverview({ usage, limits }: UsageOverviewProps) {
       <CardContent className="space-y-5">
         {entries.map(([key, data]) => (
           <div key={key} className="space-y-1.5">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span className="min-w-0 font-medium">
                 {t(`usage.metrics.${key}` as Parameters<typeof t>[0], { fallback: key })}
               </span>
-              <span className="text-muted-foreground">
+              <span className="shrink-0 text-right text-muted-foreground">
                 {formatValue(key, data.current)}
                 <span className="mx-1">/</span>
                 {data.limit === null ? t("usage.unlimited") : formatValue(key, data.limit)}

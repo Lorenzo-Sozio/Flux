@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Loader2, Undo2 } from "lucide-react";
@@ -10,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createCreditNote } from "@/actions/invoices";
-import { Badge } from "@/components/ui/badge";
+import { RelatedRow, StatusBadge } from "@/components/crm/record/record-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -60,8 +59,8 @@ export function CreditNoteButton({ invoiceId, residual }: { invoiceId: string; r
 
   return (
     <>
-      <Button variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
-        <Undo2 className="h-4 w-4" /> {t("button")}
+      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
+        <Undo2 className="size-3.5" aria-hidden /> {t("button")}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
@@ -122,42 +121,45 @@ export function CreditNotesCard({
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base">{t("cardTitle")}</CardTitle>
-          <Badge variant={residual === 0 ? "secondary" : "outline"}>
-            {residual === 0 ? t("fullyCredited") : t("partlyCredited")}
-          </Badge>
-        </div>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+        <CardTitle className="text-base">{t("cardTitle")}</CardTitle>
+        <StatusBadge tone={residual === 0 ? "neutral" : "warning"}>
+          {residual === 0 ? t("fullyCredited") : t("partlyCredited")}
+        </StatusBadge>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <div className="grid grid-cols-1 gap-2 tabular-nums sm:grid-cols-3">
-          <div>
-            <p className="text-muted-foreground text-xs">{t("invoiced")}</p>
-            <p className="font-medium">{formatMoney(total, currency)}</p>
+        {/* Label and figure on one line each: the side column is a third of the
+            width, and three figures side by side in it truncate to "€1.2…". */}
+        <dl className="space-y-1.5 tabular-nums">
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-muted-foreground">{t("invoiced")}</dt>
+            <dd>{formatMoney(total, currency)}</dd>
           </div>
-          <div>
-            <p className="text-muted-foreground text-xs">{t("credited")}</p>
-            <p className="font-medium">{formatMoney(credited, currency)}</p>
+          <div className="flex items-center justify-between gap-3">
+            <dt className="text-muted-foreground">{t("credited")}</dt>
+            <dd>{formatMoney(credited, currency)}</dd>
           </div>
-          <div>
-            <p className="text-muted-foreground text-xs">{t("residual")}</p>
-            <p className="font-semibold">{formatMoney(residual, currency)}</p>
+          <div className="flex items-center justify-between gap-3 font-semibold">
+            <dt>{t("residual")}</dt>
+            <dd>{formatMoney(residual, currency)}</dd>
           </div>
-        </div>
-        <ul className="divide-y rounded-md border">
+        </dl>
+        <ul className="space-y-2">
           {notes.map((n) => (
-            <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-              <Link href={`/dashboard/sales/invoices/${n.id}`} className="min-w-0 font-medium hover:underline">
-                {n.documentNumber ? t("noteNumber", { number: n.documentNumber }) : t("draftNote")}
-                {n.issueDate ? <span className="ml-2 text-muted-foreground text-xs">{n.issueDate}</span> : null}
-              </Link>
-              <span className="flex items-center gap-2 tabular-nums">
-                <Badge variant={n.status === "draft" ? "outline" : "secondary"}>
-                  {tInv(`statuses.${n.status as "draft" | "issued"}`)}
-                </Badge>
-                {formatMoney(n.total, currency)}
-              </span>
+            <li key={n.id}>
+              <RelatedRow
+                href={`/dashboard/sales/invoices/${n.id}`}
+                title={n.documentNumber ? t("noteNumber", { number: n.documentNumber }) : t("draftNote")}
+                sub={n.issueDate ?? undefined}
+                aside={
+                  <>
+                    <span className="font-semibold tabular-nums">{formatMoney(n.total, currency)}</span>
+                    <StatusBadge tone={n.status === "draft" ? "neutral" : "success"} className="text-[11px]">
+                      {tInv(`statuses.${n.status as "draft" | "issued"}`)}
+                    </StatusBadge>
+                  </>
+                }
+              />
             </li>
           ))}
         </ul>

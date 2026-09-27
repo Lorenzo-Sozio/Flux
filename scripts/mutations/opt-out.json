@@ -20,8 +20,8 @@
   {
     "file": "src/app/api/crm/opt-out/route.ts",
     "description": "le regole del titolare non scattano sulla revoca: chi sorvegliava quel consenso non lo sa",
-    "find": "    after(() =>\n      runAutomations({",
-    "replace": "    if (false)\n    after(() =>\n      runAutomations({"
+    "find": "    runRulesAfterApiWrite(tenant.id, {\n      entityType: riga.entityType,",
+    "replace": "    if (false)\n    runRulesAfterApiWrite(tenant.id, {\n      entityType: riga.entityType,"
   },
   {
     "file": "src/app/api/crm/opt-out/route.ts",

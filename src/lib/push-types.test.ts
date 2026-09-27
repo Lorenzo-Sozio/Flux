@@ -30,9 +30,22 @@ describe("the catalogue", () => {
     // deadline, and missing it renews or loses the customer by default.
     // And a prospect answering a follow-up sequence: the conversation is now a
     // person's to pick up, and the automatic emails have stopped.
+    // And the reminder somebody set on an appointment themselves: asking for it
+    // is the decision.
+    // And a customer somebody owns writing to them outside any ticket (inbound-sales-reply),
+    // or opening, accepting or declining their quote (quote-events).
+    // And a visitor booking time from somebody's booking page: their day just changed.
+    // And a colleague naming them in the chat: a mention is addressed to one person.
     expect(onByDefault).toEqual([
+      "appointment_reminder",
+      "booking_received",
+      "chat_mention",
       "contract_renewal",
+      "email_reply",
       "lead_assigned",
+      "quote_accepted",
+      "quote_declined",
+      "quote_viewed",
       "sequence_reply",
       "sla_breach",
       "sla_warning",

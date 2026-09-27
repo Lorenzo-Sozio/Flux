@@ -58,8 +58,9 @@ function ToolbarButton({ onClick, active, disabled, label, children }: ToolbarBu
           type="button"
           variant={active ? "secondary" : "ghost"}
           size="icon"
-          className="h-7 w-7"
+          className="size-9 shrink-0 sm:size-7"
           onClick={onClick}
+          aria-label={label}
           disabled={disabled}
         >
           {children}
@@ -129,7 +130,10 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
     <TooltipProvider delayDuration={200}>
       <div className={cn("rounded-md border bg-background", className)}>
         {/* Toolbar */}
-        <div className="flex flex-wrap items-center gap-0.5 border-b px-2 py-1.5">
+        {/* ⚠️ One scrolling line below `sm`, not a wrapped block: at a thumb's 36px
+            the buttons and the variable chips wrapped to four rows, a toolbar
+            taller than the text box under it. */}
+        <div className="flex items-center gap-0.5 overflow-x-auto border-b px-2 py-1.5 sm:flex-wrap">
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive("bold")}
@@ -159,7 +163,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
             <Strikethrough className="h-3.5 w-3.5" />
           </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -176,7 +180,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
             <Heading2 className="h-3.5 w-3.5" />
           </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign("left").run()}
@@ -200,7 +204,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
             <AlignRight className="h-3.5 w-3.5" />
           </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -234,7 +238,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
             <Link2 className="h-3.5 w-3.5" />
           </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5" />
+          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
@@ -252,13 +256,13 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           </ToolbarButton>
 
           {/* Variable chip insertions */}
-          <Separator orientation="vertical" className="mx-1 h-5" />
-          <span className="text-[10px] text-muted-foreground">{t("variables")}</span>
+          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
+          <span className="shrink-0 text-[10px] text-muted-foreground">{t("variables")}</span>
           {(macroVariables ? MACRO_VARS : EMAIL_VARS).map((v) => (
             <button
               key={v}
               type="button"
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary hover:text-primary-foreground"
+              className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary hover:text-primary-foreground"
               onClick={() => editor.chain().focus().insertContent(v).run()}
             >
               {v}

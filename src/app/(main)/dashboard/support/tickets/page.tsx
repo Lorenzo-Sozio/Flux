@@ -193,7 +193,8 @@ export default function TicketsListPage() {
           <Button
             variant={view === "list" ? "default" : "ghost"}
             size="sm"
-            className="h-7 gap-1.5 px-2.5"
+            className="h-9 gap-1.5 px-3 sm:h-7 sm:px-2.5"
+            aria-pressed={view === "list"}
             onClick={() => setView("list")}
           >
             <LayoutList className="h-3.5 w-3.5" />
@@ -202,7 +203,8 @@ export default function TicketsListPage() {
           <Button
             variant={view === "kanban" ? "default" : "ghost"}
             size="sm"
-            className="h-7 gap-1.5 px-2.5"
+            className="h-9 gap-1.5 px-3 sm:h-7 sm:px-2.5"
+            aria-pressed={view === "kanban"}
             onClick={() => setView("kanban")}
           >
             <Kanban className="h-3.5 w-3.5" />
@@ -253,7 +255,7 @@ export default function TicketsListPage() {
               key={value}
               type="button"
               onClick={() => setStatusFilter(value)}
-              className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition-colors ${
+              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 font-medium text-sm transition-colors sm:py-2 ${
                 active
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
@@ -302,6 +304,7 @@ export default function TicketsListPage() {
             <SelectItem value="chat">{t("channels.chat")}</SelectItem>
             <SelectItem value="phone">{t("channels.phone")}</SelectItem>
             <SelectItem value="social">{t("channels.social")}</SelectItem>
+            <SelectItem value="web">{t("channels.web")}</SelectItem>
           </SelectContent>
         </Select>
       </div>

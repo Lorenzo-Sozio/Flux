@@ -136,7 +136,7 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
 
   if (campaigns.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-xl bg-muted/5">
+      <div className="flex flex-col items-center justify-center px-4 py-16 text-center sm:py-24 border-2 border-dashed rounded-xl bg-muted/5">
         <TargetIcon className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
         <p className="font-medium text-muted-foreground">{t("noCampaignsYet")}</p>
         <p className="text-sm text-muted-foreground mt-1 mb-5">{t("noCampaignsYetDesc")}</p>
@@ -165,7 +165,12 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                   </Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 shrink-0 md:size-7"
+                        aria-label={tc("actions")}
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -202,9 +207,9 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                   {c.description || t("noDescription")}
                 </CardDescription>
                 {templateName && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Mail className="h-3 w-3" />
-                    {templateName}
+                  <p className="text-xs text-muted-foreground flex min-w-0 items-center gap-1 mt-1">
+                    <Mail className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{templateName}</span>
                   </p>
                 )}
                 {c.status === "scheduled" && c.scheduledAt && (

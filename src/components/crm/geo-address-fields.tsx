@@ -1,7 +1,14 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type Control, Controller, type UseFormSetValue, type UseFormWatch } from "react-hook-form";
+import {
+  type Control,
+  Controller,
+  type FieldValues,
+  type Path,
+  type UseFormSetValue,
+  type UseFormWatch,
+} from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,11 +46,18 @@ export interface GeoAddressLabels {
   country: string;
 }
 
-export interface GeoAddressFieldsProps {
-  // react-hook-form bindings (generic <any> form)
-  control: Control<any>;
-  setValue: UseFormSetValue<any>;
-  watch: UseFormWatch<any>;
+/** The address fields a form must have for this component to draw them. */
+type AddressField = "street" | "city" | "state" | "zipCode" | "country";
+
+/**
+ * Generic over the form it is placed in, rather than typed `Control<any>`.
+ * react-hook-form 7.88 stopped accepting a specific form's `Control` where
+ * `Control<any>` is declared, and the generic keeps each modal's own field types.
+ */
+export interface GeoAddressFieldsProps<T extends FieldValues> {
+  control: Control<T>;
+  setValue: UseFormSetValue<T>;
+  watch: UseFormWatch<T>;
   errors?: {
     street?: { message?: string };
     city?: { message?: string };
@@ -54,16 +68,20 @@ export interface GeoAddressFieldsProps {
   labels: GeoAddressLabels;
 }
 
-export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsProps) {
+export function GeoAddressFields<T extends FieldValues>({ control, errors, labels }: GeoAddressFieldsProps<T>) {
+  // Each modal declares these five fields; the names are checked there, by the schema.
+  const name = (field: AddressField) => field as Path<T>;
   const t = useTranslations("geoAddress");
 
   return (
     <>
-      {/* Street -- full width */}
-      <div className="col-span-2">
+      {/* Street -- full width. ⚠️ `sm:` like the grid it sits in: every caller's
+          grid is one column below sm, and a span of two there makes the browser
+          invent a second column and squeeze the rest of the fields into it. */}
+      <div className="sm:col-span-2">
         <Controller
           control={control}
-          name="street"
+          name={name("street")}
           render={({ field }) => (
             <F label={labels.street} error={errors?.street?.message}>
               <Input {...field} value={field.value ?? ""} placeholder={t("streetPlaceholder")} />
@@ -76,7 +94,7 @@ export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsPr
       <div>
         <Controller
           control={control}
-          name="country"
+          name={name("country")}
           render={({ field }) => (
             <F label={labels.country} error={errors?.country?.message}>
               <Input {...field} value={field.value ?? ""} placeholder={t("countryPlaceholder")} />
@@ -89,7 +107,7 @@ export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsPr
       <div>
         <Controller
           control={control}
-          name="city"
+          name={name("city")}
           render={({ field }) => (
             <F label={labels.city} error={errors?.city?.message}>
               <Input {...field} value={field.value ?? ""} placeholder={t("cityPlaceholder")} />
@@ -102,7 +120,7 @@ export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsPr
       <div>
         <Controller
           control={control}
-          name="state"
+          name={name("state")}
           render={({ field }) => (
             <F label={labels.state} error={errors?.state?.message}>
               <Input {...field} value={field.value ?? ""} placeholder="MI" />
@@ -115,7 +133,7 @@ export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsPr
       <div>
         <Controller
           control={control}
-          name="zipCode"
+          name={name("zipCode")}
           render={({ field }) => (
             <F label={labels.zipCode} error={errors?.zipCode?.message}>
               <Input {...field} value={field.value ?? ""} placeholder="20100" />

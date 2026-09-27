@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { and, count, desc, eq, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import {
   activities,
   companies,
@@ -19,14 +18,18 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
-import { notify } from "@/lib/notify";
+import { notifyMany } from "@/lib/notify";
 import { can } from "@/lib/permissions";
 import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/queue-window";
+import { activityTypeFor, outcomeFor, taskTypeOf } from "@/lib/task-kinds";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import { getDb } from "@/lib/tenant-context";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 export async function createTask(data: {
   title: string;
+  type?: string;
   description?: string;
   dueDate?: Date;
   startDate?: Date;
@@ -43,7 +46,7 @@ export async function createTask(data: {
   ticketId?: string;
   estimatedHours?: string;
 }) {
-  await requireWriteAccess();
+  const actor = await requireWriteAccess();
   const db = await getDb();
   let depth = 0;
   if (data.parentId) {
@@ -54,7 +57,9 @@ export async function createTask(data: {
   }
   const result = await db
     .insert(tasks)
-    .values({ ...data, depth })
+    // Owned by whoever wrote it down unless somebody else was named: a task with no owner
+    // is on nobody's agenda and in nobody's list.
+    .values({ ...data, ownerId: data.ownerId ?? actor.user.id, type: taskTypeOf(data.type), depth })
     .returning();
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
   if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
@@ -193,6 +198,7 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
     .select({
       id: tasks.id,
       title: tasks.title,
+      type: tasks.type,
       description: tasks.description,
       dueDate: tasks.dueDate,
       startDate: tasks.startDate,
@@ -233,14 +239,26 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
 export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
   await requireWriteAccess();
   const db = await getDb();
-  const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
+  const clean = data.type !== undefined ? { ...data, type: taskTypeOf(data.type) } : data;
+  const result = await db.update(tasks).set(clean).where(eq(tasks.id, id)).returning();
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
   return result[0];
 }
 
-export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string) {
-  await requireWriteAccess();
+/**
+ * What the person said when they completed a task — the "how did it go?" panel. Every
+ * field is optional: ticking a box with nothing to say still records that it was done.
+ */
+export interface TaskReport {
+  outcome?: string | null;
+  note?: string | null;
+  /** The next step, planned in the same gesture. It inherits the task's record. */
+  next?: { type?: string; title: string; dueDate?: Date | null; allDay?: boolean } | null;
+}
+
+export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string, report?: TaskReport) {
+  const session = await requireWriteAccess();
   const db = await getDb();
   if (status === "done") {
     const blocking = await checkDependencyViolation(id);
@@ -252,13 +270,22 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
   const [task] = await db.update(tasks).set({ status, completedAt }).where(eq(tasks.id, id)).returning();
   if (task?.parentId) await recalcParentProgress(task.parentId);
 
-  // When a task is completed, auto-record in the related entity's activity timeline
+  // ⚠️⚠️ Completing a task *is* recording it: the activity takes the task's kind, what
+  // happened and the note, so a call ticked off is a call in the timeline — not a "✓" note
+  // beside a second record somebody had to type (src/lib/task-kinds.ts).
   if (status === "done" && task) {
+    const type = taskTypeOf(task.type);
+    const note = report?.note?.trim();
     const activityPayload = {
-      type: "note" as const,
-      content: `Task completed: "${task.title}"`,
+      type: activityTypeFor(type),
+      // Stored text, read by whoever opens the record in whatever language: a check mark
+      // and the task's own words, where an English sentence used to sit in Italian timelines.
+      content: note ? `✓ «${task.title}»\n${note}` : `✓ «${task.title}»`,
+      outcome: outcomeFor(type, report?.outcome),
+      taskId: task.id,
       date: new Date(),
-      ownerId: task.ownerId ?? undefined,
+      // Whoever did it, not whoever wrote the task down: the call is theirs.
+      ownerId: session.user.id ?? task.ownerId ?? undefined,
       leadId: task.leadId ?? undefined,
       contactId: task.contactId ?? undefined,
       companyId: task.companyId ?? undefined,
@@ -270,6 +297,33 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
       // biome-ignore lint/suspicious/noEmptyBlockStatements: swallow fire-and-forget errors
       .catch(() => {});
 
+    // The next step, on the same record, for the person who just did this one.
+    const nextTitle = report?.next?.title?.trim();
+    if (nextTitle) {
+      await db.insert(tasks).values({
+        title: nextTitle,
+        type: taskTypeOf(report?.next?.type),
+        dueDate: report?.next?.dueDate ?? null,
+        allDay: report?.next?.allDay ?? true,
+        ownerId: session.user.id,
+        assigneeId: session.user.id,
+        leadId: task.leadId,
+        contactId: task.contactId,
+        companyId: task.companyId,
+        dealId: task.dealId,
+        ticketId: task.ticketId,
+      });
+      for (const [key, base] of [
+        ["leadId", "leads"],
+        ["contactId", "contacts"],
+        ["companyId", "companies"],
+        ["dealId", "pipeline"],
+      ] as const) {
+        if (task[key]) revalidatePath(`/dashboard/${base}/${task[key]}`);
+      }
+      revalidatePath("/dashboard/tasks");
+    }
+
     // Webhook dispatch
     dispatchWebhook("task.completed", {
       id: task.id,
@@ -280,17 +334,29 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
       // biome-ignore lint/suspicious/noEmptyBlockStatements: swallow fire-and-forget errors
     }).catch(() => {});
 
-    // In-app notification to assignee (if different from owner)
-    const notifyUserId = task.assigneeId ?? task.ownerId;
-    if (notifyUserId) {
-      await notify({
-        userId: notifyUserId,
-        type: "task_due",
-        title: "Task completed",
-        message: `"${task.title}" was marked as done.`,
-        link: "/dashboard/calendar",
+    // ⚠️⚠️ Whoever owns the task and whoever it was given to — never the person who has just
+    // ticked it. It used to notify `assigneeId ?? ownerId`, which is usually the person
+    // clicking, as a `task_due` (which pushes by default) linking to the calendar: every
+    // completed task buzzed the phone of the one who completed it.
+    const completer = session.user.id;
+    const recipients = [...new Set([task.ownerId, task.assigneeId])].filter(
+      (id): id is string => Boolean(id) && id !== completer,
+    );
+    if (recipients.length > 0) {
+      const [who] = await db
+        .select({ name: users.name, email: users.email })
+        .from(users)
+        .where(eq(users.id, completer));
+      await notifyMany(
+        recipients.map((userId) => ({
+          userId,
+          type: "task_completed",
+          key: "taskCompleted" as const,
+          params: { completer: who?.name ?? who?.email ?? "—", title: task.title },
+          link: `/dashboard/tasks?task=${task.id}`,
+        })),
         // biome-ignore lint/suspicious/noEmptyBlockStatements: swallow fire-and-forget errors
-      }).catch(() => {});
+      ).catch(() => {});
     }
   }
 
@@ -360,6 +426,7 @@ export async function getAllTasks(options?: { includeDone?: boolean; alwaysInclu
     .select({
       id: tasks.id,
       title: tasks.title,
+      type: tasks.type,
       description: tasks.description,
       dueDate: tasks.dueDate,
       startDate: tasks.startDate,
@@ -507,7 +574,7 @@ export async function getTasksByTicketId(ticketId: string) {
 export async function getTasksDueToday() {
   await requireCapability("record:read");
   const db = await getDb();
-  return selectTasksDueToday(db);
+  return selectTasksDueToday(db, await getWorkspaceTimeZone());
 }
 
 export async function getTaskActualHours(taskId: string): Promise<string | null> {
@@ -823,6 +890,7 @@ export async function getTaskById(id: string) {
     .select({
       id: tasks.id,
       title: tasks.title,
+      type: tasks.type,
       description: tasks.description,
       dueDate: tasks.dueDate,
       startDate: tasks.startDate,
@@ -850,6 +918,13 @@ export async function getTaskById(id: string) {
 export async function getAllTasksForGantt() {
   await requireCapability("record:read");
   const db = await getDb();
+  // The other people responsible for each task: the workload panel counts them, as the
+  // workload page does (src/lib/workload-allocation.ts). One statement for all of them.
+  const raci: { taskId: string; userId: string }[] = await db
+    .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
+    .from(taskAssignees);
+  const responsible = new Map<string, string[]>();
+  for (const r of raci) responsible.set(r.taskId, [...(responsible.get(r.taskId) ?? []), r.userId]);
   const rows = await db
     .select({
       id: tasks.id,
@@ -873,5 +948,6 @@ export async function getAllTasksForGantt() {
     ...r,
     estimatedHours: r.estimatedHoursRaw !== null ? Number(r.estimatedHoursRaw) : null,
     estimatedHoursRaw: undefined,
+    responsibleIds: responsible.get(r.id) ?? [],
   }));
 }

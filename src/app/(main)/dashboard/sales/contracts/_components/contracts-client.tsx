@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { type ContractList, deleteContract } from "@/actions/contracts";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -112,7 +113,7 @@ export function ContractsClient({
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("mrr")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl tabular-nums">{byCurrency(1)}</div>
+            <div className="break-words font-bold text-2xl tabular-nums">{byCurrency(1)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("mrrDesc", { count: earning })}</p>
           </CardContent>
         </Card>
@@ -121,7 +122,7 @@ export function ContractsClient({
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("arr")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl tabular-nums">{byCurrency(12)}</div>
+            <div className="break-words font-bold text-2xl tabular-nums">{byCurrency(12)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("arrDesc")}</p>
           </CardContent>
         </Card>
@@ -144,9 +145,11 @@ export function ContractsClient({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+        {/* Five views do not fit a phone's width; they scroll sideways there instead
+            of wrapping into a second row that looks like a different control. */}
+        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto max-sm:pb-1 sm:flex-wrap">
           {VIEWS.map((v) => (
-            <Button key={v} asChild size="sm" variant={view === v ? "default" : "outline"}>
+            <Button key={v} asChild size="sm" variant={view === v ? "default" : "outline"} className="shrink-0">
               <Link href={viewHref(v)} scroll={false}>
                 {t(`views.${v}`)}
               </Link>
@@ -168,82 +171,145 @@ export function ContractsClient({
           {rows.length === 0 ? (
             <p className="py-12 text-center text-muted-foreground text-sm">{t("empty")}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("contract")}</TableHead>
-                    <TableHead>{t("status")}</TableHead>
-                    <TableHead className="text-right">{t("amount")}</TableHead>
-                    <TableHead className="text-right">{t("monthly")}</TableHead>
-                    <TableHead>{t("termEnd")}</TableHead>
-                    <TableHead>{t("noticeBy")}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {rows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="min-w-0">
-                        <Link href={`/dashboard/sales/contracts/${row.id}`} className="font-medium hover:underline">
-                          {row.title}
-                        </Link>
-                        <p className="text-muted-foreground text-xs">
-                          {row.companyName ?? t("noCompany")}
-                          {row.ownerName ? ` · ${row.ownerName}` : ""}
-                        </p>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn("whitespace-nowrap", PHASE_STYLE[row.phase])}>
-                          {t(`phases.${row.phase}`)}
-                        </Badge>
-                        {row.autoRenew && <p className="mt-1 text-[11px] text-muted-foreground">{t("autoRenews")}</p>}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-right tabular-nums">
-                        {formatMoney(row.amount, row.currency)}
-                        <span className="ml-1 text-muted-foreground text-xs">
-                          / {t(`periods.${row.billingPeriod}`)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoney(row.monthly, row.currency)}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums">{row.termEnd ?? "—"}</TableCell>
-                      <TableCell
-                        className={cn(
-                          "whitespace-nowrap tabular-nums",
-                          row.phase === "renewal_due" && "font-medium text-amber-700 dark:text-amber-400",
-                        )}
+            <ResponsiveRecordList
+              cards={
+                <RecordCards
+                  className="p-2"
+                  items={rows.map((row) => ({
+                    id: row.id,
+                    href: `/dashboard/sales/contracts/${row.id}`,
+                    title: row.title,
+                    subtitle: `${row.companyName ?? t("noCompany")}${row.ownerName ? ` · ${row.ownerName}` : ""}`,
+                    badge: (
+                      <Badge variant="outline" className={cn("whitespace-nowrap", PHASE_STYLE[row.phase])}>
+                        {t(`phases.${row.phase}`)}
+                      </Badge>
+                    ),
+                    fields: [
+                      {
+                        label: t("amount"),
+                        value: (
+                          <span className="tabular-nums">
+                            {formatMoney(row.amount, row.currency)}
+                            <span className="ml-1 text-muted-foreground text-xs">
+                              / {t(`periods.${row.billingPeriod}`)}
+                            </span>
+                          </span>
+                        ),
+                      },
+                      { label: t("monthly"), value: formatMoney(row.monthly, row.currency) },
+                      { label: t("termEnd"), value: row.termEnd },
+                      {
+                        label: t("noticeBy"),
+                        value: row.noticeBy ? (
+                          <span
+                            className={cn(
+                              "tabular-nums",
+                              row.phase === "renewal_due" && "font-medium text-amber-700 dark:text-amber-400",
+                            )}
+                          >
+                            {row.noticeBy}
+                          </span>
+                        ) : null,
+                      },
+                    ],
+                    // No pencil here: the card itself opens the contract, which is
+                    // where it is edited, so a second link to the same page is noise.
+                    actions: canDelete ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(row.id)}
+                        aria-label={t("delete")}
                       >
-                        {row.noticeBy ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {canWrite && (
-                            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-                              <Link href={`/dashboard/sales/contracts/${row.id}`} aria-label={t("edit")}>
-                                <Pencil className="h-3.5 w-3.5" />
-                              </Link>
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={() => setDeleteId(row.id)}
-                              aria-label={t("delete")}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : undefined,
+                  }))}
+                />
+              }
+              table={
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t("contract")}</TableHead>
+                        <TableHead>{t("status")}</TableHead>
+                        <TableHead className="text-right">{t("amount")}</TableHead>
+                        <TableHead className="text-right">{t("monthly")}</TableHead>
+                        <TableHead>{t("termEnd")}</TableHead>
+                        <TableHead>{t("noticeBy")}</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((row) => (
+                        <TableRow key={row.id}>
+                          <TableCell className="min-w-0">
+                            <Link href={`/dashboard/sales/contracts/${row.id}`} className="font-medium hover:underline">
+                              {row.title}
+                            </Link>
+                            <p className="text-muted-foreground text-xs">
+                              {row.companyName ?? t("noCompany")}
+                              {row.ownerName ? ` · ${row.ownerName}` : ""}
+                            </p>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn("whitespace-nowrap", PHASE_STYLE[row.phase])}>
+                              {t(`phases.${row.phase}`)}
+                            </Badge>
+                            {row.autoRenew && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">{t("autoRenews")}</p>
+                            )}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap text-right tabular-nums">
+                            {formatMoney(row.amount, row.currency)}
+                            <span className="ml-1 text-muted-foreground text-xs">
+                              / {t(`periods.${row.billingPeriod}`)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatMoney(row.monthly, row.currency)}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap tabular-nums">{row.termEnd ?? "—"}</TableCell>
+                          <TableCell
+                            className={cn(
+                              "whitespace-nowrap tabular-nums",
+                              row.phase === "renewal_due" && "font-medium text-amber-700 dark:text-amber-400",
+                            )}
+                          >
+                            {row.noticeBy ?? "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              {canWrite && (
+                                <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                                  <Link href={`/dashboard/sales/contracts/${row.id}`} aria-label={t("edit")}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Link>
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => setDeleteId(row.id)}
+                                  aria-label={t("delete")}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              }
+            />
           )}
         </CardContent>
       </Card>

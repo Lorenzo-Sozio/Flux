@@ -254,6 +254,40 @@ describe("the import API", () => {
     expect(pushing).toEqual([]);
   });
 
+  it("⚠️⚠️ runs the workspace's rules only through runRulesAfterApiWrite", () => {
+    // `runAutomations` reads its rules through `getDb()`, which throws on a request that
+    // carries an API key. Four routes called it bare inside `after()`, the rejection was
+    // never awaited, and every rule an integration should have set off failed unseen.
+    const bare = routes.filter((f) => /\brunAutomations\(/.test(stripComments(read(f))));
+    expect(bare).toEqual([]);
+  });
+
+  it("⚠️ runs them for every single-record write, as the dashboard does", () => {
+    // A lead filed by an assistant must get the owner, the sequence and the notification
+    // a lead typed by hand gets. These are the routes that create or change one record.
+    const single = [
+      "src/app/api/crm/leads/route.ts",
+      "src/app/api/crm/contacts/route.ts",
+      "src/app/api/crm/companies/route.ts",
+      "src/app/api/crm/leads/stage/route.ts",
+      "src/app/api/crm/close/route.ts",
+      "src/app/api/crm/custom-fields/route.ts",
+      "src/app/api/crm/opt-out/route.ts",
+    ];
+    const silent = single.filter((f) => !/runRulesAfterApiWrite\(/.test(stripComments(read(f))));
+    expect(silent).toEqual([]);
+  });
+
+  it("⚠️ and never for an import in bulk, which is a migration and not an event", () => {
+    // «Send the welcome email» for five hundred historical contacts is the opposite of
+    // what somebody moving their data wants. Changing this is a product decision, and the
+    // API documentation says the bulk routes run no rules.
+    const firing = routes
+      .filter((f) => f.endsWith("/bulk/route.ts"))
+      .filter((f) => /runRulesAfterApiWrite\(/.test(stripComments(read(f))));
+    expect(firing).toEqual([]);
+  });
+
   it("⚠️ never falls back to the platform database", () => {
     // One route did, behind a condition an earlier 400 had already made true.
     // Dead, but sitting where reaching it would write a customer's contact into

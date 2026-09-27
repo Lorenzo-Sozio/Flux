@@ -30,11 +30,14 @@ export default async function WinLossPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requirePageCapability("report:read");
-  const { owners, period } = parsePipelineFilters(await searchParams, {
+  const { owners, period, pipeline } = parsePipelineFilters(await searchParams, {
     period: pipelineView("winLoss").defaultPeriod,
   });
 
-  const [analysis, t] = await Promise.all([getWinLossAnalysis(period, owners), getTranslations("pipeline.winLoss")]);
+  const [analysis, t] = await Promise.all([
+    getWinLossAnalysis(period, owners, pipeline),
+    getTranslations("pipeline.winLoss"),
+  ]);
 
   return (
     <div className="space-y-6">

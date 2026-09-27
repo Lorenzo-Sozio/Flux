@@ -1,0 +1,110 @@
+[
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "⚠️⚠️ chi non ha numeri nel periodo sparisce dalla scheda, cioè proprio chi il responsabile deve vedere",
+    "find": "  for (const m of input.members) {\n    if (m.former) continue;",
+    "replace": "  for (const m of [] as ScorecardMember[]) {\n    if (m.former) continue;"
+  },
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "⚠️ chi ha lasciato il workspace compare anche nei periodi in cui non ha numeri",
+    "find": "    if (m.former) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "⚠️ l'email di un cliente conta come lavoro della riga «nessuno»",
+    "find": "    if (a.ownerId === null) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "⚠️⚠️ la squadra risulta sopra l'obiettivo sommando le vendite di chi un obiettivo non l'ha",
+    "find": "  if (totals.target !== null && totals.target > 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "la copertura non tiene conto di quanto è già stato vinto",
+    "find": "    const left = r.target === null ? null : r.target - r.wonValue;",
+    "replace": "    const left = r.target;"
+  },
+  {
+    "file": "src/lib/rep-scorecard.ts",
+    "description": "⚠️ le vinte si contano per data di creazione invece che di chiusura",
+    "find": "          sql`(${closedBetween(\"won\", bounds.from, last)} or ${closedBetween(\"lost\", bounds.from, last)})`,",
+    "replace": "          sql`(${deals.status} in ('won', 'lost') and ${deals.createdAt} >= ${bounds.from} and ${deals.createdAt} <= ${last})`,"
+  },
+  {
+    "file": "src/lib/calendar-period.ts",
+    "description": "⚠️⚠️ un obiettivo trimestrale scritto si somma a quelli mensili invece di sostituirli",
+    "find": "  if (own.length > 0) return own.reduce((s, r) => s + r.amount, 0);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/calendar-period.ts",
+    "description": "⚠️ il periodo inizia alla mezzanotte UTC e non a quella del workspace",
+    "find": "  const from = fromWallValue(`${months[0]}-01`, timeZone);",
+    "replace": "  const from = new Date(`${months[0]}-01T00:00:00Z`);"
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "⚠️ il link dalla scheda non filtra più per periodo di chiusura",
+    "find": "  return p ? periodKey(p) : null;",
+    "replace": "  return null;"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ «chiuse a settembre» mostra anche le trattative aperte",
+    "find": "  else if (!closedIn)",
+    "replace": "  else"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️⚠️ la scheda Vendite mostra le vendite di tutti sotto il nome di una persona",
+    "find": "  const mineDeals = userId ? [eq(deals.ownerId, userId)] : [];",
+    "replace": "  const mineDeals: SQL[] = [];"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "un task iniziato non risulta più in ritardo",
+    "find": "and(isNotNull(tasks.assigneeId), ne(tasks.status, \"done\"), lte(tasks.dueDate, new Date()), ...mine)",
+    "replace": "and(isNotNull(tasks.assigneeId), eq(tasks.status, \"todo\"), lte(tasks.dueDate, new Date()), ...mine)"
+  },
+  {
+    "file": "src/actions/dashboard.ts",
+    "description": "⚠️ la distribuzione in home torna a contare vinte e perse per fase",
+    "find": "        .leftJoin(deals, and(eq(deals.stageId, pipelineStages.id), eq(deals.status, \"open\")))",
+    "replace": "        .leftJoin(deals, eq(deals.stageId, pipelineStages.id))"
+  },
+  {
+    "file": "src/lib/workload-allocation.ts",
+    "description": "⚠️⚠️ un task senza stima non pesa, e chi non stima risulta libero",
+    "find": "    const estimate = task.estimatedHours ?? DEFAULT_TASK_HOURS;",
+    "replace": "    if (task.estimatedHours === null) continue;\n    const estimate = task.estimatedHours;"
+  },
+  {
+    "file": "src/lib/workload-allocation.ts",
+    "description": "⚠️ il lavoro di un task padre si conta due volte, sopra quello dei sottotask",
+    "find": "    if (!task.dueDay || parents.has(task.id) || task.status === \"done\") continue;",
+    "replace": "    if (!task.dueDay || task.status === \"done\") continue;"
+  },
+  {
+    "file": "src/lib/workload-allocation.ts",
+    "description": "⚠️ un task già fatto occupa ancora la giornata",
+    "find": "    if (!task.dueDay || parents.has(task.id) || task.status === \"done\") continue;",
+    "replace": "    if (!task.dueDay || parents.has(task.id)) continue;"
+  },
+  {
+    "file": "src/lib/workload-allocation.ts",
+    "description": "un task parzialmente visibile sembra più pesante",
+    "find": "    const perDay = Math.round((estimate / span.length) * 100) / 100;",
+    "replace": "    const perDay = Math.round((estimate / span.filter((d) => visible.has(d)).length) * 100) / 100;"
+  },
+  {
+    "file": "src/actions/workload.ts",
+    "description": "⚠️⚠️ la pagina del carico mette il task al giorno UTC, un giorno prima a Roma dopo mezzanotte",
+    "find": "  const dayOf = (d: Date | null) => (d ? toWallDate(new Date(d), timeZone) : null);",
+    "replace": "  const dayOf = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : null);"
+  }
+]

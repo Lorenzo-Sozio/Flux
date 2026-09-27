@@ -82,6 +82,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
     .select({
       id: tasks.id,
       title: tasks.title,
+      taskType: tasks.type,
       dueDate: tasks.dueDate,
       startDate: tasks.startDate,
       allDay: tasks.allDay,
@@ -172,6 +173,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
         endAt: !isAllDay ? t.dueDate : undefined,
         allDay: isAllDay,
         type: "task" as const,
+        taskType: t.taskType,
         status: t.status,
         priority: t.priority,
         displayTitle: t.title,
@@ -205,7 +207,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
         : a.contactId
           ? `/dashboard/contacts/${a.contactId}`
           : a.dealId
-            ? `/dashboard/pipeline?dealId=${a.dealId}`
+            ? `/dashboard/pipeline/${a.dealId}`
             : "#",
       leadId: a.leadId,
     }));

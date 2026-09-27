@@ -392,7 +392,6 @@ async function seed() {
         probability,
         status: "open",
         expectedCloseDate: day(closeIn),
-        healthScore: Math.round(40 + ((amount / 1000) % 55)),
         createdAt: day(-60 + closeIn),
       })),
       {

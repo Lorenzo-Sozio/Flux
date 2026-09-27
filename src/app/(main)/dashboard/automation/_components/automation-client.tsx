@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Clock, Pencil, Plus, Trash2, Zap } from "lucide-react";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteAutomationRule, toggleAutomationRuleActive } from "@/actions/automation";
@@ -81,34 +81,8 @@ function getScheduledTrigger(triggerOn: string[] | null): string | null {
 export function AutomationClient({ rules, canEdit }: Props) {
   const t = useTranslations("automation");
   const tCommon = useTranslations("common");
-  const locale = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-
-  const formatCronDescription = (cronExpr: string): string => {
-    const parts = cronExpr.split(" ");
-    if (parts.length < 5) return cronExpr;
-    const minute = parts[0];
-    const hour = parts[1];
-    const dayOfMonth = parts[2];
-    const dayOfWeek = parts[4];
-    if (dayOfMonth === "*" && dayOfWeek === "*") {
-      return t("cron.daily", { hour, minute: minute.padStart(2, "0") });
-    }
-    if (dayOfMonth === "*" && dayOfWeek !== "*") {
-      const dayNum = parseInt(dayOfWeek, 10);
-      // 4 January 1970 was a Sunday, so day N of the cron week is 4 + N January 1970.
-      const day =
-        dayNum >= 0 && dayNum <= 6
-          ? new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(Date.UTC(1970, 0, 4 + dayNum))
-          : "??";
-      return t("cron.weekly", { day, hour, minute: minute.padStart(2, "0") });
-    }
-    if (hour === "*/6") return t("cron.every6h");
-    if (hour === "*/4") return t("cron.every4h");
-    if (hour === "*/2") return t("cron.every2h");
-    return cronExpr;
-  };
 
   const triggerLabels: Record<string, string> = {
     onCreate: t("triggers.onCreate"),
@@ -141,10 +115,12 @@ export function AutomationClient({ rules, canEdit }: Props) {
   return (
     <div className="space-y-5">
       {/* ── Page Header ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-3">
+      {/* Wrapping, not shrinking: the two buttons beside the title pushed past the
+          edge of a phone. They drop to their own line there. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2.5 font-bold text-2xl">
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
               <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
             </span>
             {t("title")}
@@ -152,7 +128,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
           <p className="mt-1.5 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         {canEdit && (
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {/* Offered before the empty builder, not after it. */}
             <RecipeLibrary />
             <RuleModal onSaved={() => router.refresh()}>
@@ -166,14 +142,14 @@ export function AutomationClient({ rules, canEdit }: Props) {
 
       {/* ── Empty State ───────────────────────────────────────────────── */}
       {rules.length === 0 ? (
-        <div className="rounded-xl border-2 border-dashed p-16 text-center">
+        <div className="rounded-xl border-2 border-dashed px-4 py-12 text-center sm:p-16">
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Zap className="h-7 w-7 text-muted-foreground" />
           </div>
           <p className="font-semibold">{t("emptyTitle")}</p>
           <p className="mt-1 text-muted-foreground text-sm">{t("emptyDesc")}</p>
           {canEdit && (
-            <div className="mt-5 flex items-center justify-center gap-2">
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <RecipeLibrary />
               <RuleModal onSaved={() => router.refresh()}>
                 <Button className="gap-2">
@@ -194,7 +170,10 @@ export function AutomationClient({ rules, canEdit }: Props) {
             return (
               <div
                 key={rule.id}
-                className={`flex items-center gap-4 bg-card px-5 py-4 transition-colors hover:bg-muted/30 ${
+                // ⚠️ `flex-wrap` with a full-width action group below `sm`: beside a
+                // switch and two buttons the rule's name had 140px and broke one
+                // word per line. On a phone the actions take a line of their own.
+                className={`flex flex-wrap items-center gap-x-4 gap-y-2 bg-card px-4 py-3 transition-colors hover:bg-muted/30 sm:flex-nowrap sm:px-5 sm:py-4 ${
                   i < rules.length - 1 ? "border-b" : ""
                 }`}
               >
@@ -242,7 +221,8 @@ export function AutomationClient({ rules, canEdit }: Props) {
                       );
                     })}
 
-                    {/* Scheduled Trigger Badge */}
+                    {/* Scheduled Trigger Badge — says the schedule does not run, because it
+                        does not (see the rule builder). */}
                     {getScheduledTrigger(rule.triggerOn) && (
                       <TooltipProvider>
                         <Tooltip>
@@ -252,12 +232,10 @@ export function AutomationClient({ rules, canEdit }: Props) {
                               className="h-5 cursor-help gap-1 border-0 bg-amber-100 px-2 py-0 font-medium text-[11px] text-amber-700 dark:bg-amber-900/40"
                             >
                               <Clock className="h-3 w-3" />
-                              {t("triggers.scheduled")}
+                              {t("triggers.scheduledInactive")}
                             </Badge>
                           </TooltipTrigger>
-                          <TooltipContent>
-                            {formatCronDescription(getScheduledTrigger(rule.triggerOn) ?? "")}
-                          </TooltipContent>
+                          <TooltipContent>{t("triggers.scheduledInactiveHint")}</TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}
@@ -275,7 +253,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
 
                 {/* Row actions */}
                 {canEdit && (
-                  <div className="flex flex-shrink-0 items-center gap-1">
+                  <div className="flex w-full flex-shrink-0 items-center justify-end gap-1 sm:w-auto">
                     <Switch
                       checked={rule.isActive}
                       onCheckedChange={() => handleToggle(rule.id, rule.isActive)}
@@ -284,7 +262,12 @@ export function AutomationClient({ rules, canEdit }: Props) {
                     />
 
                     <RuleModal rule={rule} onSaved={() => router.refresh()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-9 text-muted-foreground sm:size-8"
+                        aria-label={tCommon("edit")}
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                     </RuleModal>
@@ -294,7 +277,8 @@ export function AutomationClient({ rules, canEdit }: Props) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          className="size-9 text-muted-foreground hover:text-destructive sm:size-8"
+                          aria-label={tCommon("delete")}
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>

@@ -16,6 +16,7 @@ import {
 } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
@@ -26,20 +27,38 @@ interface Props {
 
 export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
   const t = useTranslations("crm");
+  // ⚠️ On a phone the desktop margins took some 50px of a 300px card, stage
+  // names ran into each other on the axis, and the pie's outside labels were
+  // clipped at both edges. The phone gets tighter margins, shortened stage
+  // names (the tooltip keeps the full one) and a legend instead of labels.
+  const isMobile = useIsMobile();
+  const shorten = (name: string) => (isMobile && name.length > 8 ? `${name.slice(0, 7)}…` : name);
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-2">
       {/* Pipeline Chart */}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle>{t("dealsByStage")}</CardTitle>
           <CardDescription>{t("dealsByStageDesc")}</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px]">
+        <CardContent className="h-[240px] sm:h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dealDistribution} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <BarChart
+              data={dealDistribution}
+              margin={
+                isMobile ? { top: 12, right: 8, left: -16, bottom: 0 } : { top: 20, right: 30, left: 20, bottom: 5 }
+              }
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} style={{ fontSize: "12px" }} />
-              <YAxis axisLine={false} tickLine={false} style={{ fontSize: "12px" }} />
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                style={{ fontSize: isMobile ? "10px" : "12px" }}
+                tickFormatter={shorten}
+                interval={isMobile ? 0 : "preserveEnd"}
+              />
+              <YAxis axisLine={false} tickLine={false} style={{ fontSize: isMobile ? "10px" : "12px" }} />
               <Tooltip
                 cursor={{ fill: "#f3f4f6" }}
                 contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
@@ -56,7 +75,7 @@ export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
           <CardTitle>{t("leadsBySource")}</CardTitle>
           <CardDescription>{t("leadsBySourceDesc")}</CardDescription>
         </CardHeader>
-        <CardContent className="h-[300px] flex flex-col justify-center">
+        <CardContent className="flex h-[240px] flex-col justify-center sm:h-[300px]">
           {!leadsBySource || leadsBySource.length === 0 ? (
             <p className="text-center text-muted-foreground italic">{t("noLeadSourceData")}</p>
           ) : (
@@ -66,12 +85,15 @@ export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
                   data={leadsBySource}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
+                  innerRadius={isMobile ? 45 : 60}
+                  outerRadius={isMobile ? 75 : 100}
                   paddingAngle={5}
                   dataKey="value"
-                  label={(entry: any) =>
-                    `${entry.name} ${(((entry.value || 0) / (leadsBySource.reduce((s, e) => s + (e.value || 0), 0) || 1)) * 100).toFixed(0)}%`
+                  label={
+                    isMobile
+                      ? false
+                      : (entry: any) =>
+                          `${entry.name} ${(((entry.value || 0) / (leadsBySource.reduce((s, e) => s + (e.value || 0), 0) || 1)) * 100).toFixed(0)}%`
                   }
                 >
                   {leadsBySource.map((entry, index) => (
@@ -79,7 +101,7 @@ export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
+                <Legend wrapperStyle={isMobile ? { fontSize: 11 } : undefined} />
               </PieChart>
             </ResponsiveContainer>
           )}

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, isNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, notInArray, type SQL } from "drizzle-orm";
 
 import { deals, orders, quotes, tickets } from "@/db/schema";
 import { getTenantEntitlements, requireCapability } from "@/lib/auth-guard";
@@ -141,9 +141,13 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
         .where(
           and(
             where({ companyId: tickets.companyId, contactId: tickets.contactId }),
-            // Anything still open first; closed ones are history and the timeline
-            // below already carries the shape of the relationship.
-            or(isNull(tickets.closedAt), eq(tickets.status, "closed")),
+            // Only what is still open: closed ones are history and the timeline
+            // already carries the shape of the relationship.
+            // ⚠️ By status, not by `closedAt`. This was `closedAt IS NULL OR
+            // status = 'closed'`, which kept every closed ticket and dropped the
+            // resolved ones — and older code closed tickets without setting
+            // `closedAt` at all, so the column cannot say "open" on its own.
+            notInArray(tickets.status, ["resolved", "closed"]),
           ),
         )
         .orderBy(desc(tickets.createdAt))

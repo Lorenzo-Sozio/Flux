@@ -111,8 +111,8 @@ export default async function FunnelPage({
           <CardContent className="space-y-4">
             {conversionRates.map((cr) => (
               <div key={`${cr.from}-${cr.to}`}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-muted-foreground text-sm">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="min-w-0 text-muted-foreground text-sm">
                     {cr.from} → {cr.to}
                   </span>
                   <span
@@ -136,11 +136,11 @@ export default async function FunnelPage({
             ))}
 
             <div className="space-y-2 border-t pt-3 text-sm">
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">{t("avgLeadConversion")}</span>
                 <span className="font-medium">{t("daysShort", { days: data.avgLeadConversionDays })}</span>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-2">
                 <span className="text-muted-foreground">{t("avgDealCycle")}</span>
                 <span className="font-medium">{t("daysShort", { days: data.avgDealCycleDays })}</span>
               </div>

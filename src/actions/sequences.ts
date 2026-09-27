@@ -7,6 +7,7 @@ import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 import { contacts, emailSequenceEnrollments, emailSequenceSteps, emailSequences, leads } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { inboundEmailConfigured } from "@/lib/inbound-sales-reply";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { cleanSequence, type SequenceEntity, type SequenceInput, type StopReason } from "@/lib/sequence-plan";
 import { enroll, stopEnrollments } from "@/lib/sequence-runner";
@@ -25,7 +26,7 @@ export type SequenceResult = { ok: true; id: string } | { ok: false; error: stri
  */
 export async function replyDetectionConfigured(): Promise<boolean> {
   await requireCapability("record:read");
-  return Boolean(process.env.RESEND_INBOUND_WEBHOOK_SECRET || process.env.INBOUND_EMAIL_SECRET);
+  return inboundEmailConfigured();
 }
 
 export async function getSequences() {
@@ -149,6 +150,11 @@ export async function saveSequence(id: string | null, input: SequenceInput): Pro
         delayDays: sqlExcluded("delay_days"),
         subject: sqlExcluded("subject"),
         body: sqlExcluded("body"),
+        // ⚠️ Every column a step has: one left out keeps its old value on an edited step, and a
+        // task turned back into an email would go on creating tasks.
+        kind: sqlExcluded("kind"),
+        taskType: sqlExcluded("task_type"),
+        replyInThread: sqlExcluded("reply_in_thread"),
       },
     });
   await db
@@ -206,6 +212,7 @@ const REFUSALS: Record<string, string> = {
   missing_email: "missingEmail",
   converted: "converted",
   record_deleted: "recordDeleted",
+  with_assistant: "withAssistant",
 };
 
 export async function enrollRecord(
@@ -266,6 +273,6 @@ export async function stopEnrollment(id: string): Promise<{ ok: true }> {
 }
 
 /** The value the upsert tried to insert, for the columns it updates on conflict. */
-function sqlExcluded(column: "delay_days" | "subject" | "body") {
+function sqlExcluded(column: "delay_days" | "subject" | "body" | "kind" | "task_type" | "reply_in_thread") {
   return sql.raw(`excluded.${column}`);
 }

@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/navigation/sidebar/filter-nav.ts",
+    "description": "⚠️⚠️ il commerciale torna a vedere catalogo, contratti e le sei viste d'analisi nel menu",
+    "find": "    if (entry.audience === \"manager\" && !manager) secondary.push(entry.url);",
+    "replace": ""
+  },
+  {
+    "file": "src/navigation/sidebar/filter-nav.ts",
+    "description": "⚠️ «mostra solo l'essenziale» non toglie niente",
+    "find": "  const hidden = new Set([...access.hidden, ...(options.focused ? (access.secondary ?? []) : [])]);",
+    "replace": "  const hidden = new Set([...access.hidden]);"
+  },
+  {
+    "file": "src/navigation/sidebar/sidebar-items.ts",
+    "description": "⚠️⚠️ un editor vede Finanza nel menu e al clic viene rimandato indietro",
+    "find": "        module: \"sales\",\n        need: \"settings:manage\",\n      },",
+    "replace": "        module: \"sales\",\n      },"
+  },
+  {
+    "file": "src/lib/palette-commands.ts",
+    "description": "⚠️ la palette offre sezioni bloccate dal piano, che aprono la pagina dell'abbonamento",
+    "find": "    if (!entry.url || entry.locked || seen.has(entry.url)) return;",
+    "replace": "    if (!entry.url || seen.has(entry.url)) return;"
+  },
+  {
+    "file": "src/lib/palette-commands.ts",
+    "description": "⚠️⚠️ la palette non trova le viste dentro una sezione: «previsione» non porta da nessuna parte",
+    "find": "      for (const sub of item.subItems ?? []) if (!item.locked) add(sub, group.labelKey);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/text-match.ts",
+    "description": "⚠️⚠️ «Nicolo» torna a non trovare «Nicolò»",
+    "find": "export const fold = (value: unknown): SQL => sql`translate(lower(${value}), ${FOLD_FROM}, ${FOLD_TO})`;",
+    "replace": "export const fold = (value: unknown): SQL => sql`lower(${value})`;"
+  },
+  {
+    "file": "src/lib/search/providers.ts",
+    "description": "⚠️ un contatto non si trova più con il nome della sua azienda",
+    "find": "          // By the company they work for: \"Rossi\" finds the people at Rossi Srl too.\n          matches(companies.name, like),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/filter-engine.ts",
+    "description": "il filtro «contiene» delle liste torna a distinguere gli accenti",
+    "find": "    case \"contains\":\n      return matchesText(col, `%${val}%`);",
+    "replace": "    case \"contains\":\n      return sql`${col} ILIKE ${`%${val}%`}`;"
+  }
+]

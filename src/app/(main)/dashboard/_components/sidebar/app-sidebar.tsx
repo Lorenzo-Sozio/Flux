@@ -24,8 +24,10 @@ import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav"
 import { accountPlacement, sidebarItems, sidebarPlacement } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
+import { MenuScopeToggle } from "./menu-scope-toggle";
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
+import { useFullMenu } from "./use-full-menu";
 
 export function AppSidebar({
   user,
@@ -35,7 +37,10 @@ export function AppSidebar({
 }: React.ComponentProps<typeof Sidebar> & { user: any; navAccess: NavAccess; creatable: EntityType[] }) {
   // The menu — icons included — is imported here, on the client, and never
   // travels. Only the server's verdict about it does.
-  const navGroups = useMemo(() => applyNavAccess(sidebarItems, navAccess), [navAccess]);
+  // The day's work first for whoever does not run the workspace, unless they asked for
+  // every section (§4.1). The account menu is never trimmed.
+  const { full, setFull } = useFullMenu();
+  const navGroups = useMemo(() => applyNavAccess(sidebarItems, navAccess, { focused: !full }), [navAccess, full]);
   // Administration is filtered by the same pass as everything else and only
   // then split out: it is the account menu, not a destination.
   const mainGroups = useMemo(() => sidebarPlacement(navGroups), [navGroups]);
@@ -70,6 +75,9 @@ export function AppSidebar({
         {/* Filtered by the layout against the viewer's role and plan; the full
             list used to be rendered to everybody (audit rilievi D-08, U-02). */}
         <NavMain items={mainGroups} creatable={creatable} />
+        <div className="px-2 group-data-[collapsible=icon]:hidden">
+          <MenuScopeToggle full={full} onChange={setFull} hiddenCount={navAccess.secondary?.length ?? 0} />
+        </div>
 
         {/*
           ⚠️ Administration is the account menu from md up — a dropdown under the

@@ -72,9 +72,10 @@ Nessuno richiede decisioni. Ciascuno si chiude con test, mutazioni dove un error
 
 | Decisione | Sblocca | Nota |
 |---|---|---|
-| D1 canale SDI e fornitore | I6 | Ancora da prendere. Tutto il resto della fatturazione si costruisce senza. |
-| D5 firma **avanzata** tramite fornitore | L2 | Decisa il 15 settembre 2026; resta da scegliere il fornitore, senza il quale L2 non inizia. |
-| D6 provvigione su vinto o su incassato | L8 | Su incassato richiede anche I9. |
+| D1 canale SDI e fornitore | I6 | Proposto Namirial, confrontato con A-Cube, Openapi, Aruba e InfoCert (27 settembre 2026): si chiedono preventivi a Namirial e A-Cube. Tutto il resto della fatturazione si costruisce senza. |
+| D5 firma **avanzata** tramite fornitore | — | Resta aperta per dopo, nessun fornitore scelto. La firma **semplice** non la attende: vedi sotto. |
+
+**Prese il 27 settembre 2026:** D5 — L2 si fa ora con la firma **semplice** (nome digitato, consenso, IP, data e ora, SHA-256 del PDF congelato); l'avanzata tramite fornitore resta aperta. D6 — la provvigione matura sulla **trattativa vinta**: L8 non dipende più da I9; «sull'incassato» si rivaluta quando I9 esisterà. L9 è fatta.
 
 **Prese il 15 settembre 2026:** D2 e D3 sul perimetro consigliato (TD01 e TD04, IVA ordinaria con Natura, bollo virtuale; una fattura per ordine). D4 listini con percentuale sul prezzo base e prezzi espliciti per prodotto che la sostituiscono. D7 chiavi API con ambiti di lettura e scrittura **per entità**.
 
@@ -158,7 +159,7 @@ Chiude la catena lead, trattativa, preventivo, ordine, pagamento. Oggi le aziend
 | I6 | **Invio e esiti tramite il canale scelto**<br>Invio dell'XML; webhook per ricevuta di consegna, scarto, mancata consegna ed esito; stato aggiornato in modo idempotente e notifica al titolare. | Uno scarto arriva in campanella con il motivo leggibile | 3 g |
 | I7 | **Copia di cortesia e archiviazione**<br>PDF leggibile per il cliente; XML e ricevute salvati su R2. | Il cliente riceve il PDF, l'XML resta scaricabile dalla fattura | 1,5 g |
 | I8 | **Note di credito**<br>TD04 collegata alla fattura d'origine, totale o parziale. | Stornare una fattura aggiorna il residuo da incassare | 1,5 g |
-| I9 | **Da ordine a incasso**<br>Pagamenti collegati alla fattura oltre che all'ordine; scadenzario dei crediti su finance. | Finance mostra fatture scadute e non incassate | 3 g |
+| I9 | ~~**Da ordine a incasso**~~ ✅ 27/09/2026<br>Pagamenti collegati alla fattura oltre che all'ordine; scadenzario dei crediti su finance. Fatto: il dovuto è il totale meno note di credito e pagamenti; un pagamento sull'ordine va alla fattura solo se è l'unica emessa (anche per il pregresso, migrazione 0053); scadenzario per età e per valuta; `invoice.paid`. D6 «sull'incassato» si può ora rivalutare. | Finance mostra fatture scadute e non incassate | 3 g |
 
 ## Fase 4 · Flusso commerciale completo
 
@@ -169,13 +170,13 @@ Ordinate in modo che ciascuna trovi pronto quello da cui dipende: i territori pr
 | ID | Attività | Dipende da | Stima |
 |---|---|---|---|
 | L1 | **Assegnazione automatica dei lead a rotazione**<br>Nuova azione `assign_owner` del motore di automazione; il turno salvato in tabella con compare-and-swap, così due lead simultanei non vanno alla stessa persona. | — | 2 g |
-| L2 | **Firma del preventivo**<br>Firma elettronica semplice sulla pagina pubblica: nome digitato, consenso, IP, data e hash SHA-256 del PDF congelato al momento della firma, nel registro del preventivo. | D5 | 2 g |
+| L2 | ~~**Firma del preventivo**~~ ✅ 27/09/2026<br>Firma elettronica semplice sulla pagina pubblica: nome digitato, consenso, IP, data e hash SHA-256 del PDF congelato al momento della firma, nel registro del preventivo. Fatta: `src/lib/quote-signature.ts`, migrazione 0049, PDF firmato conservato e scaricabile solo se corrisponde all'impronta. | — (D5 presa: semplice ora) | 2 g |
 | L3 | **Listini**<br>Listino con prezzi o sconto sul prezzo base, assegnato all'azienda; il selettore prodotto di preventivo e ordine propone il prezzo del listino del cliente. | D4 | 3 g |
 | L4 | **Territori**<br>Territori per paese, regione o provincia; usati in assegnazione e nei report, non nella visibilità dei record. | — | 2 g |
 | L5 | **Assegnazione per regola**<br>Regole su fonte e territorio in cima alla rotazione di L1. | L1 · L4 | 1 g |
 | L6 | **Sequenze di follow-up**<br>Passi con ritardo e modello; esecuzione nella coda email esistente; si fermano alla risposta del cliente usando la posta in arrivo già collegata, e all'opt-out. Guardia dei lavori ripetuti estesa. | — | 5 g |
 | L7 | **Contratti e rinnovi**<br>Valore ricorrente, periodicità, scadenza e preavviso; avviso di scadenza sul lavoro giornaliero esistente; ricavo ricorrente mensile sul cruscotto. | — | 3 g |
-| L8 | **Provvigioni**<br>Regole per commerciale; maturazione su trattativa vinta o su incasso; report per periodo. | D6 · I9 | 3 g |
+| L8 | ~~**Provvigioni**~~ ✅ 27/09/2026<br>Regole per commerciale; maturazione sulla trattativa vinta (D6); report per periodo. «Sull'incassato» da rivalutare dopo I9. Fatta: aliquote per persona e/o pipeline con data di decorrenza, report per mese, trimestre o anno, approvazione del mese che congela le righe (`src/lib/commissions.ts`, migrazione 0051). | — (D6 presa) | 3 g |
 | L9 | **API di lettura**<br>GET con cursore per contatti, lead, aziende, trattative e ordini, filtro `updatedSince` per riconciliare; ambiti lettura e scrittura sulle chiavi API, che oggi scrivono tutto con una chiave sola. | D7 | 4 g |
 
 ---

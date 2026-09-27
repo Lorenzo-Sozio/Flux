@@ -1,0 +1,20 @@
+[
+  { "width": 430, "height": 932, "ratio": 3, "devices": "iPhone 14/15 Pro Max, 15 Plus, 16 Plus" },
+  { "width": 440, "height": 956, "ratio": 3, "devices": "iPhone 16 Pro Max" },
+  { "width": 402, "height": 874, "ratio": 3, "devices": "iPhone 16 Pro" },
+  { "width": 393, "height": 852, "ratio": 3, "devices": "iPhone 14 Pro, 15, 15 Pro, 16" },
+  { "width": 428, "height": 926, "ratio": 3, "devices": "iPhone 12/13 Pro Max, 14 Plus" },
+  { "width": 390, "height": 844, "ratio": 3, "devices": "iPhone 12, 13, 14" },
+  { "width": 375, "height": 812, "ratio": 3, "devices": "iPhone X, XS, 11 Pro, 12/13 mini" },
+  { "width": 414, "height": 896, "ratio": 3, "devices": "iPhone XS Max, 11 Pro Max" },
+  { "width": 414, "height": 896, "ratio": 2, "devices": "iPhone XR, 11" },
+  { "width": 414, "height": 736, "ratio": 3, "devices": "iPhone 6/7/8 Plus" },
+  { "width": 375, "height": 667, "ratio": 2, "devices": "iPhone 6/7/8, SE 2nd/3rd gen" },
+  { "width": 1024, "height": 1366, "ratio": 2, "devices": "iPad Pro 12.9\"" },
+  { "width": 834, "height": 1194, "ratio": 2, "devices": "iPad Pro 11\"" },
+  { "width": 820, "height": 1180, "ratio": 2, "devices": "iPad Air 4/5, iPad 10" },
+  { "width": 834, "height": 1112, "ratio": 2, "devices": "iPad Air 3, iPad Pro 10.5\"" },
+  { "width": 810, "height": 1080, "ratio": 2, "devices": "iPad 7/8/9" },
+  { "width": 768, "height": 1024, "ratio": 2, "devices": "iPad mini 5, older iPads" },
+  { "width": 744, "height": 1133, "ratio": 2, "devices": "iPad mini 6" }
+]

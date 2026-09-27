@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ le note di credito non vengono tolte dal dovuto: si sollecita un cliente per ciò che gli è stato stornato",
+    "find": "  const due = Math.round((Number(total) - Number(credited)) * 100) / 100;",
+    "replace": "  const due = Math.round(Number(total) * 100) / 100;"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ le note di credito finiscono nello scadenzario come crediti da incassare",
+    "find": "        eq(invoices.documentType, \"TD01\"),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ lo scadenzario elenca anche le fatture già pagate",
+    "find": "        sql`round(${invoices.total} - ${invoices.creditedAmount} - coalesce(${paidPerInvoice.paid}, 0), 2) > 0`,",
+    "replace": "        sql`true`,"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️ una fattura senza scadenza non scade mai: non verrà mai sollecitata",
+    "find": "      const due = r.dueDate ?? r.issueDate ?? input.today;",
+    "replace": "      const due = r.dueDate ?? input.today;"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "il cliente mostrato è il nome di oggi, non quello fatturato",
+    "find": "        customer: r.snapshotName ?? r.companyName,",
+    "replace": "        customer: r.companyName ?? r.snapshotName,"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️ lo scaduto conta anche ciò che non è ancora scaduto",
+    "find": "    if (r.bucket !== \"current\") t.overdue = Math.round((t.overdue + r.outstanding) * 100) / 100;",
+    "replace": "    t.overdue = Math.round((t.overdue + r.outstanding) * 100) / 100;"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ si può incassare una bozza o una nota di credito",
+    "find": "  if (invoice.status !== \"issued\" || invoice.documentType !== \"TD01\") return { ok: false, reason: \"not_receivable\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️ ogni pagamento dopo il saldo manda di nuovo invoice.paid",
+    "find": "  const becamePaid = settled && balance.outstanding + amount > 0;",
+    "replace": "  const becamePaid = settled;"
+  },
+  {
+    "file": "src/lib/receivables-aging.ts",
+    "description": "⚠️ una fattura che scade oggi risulta già in ritardo",
+    "find": "  if (late <= 0) return { bucket: \"current\", daysOverdue: 0 };",
+    "replace": "  if (late < 0) return { bucket: \"current\", daysOverdue: 0 };"
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️⚠️ con più fatture sullo stesso ordine il pagamento finisce su una a caso",
+    "find": "  if (issued.length === 1) {",
+    "replace": "  if (issued.length >= 1) {"
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️ un pagamento sull'ordine non arriva mai alla sua unica fattura: lo scadenzario la sollecita già pagata",
+    "find": "  if (issued.length === 1) {",
+    "replace": "  if (false) {"
+  }
+]

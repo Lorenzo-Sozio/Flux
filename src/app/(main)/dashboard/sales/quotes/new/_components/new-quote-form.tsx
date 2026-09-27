@@ -6,7 +6,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronLeft, FileText, Loader2, Package, Plus, Trash2 } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  FileText,
+  ListOrdered,
+  Loader2,
+  Package,
+  Plus,
+  Receipt,
+  Trash2,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -15,6 +26,7 @@ import type { z } from "zod";
 import { createQuoteAction, type getQuoteFormData } from "@/actions/quotes";
 import { CreateQuoteSchema } from "@/actions/quotes-validation";
 import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +45,14 @@ import { cn } from "@/lib/utils";
 
 type FormValues = z.infer<typeof CreateQuoteSchema>;
 type FormData = Awaited<ReturnType<typeof getQuoteFormData>>;
+
+/** Today plus the default validity, as `<input type="date">` wants it; "" for none. */
+function defaultExpiryInput(days: number): string {
+  if (days <= 0) return "";
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
 
 /** Marks a line as written by hand rather than picked from the catalogue. */
 const CUSTOM = "_custom";
@@ -54,6 +74,9 @@ const emptyLine = () => ({
   discountPercent: 0,
   taxPercent: 0,
 });
+
+/** What a phone shows at a time: the editor's four tabs, in the editor's order. */
+type QuoteSection = "customer" | "lines" | "terms" | "summary";
 
 /**
  * Writing a quote.
@@ -87,10 +110,17 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
   const params = useSearchParams();
   const t = useTranslations("quotes.form");
   const tc = useTranslations("common");
+  const tR = useTranslations("record");
   const { formatMoney } = useCurrency();
 
   const data = initialData;
   const [submitting, setSubmitting] = useState(false);
+  // What a phone shows: one card at a time, and one line open at a time, as the
+  // editor does. The form is one form whatever is on screen - every field stays
+  // mounted. The first line starts open: a new quote's only line is empty, and a
+  // folded empty row is one more tap before anything can be typed.
+  const [section, setSection] = useState<QuoteSection>("customer");
+  const [openLine, setOpenLine] = useState<number | null>(0);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateQuoteSchema),
@@ -98,9 +128,10 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
       dealId: params.get("dealId") ?? "",
       companyId: params.get("companyId") ?? "",
       contactId: params.get("contactId") ?? "",
-      expiresAt: "",
+      // The workspace's standard validity and conditions (Settings → General).
+      expiresAt: defaultExpiryInput(data?.defaults?.validityDays ?? 0),
       items: [emptyLine()],
-      notes: "",
+      notes: data?.defaults?.terms ?? "",
       discountPercent: 0,
       taxPercent: 0,
       currency: "EUR",
@@ -221,7 +252,19 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
+      <form
+        onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          // ⚠️ On a phone the field that failed may be on another tab, or inside a
+          // folded line: open both, or Create looks like it did nothing.
+          if (errors.dealId || errors.companyId || errors.contactId) setSection("customer");
+          else if (errors.items) {
+            setSection("lines");
+            const bad = Array.isArray(errors.items) ? errors.items.findIndex(Boolean) : -1;
+            if (bad >= 0) setOpenLine(bad);
+          } else setSection("terms");
+        })}
+        className="flex flex-col gap-6"
+      >
         {/* ── The bar that stays put ─────────────────────────────────────── */}
         <div className="-mx-4 md:-mx-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-md md:px-6">
           <div className="flex min-w-0 items-center gap-2">
@@ -236,7 +279,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                 <ChevronLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:flex">
               <FileText className="h-5 w-5 text-primary" />
             </div>
             <div className="min-w-0">
@@ -245,12 +288,18 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <div className="mr-2 hidden items-baseline gap-2 sm:flex">
               <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
               <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
             </div>
-            <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/quotes")}>
+            {/* The back chevron already leaves; on a phone this second way out is what pushed the bar onto two lines. */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="hidden sm:inline-flex"
+              onClick={() => router.push("/dashboard/sales/quotes")}
+            >
               {tc("cancel")}
             </Button>
             <Button type="submit" disabled={submitting} className="gap-2">
@@ -260,10 +309,35 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        {/*
+          ⚠️ On a phone the form is four tabs, as the editor is. Stacked, every
+          line's six fields open at once pushed the terms and the total a long
+          scroll down. Not sticky: the bar above already holds the top edge, and
+          two pinned bars leave little of a phone's screen for the form.
+        */}
+        <RecordTabBar
+          sticky={false}
+          tabs={[
+            { id: "customer", label: t("customerTitle"), icon: <Building2 aria-hidden /> },
+            { id: "lines", label: t("linesTitle"), icon: <ListOrdered aria-hidden />, count: fields.length },
+            { id: "terms", label: tR("tabs.terms"), icon: <FileText aria-hidden /> },
+            { id: "summary", label: t("summaryTitle"), icon: <Receipt aria-hidden /> },
+          ]}
+          active={section}
+          onChange={(id) => setSection(id as QuoteSection)}
+          label={tR("sectionsLabel")}
+          invalid={[
+            ...(form.formState.errors.dealId || form.formState.errors.companyId ? ["customer"] : []),
+            ...(form.formState.errors.items ? ["lines"] : []),
+          ]}
+        />
+
+        {/* The negative margin takes back the tab bar's own bottom margin, which
+            the form's gap already provides; from lg up the bar is not there. */}
+        <div className="-mt-3 sm:-mt-4 grid grid-cols-1 gap-6 lg:mt-0 xl:grid-cols-12">
           {/* ── Main column: who it is for, what is quoted, on what terms ── */}
           <div className="min-w-0 space-y-6 xl:col-span-8">
-            <Card>
+            <Card className={cn(section !== "customer" && "max-lg:hidden")}>
               <CardHeader>
                 <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                   {t("customerTitle")}
@@ -348,7 +422,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cn(section !== "lines" && "max-lg:hidden")}>
               <CardHeader className="flex flex-row items-start justify-between gap-3">
                 <div className="min-w-0">
                   <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
@@ -362,7 +436,10 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => append(emptyLine())}
+                  onClick={() => {
+                    append(emptyLine());
+                    setOpenLine(fields.length);
+                  }}
                 >
                   <Plus className="h-3.5 w-3.5" /> {t("addLine")}
                 </Button>
@@ -401,22 +478,48 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                         key={field.id}
                         className="rounded-lg border bg-muted/20 p-3 2xl:rounded-none 2xl:border-0 2xl:border-b 2xl:bg-transparent 2xl:px-0 2xl:py-2 2xl:hover:bg-muted/20 2xl:last:border-b-0"
                       >
-                        {/* Narrow screens get the line's own header; wide ones read it off the row. */}
-                        <div className="mb-3 flex items-center justify-between gap-2 2xl:hidden">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-muted-foreground text-xs">
-                              {t("line", { number: index + 1 })}
+                        {/* Narrow screens get the line's own header; wide ones read it off the row.
+                            On a phone the header is also a summary row that opens to edit:
+                            six fields a line, open for every line, was most of the page. */}
+                        <div
+                          className={cn(
+                            "mb-3 flex items-center justify-between gap-2 2xl:hidden",
+                            openLine !== index && "max-lg:mb-0",
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setOpenLine(openLine === index ? null : index)}
+                            aria-expanded={openLine === index}
+                            className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 text-left lg:pointer-events-none lg:min-h-0"
+                          >
+                            <span className="flex min-w-0 flex-wrap items-center gap-2">
+                              <span className="font-medium text-muted-foreground text-xs">
+                                {t("line", { number: index + 1 })}
+                              </span>
+                              {isCustom && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                                >
+                                  {t("offCatalogue")}
+                                </Badge>
+                              )}
+                              <ChevronDown
+                                className={cn(
+                                  "size-3.5 text-muted-foreground transition-transform lg:hidden",
+                                  openLine === index && "rotate-180",
+                                )}
+                                aria-hidden
+                              />
                             </span>
-                            {isCustom && (
-                              <Badge
-                                variant="outline"
-                                className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                              >
-                                {t("offCatalogue")}
-                              </Badge>
+                            {openLine !== index && (
+                              <span className="max-w-full truncate font-medium text-sm lg:hidden">
+                                {line?.description || t("descriptionPlaceholder")}
+                              </span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-1">
+                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
                             <span className="mr-1 font-semibold text-sm tabular-nums">
                               {formatMoney(lineTotal, currency)}
                             </span>
@@ -424,7 +527,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="h-9 w-9 text-muted-foreground hover:text-destructive"
                               onClick={() => remove(index)}
                               disabled={fields.length === 1}
                               aria-label={t("removeLine")}
@@ -434,7 +537,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                           </div>
                         </div>
 
-                        <div className={LINE_GRID}>
+                        <div className={cn(LINE_GRID, openLine !== index && "max-lg:hidden")}>
                           <span className="hidden text-muted-foreground text-xs tabular-nums 2xl:block">
                             {index + 1}
                           </span>
@@ -596,14 +699,17 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                   type="button"
                   variant="ghost"
                   className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
-                  onClick={() => append(emptyLine())}
+                  onClick={() => {
+                    append(emptyLine());
+                    setOpenLine(fields.length);
+                  }}
                 >
                   <Plus className="h-4 w-4" /> {t("addAnotherLine")}
                 </Button>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cn(section !== "terms" && "max-lg:hidden")}>
               <CardHeader>
                 <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                   {t("termsTitle")}
@@ -705,7 +811,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
           </div>
 
           {/* ── Side column: the money, kept in view while the lines are written ── */}
-          <div className="min-w-0 xl:col-span-4">
+          <div className={cn("min-w-0 xl:col-span-4", section !== "summary" && "max-lg:hidden")}>
             <div className="space-y-6 xl:sticky xl:top-20">
               <Card>
                 <CardHeader>

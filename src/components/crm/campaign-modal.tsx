@@ -152,7 +152,8 @@ export function CampaignModal({ templates, campaign, onSuccess, children, openOn
     <Button
       variant={isEditing ? "ghost" : "default"}
       size={isEditing ? "icon" : "default"}
-      className={isEditing ? "h-8 w-8" : "gap-2"}
+      className={isEditing ? "size-9 md:size-8" : "gap-2"}
+      aria-label={isEditing ? tc("edit") : undefined}
     >
       {isEditing ? (
         <Pencil className="h-3.5 w-3.5" />
@@ -229,7 +230,9 @@ export function CampaignModal({ templates, campaign, onSuccess, children, openOn
                     control={control}
                     name="status"
                     render={({ field }) => (
-                      <div className="grid grid-cols-3 gap-2">
+                      // One per line on a phone: three columns of 95px left each
+                      // description three words to a line.
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         {STATUS_OPTIONS.map((opt) => {
                           const active = field.value === opt;
                           return (
@@ -277,7 +280,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children, openOn
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <F label={t("selectTemplate")} error={e.templateId?.message}>
                         <span /> {/* spacer for F layout */}
                       </F>

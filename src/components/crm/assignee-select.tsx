@@ -33,23 +33,29 @@ interface Props {
   onChange: (encoded: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  /**
+   * False where the record has nowhere to keep a group. ⚠️ A task has only
+   * `assigneeId`: offered a group, the task dialog saved the choice as nobody,
+   * and the task disappeared from everyone's list without a word.
+   */
+  allowGroups?: boolean;
 }
 
 type UserOption = { id: string; name: string | null; email: string | null };
 type GroupOption = { id: string; name: string; color: string; memberCount: number };
 
-export function AssigneeSelect({ value, onChange, disabled, placeholder: placeholderProp }: Props) {
+export function AssigneeSelect({ value, onChange, disabled, placeholder: placeholderProp, allowGroups = true }: Props) {
   const t = useTranslations("assignees");
   const placeholder = placeholderProp ?? t("unassigned");
   const [users, setUsers] = useState<UserOption[]>([]);
   const [groups, setGroups] = useState<GroupOption[]>([]);
 
   useEffect(() => {
-    Promise.all([getAllUsers(), getGroupsForSelect()]).then(([u, g]) => {
+    Promise.all([getAllUsers(), allowGroups ? getGroupsForSelect() : Promise.resolve([])]).then(([u, g]) => {
       setUsers(u);
       setGroups(g);
     });
-  }, []);
+  }, [allowGroups]);
 
   const options = [
     { value: "__none__", label: placeholder },

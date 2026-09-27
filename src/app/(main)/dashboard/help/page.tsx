@@ -9,7 +9,6 @@ import {
   Banknote,
   BarChart3,
   Bell,
-  BookOpen,
   Building2,
   Calendar,
   CheckSquare,
@@ -377,11 +376,11 @@ export default function HelpPage() {
       {/* ── Main Content ─────────────────────────────────────────────────────── */}
       <div className="min-w-0 flex-1 space-y-6 pb-16">
         {/* Header */}
-        <div className="flex items-start gap-4 rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-6">
+        <div className="flex items-start gap-3 rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-4 sm:gap-4 sm:p-6">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
             <HelpCircle className="h-6 w-6 text-primary" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
             <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
           </div>
@@ -449,7 +448,9 @@ export default function HelpPage() {
               >
                 <Card className={cn("overflow-hidden border", section.border)}>
                   {/* Section header */}
-                  <CardHeader className={cn("flex flex-row items-center gap-4 border-b pb-4", section.bg)}>
+                  <CardHeader
+                    className={cn("flex flex-row items-center gap-3 border-b px-4 pb-4 sm:gap-4 sm:px-6", section.bg)}
+                  >
                     <div
                       className={cn(
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
@@ -473,13 +474,15 @@ export default function HelpPage() {
                         href={section.href}
                         className={cn(
                           "flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                          // An arrow on a phone: the words took 130px from a title that then wrapped a word per line.
+                          "max-sm:size-9 max-sm:justify-center max-sm:p-0",
                           "border",
                           section.border,
                           "hover:bg-background/60",
                           section.color,
                         )}
                       >
-                        {t("goToSection")}
+                        <span className="max-sm:sr-only">{t("goToSection")}</span>
                         <ArrowRight className="h-3.5 w-3.5" />
                       </Link>
                     )}
@@ -487,7 +490,7 @@ export default function HelpPage() {
 
                   <CardContent className="p-0">
                     {/* Description */}
-                    <div className="flex items-start gap-3 border-b bg-muted/20 px-6 py-4">
+                    <div className="flex items-start gap-3 border-b bg-muted/20 px-4 py-4 sm:px-6">
                       <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                       <p className="text-muted-foreground text-sm leading-relaxed">{section.description}</p>
                     </div>
@@ -495,7 +498,7 @@ export default function HelpPage() {
                     {/* FAQ */}
                     <Accordion type="multiple" className="divide-y">
                       {section.topics.map((topic, i) => (
-                        <AccordionItem key={i} value={`${section.id}-${i}`} className="border-0 px-6">
+                        <AccordionItem key={i} value={`${section.id}-${i}`} className="border-0 px-4 sm:px-6">
                           <AccordionTrigger className="py-4 text-left text-sm font-medium hover:no-underline">
                             {topic.q}
                           </AccordionTrigger>
@@ -518,7 +521,7 @@ export default function HelpPage() {
         )}
 
         {/* Footer */}
-        <div className="rounded-xl border bg-muted/30 p-6 text-center">
+        <div className="rounded-xl border bg-muted/30 p-4 text-center sm:p-6">
           <p className="font-medium text-sm">{t("notFoundTitle")}</p>
           <p className="mt-1 text-muted-foreground text-sm">{t("notFoundHint")}</p>
         </div>

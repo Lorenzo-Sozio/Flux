@@ -8,12 +8,33 @@
  * pointing the wrong way.
  */
 
+/** Which credential wrote: a key's id and its name, never the key. */
+export interface OriginKey {
+  id: string;
+  name: string;
+}
+
 /** Who caused the change that produced the event. */
 export interface Origin {
   /** `api` = a machine wrote through the API; `user` = somebody in the interface. */
   via: "api" | "user" | "system";
   /** The user's id, where there is one. Machines do not have one. */
   actor?: string | null;
+  /**
+   * ⚠️⚠️ For `api`: **which** key. `via` alone says "a machine", and an integration that
+   * drops every `api` event to avoid hearing itself also drops what every *other*
+   * integration did — a lead pushed by the website connector never reaches the assistant.
+   * With the key it can drop only its own.
+   */
+  key?: OriginKey | null;
+}
+
+/**
+ * The origin of a write through `/api/crm`, from whoever the gate let in. A person calling
+ * with their session is still `api` — they used the API — and named as the actor.
+ */
+export function apiOrigin(who: { userId: string | null; key: OriginKey | null }): Origin {
+  return { via: "api", actor: who.userId, key: who.key };
 }
 
 /**

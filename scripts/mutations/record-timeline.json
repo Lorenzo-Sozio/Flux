@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/field-history.ts",
+    "description": "⚠️⚠️ la storia registra anche i campi che non sono cambiati",
+    "find": "    if (oldValue !== newValue) out.push({ field, oldValue, newValue });",
+    "replace": "    out.push({ field, oldValue, newValue });"
+  },
+  {
+    "file": "src/lib/field-history.ts",
+    "description": "⚠️ un importo riletto dal database («1000.00») risulta cambiato rispetto al modulo (1000)",
+    "find": "const NUMERIC = new Set([\"amount\", \"probability\"]);",
+    "replace": "const NUMERIC = new Set<string>([]);"
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "⚠️⚠️ l'azienda non vede più le attività registrate sui suoi contatti",
+    "find": "  if (contactIds.length) parts.push(inArray(activities.contactId, contactIds));",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "⚠️⚠️ azienda e contatto non vedono più le attività delle loro trattative",
+    "find": "  if (dealIds.length) parts.push(inArray(activities.dealId, dealIds));",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "⚠️ la cronologia torna a essere ordinata per quando la riga è stata scritta",
+    "find": "    .orderBy(desc(activityMoment))",
+    "replace": "    .orderBy(desc(activities.createdAt))"
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "⚠️ una pagina taglia a metà le modifiche di un salvataggio, e le altre si perdono",
+    "find": "  while (end < all.length && all[end].at === all[end - 1].at) end++;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "⚠️ un incontro fissato per la prossima settimana conta come ultimo contatto",
+    "find": "`max(${activityMoment}) filter (where ${activityMoment} <= ${now})`",
+    "replace": "`max(${activityMoment})`"
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "le modifiche di una trattativa non dicono più, sull'azienda, da quale trattativa vengono",
+    "find": "            : (via.get(`${c.entityType}:${c.entityId}`) ?? null),",
+    "replace": "            : null,"
+  },
+  {
+    "file": "src/lib/record-timeline.ts",
+    "description": "gli eventi dei preventivi spariscono dalla cronologia dell'azienda",
+    "find": "  if (scope.type === \"company\") return eq(quotes.companyId, scope.id);",
+    "replace": "  if (scope.type === \"company\") return null;"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ spostare una trattativa non lascia traccia di chi l'ha fatto",
+    "find": "  await recordFieldChanges(db, \"deal\", dealId, oldDeal, updatedDeal, actor.user.id);\n  revalidatePath(\"/dashboard/pipeline\");",
+    "replace": "  revalidatePath(\"/dashboard/pipeline\");"
+  }
+]

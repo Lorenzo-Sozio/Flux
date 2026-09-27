@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 
 import NextAuth from "next-auth";
 
+import { CLAIMED_TENANT_HEADER } from "@/lib/claimed-tenant";
+import { clientIp } from "@/lib/client-ip";
+
 import { authConfig } from "./auth.config";
 
 // ─── CSP builder ─────────────────────────────────────────────────────────────
@@ -12,7 +15,13 @@ import { authConfig } from "./auth.config";
  * controlled inline scripts (ThemeBootScript, etc.) must carry the nonce.
  * 'strict-dynamic' allows Next.js to load its own chunks without explicit listing.
  */
-function buildCsp(nonce: string): string {
+/**
+ * `embeddable`: the public pages a customer puts on their own site — a booking page, a
+ * form. They may be framed by anybody, and may frame Cloudflare Turnstile. Nothing on them
+ * is signed in, so there is no session a hostile frame could act with; everything else keeps
+ * `frame-ancestors 'none'`.
+ */
+function buildCsp(nonce: string, options: { embeddable?: boolean } = {}): string {
   const isDev = process.env.NODE_ENV !== "production";
 
   return [
@@ -30,8 +39,8 @@ function buildCsp(nonce: string): string {
     // cannot take the installed app apart without anybody noticing.
     "worker-src 'self'",
     "manifest-src 'self'",
-    "frame-src 'none'",
-    "frame-ancestors 'none'",
+    options.embeddable ? "frame-src https://challenges.cloudflare.com" : "frame-src 'none'",
+    options.embeddable ? "frame-ancestors *" : "frame-ancestors 'none'",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -87,7 +96,7 @@ export const proxy = auth((req) => {
    *
    * extraRequestHeaders: additional k/v pairs to set on the forwarded request.
    */
-  function passThrough(extraRequestHeaders: Record<string, string> = {}): NextResponse {
+  function passThrough(extraRequestHeaders: Record<string, string> = {}, policy: string = csp): NextResponse {
     const requestHeaders = new Headers(req.headers);
 
     // ⚠️⚠️ **Anything a client sent under these names is removed before we add our
@@ -102,26 +111,27 @@ export const proxy = auth((req) => {
     // they resolve the tenant from the data instead, but that is a property of
     // every route that exists rather than a rule the next one has to obey.
     // Stripping here makes it the rule.
-    for (const header of ["x-tenant-id", "x-nonce", "x-pathname"]) {
+    // ⚠️ What a client *claims* survives under another name, for the API alone to check
+    // against its key (src/lib/api-import-auth.ts): the platform key names its workspace
+    // with X-Tenant-ID, and stripping it outright made that key unable to name any.
+    const claimed = req.headers.get("x-tenant-id");
+    for (const header of ["x-tenant-id", "x-nonce", "x-pathname", CLAIMED_TENANT_HEADER]) {
       requestHeaders.delete(header);
     }
+    if (claimed) requestHeaders.set(CLAIMED_TENANT_HEADER, claimed);
 
     requestHeaders.set("x-nonce", nonce);
     for (const [k, v] of Object.entries(extraRequestHeaders)) {
       requestHeaders.set(k, v);
     }
     const res = NextResponse.next({ request: { headers: requestHeaders } });
-    res.headers.set("Content-Security-Policy", csp);
+    res.headers.set("Content-Security-Policy", policy);
     return res;
   }
 
-  // On Vercel, x-vercel-forwarded-for is infrastructure-set and cannot be
-  // spoofed by clients. Fall back to the rightmost X-Forwarded-For entry
-  // (appended by the trusted edge proxy) rather than the leftmost (client-supplied).
-  const ip =
-    req.headers.get("x-vercel-forwarded-for") ??
-    req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
-    "unknown";
+  // Only a header the platform itself sets (src/lib/client-ip.ts): x-vercel-forwarded-for
+  // was trusted everywhere, and on Workers a client writes it freely.
+  const ip = clientIp(req.headers);
 
   // ── Rate-limit credentials login ─────────────────────────────────────────────
   if (pathname === "/api/auth/callback/credentials") {
@@ -149,6 +159,47 @@ export const proxy = auth((req) => {
   // Quote preview pages accessible without auth
   if (pathname.startsWith("/q/") || pathname.startsWith("/api/quotes/public")) {
     return passThrough();
+  }
+
+  // A person's booking page and its form (src/lib/booking-public.ts). The form writes into
+  // a workspace for somebody with no account, so it is held to a few tries a minute.
+  if (pathname.startsWith("/b/") || pathname === "/api/booking") {
+    if (pathname === "/api/booking" && req.method === "POST" && !rateLimit(ip, "booking", 5, 60_000)) {
+      return new Response(JSON.stringify({ ok: false, reason: "tooMany" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "60" },
+      });
+    }
+    return passThrough({}, pathname.startsWith("/b/") ? buildCsp(nonce, { embeddable: true }) : csp);
+  }
+
+  // The workspace's public forms (src/lib/web-forms-public.ts): the same terms.
+  if (pathname.startsWith("/f/") || pathname === "/api/forms") {
+    if (pathname === "/api/forms" && req.method === "POST" && !rateLimit(ip, "forms", 5, 60_000)) {
+      return new Response(JSON.stringify({ ok: false, reason: "tooMany" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "60", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+    return passThrough({}, pathname.startsWith("/f/") ? buildCsp(nonce, { embeddable: true }) : csp);
+  }
+
+  // A customer's own request: its status page and its rating (src/lib/ticket-public-page.ts).
+  // The token is the permission; the rating is held to a few answers a minute per address.
+  if (pathname.startsWith("/t/") || pathname === "/api/tickets/public") {
+    if (pathname === "/api/tickets/public" && req.method === "POST" && !rateLimit(ip, "ticket_rating", 10, 60_000)) {
+      return new Response(JSON.stringify({ ok: false, reason: "tooMany" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "60" },
+      });
+    }
+    return passThrough({}, csp);
+  }
+
+  // The public API reference and its OpenAPI file (src/lib/api-docs/public-api.ts): they
+  // describe what a key can do and open nothing, so whoever holds a key can read them.
+  if (pathname === "/developers" || pathname === "/api/openapi.json") {
+    return passThrough({}, csp);
   }
 
   // `/login` still redirects here, so old links and bookmarks keep working.

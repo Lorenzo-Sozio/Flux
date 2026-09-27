@@ -132,25 +132,25 @@ describe("a job that repeats within a day", () => {
     expect(broken).toEqual([]);
   });
 
-  it("⚠️ does not send an email it has already sent", () => {
-    // task-reminders emailed on every run too, which is the half that costs
-    // money and reaches people who never opened the app.
+  it("⚠️ does not remind twice, and sends no email per task", () => {
+    // task-reminders once emailed on every run, then once per task per day; the tasks now
+    // reach the inbox once, in the morning digest (src/lib/morning-digest.ts).
     const source = read(routeFile("/api/cron/task-reminders"));
     const guardAt = source.indexOf("toldToday.has(key)");
-    // The call site, not the import line, which naturally comes first.
-    const emailAt = source.indexOf("sendTaskDueEmail(user.email");
+    const notifyAt = source.indexOf('await notify({ userId, type: "task_due"');
     expect(guardAt).toBeGreaterThan(-1);
-    expect(emailAt).toBeGreaterThan(guardAt);
+    expect(notifyAt).toBeGreaterThan(guardAt);
+    expect(source).not.toContain("sendTaskDueEmail");
   });
 });
 
 describe("the activity reminder", () => {
   it("⚠️ is not sent twice because the window is wider than the schedule", () => {
-    // `getActivitiesWithPendingReminder` looks two minutes ahead and the worker
-    // runs every minute, so each reminder matched on two consecutive runs. The
-    // wide window is deliberate: it is what stops a missed run losing a reminder
-    // altogether. So the answer is memory, and the memory is what today has
-    // already produced.
+    // `activitiesDueForReminder` looks wider than the worker's schedule — ahead by it,
+    // and a little behind — so consecutive runs overlap and a reminder can match twice.
+    // The width is deliberate: it is what stops a late or missed run losing a reminder
+    // (see activity-reminders.test.ts). So the answer is memory, and the memory is
+    // what today has already produced.
     const source = read(routeFile("/api/cron/email-worker"));
     const guardAt = source.indexOf("toldToday.has(key)");
     const notifyAt = source.indexOf("await notify({");

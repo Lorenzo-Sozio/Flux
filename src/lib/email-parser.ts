@@ -114,3 +114,20 @@ export function recipientAddresses(header: string): string[] {
   }
   return [...seen];
 }
+
+/**
+ * One address header as text, whatever shape the bridge handed it in: a string, a list of
+ * strings, mailparser's `{ text }` / `{ value: [{ address }] }`, or a list of those.
+ * Anything else is no address at all, never a thrown request.
+ */
+export function addressHeaderText(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.map(addressHeaderText).filter(Boolean).join(", ");
+  if (value && typeof value === "object") {
+    const v = value as { text?: unknown; address?: unknown; value?: unknown };
+    if (typeof v.text === "string") return v.text;
+    if (typeof v.address === "string") return v.address;
+    if (Array.isArray(v.value)) return addressHeaderText(v.value);
+  }
+  return "";
+}

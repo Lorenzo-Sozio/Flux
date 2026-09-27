@@ -43,6 +43,11 @@ describe("a key somebody already holds", () => {
     expect(decide(stored, "hash-a", NOW)).toEqual({ kind: "replay", body: { summary: { created: 2 } } });
   });
 
+  it("⚠️ replays with the status the first answer had — a 201 is not a 200", () => {
+    const stored = attempt({ status: "done", response: JSON.stringify({ $status: 201, $body: { id: "q1" } }) });
+    expect(decide(stored, "hash-a", NOW)).toEqual({ kind: "replay", body: { id: "q1" }, status: 201 });
+  });
+
   it("⚠️ replays a finished request that stored nothing, rather than importing", () => {
     // A row marked done with no body is our bug. Running the import a second
     // time is not the way to make up for it.

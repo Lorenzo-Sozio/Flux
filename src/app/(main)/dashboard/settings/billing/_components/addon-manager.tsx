@@ -28,6 +28,7 @@ interface AddonManagerProps {
 
 export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
   const t = useTranslations("settings.billing");
+  const tc = useTranslations("common");
   // ADDON_CONFIGS carries English; addons.catalogue.<type> carries the reader's language.
   const addonText = (type: string, part: "name" | "description", fallback: string | undefined) =>
     t.has(`addons.catalogue.${type}.${part}`) ? t(`addons.catalogue.${type}.${part}`) : fallback;
@@ -64,8 +65,11 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
           activeAddons.map((addon) => {
             const cfg = ADDON_CONFIGS[addon.addonType as AddonType];
             return (
-              <div key={addon.id} className="flex items-center justify-between rounded-md border px-4 py-3">
-                <div>
+              <div
+                key={addon.id}
+                className="flex items-center justify-between gap-3 rounded-md border px-3 py-3 sm:px-4"
+              >
+                <div className="min-w-0">
                   <p className="text-sm font-medium">
                     {addonText(addon.addonType, "name", cfg?.displayName ?? addon.addonType)}
                     {addon.quantity > 1 && (
@@ -81,8 +85,9 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="text-destructive hover:text-destructive"
+                  className="shrink-0 text-destructive hover:text-destructive"
                   disabled={removing === addon.id}
+                  aria-label={tc("remove")}
                   onClick={() => handleRemove(addon.id)}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -101,8 +106,8 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
           {(Object.entries(ADDON_CONFIGS) as [AddonType, (typeof ADDON_CONFIGS)[AddonType]][]).map(([type, cfg]) => {
             const alreadyActive = activeAddons.some((a) => a.addonType === type);
             return (
-              <div key={type} className="flex items-center justify-between rounded-md border px-4 py-3">
-                <div>
+              <div key={type} className="flex items-center justify-between gap-3 rounded-md border px-3 py-3 sm:px-4">
+                <div className="min-w-0">
                   <p className="text-sm font-medium">{addonText(type, "name", cfg.displayName)}</p>
                   <p className="text-xs text-muted-foreground">{addonText(type, "description", cfg.description)}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
@@ -110,11 +115,16 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
                   </p>
                 </div>
                 {alreadyActive ? (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className="shrink-0 text-xs">
                     {t("addons.activeBadge")}
                   </Badge>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => toast.info(t("addons.addViaPortal"))}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => toast.info(t("addons.addViaPortal"))}
+                  >
                     <Plus className="mr-1 h-3 w-3" />
                     {t("addons.addButton")}
                   </Button>

@@ -17,6 +17,8 @@ export type RawTask = {
   assigneeId: string | null;
   assigneeName: string | null;
   estimatedHours: number | null;
+  /** The other people responsible (RACI), who carry its hours too. */
+  responsibleIds?: string[];
 };
 
 export type RawDep = {

@@ -183,3 +183,17 @@ export function invalidateTenantLookup(cacheKey: string): void {
 }
 
 export type { tenantSchema };
+
+const SUBDOMAIN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/**
+ * The workspace a public page names in its address — `/b/<subdomain>/…`, `/f/<subdomain>/…`.
+ * One comparison per workspace in the registry, and no workspace database opened until the
+ * subdomain matches; memoised like every other lookup here.
+ */
+export async function resolveTenantBySubdomain(subdomain: string): Promise<ResolvedTenant | null> {
+  if (!SUBDOMAIN.test(subdomain)) return null;
+  return resolveTenantByProbe(`subdomain:${subdomain}`, async (_db, tenant) => tenant.subdomain === subdomain).catch(
+    () => null,
+  );
+}

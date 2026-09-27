@@ -14,13 +14,14 @@
  */
 import { type NextRequest, NextResponse } from "next/server";
 
-import { and, eq, gte, inArray, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { appointmentAttendees, appointments, users } from "@/db/schema";
 import { verifyCalendarFeedToken } from "@/lib/calendar-feed-token";
 import { type FeedEvent, generateFeedICS } from "@/lib/ical";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { openTenantDb } from "@/lib/tenant-resolve";
+import { safeTimeZone } from "@/lib/wall-clock";
 
 /**
  * How much of the calendar travels.
@@ -86,6 +87,10 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ token:
       locationUrl: appointments.locationUrl,
       startAt: appointments.startAt,
       endAt: appointments.endAt,
+      timezone: appointments.timezone,
+      allDay: appointments.allDay,
+      recurrenceRule: appointments.recurrenceRule,
+      recurrenceExceptions: appointments.recurrenceExceptions,
       status: appointments.status,
       sequence: appointments.sequence,
       createdAt: appointments.createdAt,
@@ -95,7 +100,13 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ token:
     .where(
       and(
         mine,
-        gte(appointments.startAt, from),
+        // ⚠️ A series that began before the window is still running inside it:
+        // filtering it on its first date would drop a weekly meeting from every
+        // subscriber's calendar ninety days after it was booked.
+        or(
+          and(isNull(appointments.recurrenceRule), gte(appointments.startAt, from)),
+          isNotNull(appointments.recurrenceRule),
+        ),
         lte(appointments.startAt, until),
         inArray(appointments.status, VISIBLE_STATUSES),
       ),
@@ -109,6 +120,10 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ token:
     locationUrl: row.locationUrl,
     startAt: row.startAt,
     endAt: row.endAt,
+    timeZone: safeTimeZone(row.timezone),
+    allDay: row.allDay,
+    recurrenceRule: row.recurrenceRule,
+    recurrenceExceptions: row.recurrenceExceptions,
     status: row.status,
     sequence: row.sequence,
     createdAt: row.createdAt,

@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/consent.ts",
+    "description": "⚠️⚠️ una revoca resta datata al giorno del consenso",
+    "find": "    consentDate: next ? (typedDate ?? now) : now,",
+    "replace": "    consentDate: next ? (typedDate ?? now) : (before.consentDate ?? null),"
+  },
+  {
+    "file": "src/lib/consent.ts",
+    "description": "⚠️ salvare la scheda senza toccare il consenso ne sposta data e fonte",
+    "find": "  if (Boolean(before.marketingConsent) === next) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/consent-withdraw.ts",
+    "description": "⚠️ una disiscrizione ripetuta sposta la data della revoca e aggiunge una riga alla storia",
+    "find": "    .where(and(eq(table.id, id), eq(table.marketingConsent, true)))",
+    "replace": "    .where(eq(table.id, id))"
+  },
+  {
+    "file": "src/lib/consent-withdraw.ts",
+    "description": "⚠️⚠️ la revoca dal link non lascia traccia nella storia della scheda",
+    "find": "  await recordFieldChanges(db, entity, id, { marketingConsent: true }, { marketingConsent: false }, null);",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ il modulo del contatto revoca il consenso lasciando la data della concessione",
+    "find": "      ...consentPatch(previous, validated.marketingConsent, \"form\", new Date(), validated.consentDate),\n      leadScore: computeLeadScore(validated),",
+    "replace": "      leadScore: computeLeadScore(validated),"
+  },
+  {
+    "file": "src/lib/field-history.ts",
+    "description": "⚠️ il consenso del contatto non ha più una storia",
+    "find": "    // The history of a consent is its proof (src/lib/consent.ts).\n    \"marketingConsent\",",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "⚠️⚠️ la cancellazione lascia i vecchi indirizzi nella storia dei campi",
+    "find": "  report.deleted.field_change = histories.length",
+    "replace": "  report.deleted.field_change = false"
+  },
+  {
+    "file": "src/lib/subject-access.ts",
+    "description": "l'esportazione consegna alla persona le cifre dell'azienda sulle trattative",
+    "find": "          .select({\n            id: deals.id,\n            name: deals.name,\n            status: deals.status,\n            createdAt: deals.createdAt,\n            closedAt: deals.closedAt,\n          })",
+    "replace": "          .select()"
+  },
+  {
+    "file": "src/lib/subject-access.ts",
+    "description": "⚠️ l'esportazione tace la storia della scheda",
+    "find": "    historyWhere.length ? rows(fieldChanges, or(...historyWhere) as SQL) : none,",
+    "replace": "    none,"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ un editor può esportare o cancellare una persona",
+    "find": "  \"privacy:manage\": \"admin\",",
+    "replace": "  \"privacy:manage\": \"editor\","
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "un sì arrivato da un'importazione non dice da dove viene",
+    "find": "  return consent === true ? { consentDate: new Date(), consentSource: source } : {};",
+    "replace": "  return {};"
+  }
+]

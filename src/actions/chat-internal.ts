@@ -1,12 +1,17 @@
 "use server";
 
-import { and, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 
 import { auth } from "@/auth";
-import { dmConversationMembers, dmConversations, dmMessages, users } from "@/db/schema";
-import { notify } from "@/lib/notify";
-import { getDb } from "@/lib/tenant-context";
+import { dmAttachments, dmConversationMembers, dmConversations, dmMessages, notifications, users } from "@/db/schema";
+import { conversationLink, postChatMessage } from "@/lib/chat-send";
+import { getStorage } from "@/lib/storage";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
+import { membersWith } from "@/lib/workspace-members";
+
+/** The bell rows the chat writes: an ordinary message, and a mention by name. */
+const CHAT_TYPES = ["chat_message", "chat_mention"];
 
 type SessionUser = { id: string; name?: string | null; email?: string | null };
 
@@ -19,6 +24,61 @@ async function requireSession(): Promise<SessionUser> {
 function isMuted(mutedUntil: Date | null): boolean {
   if (!mutedUntil) return false;
   return mutedUntil.getTime() > Date.now();
+}
+
+/**
+ * The people who belong to this workspace now.
+ *
+ * ⚠️ From the platform registry, not the workspace's own `user` table. That table
+ * is a copy the dashboard writes on each visit and nothing prunes (see
+ * src/lib/workspace-members.ts): the "new message" picker offered people who had
+ * left the workspace, and a conversation could be opened with anyone whose id was
+ * in it. `null` when there is no workspace to ask about — a script or a test —
+ * which filters nothing.
+ */
+async function currentMemberIds(): Promise<Set<string> | null> {
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return null;
+  return new Set(await membersWith(tenantId, "record:read"));
+}
+
+async function requireMembers(ids: string[]) {
+  const members = await currentMemberIds();
+  if (members && ids.some((id) => !members.has(id))) throw new Error("Not a member of this workspace");
+}
+
+/**
+ * Unread messages per conversation for one person, in ONE statement.
+ *
+ * ⚠️ It was one count per conversation, run by the badge poll every thirty
+ * seconds on every open tab: someone in twenty conversations cost twenty-one
+ * queries a poll, and every query wakes the database (CLAUDE.md, "the frequency
+ * of these is a database bill"). A muted conversation counts nothing, as before.
+ */
+async function unreadByConversation(db: Awaited<ReturnType<typeof getDb>>, userId: string) {
+  const rows = await db
+    .select({
+      conversationId: dmConversationMembers.conversationId,
+      unread: sql<number>`count(${dmMessages.id})::int`,
+    })
+    .from(dmConversationMembers)
+    .leftJoin(
+      dmMessages,
+      and(
+        eq(dmMessages.conversationId, dmConversationMembers.conversationId),
+        sql`${dmMessages.senderId} IS DISTINCT FROM ${dmConversationMembers.userId}`,
+        sql`(${dmConversationMembers.lastReadAt} IS NULL OR ${dmMessages.createdAt} > ${dmConversationMembers.lastReadAt})`,
+      ),
+    )
+    .where(
+      and(
+        eq(dmConversationMembers.userId, userId),
+        // Compared with the app's clock, which is the clock that wrote `mutedUntil`.
+        sql`(${dmConversationMembers.mutedUntil} IS NULL OR ${dmConversationMembers.mutedUntil} <= ${new Date()})`,
+      ),
+    )
+    .groupBy(dmConversationMembers.conversationId);
+  return new Map(rows.map((r) => [r.conversationId, Number(r.unread)]));
 }
 
 // ── Conversations list ────────────────────────────────────────────────────────
@@ -41,39 +101,28 @@ export async function getConversations() {
   const convIds = myMemberships.map((m) => m.conversationId);
   const memberMap = new Map(myMemberships.map((m) => [m.conversationId, m]));
 
-  const convos = await db.query.dmConversations.findMany({
-    where: inArray(dmConversations.id, convIds),
-    orderBy: desc(dmConversations.updatedAt),
-    with: {
-      members: { with: { user: { columns: USER_SUMMARY_COLUMNS } } },
-      messages: { orderBy: desc(dmMessages.createdAt), limit: 1 },
-    },
-  });
-
-  const result = await Promise.all(
-    convos.map(async (c) => {
-      // The conversations were selected from these very memberships, so the
-      // fallback is unreachable; if it ever were reached, never-read and unmuted
-      // is the reading that shows the badge rather than hiding it.
-      const m = memberMap.get(c.id) ?? { lastReadAt: null, mutedUntil: null };
-      const muted = isMuted(m.mutedUntil ?? null);
-
-      let unread = 0;
-      if (!muted) {
-        const baseWhere = and(
-          eq(dmMessages.conversationId, c.id),
-          sql`${dmMessages.senderId} IS DISTINCT FROM ${me.id}`,
-        );
-        const where = m.lastReadAt ? and(baseWhere, gt(dmMessages.createdAt, m.lastReadAt)) : baseWhere;
-        const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(dmMessages).where(where);
-        unread = row?.count ?? 0;
-      }
-
-      return { ...c, unread, muted, mutedUntil: m.mutedUntil ?? null };
+  const [convos, unread] = await Promise.all([
+    db.query.dmConversations.findMany({
+      where: inArray(dmConversations.id, convIds),
+      orderBy: desc(dmConversations.updatedAt),
+      with: {
+        members: { with: { user: { columns: USER_SUMMARY_COLUMNS } } },
+        // The file's name is the preview of a message that is only a file.
+        messages: {
+          orderBy: desc(dmMessages.createdAt),
+          limit: 1,
+          with: { attachments: { columns: { name: true } } },
+        },
+      },
     }),
-  );
+    unreadByConversation(db, me.id),
+  ]);
 
-  return result;
+  return convos.map((c) => {
+    const m = memberMap.get(c.id);
+    const mutedUntil = m?.mutedUntil ?? null;
+    return { ...c, unread: unread.get(c.id) ?? 0, muted: isMuted(mutedUntil), mutedUntil };
+  });
 }
 
 // ── Total unread badge ────────────────────────────────────────────────────────
@@ -81,27 +130,8 @@ export async function getConversations() {
 export async function getTotalUnreadCount(): Promise<number> {
   const db = await getDb();
   const me = await requireSession();
-
-  const memberships = await db
-    .select({
-      conversationId: dmConversationMembers.conversationId,
-      lastReadAt: dmConversationMembers.lastReadAt,
-      mutedUntil: dmConversationMembers.mutedUntil,
-    })
-    .from(dmConversationMembers)
-    .where(eq(dmConversationMembers.userId, me.id));
-
   let total = 0;
-  for (const m of memberships) {
-    if (isMuted(m.mutedUntil ?? null)) continue;
-    const baseWhere = and(
-      eq(dmMessages.conversationId, m.conversationId),
-      sql`${dmMessages.senderId} IS DISTINCT FROM ${me.id}`,
-    );
-    const where = m.lastReadAt ? and(baseWhere, gt(dmMessages.createdAt, m.lastReadAt)) : baseWhere;
-    const [row] = await db.select({ count: sql<number>`count(*)::int` }).from(dmMessages).where(where);
-    total += row?.count ?? 0;
-  }
+  for (const n of (await unreadByConversation(db, me.id)).values()) total += n;
   return total;
 }
 
@@ -111,6 +141,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
   const db = await getDb();
   const me = await requireSession();
   if (me.id === otherUserId) throw new Error("Cannot DM yourself");
+  await requireMembers([otherUserId]);
 
   const myConvIds = await db
     .select({ conversationId: dmConversationMembers.conversationId })
@@ -150,6 +181,7 @@ export async function createGroupConversation(name: string, memberIds: string[])
   const me = await requireSession();
   const allIds = Array.from(new Set([me.id, ...memberIds]));
   if (allIds.length < 2) throw new Error("Group needs at least 2 members");
+  await requireMembers(allIds.filter((id) => id !== me.id));
 
   // The id is made here rather than read back, so the conversation and the people
   // in it are one commit. A group nobody belongs to cannot be opened, cannot be
@@ -165,6 +197,9 @@ export async function createGroupConversation(name: string, memberIds: string[])
 
 // ── Get messages ──────────────────────────────────────────────────────────────
 
+/** The page size of a conversation's history: the newest fifty, then fifty more on request. */
+const MESSAGE_PAGE = 50;
+
 export async function getMessages(conversationId: string, before?: string) {
   const db = await getDb();
   const me = await requireSession();
@@ -179,8 +214,8 @@ export async function getMessages(conversationId: string, before?: string) {
       ? and(eq(dmMessages.conversationId, conversationId), lt(dmMessages.createdAt, new Date(before)))
       : eq(dmMessages.conversationId, conversationId),
     orderBy: desc(dmMessages.createdAt),
-    limit: 50,
-    with: { sender: { columns: USER_SUMMARY_COLUMNS } },
+    limit: MESSAGE_PAGE,
+    with: { sender: { columns: USER_SUMMARY_COLUMNS }, attachments: true },
   });
 
   return msgs.reverse();
@@ -188,46 +223,11 @@ export async function getMessages(conversationId: string, before?: string) {
 
 // ── Send message ──────────────────────────────────────────────────────────────
 
-export async function sendMessage(conversationId: string, content: string) {
+export async function sendMessage(conversationId: string, content: string, mentionIds: string[] = []) {
   const db = await getDb();
   const me = await requireSession();
-  const trimmed = content.trim();
-  if (!trimmed) throw new Error("Empty message");
-
-  const membership = await db.query.dmConversationMembers.findFirst({
-    where: and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)),
-  });
-  if (!membership) throw new Error("Not a member");
-
-  const now = new Date();
-  const [msg] = await db.insert(dmMessages).values({ conversationId, senderId: me.id, content: trimmed }).returning();
-
-  await db.update(dmConversations).set({ updatedAt: now }).where(eq(dmConversations.id, conversationId));
-  await db
-    .update(dmConversationMembers)
-    .set({ lastReadAt: now })
-    .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
-
-  const otherMembers = await db
-    .select({ userId: dmConversationMembers.userId })
-    .from(dmConversationMembers)
-    .where(and(eq(dmConversationMembers.conversationId, conversationId), ne(dmConversationMembers.userId, me.id)));
-
-  const senderName = me.name ?? me.email ?? "Someone";
-  const preview = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
-
-  for (const { userId } of otherMembers) {
-    notify({
-      userId,
-      type: "chat_message",
-      title: `New message from ${senderName}`,
-      message: preview,
-      link: undefined,
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-    }).catch(() => {});
-  }
-
-  return msg;
+  // One path for every message, text or file: src/lib/chat-send.ts.
+  return postChatMessage(db, me, conversationId, content, { mentionIds });
 }
 
 // ── Mark read ─────────────────────────────────────────────────────────────────
@@ -235,10 +235,29 @@ export async function sendMessage(conversationId: string, content: string) {
 export async function markConversationRead(conversationId: string) {
   const db = await getDb();
   const me = await requireSession();
+  // ⚠️ Read up to the newest message by the database's own timestamp, not up to
+  // "now" on the app's clock: messages are stamped by the database, and a clock a
+  // few milliseconds (or, between two machines, seconds) behind left the latest
+  // ones counted as unread after the conversation had been read.
   await db
     .update(dmConversationMembers)
-    .set({ lastReadAt: new Date() })
+    .set({
+      lastReadAt: sql`coalesce((select max(${dmMessages.createdAt}) from ${dmMessages} where ${dmMessages.conversationId} = ${conversationId}), ${new Date()})`,
+    })
     .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
+  // Reading the conversation answers its notification too, so the bell and the
+  // chat badge do not disagree about what is still unread.
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(notifications.userId, me.id),
+        inArray(notifications.type, CHAT_TYPES),
+        eq(notifications.link, conversationLink(conversationId)),
+        eq(notifications.isRead, false),
+      ),
+    );
 }
 
 // ── Mute / unmute ─────────────────────────────────────────────────────────────
@@ -253,29 +272,91 @@ export async function muteConversation(conversationId: string, minutes: number |
     .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
 }
 
-// ── Leave group ───────────────────────────────────────────────────────────────
+/**
+ * The stored bytes of a conversation's attachments, removed before its rows go.
+ * The rows cascade with the conversation; the objects in storage would not, and
+ * unreferenced bytes are cost with nothing left that can reach them.
+ */
+async function deleteStoredAttachments(db: Awaited<ReturnType<typeof getDb>>, conversationId: string) {
+  const files = await db
+    .select({ key: dmAttachments.storageKey })
+    .from(dmAttachments)
+    .where(eq(dmAttachments.conversationId, conversationId));
+  if (files.length === 0) return;
+  try {
+    const storage = await getStorage();
+    await Promise.all(files.map((f) => storage.delete(f.key).catch(() => undefined)));
+  } catch (err) {
+    console.error("[chat] could not remove attachment bytes", err);
+  }
+}
 
+// ── Leave / delete ────────────────────────────────────────────────────────────
+
+/**
+ * Leaving a group takes it out of MY list; the group is deleted only when the last
+ * person leaves.
+ */
 export async function leaveConversation(conversationId: string) {
   const db = await getDb();
   const me = await requireSession();
-  await db
-    .delete(dmConversationMembers)
-    .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
-}
 
-// ── Delete conversation ───────────────────────────────────────────────────────
-
-export async function deleteConversation(conversationId: string) {
-  const db = await getDb();
-  const me = await requireSession();
-
-  // Verify membership before deleting
   const membership = await db.query.dmConversationMembers.findFirst({
     where: and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)),
   });
   if (!membership) throw new Error("Not a member");
 
-  // Cascade deletes members + messages automatically
+  await db
+    .delete(dmConversationMembers)
+    .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
+  await db
+    .delete(notifications)
+    .where(
+      and(
+        eq(notifications.userId, me.id),
+        inArray(notifications.type, CHAT_TYPES),
+        eq(notifications.link, conversationLink(conversationId)),
+      ),
+    );
+
+  const [left] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(dmConversationMembers)
+    .where(eq(dmConversationMembers.conversationId, conversationId));
+  // Messages and memberships cascade with the conversation.
+  if (Number(left?.n ?? 0) === 0) {
+    await deleteStoredAttachments(db, conversationId);
+    await db.delete(dmConversations).where(eq(dmConversations.id, conversationId));
+  }
+}
+
+/**
+ * Deletes a DIRECT conversation, for both people in it — which the confirmation says.
+ *
+ * ⚠️⚠️ Never a group. "Delete" used to work on groups too, so any member could erase
+ * a whole group's history for everyone else in it. A group is left, not deleted,
+ * and it disappears when its last member leaves.
+ */
+export async function deleteConversation(conversationId: string) {
+  const db = await getDb();
+  const me = await requireSession();
+
+  const membership = await db.query.dmConversationMembers.findFirst({
+    where: and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)),
+  });
+  if (!membership) throw new Error("Not a member");
+
+  const [conv] = await db
+    .select({ type: dmConversations.type })
+    .from(dmConversations)
+    .where(eq(dmConversations.id, conversationId));
+  if (conv?.type !== "direct") throw new Error("A group is left, not deleted");
+
+  await db
+    .delete(notifications)
+    .where(and(inArray(notifications.type, CHAT_TYPES), eq(notifications.link, conversationLink(conversationId))));
+  // Members, messages and attachment rows cascade with the conversation.
+  await deleteStoredAttachments(db, conversationId);
   await db.delete(dmConversations).where(eq(dmConversations.id, conversationId));
 }
 
@@ -284,9 +365,11 @@ export async function deleteConversation(conversationId: string) {
 export async function getChatUsers() {
   const db = await getDb();
   const me = await requireSession();
-  return db
+  const rows = await db
     .select({ id: users.id, name: users.name, email: users.email })
     .from(users)
     .where(ne(users.id, me.id))
     .orderBy(users.name);
+  const members = await currentMemberIds();
+  return members ? rows.filter((u) => members.has(u.id)) : rows;
 }

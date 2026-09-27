@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { format } from "date-fns";
-import { and, desc, eq, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 
 import { auth } from "@/auth";
-import { userActivityLogs, users } from "@/db/schema";
+import { activities, companies, contacts, deals, leads, users } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
@@ -22,44 +22,18 @@ function row(...cells: (string | null | undefined)[]): string {
   return cells.map(esc).join(",");
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  login: "Login",
-  create_deal: "Create Deal",
-  update_deal: "Update Deal",
-  win_deal: "Win Deal",
-  lose_deal: "Lose Deal",
-  delete_deal: "Delete Deal",
-  create_lead: "Create Lead",
-  update_lead: "Update Lead",
-  convert_lead: "Convert Lead",
-  delete_lead: "Delete Lead",
-  create_contact: "Create Contact",
-  update_contact: "Update Contact",
-  delete_contact: "Delete Contact",
-  create_company: "Create Company",
-  create_task: "Create Task",
-  complete_task: "Complete Task",
-  delete_task: "Delete Task",
-  create_quote: "Create Quote",
-  send_quote: "Send Quote",
-  accept_quote: "Accept Quote",
-  delete_quote: "Delete Quote",
-  create_ticket: "Create Ticket",
-  resolve_ticket: "Resolve Ticket",
-  close_ticket: "Close Ticket",
-  launch_campaign: "Launch Campaign",
-};
-
+/**
+ * The activity report as CSV: the calls, meetings, emails and notes logged in the period.
+ *
+ * ⚠️⚠️ It exported `user_activity_log`, which nothing in the product writes: every file it
+ * ever produced was a header and nothing else. Same table as the Activity tab reads now.
+ */
 export async function GET(req: NextRequest) {
   const db = await getDb();
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ⚠️⚠️ The WORKSPACE role, not the platform one. This line read `session.user.role`,
-  // which is Flux's own staff scale and reads "user" for every customer: the list never
-  // contained its value, so exporting the activity log was forbidden to everybody, the
-  // workspace owner included, while staying open to Flux's own staff. It did not look like
-  // an error. It looked like a feature that is not there. See the two scales in CLAUDE.md.
+  // ⚠️⚠️ The WORKSPACE role, not the platform one. See the two scales in CLAUDE.md.
   const actor = await getActor();
   if (!can(actor, "report:manage")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -69,48 +43,58 @@ export async function GET(req: NextRequest) {
   const to = req.nextUrl.searchParams.get("to");
   const userId = req.nextUrl.searchParams.get("userId");
 
+  const when = sql<Date>`coalesce(${activities.date}, ${activities.createdAt})`;
+
   try {
     const conditions = [
-      ...(from ? [gte(userActivityLogs.createdAt, new Date(from))] : []),
-      ...(to ? [lte(userActivityLogs.createdAt, new Date(`${to}T23:59:59`))] : []),
-      ...(userId ? [eq(userActivityLogs.userId, userId)] : []),
+      ...(from ? [gte(when, new Date(from))] : []),
+      ...(to ? [lte(when, new Date(`${to}T23:59:59`))] : []),
+      ...(userId ? [eq(activities.ownerId, userId)] : []),
     ];
 
-    const logs = await db
+    const rows = await db
       .select({
-        id: userActivityLogs.id,
-        createdAt: userActivityLogs.createdAt,
-        action: userActivityLogs.action,
-        entityType: userActivityLogs.entityType,
-        entityId: userActivityLogs.entityId,
-        ipAddress: userActivityLogs.ipAddress,
-        userId: userActivityLogs.userId,
+        when,
+        type: activities.type,
+        content: activities.content,
+        durationMinutes: activities.durationMinutes,
         userName: users.name,
         userEmail: users.email,
+        leadFirst: leads.firstName,
+        leadLast: leads.lastName,
+        contactFirst: contacts.firstName,
+        contactLast: contacts.lastName,
+        companyName: companies.name,
+        dealName: deals.name,
       })
-      .from(userActivityLogs)
-      .leftJoin(users, eq(userActivityLogs.userId, users.id))
+      .from(activities)
+      .leftJoin(users, eq(activities.ownerId, users.id))
+      .leftJoin(leads, eq(activities.leadId, leads.id))
+      .leftJoin(contacts, eq(activities.contactId, contacts.id))
+      .leftJoin(companies, eq(activities.companyId, companies.id))
+      .leftJoin(deals, eq(activities.dealId, deals.id))
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(userActivityLogs.createdAt))
+      .orderBy(desc(when))
       .limit(10000);
 
-    console.info("[reports/export] rows=%d from=%s to=%s userId=%s", logs.length, from, to, userId);
-
-    const header = row("Timestamp", "User", "Email", "Action", "Entity Type", "Entity ID", "IP Address");
-    const lines = logs.map((l) =>
+    const header = row("Date", "User", "Email", "Type", "Lead", "Contact", "Company", "Deal", "Minutes", "Content");
+    const lines = rows.map((r) =>
       row(
-        format(new Date(l.createdAt), "yyyy-MM-dd HH:mm:ss"),
-        l.userName ?? "",
-        l.userEmail ?? "",
-        ACTION_LABELS[l.action] ?? l.action,
-        l.entityType ?? "",
-        l.entityId ?? "",
-        l.ipAddress ?? "",
+        format(new Date(r.when), "yyyy-MM-dd HH:mm"),
+        r.userName ?? "",
+        r.userEmail ?? "",
+        r.type,
+        [r.leadFirst, r.leadLast].filter(Boolean).join(" "),
+        [r.contactFirst, r.contactLast].filter(Boolean).join(" "),
+        r.companyName ?? "",
+        r.dealName ?? "",
+        r.durationMinutes != null ? String(r.durationMinutes) : "",
+        r.content ?? "",
       ),
     );
 
     const csv = [header, ...lines].join("\r\n");
-    const filename = `activity-report-${from ?? "all"}-to-${to ?? "now"}.csv`;
+    const filename = `activities-${from ?? "all"}-to-${to ?? "now"}.csv`;
 
     return new NextResponse(csv, {
       headers: {

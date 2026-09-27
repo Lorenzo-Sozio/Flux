@@ -3,35 +3,64 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, count, eq, gte, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, getTableColumns, gte, ilike, inArray, lt, or, type SQL, sql } from "drizzle-orm";
 import { getFormatter, getTranslations } from "next-intl/server";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
-  activities,
   companies,
   contacts,
   dealLossReasons,
   deals,
-  leads,
+  fieldChanges,
   pipelineStages,
+  pipelines,
   salesTargets,
   users,
 } from "@/db/schema";
 import { DEFAULT_STAGES } from "@/db/seed-workspace";
-import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { periodBounds } from "@/lib/calendar-period";
 import { contactReach } from "@/lib/contact-reach";
-import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
+import { dealAmountForStorage } from "@/lib/deal-amount";
+import { dealSignals, lastActivityByDeal, nextStepByDeal } from "@/lib/deal-signals";
+import { getExchangeRates } from "@/lib/exchange-rates";
+import { recordFieldChanges } from "@/lib/field-history";
+import { closedBetween, dealEur } from "@/lib/metrics";
+import { daysBetween } from "@/lib/next-actions";
 import { notify } from "@/lib/notify";
 import { type DealStatusFilter, ownerCondition, periodStart } from "@/lib/pipeline-filters";
+import {
+  closingStageFor,
+  DEFAULT_PIPELINE_ID,
+  listPipelines,
+  type PipelineRow,
+  pipelineOfStage,
+  resolvePipelineId,
+  stageIdsOfPipeline,
+  stagesOfPipeline,
+} from "@/lib/pipelines";
+import { countRecords } from "@/lib/record-count";
+import { isStale, type StageChange, salesVelocity, stageFigures } from "@/lib/stage-history";
+import { checkStageKind, flagsOf, type StageKind, type StageKindRefusal } from "@/lib/stage-kind";
 import { getDb } from "@/lib/tenant-context";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 export async function getPipelineData(
-  filters: { owners?: string[]; status?: DealStatusFilter | null; q?: string } = {},
+  filters: {
+    owners?: string[];
+    status?: DealStatusFilter | null;
+    q?: string;
+    closed?: string | null;
+    /** A pipeline's id, or "all" for every pipeline's columns side by side (src/lib/pipelines.ts). */
+    pipeline?: string | null;
+  } = {},
 ) {
   await requireCapability("record:read");
   const db = await getDb();
+  // Closed within a calendar period: the deals a figure on the scorecard counted.
+  const closedIn = filters.closed ? periodBounds(filters.closed, await getWorkspaceTimeZone()) : null;
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
 
   // Seed default stages if pipeline is completely empty.
@@ -45,15 +74,93 @@ export async function getPipelineData(
     stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   }
 
+  // One pipeline's columns — or, asked for "all" (a figure opening the deals it counted
+  // across the workspace), every pipeline's, each column saying whose it is.
+  const pipelineList = await listPipelines(db);
+  const all = filters.pipeline === "all" && pipelineList.length > 1;
+  const pipelineId = all ? "all" : (pipelineList.find((p) => p.id === filters.pipeline) ?? pipelineList[0])?.id;
+  const pipelineOrder = new Map(pipelineList.map((p, i) => [p.id, { i, name: p.name }]));
+  stages = all
+    ? [...stages].sort(
+        (a, b) =>
+          (pipelineOrder.get(a.pipelineId)?.i ?? 0) - (pipelineOrder.get(b.pipelineId)?.i ?? 0) || a.order - b.order,
+      )
+    : stages.filter((st) => !pipelineId || st.pipelineId === pipelineId);
+  const shownStages = stages.map((st) => ({
+    ...st,
+    pipelineName: all ? (pipelineOrder.get(st.pipelineId)?.name ?? null) : null,
+  }));
+
   const where: (SQL | undefined)[] = [ownerCondition(deals.ownerId, filters.owners ?? [])];
+  if (!all) {
+    const ids = stages.map((st) => st.id);
+    where.push(ids.length ? inArray(deals.stageId, ids) : sql`false`);
+  }
+  // ⚠️ With no status asked for, the open deals and those closed in the last month — not
+  // every deal ever won or lost, which the board used to load on every visit.
   if (filters.status) where.push(eq(deals.status, filters.status));
+  else if (!closedIn)
+    where.push(or(eq(deals.status, "open"), gte(deals.closedAt, new Date(Date.now() - RECENTLY_CLOSED_DAYS * DAY_MS))));
+  if (closedIn) where.push(gte(deals.closedAt, closedIn.from), lt(deals.closedAt, closedIn.to));
   if (filters.q) where.push(ilike(deals.name, `%${filters.q.replace(/[\\%_]/g, "\\$&")}%`));
-  const allDeals = await db
-    .select()
+  // Idle days and next step are worked out here, on every read (src/lib/deal-signals.ts).
+  const now = new Date();
+  const last = lastActivityByDeal(db, now);
+  const next = nextStepByDeal(db, now);
+  // When the deal entered its stage: the last stage change in its history (V1.7), or its
+  // creation for a deal that has not moved since.
+  const stageSince = db
+    .select({
+      dealId: fieldChanges.entityId,
+      at: sql<Date | null>`max(${fieldChanges.changedAt})`.mapWith(fieldChanges.changedAt).as("stage_since"),
+    })
+    .from(fieldChanges)
+    .where(and(eq(fieldChanges.entityType, "deal"), eq(fieldChanges.field, "stageId")))
+    .groupBy(fieldChanges.entityId)
+    .as("deal_stage_since");
+  const rows = await db
+    .select({
+      ...getTableColumns(deals),
+      lastActivityAt: last.at,
+      nextStepAt: next.at,
+      nextStepCount: next.n,
+      stageSince: stageSince.at,
+      companyName: companies.name,
+    })
     .from(deals)
+    .leftJoin(last, eq(last.dealId, deals.id))
+    .leftJoin(next, eq(next.dealId, deals.id))
+    .leftJoin(stageSince, eq(stageSince.dealId, deals.id))
+    .leftJoin(companies, eq(companies.id, deals.companyId))
     .where(and(...where));
 
-  return { stages, deals: allDeals };
+  const staleAfter = new Map(
+    stages.map((st: { id: string; staleAfterDays: number | null }) => [st.id, st.staleAfterDays]),
+  );
+  const allDeals = rows.map(({ lastActivityAt, nextStepAt, nextStepCount, stageSince: since, ...deal }) => ({
+    ...deal,
+    daysInStage: daysBetween(since ?? deal.createdAt, now),
+    // Past the threshold its stage sets (src/lib/stage-history.ts).
+    stale:
+      deal.status === "open" && isStale(daysBetween(since ?? deal.createdAt, now), staleAfter.get(deal.stageId ?? "")),
+    signals: dealSignals(
+      { createdAt: deal.createdAt, lastActivityAt, nextStepAt, hasNextStep: (nextStepCount ?? 0) > 0 },
+      now,
+    ),
+  }));
+
+  return { stages: shownStages, deals: allDeals, pipelines: pipelineList, pipelineId: pipelineId ?? null };
+}
+
+/** How far back the board shows closed deals when no status is asked for. */
+const RECENTLY_CLOSED_DAYS = 30;
+const DAY_MS = 86_400_000;
+
+/** Today's rates only when a conversion is needed: EUR asks nobody. */
+async function storedAmount(typed: unknown, currency: string | null | undefined) {
+  const code = (currency || "EUR").toUpperCase();
+  const rates = code === "EUR" ? {} : (await getExchangeRates()).rates;
+  return dealAmountForStorage(typed as string | number | null | undefined, code, rates);
 }
 
 export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
@@ -62,27 +169,12 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
 
   // Enforce the combined maxRecords quota before inserting
-  const [[c], [l], [co], [d]] = await Promise.all([
-    db.select({ n: count() }).from(contacts),
-    db.select({ n: count() }).from(leads),
-    db.select({ n: count() }).from(companies),
-    db.select({ n: count() }).from(deals),
-  ]);
-  const totalRecords = Number(c?.n ?? 0) + Number(l?.n ?? 0) + Number(co?.n ?? 0) + Number(d?.n ?? 0);
-  await requirePlanLimit("maxRecords", totalRecords);
+  await requirePlanLimit("maxRecords", await countRecords(db));
 
-  // Convert input amount to EUR for storage; record the original input currency
-  let amountEur = data.amount ? Number(data.amount) : 0;
-  const inputCurrency = (data.currency || "EUR").toUpperCase();
-  if (inputCurrency !== "EUR" && amountEur > 0) {
-    const { rates } = await getExchangeRates();
-    amountEur = convertToEur(amountEur, inputCurrency, rates);
-  }
-
+  // EUR in `amount`, the figure as typed in `amountOriginal`: see src/lib/deal-amount.ts.
   const payload = {
     ...data,
-    amount: String(amountEur),
-    currency: inputCurrency,
+    ...(await storedAmount(data.amount, data.currency)),
     status: data.status || "open",
   };
 
@@ -127,7 +219,7 @@ export interface LossDetails {
 }
 
 export async function updateDealStage(dealId: string, newStageId: string, loss?: LossDetails) {
-  await requireWriteAccess();
+  const actor = await requireWriteAccess();
   const db = await getDb();
 
   // Capture old state BEFORE the update (needed for "changed" operators)
@@ -160,6 +252,11 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
   // "open", so the deal kept weighing on the forecast for ever. Terminal stages
   // now close the deal, and record when.
   const closing = stage?.isWon ? "won" : stage?.isLost ? "lost" : null;
+  // ⚠️ And the reverse. Moving a closed deal back into an open stage left its
+  // status at "won" or "lost", so the card sat in "Negotiation" while the
+  // forecast ignored it and the win/loss report still counted it. `updateDeal`
+  // already reopened on a status change; a stage change is the other door.
+  const reopening = !closing && !!stage && !!oldDeal && oldDeal.status !== "open";
   const now = new Date();
 
   // Where the conversation actually stopped. Not derivable afterwards: the move
@@ -180,11 +277,13 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
       stageId: newStageId,
       probability: probabilityWasManual ? currentProbability : (stage?.defaultProbability ?? 0),
       ...(closing ? { status: closing, closedAt: now } : {}),
+      ...(reopening ? { status: "open", closedAt: null, lostReason: null } : {}),
       ...lostFields,
       updatedAt: now,
     })
     .where(eq(deals.id, dealId))
     .returning();
+  await recordFieldChanges(db, "deal", dealId, oldDeal, updatedDeal, actor.user.id);
 
   dispatchWebhook("deal.stage_changed", {
     id: updatedDeal.id,
@@ -223,7 +322,6 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
   revalidatePath("/dashboard/pipeline");
 
   after(async () => {
-    await refreshDealHealthScore(updatedDeal.id);
     runAutomations({
       entityType: "deal",
       entityId: updatedDeal.id,
@@ -236,35 +334,90 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
   return updatedDeal;
 }
 
+/**
+ * The stage and status a deal ends up with, from whichever of the two a change asked for.
+ *
+ *  - A new stage decides the status: a won or lost column closes the deal, an open one
+ *    opens it again.
+ *  - A new status of won or lost moves the deal to that column, if the pipeline has one.
+ *  - Reopening a deal that sits in a closed column moves it back where it stopped (or to
+ *    the first open stage).
+ */
+async function reconcileStageAndStatus(
+  db: Awaited<ReturnType<typeof getDb>>,
+  oldDeal: typeof deals.$inferSelect | undefined,
+  wantedStageId: string | null | undefined,
+  wantedStatus: string | undefined,
+): Promise<{ status?: string; stageId?: string | null }> {
+  // Within the pipeline the deal is in — or is moving into: "the won column" is its own.
+  const pipelineId = await pipelineOfStage(db, wantedStageId ?? oldDeal?.stageId);
+  const stages = await db
+    .select({ id: pipelineStages.id, isWon: pipelineStages.isWon, isLost: pipelineStages.isLost })
+    .from(pipelineStages)
+    .where(eq(pipelineStages.pipelineId, pipelineId))
+    .orderBy(pipelineStages.order);
+  const everyStage = await db
+    .select({ id: pipelineStages.id, isWon: pipelineStages.isWon, isLost: pipelineStages.isLost })
+    .from(pipelineStages);
+  const byId = new Map(everyStage.map((s: { id: string; isWon: boolean; isLost: boolean }) => [s.id, s]));
+  const terminal = (id: string | null | undefined) => {
+    const s = id ? byId.get(id) : undefined;
+    return s?.isWon ? "won" : s?.isLost ? "lost" : null;
+  };
+
+  if (wantedStageId !== undefined && wantedStageId !== oldDeal?.stageId) {
+    const closed = terminal(wantedStageId);
+    return { stageId: wantedStageId, status: closed ?? "open" };
+  }
+
+  if ((wantedStatus === "won" || wantedStatus === "lost") && wantedStatus !== oldDeal?.status) {
+    const column = stages.find((s) => (wantedStatus === "won" ? s.isWon : s.isLost));
+    return { status: wantedStatus, ...(column ? { stageId: column.id } : {}) };
+  }
+
+  if (wantedStatus === "open" && oldDeal && oldDeal.status !== "open" && terminal(oldDeal.stageId)) {
+    const back =
+      (oldDeal.lostAtStageId && !terminal(oldDeal.lostAtStageId) ? oldDeal.lostAtStageId : null) ??
+      stages.find((s) => !s.isWon && !s.isLost)?.id ??
+      oldDeal.stageId;
+    return { status: "open", stageId: back };
+  }
+
+  return { status: wantedStatus };
+}
+
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
-  await requireWriteAccess();
+  const actor = await requireWriteAccess();
   const db = await getDb();
 
   // Capture old state BEFORE the update
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
 
-  // Convert input amount to EUR if a non-EUR currency is provided
-  let amountStr: string | undefined;
-  if (data.amount !== undefined) {
-    const inputCurrency = (data.currency || "EUR").toUpperCase();
-    if (inputCurrency !== "EUR") {
-      const { rates } = await getExchangeRates();
-      amountStr = String(convertToEur(Number(data.amount), inputCurrency, rates));
-    } else {
-      amountStr = String(data.amount);
-    }
-  }
+  // ⚠️⚠️ The figure the form sends is the one it showed: `amountOriginal`, in the deal's
+  // currency. Converting the EUR `amount` again is what shrank a USD deal on every save.
+  const amounts = data.amount !== undefined ? await storedAmount(data.amount, data.currency ?? oldDeal?.currency) : {};
+
+  // ⚠️⚠️ Stage and status move together, whichever of the two was asked for. The form had
+  // them as two separate fields: a deal moved to "Won" from it stayed `open` and kept
+  // weighing on the forecast, one marked "won" sat in "Proposal", and one reopened stayed
+  // in the "Lost" column. Dragging on the board already kept them in step
+  // (updateDealStage); this is the same rule for every other door.
+  const { status, stageId } = await reconcileStageAndStatus(db, oldDeal, data.stageId, data.status);
 
   // Record WHEN a deal closed. "Won this month" was derived from updatedAt, so
   // re-saving an old deal moved it into the current month's revenue, and the
   // number people are measured on drifted (audit rilievo C-07).
-  const isClosing = (data.status === "won" || data.status === "lost") && oldDeal?.status !== data.status;
-  const isReopening = data.status === "open" && oldDeal?.status !== "open";
+  const isClosing = (status === "won" || status === "lost") && oldDeal?.status !== status;
+  const isReopening = status === "open" && !!oldDeal && oldDeal.status !== "open";
 
   const payload = {
     ...data,
-    amount: amountStr,
+    ...amounts,
+    ...(status !== undefined ? { status } : {}),
+    ...(stageId !== undefined ? { stageId } : {}),
     ...(isClosing ? { closedAt: new Date() } : {}),
+    // Where it stopped, before the move to the losing column overwrites the stage.
+    ...(isClosing && status === "lost" ? { lostAtStageId: oldDeal?.stageId ?? null } : {}),
     ...(isReopening ? { closedAt: null, lostReason: null } : {}),
   };
 
@@ -273,12 +426,13 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
     .set(payload as Partial<typeof deals.$inferInsert>)
     .where(eq(deals.id, dealId))
     .returning();
+  await recordFieldChanges(db, "deal", dealId, oldDeal, updatedDeal, actor.user.id);
   revalidatePath("/dashboard/pipeline");
 
   // Only on the transition. Passing status: "won" on any later edit re-fired the
   // event and re-notified the owner, so an integration saw the same deal won
   // several times.
-  if (data.status === "won" && isClosing) {
+  if (status === "won" && isClosing) {
     // ⚠️⚠️ Who the deal was about travels with the event. Without it a subscriber hears
     // "won" and has no idea whose: our ids mean nothing outside this database, and the
     // assistant on the other side matches people by telephone number and email.
@@ -294,13 +448,13 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
       notify({
         userId: updatedDeal.ownerId,
         type: "deal_won",
-        title: "Deal won! 🏆",
-        message: `"${updatedDeal.name}" has been marked as won.`,
-        link: `/dashboard/pipeline`,
+        key: "dealWon",
+        params: { name: updatedDeal.name },
+        link: `/dashboard/pipeline/${updatedDeal.id}`,
         // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
-  } else if (data.status === "lost" && isClosing) {
+  } else if (status === "lost" && isClosing) {
     const reach = await contactReach(db, updatedDeal.contactId);
     dispatchWebhook("deal.lost", {
       id: updatedDeal.id,
@@ -315,7 +469,6 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
   }
 
   after(async () => {
-    await refreshDealHealthScore(updatedDeal.id);
     runAutomations({
       entityType: "deal",
       entityId: updatedDeal.id,
@@ -342,6 +495,10 @@ export async function getDealById(dealId: string) {
       contactFirstName: contacts.firstName,
       contactLastName: contacts.lastName,
       contactEmail: contacts.email,
+      // The deal page offers a call button on a phone; the number is the one fact
+      // a rep opening a deal in the car actually needs from the contact.
+      contactPhone: contacts.phone,
+      contactMobile: contacts.mobile,
       ownerName: users.name,
     })
     .from(deals)
@@ -350,14 +507,39 @@ export async function getDealById(dealId: string) {
     .leftJoin(contacts, eq(deals.contactId, contacts.id))
     .leftJoin(users, eq(deals.ownerId, users.id))
     .where(eq(deals.id, dealId));
-  return row ?? null;
+  if (!row) return null;
+
+  const now = new Date();
+  // The same subqueries as the board, narrowed to one deal (Postgres pushes the filter
+  // on the grouping column inside them), so the page and the card cannot disagree.
+  const lastSq = lastActivityByDeal(db, now);
+  const nextSq = nextStepByDeal(db, now);
+  const [[last], [step]] = await Promise.all([
+    db.select({ at: lastSq.at }).from(lastSq).where(eq(lastSq.dealId, dealId)),
+    db.select({ at: nextSq.at, n: nextSq.n }).from(nextSq).where(eq(nextSq.dealId, dealId)),
+  ]);
+  const signals = dealSignals(
+    {
+      createdAt: row.deal.createdAt,
+      lastActivityAt: last?.at ?? null,
+      nextStepAt: step?.at ?? null,
+      hasNextStep: (step?.n ?? 0) > 0,
+    },
+    now,
+  );
+  return { ...row, signals };
 }
 
 // ─── Pipeline Report ──────────────────────────────────────────────────────────
-export async function getPipelineReport(filters: { owners?: string[]; period?: number } = {}) {
+export async function getPipelineReport(
+  filters: { owners?: string[]; period?: number; pipeline?: string | null } = {},
+) {
   await requireCapability("report:read");
   const db = await getDb();
-  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  // One pipeline at a time: stages of two pipelines in one table would add up columns that
+  // mean different things.
+  const stages = await stagesOfPipeline(db, await resolvePipelineId(db, filters.pipeline));
+  const stageIdList = stages.map((st: { id: string }) => st.id);
   // Open pipeline is what is on the table now, whatever its age; the period applies
   // to what closed, on the day it closed.
   const since = filters.period ? periodStart(filters.period) : null;
@@ -368,9 +550,35 @@ export async function getPipelineReport(filters: { owners?: string[]; period?: n
       and(
         ownerCondition(deals.ownerId, filters.owners ?? []),
         since ? or(eq(deals.status, "open"), gte(deals.closedAt, since)) : undefined,
+        stageIdList.length ? inArray(deals.stageId, stageIdList) : sql`false`,
       ),
     );
   const now = Date.now();
+
+  // Where each deal has been (src/lib/stage-history.ts): its stage changes, one statement.
+  const reportIds = allDeals.map((d) => d.id);
+  const changes: { entityId: string; oldValue: string | null; newValue: string | null; changedAt: Date }[] =
+    reportIds.length === 0
+      ? []
+      : await db
+          .select({
+            entityId: fieldChanges.entityId,
+            oldValue: fieldChanges.oldValue,
+            newValue: fieldChanges.newValue,
+            changedAt: fieldChanges.changedAt,
+          })
+          .from(fieldChanges)
+          .where(
+            and(
+              eq(fieldChanges.entityType, "deal"),
+              eq(fieldChanges.field, "stageId"),
+              inArray(fieldChanges.entityId, reportIds),
+            ),
+          )
+          .orderBy(asc(fieldChanges.changedAt));
+  const changesByDeal = new Map<string, StageChange[]>();
+  for (const c of changes) changesByDeal.set(c.entityId, [...(changesByDeal.get(c.entityId) ?? []), c]);
+  const figures = stageFigures(stages, allDeals, changesByDeal, new Date(now));
 
   const stageReport = stages.map((stage) => {
     const stageDeals = allDeals.filter((d) => d.stageId === stage.id && d.status === "open");
@@ -379,12 +587,9 @@ export async function getPipelineReport(filters: { owners?: string[]; period?: n
       (sum, d) => sum + Number(d.amount ?? 0) * ((d.probability ?? stage.defaultProbability ?? 0) / 100),
       0,
     );
-    const avgDaysInStage = stageDeals.length
-      ? Math.round(
-          stageDeals.reduce((sum, d) => sum + (now - new Date(d.createdAt).getTime()) / 86_400_000, 0) /
-            stageDeals.length,
-        )
-      : 0;
+    // ⚠️ Days spent in the stage by the deals that left it — not the deals' age, which is
+    // what this used to be. Null until one has left.
+    const stage_ = figures[stage.id];
     return {
       id: stage.id,
       name: stage.name,
@@ -392,7 +597,11 @@ export async function getPipelineReport(filters: { owners?: string[]; period?: n
       dealCount: stageDeals.length,
       totalValue,
       weightedValue,
-      avgDaysInStage,
+      avgDaysInStage: stage_?.avgDays ?? null,
+      conversion: stage_?.conversion ?? null,
+      stale: stage_?.stale ?? 0,
+      staleAfterDays: stage.staleAfterDays,
+      closing: stage.isWon || stage.isLost,
     };
   });
 
@@ -406,11 +615,24 @@ export async function getPipelineReport(filters: { owners?: string[]; period?: n
       ? ((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100).toFixed(1)
       : "0";
 
+  const cycles = wonDeals
+    .filter((d) => d.closedAt)
+    .map((d) => ((d.closedAt as Date).getTime() - new Date(d.createdAt).getTime()) / 86_400_000);
+  const velocity = salesVelocity({
+    openCount: openDeals.length,
+    wonCount: wonDeals.length,
+    lostCount: lostDeals.length,
+    wonValue: totalWonValue,
+    cycleDays: cycles.length ? cycles.reduce((a, b) => a + b, 0) / cycles.length : null,
+  });
+
   return {
     stageReport,
     totalWonValue,
     totalPipeline,
     winRate,
+    velocity,
+    cycleDays: cycles.length ? Math.round(cycles.reduce((a, b) => a + b, 0) / cycles.length) : null,
     wonCount: wonDeals.length,
     lostCount: lostDeals.length,
     openCount: openDeals.length,
@@ -419,50 +641,124 @@ export async function getPipelineReport(filters: { owners?: string[]; period?: n
 
 // ── Pipeline Stage Management ────────────────────────────────────────────────
 
+/**
+ * Every stage, in each pipeline's order — with the pipeline's name when there is more than
+ * one, so a picker can tell two "Qualification" columns apart (src/lib/pipelines.ts).
+ */
 export async function getPipelineStages() {
   await requireCapability("record:read");
   const db = await getDb();
-  return db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  const [stages, list] = await Promise.all([
+    db.select().from(pipelineStages).orderBy(pipelineStages.order),
+    listPipelines(db),
+  ]);
+  const position = new Map(list.map((p, i) => [p.id, { i, name: p.name }]));
+  const several = list.length > 1;
+  return [...stages]
+    .sort((a, b) => (position.get(a.pipelineId)?.i ?? 0) - (position.get(b.pipelineId)?.i ?? 0) || a.order - b.order)
+    .map((stage) => ({ ...stage, pipelineName: several ? (position.get(stage.pipelineId)?.name ?? null) : null }));
 }
 
-export async function createPipelineStage(data: { name: string; color?: string; defaultProbability?: number }) {
-  await requireAdminAccess();
+/** A threshold as stored: whole days between 1 and 365, or null for none. */
+function cleanStaleDays(value: number | null | undefined): number | null {
+  const n = Math.round(Number(value));
+  return value != null && Number.isFinite(n) && n > 0 ? Math.min(n, 365) : null;
+}
+
+export type StageWriteResult<T = undefined> = { ok: true; stage: T } | { ok: false; reason: StageKindRefusal };
+
+export async function createPipelineStage(data: {
+  name: string;
+  color?: string;
+  defaultProbability?: number;
+  kind?: StageKind;
+  staleAfterDays?: number | null;
+  pipelineId?: string;
+}): Promise<StageWriteResult<typeof pipelineStages.$inferSelect>> {
+  await requireCapability("pipeline:manage");
   const db = await getDb();
-  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  // One won and one lost column per pipeline, not per workspace.
+  const pipelineId = await resolvePipelineId(db, data.pipelineId);
+  const stages = await stagesOfPipeline(db, pipelineId);
+  const kind = data.kind ?? "open";
+  const refusal = checkStageKind(stages, null, kind, 0);
+  if (refusal) return { ok: false, reason: refusal };
+
   const maxOrder = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) : 0;
   const [stage] = await db
     .insert(pipelineStages)
     .values({
       name: data.name.trim(),
+      pipelineId,
       order: maxOrder + 1,
       color: data.color ?? "#94a3b8",
       defaultProbability: data.defaultProbability ?? 0,
+      // Only an open stage can hold a deal long enough to be stuck in it.
+      staleAfterDays: kind === "open" ? cleanStaleDays(data.staleAfterDays) : null,
+      ...flagsOf(kind),
     })
     .returning();
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/settings/pipeline");
-  return stage;
+  return { ok: true, stage };
 }
 
 export async function updatePipelineStage(
   id: string,
-  data: { name?: string; color?: string; defaultProbability?: number; order?: number },
-) {
-  await requireAdminAccess();
+  data: {
+    name?: string;
+    color?: string;
+    defaultProbability?: number;
+    order?: number;
+    kind?: StageKind;
+    staleAfterDays?: number | null;
+  },
+): Promise<StageWriteResult> {
+  await requireCapability("pipeline:manage");
   const db = await getDb();
+  const { kind, staleAfterDays, ...rest } = data;
+
+  if (kind !== undefined) {
+    const stages = await db
+      .select({ id: pipelineStages.id, isWon: pipelineStages.isWon, isLost: pipelineStages.isLost })
+      .from(pipelineStages)
+      .where(eq(pipelineStages.pipelineId, await pipelineOfStage(db, id)));
+    const [{ n }] = await db.select({ n: count() }).from(deals).where(eq(deals.stageId, id));
+    const refusal = checkStageKind(stages, id, kind, Number(n));
+    if (refusal) return { ok: false, reason: refusal };
+  }
+
+  // Only an open stage holds a threshold: the kind it is becoming, or the one it has.
+  let closing = kind !== undefined && kind !== "open";
+  if (kind === undefined && staleAfterDays !== undefined) {
+    const [current] = await db
+      .select({ isWon: pipelineStages.isWon, isLost: pipelineStages.isLost })
+      .from(pipelineStages)
+      .where(eq(pipelineStages.id, id));
+    closing = Boolean(current?.isWon || current?.isLost);
+  }
+
   await db
     .update(pipelineStages)
-    .set({ ...data, updatedAt: new Date() })
+    .set({
+      ...rest,
+      ...(kind !== undefined ? flagsOf(kind) : {}),
+      ...(staleAfterDays !== undefined || closing
+        ? { staleAfterDays: closing ? null : cleanStaleDays(staleAfterDays) }
+        : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(pipelineStages.id, id));
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/settings/pipeline");
+  return { ok: true, stage: undefined };
 }
 
 export async function deletePipelineStage(id: string) {
-  await requireAdminAccess();
+  await requireCapability("pipeline:manage");
   const db = await getDb();
-  const dealsInStage = await db.select().from(deals).where(eq(deals.stageId, id));
-  if (dealsInStage.length > 0) {
+  const [{ n }] = await db.select({ n: count() }).from(deals).where(eq(deals.stageId, id));
+  if (Number(n) > 0) {
     throw new Error("Cannot delete a stage with active deals.");
   }
   await db.delete(pipelineStages).where(eq(pipelineStages.id, id));
@@ -476,66 +772,9 @@ export async function getDealsForSelect() {
   return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
 }
 
-// ── Deal Health Score ─────────────────────────────────────────────────────────
-
-function computeHealthScore(
-  deal: {
-    probability: number | null;
-    expectedCloseDate: Date | null;
-    updatedAt: Date;
-  },
-  recentActivityCount: number,
-): number {
-  let score = 100;
-  const now = new Date();
-  const daysSinceUpdated = (now.getTime() - new Date(deal.updatedAt).getTime()) / 86_400_000;
-
-  // Overdue close date
-  if (deal.expectedCloseDate && new Date(deal.expectedCloseDate) < now) score -= 35;
-
-  // Stale deal (no update + no recent activity)
-  if (recentActivityCount === 0) {
-    if (daysSinceUpdated > 14) score -= 35;
-    else if (daysSinceUpdated > 7) score -= 20;
-  }
-
-  // Stuck in stage (use updatedAt as proxy)
-  if (daysSinceUpdated > 60) score -= 25;
-  else if (daysSinceUpdated > 30) score -= 12;
-
-  // Low probability
-  if ((deal.probability ?? 0) < 20) score -= 15;
-
-  return Math.max(0, Math.min(100, score));
-}
-
-async function refreshDealHealthScore(dealId: string) {
-  const db = await getDb();
-  const [deal] = await db
-    .select({
-      status: deals.status,
-      probability: deals.probability,
-      expectedCloseDate: deals.expectedCloseDate,
-      updatedAt: deals.updatedAt,
-    })
-    .from(deals)
-    .where(eq(deals.id, dealId));
-  if (!deal || deal.status !== "open") return;
-
-  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
-  const recentActivities = await db
-    .select({ id: activities.id })
-    .from(activities)
-    .where(and(eq(activities.dealId, dealId), gte(activities.createdAt, sevenDaysAgo)))
-    .limit(1);
-
-  const score = computeHealthScore(deal, recentActivities.length);
-  await db.update(deals).set({ healthScore: score }).where(eq(deals.id, dealId));
-}
-
 // ── Forecast ──────────────────────────────────────────────────────────────────
 
-export async function getForecastData(filters: { owners?: string[] } = {}) {
+export async function getForecastData(filters: { owners?: string[]; pipeline?: string | null } = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const [format, tFilters] = await Promise.all([getFormatter(), getTranslations("pipeline.filters")]);
@@ -552,11 +791,18 @@ export async function getForecastData(filters: { owners?: string[] } = {}) {
       ownerName: users.name,
       stageId: deals.stageId,
       stageName: pipelineStages.name,
+      stageProbability: pipelineStages.defaultProbability,
     })
     .from(deals)
     .leftJoin(users, eq(deals.ownerId, users.id))
     .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
-    .where(and(eq(deals.status, "open"), ownerCondition(deals.ownerId, owners)));
+    .where(
+      and(
+        eq(deals.status, "open"),
+        ownerCondition(deals.ownerId, owners),
+        inArray(deals.stageId, await stageIdsOfPipeline(db, await resolvePipelineId(db, filters.pipeline))),
+      ),
+    );
 
   // Build monthly buckets for the next 6 months
   const now = new Date();
@@ -616,7 +862,10 @@ export async function getForecastData(filters: { owners?: string[] } = {}) {
   const ownerMap = new Map<string, { name: string; weighted: number; dealCount: number }>();
   for (const deal of openDeals) {
     const amt = Number(deal.amount ?? 0);
-    const prob = deal.probability ?? 0;
+    // The stage's probability when the deal has none of its own — as the pipeline report
+    // and the finance page weight it. This used 0, so the same deal counted in one and
+    // vanished from the other.
+    const prob = deal.probability ?? deal.stageProbability ?? 0;
     const weighted = (amt * prob) / 100;
 
     let bucket: (typeof months)[number] | null = null;
@@ -668,6 +917,15 @@ export async function getForecastData(filters: { owners?: string[] } = {}) {
   // months[0] is always the current month (loop starts at i=0)
   const currentMonthTarget = months[0]?.target ?? 0;
 
+  // ⚠️ What this month's target is measured against: what has already been won this month
+  // plus what is committed to close in it. It used to divide six months of commitments by
+  // one month's target, leaving out everything already won.
+  const [wonRow] = await db
+    .select({ revenue: sql<number>`coalesce(sum(${dealEur}), 0)` })
+    .from(deals)
+    .where(and(closedBetween("won", startOfCurrentMonth), ownerCondition(deals.ownerId, owners)));
+  const wonThisMonth = Number(wonRow?.revenue ?? 0);
+
   return {
     months,
     unscheduled,
@@ -678,6 +936,8 @@ export async function getForecastData(filters: { owners?: string[] } = {}) {
     committed: months.reduce((s, m) => s + m.committed, 0),
     bestCase: months.reduce((s, m) => s + m.bestCase, 0),
     currentMonthTarget,
+    currentMonthCommitted: months[0]?.committed ?? 0,
+    wonThisMonth,
   };
 }
 
@@ -697,7 +957,7 @@ export async function getLossReasons(includeRetired = false) {
 }
 
 export async function createLossReason(name: string) {
-  await requireAdminAccess();
+  await requireCapability("pipeline:manage");
   const db = await getDb();
   const clean = name.trim();
   if (!clean) throw new Error("A reason needs a name.");
@@ -712,7 +972,7 @@ export async function createLossReason(name: string) {
 }
 
 export async function updateLossReason(id: string, data: { name?: string; isActive?: boolean; order?: number }) {
-  await requireAdminAccess();
+  await requireCapability("pipeline:manage");
   const db = await getDb();
   const [row] = await db
     .update(dealLossReasons)
@@ -735,7 +995,7 @@ export async function updateLossReason(id: string, data: { name?: string; isActi
  * later, nobody remembers.
  */
 export async function loseDeal(dealId: string, loss: LossDetails) {
-  await requireWriteAccess();
+  const actor = await requireWriteAccess();
   const db = await getDb();
 
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
@@ -744,7 +1004,8 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
 
   // Move it to the losing column if the pipeline has one, so the board agrees
   // with the record. A pipeline without one still closes the deal.
-  const [lostStage] = await db.select().from(pipelineStages).where(eq(pipelineStages.isLost, true)).limit(1);
+  // Its own pipeline's lost column: the first one in the workspace could be somebody else's.
+  const lostStage = await closingStageFor(db, oldDeal.stageId, "lost");
 
   if (lostStage) return updateDealStage(dealId, lostStage.id, loss);
 
@@ -762,6 +1023,7 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
     })
     .where(eq(deals.id, dealId))
     .returning();
+  await recordFieldChanges(db, "deal", dealId, oldDeal, updated, actor.user.id);
 
   const reach = await contactReach(db, updated.contactId);
   dispatchWebhook("deal.lost", {
@@ -787,7 +1049,7 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
  * what every sales meeting asks first. All three carry value, not just counts,
  * because ten small losses and one large one are different problems.
  */
-export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = []) {
+export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = [], pipeline: string | null = null) {
   await requireCapability("report:read");
   const db = await getDb();
   const since = periodStart(sinceDays);
@@ -805,7 +1067,12 @@ export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = [])
     })
     .from(deals)
     .where(
-      and(inArray(deals.status, ["won", "lost"]), gte(deals.closedAt, since), ownerCondition(deals.ownerId, owners)),
+      and(
+        inArray(deals.status, ["won", "lost"]),
+        gte(deals.closedAt, since),
+        ownerCondition(deals.ownerId, owners),
+        inArray(deals.stageId, await stageIdsOfPipeline(db, await resolvePipelineId(db, pipeline))),
+      ),
     );
 
   const [reasons, stages] = await Promise.all([
@@ -848,4 +1115,64 @@ export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = [])
     ),
     byCompetitor: groupLosses((d) => d.lostCompetitor?.trim() || t("noneNamed")),
   };
+}
+
+// ── Pipelines ─────────────────────────────────────────────────────────────────
+
+/** The workspace's pipelines, in order (src/lib/pipelines.ts). */
+export async function getPipelines(): Promise<PipelineRow[]> {
+  await requireCapability("record:read");
+  return listPipelines(await getDb());
+}
+
+const MAX_PIPELINE_NAME = 80;
+
+/**
+ * A new pipeline, with the default stages — a won and a lost column included, so a deal in
+ * it can be closed from the first day, as in a new workspace.
+ */
+export async function createPipelineAction(name: string): Promise<{ ok: true; id: string } | { ok: false }> {
+  await requireCapability("pipeline:manage");
+  const clean = name.trim().slice(0, MAX_PIPELINE_NAME);
+  if (!clean) return { ok: false };
+  const db = await getDb();
+  const existing = await listPipelines(db);
+  const id = crypto.randomUUID();
+  await db.insert(pipelines).values({ id, name: clean, order: (existing.at(-1)?.order ?? 0) + 1 });
+  await db.insert(pipelineStages).values(DEFAULT_STAGES.map((stage) => ({ ...stage, pipelineId: id })));
+  revalidatePath("/dashboard/pipeline", "layout");
+  revalidatePath("/dashboard/settings/pipeline");
+  return { ok: true, id };
+}
+
+export async function renamePipelineAction(id: string, name: string): Promise<{ ok: boolean }> {
+  await requireCapability("pipeline:manage");
+  const clean = name.trim().slice(0, MAX_PIPELINE_NAME);
+  if (!clean) return { ok: false };
+  await (await getDb()).update(pipelines).set({ name: clean, updatedAt: new Date() }).where(eq(pipelines.id, id));
+  revalidatePath("/dashboard/pipeline", "layout");
+  revalidatePath("/dashboard/settings/pipeline");
+  return { ok: true };
+}
+
+/**
+ * Deletes a pipeline and its stages — only when no deal stands in any of them, and never
+ * the default one, which is where a stage with no say belongs.
+ */
+export async function deletePipelineAction(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: "default" | "hasDeals" }> {
+  await requireCapability("pipeline:manage");
+  if (id === DEFAULT_PIPELINE_ID) return { ok: false, reason: "default" };
+  const db = await getDb();
+  const stageIds = await stageIdsOfPipeline(db, id);
+  if (stageIds.length > 0) {
+    const [{ n }] = await db.select({ n: count() }).from(deals).where(inArray(deals.stageId, stageIds));
+    if (Number(n) > 0) return { ok: false, reason: "hasDeals" };
+    await db.delete(pipelineStages).where(eq(pipelineStages.pipelineId, id));
+  }
+  await db.delete(pipelines).where(eq(pipelines.id, id));
+  revalidatePath("/dashboard/pipeline", "layout");
+  revalidatePath("/dashboard/settings/pipeline");
+  return { ok: true };
 }

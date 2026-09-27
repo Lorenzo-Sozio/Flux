@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/activity-reminders.ts",
+    "description": "⚠️⚠️ la finestra torna a due minuti con un job ogni dieci: quattro promemoria su cinque non partono",
+    "find": "export const REMINDER_LOOKAHEAD_MINUTES = 10;",
+    "replace": "export const REMINDER_LOOKAHEAD_MINUTES = 2;"
+  },
+  {
+    "file": "src/lib/activity-reminders.ts",
+    "description": "⚠️ un'esecuzione in ritardo torna a perdere i promemoria del suo intervallo",
+    "find": "export const REMINDER_LOOKBACK_MINUTES = 2;",
+    "replace": "export const REMINDER_LOOKBACK_MINUTES = 0;"
+  }
+]

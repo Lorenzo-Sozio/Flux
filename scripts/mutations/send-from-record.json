@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/email-log-target.ts",
+    "description": "⚠️⚠️ il tipo di record torna a essere indovinato dall'azienda: un lead senza azienda finisce su contact_id e l'email già partita risulta fallita",
+    "find": "  const kind = entityType ?? (\"isConverted\" in entity ? \"lead\" : \"contact\");",
+    "replace": "  const kind = \"companyName\" in entity ? \"lead\" : \"contact\";"
+  },
+  {
+    "file": "src/actions/email.ts",
+    "description": "⚠️ un errore nel registrare l'email già inviata torna a presentarsi come invio fallito",
+    "find": "    .catch((err) => {\n      console.error(\"[sendEmailAction] sent, but not logged on the record:\", err);\n    });",
+    "replace": ";"
+  },
+  {
+    "file": "src/lib/quote-status.ts",
+    "description": "⚠️⚠️ il sollecito di un preventivo aperto torna a tentare il passaggio a inviato dopo aver mandato l'email",
+    "find": "  if (status === \"sent\" || status === \"viewed\") return { kind: \"reminder\" };",
+    "replace": "  if (status === \"sent\") return { kind: \"reminder\" };"
+  },
+  {
+    "file": "src/lib/quote-status.ts",
+    "description": "⚠️⚠️ una bozza oltre la soglia di approvazione torna a partire",
+    "find": "  if (status !== \"approved\" && approvalReason) {",
+    "replace": "  if (status === \"never\" && approvalReason) {"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ un'email non partita torna a segnare il preventivo come inviato",
+    "find": "    if (!result.success) throw new Error(result.error ?? \"The email could not be sent.\");",
+    "replace": "    void result;"
+  }
+]

@@ -396,7 +396,7 @@ export function LeadModal({
               />
 
               <Tabs defaultValue="info">
-                <TabsList className="mb-5 w-full">
+                <TabsList className="mb-5 w-full overflow-x-auto">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
                     {t("form.tabs.info")}
@@ -574,8 +574,8 @@ export function LeadModal({
                       control={control}
                       name="marketingConsent"
                       render={({ field }) => (
-                        <div className="flex items-center justify-between rounded-lg border px-4 py-3">
-                          <div>
+                        <div className="flex items-center justify-between gap-3 rounded-lg border px-4 py-3">
+                          <div className="min-w-0">
                             <p className="font-medium text-sm">{tc("marketingConsent")}</p>
                             <p className="text-muted-foreground text-xs">{tc("marketingConsentDesc")}</p>
                           </div>
@@ -617,13 +617,16 @@ export function LeadModal({
             </div>
 
             {duplicates.length > 0 && pendingPayload && (
-              <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
+              <div className="border-t bg-amber-50 px-4 py-4 md:px-6 dark:bg-amber-950/30">
                 <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
                   {t("modal.similarExist")}
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 text-amber-700 text-sm dark:text-amber-400">
+                    <li
+                      key={d.id}
+                      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-amber-700 text-sm dark:text-amber-400"
+                    >
                       <Link
                         href={`/dashboard/leads/${d.id}`}
                         className="underline underline-offset-2 hover:text-amber-900"
@@ -631,7 +634,7 @@ export function LeadModal({
                       >
                         {d.firstName} {d.lastName}
                       </Link>
-                      {d.email && <span className="text-xs opacity-70">{d.email}</span>}
+                      {d.email && <span className="min-w-0 break-all text-xs opacity-70">{d.email}</span>}
                       {isEditing && lead && (
                         <Button
                           type="button"
@@ -726,6 +729,7 @@ export function DeleteLeadButton({ lead, redirectTo }: { lead: any; redirectTo?:
           size="icon"
           className="text-destructive hover:text-destructive/90"
           disabled={isDeleting}
+          aria-label={isConverted ? t("deleteConvertedTitle") : t("deleteTitle")}
         >
           {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
         </Button>
@@ -770,9 +774,9 @@ function QuickConvertButton({ lead }: { lead: any }) {
         toast.success(t("convertSuccessToast"));
         setOpen(false);
         if (result.dealId) {
-          router.push(`/dashboard/pipeline?dealId=${result.dealId}`);
+          router.push(`/dashboard/pipeline/${result.dealId}`);
         } else {
-          router.push(`/dashboard/contacts?contactId=${result.contactId}`);
+          router.push(`/dashboard/contacts/${result.contactId}`);
         }
       } catch {
         toast.error(t("convertErrorToast"));
@@ -785,7 +789,7 @@ function QuickConvertButton({ lead }: { lead: any }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title={t("convertLead")} disabled={isPending}>
+        <Button variant="ghost" size="icon" title={t("convertLead")} aria-label={t("convertLead")} disabled={isPending}>
           {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
         </Button>
       </DialogTrigger>
@@ -870,7 +874,9 @@ export function LeadActions({
   // hover to reveal one, and a screen reader is told nothing at all.
   const tc = useTranslations("common");
   return (
-    <div className="flex items-center gap-2">
+    // Three icons on a card leave the name little enough room as it is; the
+    // table from md up keeps its spacing.
+    <div className="flex items-center gap-1 md:gap-2">
       {/* The card itself already opens the record; on a phone this is a third
           of the row spent on a duplicate. */}
       {!hideView && (

@@ -4,10 +4,11 @@ import { getTranslations } from "next-intl/server";
 
 import { getAllUsers, getCompanyCategories, getCompanyTypes, listLeads } from "@/actions/crm";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
-import { getCustomFilters } from "@/actions/filters";
+import { getSavedViews } from "@/actions/filters";
 import { FilterBuilder } from "@/components/crm/filter-builder";
 import { ImportExportButtons } from "@/components/crm/import-export-buttons";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { PinnedViews } from "@/components/crm/pinned-views";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { hasCapability } from "@/lib/auth-guard";
@@ -28,11 +29,11 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   // The workspace role, not the platform staff field: the latter is "user" for
   // every customer, so this was always true and a viewer saw buttons that could
   // only fail (audit rilievo U-02).
-  const canEdit = await hasCapability("record:write");
+  const [canEdit, canImport] = await Promise.all([hasCapability("record:write"), hasCapability("record:import")]);
 
   const [pageResult, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
     listLeads(listParams),
-    getCustomFilters("leads").catch(() => []),
+    getSavedViews("leads").catch(() => []),
     getCustomFieldDefinitions("lead").catch(() => []),
     getAllUsers(),
     getCompanyCategories().catch(() => []),
@@ -44,6 +45,13 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(LEAD_FIELDS), ...customFieldsToMetaMap(customDefs) };
+  // "Mine" is the first thing a list is narrowed by: the owner, by name.
+  if (fields.ownerId) {
+    fields.ownerId = {
+      ...fields.ownerId,
+      lookupOptions: users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })),
+    };
+  }
 
   if (fields.leadTypeId) {
     fields.leadTypeId = {
@@ -61,7 +69,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="font-bold text-2xl">{t("title")}</h1>
           <Badge variant="secondary">{pageResult.total}</Badge>
           {activeCount > 0 && (
@@ -84,7 +92,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             }))}
             basePath="/dashboard/leads"
           />
-          <ImportExportButtons entityType="leads" />
+          <ImportExportButtons entityType="leads" canImport={canImport} />
           {canEdit && (
             <LeadModal categories={categories} companyTypes={companyTypes}>
               <Button>{t("newLead")}</Button>
@@ -93,6 +101,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
         </div>
       </div>
 
+      <PinnedViews views={savedFilters} basePath="/dashboard/leads" />
       <div className="mb-4">
         <ListToolbar
           total={pageResult.total}

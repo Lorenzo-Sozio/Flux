@@ -1,6 +1,7 @@
 import {
   Banknote,
   BarChart3,
+  BellRing,
   Bot,
   Building2,
   Calendar,
@@ -10,15 +11,19 @@ import {
   Clock,
   Contact,
   CreditCard,
+  FileInput,
   FileText,
   GanttChartSquare,
+  Gauge,
   GitMerge,
+  HandCoins,
   HelpCircle,
   Kanban,
   KeyRound,
   LifeBuoy,
   LineChart,
   ListOrdered,
+  ListTree,
   type LucideIcon,
   Mail,
   MailOpen,
@@ -34,7 +39,9 @@ import {
   Swords,
   Tags,
   Target,
+  ToggleRight,
   TrendingUp,
+  UserRound,
   Users,
   Users2,
   Wand2,
@@ -43,6 +50,7 @@ import {
 } from "lucide-react";
 
 import type { Capability } from "@/lib/permissions";
+import type { WorkspaceFeature } from "@/lib/workspace-feature-list";
 
 /** Plan modules a nav entry can belong to. */
 export type NavModule = "crm" | "sales" | "marketing" | "support" | "automation" | "reporting" | "helpdesk";
@@ -63,9 +71,16 @@ export interface NavSubItem {
   need?: Capability;
   /** Plan module this belongs to. Absent means always available. */
   module?: NavModule;
+  /** An optional part the workspace can switch off: hidden, not locked, when it is off. */
+  feature?: WorkspaceFeature;
   /** Set by `filterNav` when the plan excludes this entry. Shown, not hidden. */
   locked?: boolean;
   lockedModule?: NavModule;
+  /**
+   * `manager`: in the menu of whoever runs the workspace; for everybody else behind "show
+   * all sections", and always in the palette (§4.1). Never a permission — `need` is that.
+   */
+  audience?: "manager";
 }
 
 export interface NavMainItem {
@@ -78,8 +93,10 @@ export interface NavMainItem {
   isNew?: boolean;
   need?: Capability;
   module?: NavModule;
+  feature?: WorkspaceFeature;
   locked?: boolean;
   lockedModule?: NavModule;
+  audience?: "manager";
 }
 
 export interface NavGroup {
@@ -133,11 +150,11 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/tasks",
         icon: CheckSquare,
         subItems: [
-          { titleKey: "gantt", url: "/dashboard/tasks/gantt", icon: GanttChartSquare },
-          { titleKey: "workload", url: "/dashboard/tasks/workload", icon: Users2 },
+          { titleKey: "gantt", url: "/dashboard/tasks/gantt", icon: GanttChartSquare, feature: "projects" },
+          { titleKey: "workload", url: "/dashboard/tasks/workload", icon: Users2, feature: "projects" },
         ],
       },
-      { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle },
+      { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle, feature: "chat" },
     ],
   },
   {
@@ -162,28 +179,74 @@ export const sidebarItems: NavGroup[] = [
         icon: Kanban,
         module: "sales",
         subItems: [
-          { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
-          { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
-          { titleKey: "winLoss", url: "/dashboard/pipeline/win-loss", icon: Swords, module: "sales" },
+          // The analysis views are also the tabs across the Pipeline section, so a salesperson
+          // reaches them from the board without six more lines in the menu.
+          {
+            titleKey: "salesTargets",
+            url: "/dashboard/pipeline/targets",
+            icon: TrendingUp,
+            module: "sales",
+            audience: "manager",
+          },
+          // Not for managers only: what a person's own wins earned is theirs to see.
+          {
+            titleKey: "commissions",
+            url: "/dashboard/pipeline/commissions",
+            icon: HandCoins,
+            module: "sales",
+          },
+          {
+            titleKey: "salesFunnel",
+            url: "/dashboard/pipeline/funnel",
+            icon: GitMerge,
+            module: "sales",
+            audience: "manager",
+          },
+          {
+            titleKey: "winLoss",
+            url: "/dashboard/pipeline/win-loss",
+            icon: Swords,
+            module: "sales",
+            audience: "manager",
+          },
           {
             titleKey: "territoryReport",
             url: "/dashboard/pipeline/territories",
             icon: MapPin,
             module: "sales",
             need: "report:read",
+            audience: "manager",
           },
-          { titleKey: "forecast", url: "/dashboard/pipeline/forecast", icon: LineChart, module: "sales" },
-          { titleKey: "pipelineReport", url: "/dashboard/pipeline/report", icon: ClipboardList, module: "sales" },
+          {
+            titleKey: "forecast",
+            url: "/dashboard/pipeline/forecast",
+            icon: LineChart,
+            module: "sales",
+            audience: "manager",
+          },
+          {
+            titleKey: "pipelineReport",
+            url: "/dashboard/pipeline/report",
+            icon: ClipboardList,
+            module: "sales",
+            audience: "manager",
+          },
         ],
       },
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
-      { titleKey: "contracts", url: "/dashboard/sales/contracts", icon: ScrollText, module: "sales" },
-      { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales" },
+      {
+        titleKey: "contracts",
+        url: "/dashboard/sales/contracts",
+        icon: ScrollText,
+        module: "sales",
+        audience: "manager",
+      },
+      { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales", audience: "manager" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
-      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
+      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales", audience: "manager" },
       // Beside the catalogue, because a price list is the catalogue for one group
       // of customers — not a separate thing they buy.
-      { titleKey: "priceLists", url: "/dashboard/sales/price-lists", icon: Tags, module: "sales" },
+      { titleKey: "priceLists", url: "/dashboard/sales/price-lists", icon: Tags, module: "sales", audience: "manager" },
     ],
   },
   {
@@ -192,6 +255,16 @@ export const sidebarItems: NavGroup[] = [
     items: [
       { titleKey: "supportOverview", url: "/dashboard/support", icon: LifeBuoy, module: "support" },
       { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, module: "support" },
+      // The desk person by person (§12.2): here rather than under Reports, which is a module
+      // of its own, because a support lead needs it whether or not the workspace bought that.
+      {
+        titleKey: "supportAgents",
+        url: "/dashboard/support/agents",
+        icon: ChartBar,
+        module: "support",
+        need: "report:read",
+        audience: "manager",
+      },
       {
         titleKey: "slaManagement",
         url: "/dashboard/support/sla",
@@ -218,10 +291,16 @@ export const sidebarItems: NavGroup[] = [
       // Campaigns, the templates they send, and the rules that send things without
       // anyone clicking. Automation was a group of one, which read as a product
       // area of its own; it is not one, it is how the other areas do their work.
-      { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target, module: "marketing" },
+      {
+        titleKey: "campaigns",
+        url: "/dashboard/marketing/campaigns",
+        icon: Target,
+        module: "marketing",
+        audience: "manager",
+      },
       { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail, module: "marketing" },
       { titleKey: "sequences", url: "/dashboard/marketing/sequences", icon: ListOrdered, module: "marketing" },
-      { titleKey: "automations", url: "/dashboard/automation", icon: Zap, module: "automation" },
+      { titleKey: "automations", url: "/dashboard/automation", icon: Zap, module: "automation", audience: "manager" },
     ],
   },
   {
@@ -232,7 +311,15 @@ export const sidebarItems: NavGroup[] = [
       // and it belongs here on its own merits: it is a revenue trend and a
       // spending breakdown, not a thing you write. It also keeps this group
       // above one entry, which is the line between a heading and a label.
-      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
+      // ⚠️ The page is an administrator's (settings:manage) and the entry had no need, so
+      // every editor saw it and was bounced on clicking.
+      {
+        titleKey: "finance",
+        url: "/dashboard/sales/finance",
+        icon: Banknote,
+        module: "sales",
+        need: "settings:manage",
+      },
       // ⚠️ Here rather than beside the orders, where it used to sit: it is not a sales
       // number. It says what the thing writing into this CRM has been doing — leads,
       // notes, activities, custom fields, orders — and the orders were only one of them.
@@ -241,14 +328,23 @@ export const sidebarItems: NavGroup[] = [
       // whoever connects an assistant needs to see what it does whether or not they bought
       // a reports package. It reads only this database, so it opens with no assistant
       // connected and shows nothing, which is the truth.
-      { titleKey: "assistantContribution", url: "/dashboard/assistant", icon: Bot, need: "report:read" },
+      {
+        titleKey: "assistantContribution",
+        url: "/dashboard/assistant",
+        icon: Bot,
+        need: "report:read",
+        audience: "manager",
+      },
       {
         titleKey: "reports",
         url: "/dashboard/reports",
         icon: BarChart3,
         module: "reporting",
         need: "report:read",
-        subItems: [{ titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" }],
+        subItems: [
+          { titleKey: "repScorecard", url: "/dashboard/reports/scorecard", icon: Gauge, need: "report:read" },
+          { titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" },
+        ],
       },
     ],
   },
@@ -264,13 +360,29 @@ export const sidebarItems: NavGroup[] = [
         icon: Settings,
         need: "settings:read",
         subItems: [
+          { titleKey: "general", url: "/dashboard/settings/general", icon: Building2, need: "settings:manage" },
           { titleKey: "billing", url: "/dashboard/settings/billing", icon: CreditCard, need: "billing:read" },
+          { titleKey: "features", url: "/dashboard/settings/features", icon: ToggleRight, need: "settings:manage" },
           // Pipeline stages existed only at its URL: absent from the sidebar AND
           // from the settings index, so configuring the pipeline — the first thing
           // anyone does — meant typing the path (audit rilievo D-04).
           { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: GitMerge, need: "pipeline:manage" },
-          { titleKey: "territories", url: "/dashboard/settings/territories", icon: MapPin, need: "territory:manage" },
-          { titleKey: "invoicing", url: "/dashboard/settings/invoicing", icon: Receipt, need: "invoicing:manage" },
+          {
+            titleKey: "territories",
+            url: "/dashboard/settings/territories",
+            icon: MapPin,
+            need: "territory:manage",
+            module: "sales",
+          },
+          {
+            titleKey: "invoicing",
+            url: "/dashboard/settings/invoicing",
+            icon: Receipt,
+            need: "invoicing:manage",
+            module: "sales",
+          },
+          { titleKey: "lists", url: "/dashboard/settings/lists", icon: ListTree, need: "settings:manage" },
+          { titleKey: "webForms", url: "/dashboard/settings/forms", icon: FileInput, need: "settings:manage" },
           {
             titleKey: "customFields",
             url: "/dashboard/settings/custom-fields",
@@ -281,6 +393,17 @@ export const sidebarItems: NavGroup[] = [
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook, need: "webhook:manage" },
           { titleKey: "apiKeys", url: "/dashboard/settings/api", icon: KeyRound, need: "settings:manage" },
         ],
+      },
+      // Personal, so for everybody: their own name and password. Changing one's password was
+      // only possible from Users, which is for administrators.
+      { titleKey: "profile", url: "/dashboard/profile", icon: UserRound, need: "record:read" },
+      // ⚠️ Personal, so for everybody: what reaches this person's phone. It was reachable from
+      // the bell and nowhere else, because the settings index that listed it is for admins.
+      {
+        titleKey: "notificationSettings",
+        url: "/dashboard/settings/notifications",
+        icon: BellRing,
+        need: "record:read",
       },
       { titleKey: "help", url: "/dashboard/help", icon: HelpCircle },
     ],
@@ -298,26 +421,30 @@ export function accountPlacement(groups: readonly NavGroup[]): NavGroup[] {
 }
 
 /**
- * What a person moves between on a phone, in the order it matters there.
+ * Shortcuts in the phone's bottom bar.
  *
- * The bottom bar has four slots and this list runs longer, so a workspace
- * without sales — or without support — still gets a full bar instead of gaps.
+ * The bar is `[shortcut] [shortcut] (Create) [shortcut] [Menu]`: three
+ * destinations, the create button in the middle where either thumb reaches it,
+ * and the Menu last. The Menu is not a left-edge panel any more — it opens the
+ * navigation hub from the bottom, the edge the thumb is already on, which is
+ * what the old objection to a menu slot (a control on the right opening a panel
+ * on the left) was about. Everything else is one tap into that hub.
  */
-/**
- * Slots in the bottom bar.
- *
- * ⚠️ The menu is not one of them: it is the trigger in the header, on the left,
- * at the edge its panel comes out of. This is five *destinations*.
- */
-export const MOBILE_TAB_SLOTS = 5;
+export const MOBILE_TAB_SLOTS = 3;
 
+/**
+ * The default order of those shortcuts, for someone who has not chosen their own.
+ *
+ * It runs longer than the bar, so a workspace without sales — or without
+ * support — still gets a full bar instead of gaps.
+ */
 export const MOBILE_TAB_PREFERENCE = [
   "/dashboard/crm",
   "/dashboard/contacts",
+  "/dashboard/calendar",
   "/dashboard/pipeline",
   "/dashboard/support/tickets",
   "/dashboard/tasks",
-  "/dashboard/calendar",
   "/dashboard/companies",
   "/dashboard/sales/orders",
 ] as const;
@@ -327,10 +454,12 @@ export const MOBILE_TAB_PREFERENCE = [
  *
  * ⚠️ It adds no permission rule of its own — it only orders what survived the
  * one in `filter-nav`. Anything it could add would be a second, quieter copy of
- * that rule, and the two would disagree the first time one of them changed.
+ * that rule, and the two would disagree the first time one of them changed. A
+ * person's own choice of shortcuts comes in as `preference` and passes through
+ * the same filter: a url the role cannot open is simply not found.
  *
  * Locked entries are skipped rather than shown. In the sidebar a locked module
- * is the upgrade prompt and worth its line; in four slots it is a quarter of the
+ * is the upgrade prompt and worth its line; in three slots it is a third of the
  * navigation spent on something that does not open.
  */
 export function pickMobileTabs(
@@ -342,7 +471,7 @@ export function pickMobileTabs(
 ): NavMainItem[] {
   const reachable = new Map<string, NavMainItem>();
   // Sidebar groups only. Administration is drawn in the account menu, and a
-  // phone's four slots are not where Settings and the help centre belong —
+  // phone's three slots are not where Settings and the help centre belong —
   // today's preference list happens not to name them, and this is what keeps
   // that true when somebody edits the list.
   for (const group of sidebarPlacement(groups)) {
@@ -355,4 +484,14 @@ export function pickMobileTabs(
     .map((url) => reachable.get(url))
     .filter((item): item is NavMainItem => Boolean(item))
     .slice(0, limit);
+}
+
+/**
+ * Everything that may be pinned to the bottom bar: what `pickMobileTabs` would
+ * accept, in menu order. Built by asking it, so the list of choices and the
+ * choice itself cannot disagree.
+ */
+export function mobileTabCandidates(groups: readonly NavGroup[]): NavMainItem[] {
+  const everyUrl = sidebarPlacement(groups).flatMap((group) => group.items.map((item) => item.url));
+  return pickMobileTabs(groups, { preference: everyUrl, limit: everyUrl.length });
 }

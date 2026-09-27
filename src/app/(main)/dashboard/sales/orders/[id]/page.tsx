@@ -1,300 +1,166 @@
-"use client";
-
-import React, { useEffect, useState, useTransition } from "react";
-
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { and, asc, eq } from "drizzle-orm";
 import {
-  ArrowLeft,
-  Building2,
-  Calendar,
-  Check,
-  CheckCircle2,
-  ChevronRight,
-  Clock,
-  DollarSign,
-  Loader2,
-  Package,
-  Plus,
+  BuildingIcon,
+  ChevronDownIcon,
+  FileTextIcon,
+  InfoIcon,
+  LifeBuoyIcon,
+  PackageIcon,
+  ReceiptIcon,
   ShoppingCart,
-  Trash2,
-  User,
+  UserIcon,
+  UserRoundIcon,
+  WalletIcon,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-import { z } from "zod";
+import { getFormatter, getTranslations } from "next-intl/server";
 
-import {
-  addOrderItem,
-  deleteOrder,
-  getOrderById,
-  type OrderStatus,
-  removeOrderItem,
-  updateOrderStatus,
-} from "@/actions/orders";
+import { getOrderById, getOrderPayments } from "@/actions/orders";
 import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
-import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
+import {
+  EmptyHint,
+  Field,
+  FieldList,
+  MetaItem,
+  Metric,
+  MetricStrip,
+  RecordBackLink,
+  RecordHero,
+  RecordPage,
+  RelatedRow,
+  StatusBadge,
+} from "@/components/crm/record/record-page";
+import { RecordSections } from "@/components/crm/record/record-sections";
 import { RecordVisit } from "@/components/crm/record-visit";
-import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCurrency } from "@/hooks/use-currency";
-import { advanceLabelKey, isTerminalStatus, nextStatus } from "@/lib/order-status";
-import { priceFor } from "@/lib/price-list";
-import { cn } from "@/lib/utils";
+import { deals, invoices, orders, quotes } from "@/db/schema";
+import { paymentSummary } from "@/lib/order-payment";
+import { isTerminalStatus } from "@/lib/order-status";
+import { requirePageCapability } from "@/lib/page-guard";
+import { can } from "@/lib/permissions";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { getDb } from "@/lib/tenant-context";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { CreateInvoiceButton } from "./_components/create-invoice-button";
+import { AdvanceStatusButton, OrderMoreMenu } from "./_components/order-actions";
+import { OrderLines } from "./_components/order-lines";
+import { ORDER_STATUS_TONE, PAYMENT_TONE } from "./_components/order-tones";
 import { PaymentsCard } from "./_components/payments-card";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+const DAY = 86_400_000;
 
-type OrderDetail = Awaited<ReturnType<typeof getOrderById>>;
-type Product = Awaited<ReturnType<typeof getProductsForSelect>>[number];
-
-/**
- * Day and time, in the reader's own locale.
- *
- * These fields showed the day alone. On an order taken by phone at 09:10 and
- * another at 17:40 that is the difference between knowing the sequence and
- * guessing it, and the value was in the column all along.
- */
-function formatDateTime(value: Date | string): string {
-  return new Date(value).toLocaleString(undefined, {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-const STATUS_CONFIG: Record<string, { class: string }> = {
-  draft: { class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  processing: { class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  completed: {
-    class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  },
-  cancelled: { class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
-};
-
-// ── Add item dialog ───────────────────────────────────────────────────────────
-
-const addItemSchema = z.object({
-  productId: z.string().min(1, "Select a product"),
-  quantity: z.coerce.number().int().min(1),
-  unitPrice: z.coerce.number().min(0),
-});
-
-function AddItemDialog({
-  products,
-  companyId,
-  onAdded,
-}: {
-  products: Product[];
-  /** Whose order this is: the customer decides which price list prices the line. */
-  companyId: string | null;
-  onAdded: (item: { productId: string; quantity: number; unitPrice: number }) => void;
-}) {
-  const t = useTranslations("orders.detail");
-  const tc = useTranslations("common");
-  const [open, setOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const active = products.filter((p) => p.isActive);
-  // The customer's list, read once and kept: this dialog is opened again for
-  // every line an order gains.
-  const { rules: priceRules } = usePriceRules(companyId);
-
-  const form = useForm<z.infer<typeof addItemSchema>>({
-    resolver: zodResolver(addItemSchema),
-    defaultValues: { productId: "", quantity: 1, unitPrice: 0 },
-  });
-
-  const handleProductChange = (id: string) => {
-    const p = active.find((x) => x.id === id);
-    form.setValue("productId", id);
-    // ⚠️ A proposal only. The field stays editable, and what the reader types
-    // over it is what is added to the order.
-    if (p) form.setValue("unitPrice", priceFor(p.id, p.price, priceRules));
-  };
-
-  const onSubmit = async (data: z.infer<typeof addItemSchema>) => {
-    setSaving(true);
-    try {
-      await onAdded(data);
-      setOpen(false);
-      form.reset();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <>
-      <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setOpen(true)}>
-        <Plus className="h-3.5 w-3.5" /> {t("addItem")}
-      </Button>
-      <Dialog
-        open={open}
-        onOpenChange={(v) => {
-          if (!saving) {
-            setOpen(v);
-            if (!v) form.reset();
-          }
-        }}
-      >
-        <DialogContent className="gap-0 p-0 sm:max-w-sm">
-          <DialogHeader className="border-b px-4 md:px-5 pt-5 pb-4">
-            <DialogTitle>{t("addLineItem")}</DialogTitle>
-            <PriceListNote rules={priceRules} className="pt-1" />
-          </DialogHeader>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="space-y-3 px-5 py-4">
-              <div className="space-y-1.5">
-                <Label>{t("product")}</Label>
-                <Select value={form.watch("productId")} onValueChange={handleProductChange}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder={t("selectProduct")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {active.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                        {p.sku ? ` — ${p.sku}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.productId && (
-                  <p className="text-destructive text-xs">{form.formState.errors.productId.message}</p>
-                )}
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>{t("qty")}</Label>
-                  <Input type="number" min="1" {...form.register("quantity")} className="h-9" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>{t("unitPrice")}</Label>
-                  <Input type="number" step="0.01" min="0" {...form.register("unitPrice")} className="h-9 font-mono" />
-                  <PriceSourceBadge
-                    source={listPriceSource(
-                      priceRules,
-                      active.find((p) => p.id === form.watch("productId")),
-                      form.watch("unitPrice"),
-                    )}
-                    listName={priceRules?.name}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter className="border-t bg-muted/10 px-4 md:px-5 py-4">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-                {tc("cancel")}
-              </Button>
-              <Button type="submit" disabled={saving} className="gap-2">
-                {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                {tc("add")}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </>
+/** Today's calendar date on the workspace's clock, as YYYY-MM-DD — never the server's (UTC on Workers). */
+function todayIn(timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date(),
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+/** Whole days from one calendar date to another, both YYYY-MM-DD: no clock, so no summer-time hour. */
+function daysBetween(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+}
 
-export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = React.use(params);
-  const router = useRouter();
-  const t = useTranslations("orders.detail");
-  const tStatus = useTranslations("orders.statuses");
-  // The pending flag was discarded. The two status buttons need it: without it a
-  // slow save invites a second click, and a second click on "Close order" is a
-  // second write of the same thing.
-  const [isPending, startTransition] = useTransition();
-  const { formatMoney } = useCurrency();
+/**
+ * One order, laid out for whoever has to fulfil it and get it paid.
+ *
+ * ⚠️ The order of the screen is the order of the questions: what state is it in
+ * and what is the next move (the hero), how much, how much has arrived and is any
+ * of it late (the figures), what was ordered and what has been paid (the work
+ * column), and who, where from, which invoices (the side column).
+ *
+ * This page used to be a client component that fetched its own order in an
+ * effect, so nothing rendered until three round trips had come back and every
+ * change patched a local copy. It is a server component now, like the other
+ * record pages: one read, and a change refreshes the route so the hero's figures
+ * and the cards under it are drawn from the same rows.
+ */
+export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const actor = await requirePageCapability("record:read", `/dashboard/sales/orders/${id}`);
+  // A viewer reads the order; the controls that would only answer "forbidden" are
+  // not drawn for them. The same capabilities the actions check.
+  const canWrite = can(actor, "order:write");
+  const canDelete = can(actor, "order:delete");
+  const canInvoice = can(actor, "invoice:write");
+  const db = await getDb();
 
-  const [order, setOrder] = useState<OrderDetail>(null);
-  const [products, setProducts] = useState<Product[]>([]);
-  // An order could be prepared, shipped and closed while a conversation about it
-  // ran in the support module, and nothing here said so.
-  const [ticketsAbout, setTicketsAbout] = useState<Awaited<ReturnType<typeof getTicketsForOrder>>>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([getOrderById(id), getProductsForSelect(), getTicketsForOrder(id).catch(() => [])]).then(
-      ([o, p, tk]) => {
-        setOrder(o);
-        setProducts(p);
-        setTicketsAbout(tk);
-        setLoading(false);
-      },
-    );
-  }, [id]);
-
-  const handleStatusChange = (status: OrderStatus) => {
-    startTransition(async () => {
-      await updateOrderStatus(id, status);
-      setOrder((prev) => (prev ? { ...prev, status } : prev));
-      toast.success(t("statusUpdated"));
-    });
-  };
-
-  const handleAddItem = async (item: { productId: string; quantity: number; unitPrice: number }) => {
-    await addOrderItem(id, item);
-    const updated = await getOrderById(id);
-    setOrder(updated);
-    toast.success(t("itemAdded"));
-  };
-
-  const handleRemoveItem = (itemId: string) => {
-    if (!confirm(t("confirmRemoveItem"))) return;
-    startTransition(async () => {
-      await removeOrderItem(itemId, id);
-      const updated = await getOrderById(id);
-      setOrder(updated);
-      toast.success(t("itemRemoved"));
-    });
-  };
-
-  const handleDelete = () => {
-    if (!confirm(t("confirmDelete"))) return;
-    startTransition(async () => {
-      await deleteOrder(id);
-      toast.success(t("orderDeleted"));
-      router.push("/dashboard/sales/orders");
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="animate-pulse space-y-4">
-        <div className="h-5 w-28 rounded bg-muted" />
-        <div className="h-10 w-full max-w-64 rounded bg-muted" />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="h-64 rounded-xl bg-muted md:col-span-2" />
-          <div className="h-64 rounded-xl bg-muted" />
-        </div>
-      </div>
-    );
-  }
+  const [
+    order,
+    payments,
+    products,
+    ticketsAbout,
+    orderInvoices,
+    [fromQuote],
+    [fromDeal],
+    timeZone,
+    t,
+    tP,
+    tStatus,
+    tInv,
+    tX,
+    tR,
+    tEntity,
+    format,
+  ] = await Promise.all([
+    getOrderById(id),
+    getOrderPayments(id),
+    // The add-line dialog's catalogue, and only for somebody who can add a line.
+    canWrite ? getProductsForSelect() : Promise.resolve([]),
+    // An order could be prepared, shipped and closed while a conversation about it
+    // ran in the support module, and nothing here said so.
+    getTicketsForOrder(id).catch(() => []),
+    // Which invoices this order became. `invoice.order_id` has been written since
+    // invoicing from an order existed; nothing on the order showed it, so the only
+    // way to know whether an order had been invoiced was to try again and be refused.
+    tolerateUnmigrated(
+      "invoices",
+      () =>
+        db
+          .select({
+            id: invoices.id,
+            documentType: invoices.documentType,
+            status: invoices.status,
+            documentNumber: invoices.documentNumber,
+            issueDate: invoices.issueDate,
+            dueDate: invoices.dueDate,
+            total: invoices.total,
+            currency: invoices.currency,
+          })
+          .from(invoices)
+          .where(eq(invoices.orderId, id))
+          .orderBy(asc(invoices.createdAt)),
+      [],
+    ),
+    // Where the order came from, by name: the ids have been on the row since the
+    // conversion from a quote was wired up (audit rilievo D-06).
+    db
+      .select({ id: quotes.id, number: quotes.quoteNumber })
+      .from(quotes)
+      .innerJoin(orders, and(eq(orders.quoteId, quotes.id), eq(orders.id, id))),
+    db
+      .select({ id: deals.id, name: deals.name })
+      .from(deals)
+      .innerJoin(orders, and(eq(orders.dealId, deals.id), eq(orders.id, id))),
+    getWorkspaceTimeZone(),
+    getTranslations("orders.detail"),
+    getTranslations("orders.payments"),
+    getTranslations("orders.statuses"),
+    getTranslations("invoices"),
+    getTranslations("pipeline.detail"),
+    getTranslations("record"),
+    getTranslations("entities.statuses"),
+    getFormatter(),
+  ]);
 
   if (!order) {
     return (
       <div className="py-20 text-center">
-        <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+        <ShoppingCart className="mx-auto mb-4 size-12 text-muted-foreground/30" aria-hidden />
         <p className="mb-4 text-muted-foreground">{t("notFound")}</p>
         <Button asChild>
           <Link href="/dashboard/sales/orders">{t("back")}</Link>
@@ -303,327 +169,355 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const statusCfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.draft;
-  // The next step this order can take, named after where it goes rather than
-  // after the movement, and in the reader's language.
-  const advanceKey = advanceLabelKey(order.status);
-  const customer = order.contactFirstName
-    ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
-    : (order.companyName ?? null);
+  // ── Derived ──
+  const money = (value: number | string | null | undefined, currency: string) =>
+    format.number(Number(value ?? 0), { style: "currency", currency: currency || "EUR" });
+  const day = (value: Date | string) => format.dateTime(new Date(value), { dateStyle: "medium", timeZone });
+  // Day and time: on an order taken by phone at 09:10 and another at 17:40 that is
+  // the difference between knowing the sequence and guessing it.
+  const dayTime = (value: Date | string) =>
+    format.dateTime(new Date(value), { dateStyle: "medium", timeStyle: "short", timeZone });
+  const statusLabel = (s: string) => (tStatus.has(s as never) ? tStatus(s as never) : s);
+  const entityStatus = (s: string) => (tEntity.has(s as never) ? tEntity(s as never) : s);
 
-  return (
-    <div className="space-y-5">
-      <RecordVisit type="order" id={order.id} label={order.orderNumber} sub={order.companyName ?? null} />
-      {/* Back nav */}
-      <Link
-        href="/dashboard/sales/orders"
-        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> {t("allOrders")}
-      </Link>
+  const contactName = [order.contactFirstName, order.contactLastName].filter(Boolean).join(" ");
+  const summary = paymentSummary(order.totalAmount, payments);
+  const terminal = isTerminalStatus(order.status);
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <span className="font-mono font-semibold text-muted-foreground text-xs">{order.orderNumber}</span>
-          <h1 className="mt-0.5 font-bold text-2xl tracking-tight">{customer ?? "Order Details"}</h1>
-          <div className="mt-2 flex items-center gap-2">
-            <Badge variant="outline" className={cn("text-xs", statusCfg.class)}>
-              {tStatus(order.status as "draft" | "processing" | "completed" | "cancelled")}
-            </Badge>
-            <span className="flex items-center gap-1 text-muted-foreground text-xs">
-              <Calendar className="h-3 w-3" />
-              {formatDateTime(order.orderDate)}
-            </span>
-          </div>
-        </div>
+  // An order is invoiced once an invoice for it is issued — the rule the new-invoice
+  // page uses to decide which orders it offers. One with only a draft opens the draft.
+  const invoiceDocs = orderInvoices.filter((i) => i.documentType === "TD01");
+  const issuedInvoice = invoiceDocs.find((i) => i.status === "issued");
+  const draftInvoice = invoiceDocs.find((i) => i.status === "draft");
+  const offerInvoice = canInvoice && order.status !== "cancelled" && !issuedInvoice;
 
-        <div className="flex shrink-0 items-center gap-2">
-          <CreateInvoiceButton orderId={order.id} />
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 text-destructive hover:text-destructive"
-            onClick={handleDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5" /> {t("delete")}
-          </Button>
-        </div>
-      </div>
+  // The balance is late when the invoice asked for it by a date that has passed.
+  // An order carries no due date of its own; its issued invoice does.
+  const today = todayIn(timeZone);
+  const dueDate =
+    invoiceDocs
+      .filter((i) => i.status === "issued" && i.dueDate)
+      .map((i) => i.dueDate as string)
+      .sort()[0] ?? null;
+  const owing = summary.outstanding > 0;
+  const daysToDue = dueDate ? daysBetween(today, dueDate) : null;
+  const balanceOverdue = owing && daysToDue != null && daysToDue < 0;
+  const balanceHint =
+    owing && daysToDue != null
+      ? daysToDue === 0
+        ? tR("today")
+        : daysToDue < 0
+          ? tR("overdueBy", { days: -daysToDue })
+          : tR("inDays", { days: daysToDue })
+      : tP(`state.${summary.state}`);
 
-      {/* Content grid */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        {/* Left — line items */}
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Package className="h-4 w-4 text-muted-foreground" />
-                {t("lineItems")}
-              </CardTitle>
-              <AddItemDialog products={products} companyId={order.companyId} onAdded={handleAddItem} />
-            </CardHeader>
-            <CardContent className="p-0">
-              {order.items.length === 0 ? (
-                <div className="py-10 text-center">
-                  <Package className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                  <p className="text-muted-foreground text-sm">{t("noItems")}</p>
-                </div>
+  const invoiceTitle = (i: (typeof orderInvoices)[number]) =>
+    i.documentType === "TD04"
+      ? i.documentNumber
+        ? tInv("credit.noteNumber", { number: i.documentNumber })
+        : tInv("credit.draftNote")
+      : i.documentNumber
+        ? tInv("numberTitle", { number: i.documentNumber })
+        : tInv("draftTitle");
+
+  // ── Sections ──
+  const details = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t("orderDetails")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FieldList>
+          <Field label={tX("fieldCompany")}>
+            {order.companyName &&
+              (order.companyId ? (
+                <Link href={`/dashboard/companies/${order.companyId}`} className="text-primary hover:underline">
+                  {order.companyName}
+                </Link>
               ) : (
-                // Four money columns do not fit a phone; the table scrolls
-                // sideways inside its card rather than pushing the page out.
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b bg-muted/30 text-muted-foreground text-xs">
-                        <th className="px-4 py-2.5 text-left font-medium">{t("product")}</th>
-                        <th className="px-4 py-2.5 text-right font-medium">{t("qty")}</th>
-                        <th className="px-4 py-2.5 text-right font-medium">{t("unitPriceCol")}</th>
-                        <th className="px-4 py-2.5 text-right font-medium">{t("totalCol")}</th>
-                        <th className="w-10 px-4 py-2.5" />
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {order.items.map((item) => (
-                        <tr key={item.id} className="group hover:bg-muted/20">
-                          <td className="px-4 py-3">
-                            <p className="font-medium">{item.productName ?? item.description ?? "Unknown"}</p>
-                            {item.productSku && (
-                              <span className="font-mono text-[10px] text-muted-foreground">{item.productSku}</span>
-                            )}
-                            {/* What was asked for on this line: the changes the customer
-                                                wanted, and what they called it when that is not the
-                                                catalogue name. Under the item, where whoever prepares it
-                                                reads before touching anything. */}
-                            {item.itemNotes && (
-                              <p className="mt-0.5 whitespace-pre-line text-muted-foreground text-xs">
-                                {item.itemNotes}
-                              </p>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">
-                            {formatMoney(item.unitPrice, order.currency)}
-                          </td>
-                          <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                            {formatMoney(item.totalPrice, order.currency)}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(item.id)}
-                              className="text-muted-foreground/50 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="border-t bg-muted/20">
-                        <td colSpan={3} className="px-4 py-3 text-right font-medium text-muted-foreground text-sm">
-                          {t("totalCol")}
-                        </td>
-                        <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
-                          {formatMoney(order.totalAmount, order.currency)}
-                        </td>
-                        <td />
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Right — details */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">{t("orderDetails")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              {/* Status */}
-              <div>
-                <p className="mb-1.5 text-muted-foreground text-xs">{t("status")}</p>
-
-                {/*
-                  The dropdown and the two moves anyone actually makes, on one row.
-                  The buttons carry no label: at this size a word wraps the row and
-                  pushes the panel about, and the two icons are the conventional
-                  ones for "next" and "done". The name is still there for a hover
-                  and for a screen reader, which is where it costs nothing.
-                */}
-                <div className="flex items-center gap-1.5">
-                  <Select value={order.status} onValueChange={handleStatusChange}>
-                    <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(STATUS_CONFIG).map((v) => (
-                        <SelectItem key={v} value={v} className="text-xs">
-                          {tStatus(v as "draft" | "processing" | "completed" | "cancelled")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {!isTerminalStatus(order.status) && (
-                    <TooltipProvider delayDuration={200}>
-                      {advanceKey && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-8 w-8 shrink-0"
-                              disabled={isPending}
-                              aria-label={t(advanceKey)}
-                              onClick={() => {
-                                const next = nextStatus(order.status);
-                                if (next) handleStatusChange(next);
-                              }}
-                            >
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t(advanceKey)}</TooltipContent>
-                        </Tooltip>
-                      )}
-
-                      {/*
-                        Only while it would skip a step. From "processing" this and
-                        the arrow do the same thing, and two controls with one
-                        effect is the confusion this is meant to remove.
-                      */}
-                      {nextStatus(order.status) !== "completed" && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              className="h-8 w-8 shrink-0 bg-emerald-600 hover:bg-emerald-700"
-                              disabled={isPending}
-                              aria-label={t("closeOrder")}
-                              onClick={() => handleStatusChange("completed")}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>{t("closeOrder")}</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </TooltipProvider>
-                  )}
-                </div>
-
-                {isTerminalStatus(order.status) && (
-                  <p className="mt-1.5 text-muted-foreground text-xs">
-                    {order.status === "completed" ? t("closedHint") : t("cancelledHint")}
-                  </p>
+                order.companyName
+              ))}
+          </Field>
+          <Field label={tX("fieldContact")}>
+            {contactName && (
+              <div className="min-w-0 space-y-0.5">
+                {order.contactId ? (
+                  <Link href={`/dashboard/contacts/${order.contactId}`} className="text-primary hover:underline">
+                    {contactName}
+                  </Link>
+                ) : (
+                  <span>{contactName}</span>
+                )}
+                {order.contactEmail && (
+                  <a
+                    href={`mailto:${order.contactEmail}`}
+                    className="block truncate text-muted-foreground text-xs hover:text-foreground"
+                  >
+                    {order.contactEmail}
+                  </a>
                 )}
               </div>
+            )}
+          </Field>
+          <Field label={t("owner")} always>
+            {order.ownerName ?? tR("unassigned")}
+          </Field>
+          <Field label={t("orderDate")} always>
+            <span className="tabular-nums">{dayTime(order.orderDate)}</span>
+          </Field>
+          <Field label={tP("deliveredOn")}>
+            {order.deliveredAt && <span className="tabular-nums">{day(order.deliveredAt)}</span>}
+          </Field>
+          <Field label={t("sourceQuote")}>
+            {fromQuote && (
+              <Link href={`/dashboard/sales/quotes/${fromQuote.id}`} className="text-primary hover:underline">
+                {fromQuote.number}
+              </Link>
+            )}
+          </Field>
+          <Field label={t("sourceDeal")}>
+            {fromDeal && (
+              <Link href={`/dashboard/pipeline/${fromDeal.id}`} className="text-primary hover:underline">
+                {fromDeal.name}
+              </Link>
+            )}
+          </Field>
+        </FieldList>
 
-              {/* Amount */}
-              <div className="flex items-center justify-between border-t pt-3">
-                <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                  <DollarSign className="h-3 w-3" /> {t("totalAmount")}
-                </span>
-                <span className="font-bold tabular-nums">{formatMoney(order.totalAmount, order.currency)}</span>
-              </div>
-
-              <div className="mb-4">
-                <PaymentsCard
-                  orderId={id}
-                  totalAmount={order.totalAmount}
-                  currency={order.currency}
-                  deliveredAt={order.deliveredAt ?? null}
-                />
-              </div>
-
-              {/* What the customer has said about it, if anything. */}
-              {ticketsAbout.length > 0 && (
-                <div className="mb-4 space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{t("openTickets")}</p>
-                  {ticketsAbout.map((tk) => (
-                    <Link
-                      key={tk.id}
-                      href={`/dashboard/support/tickets/${tk.id}`}
-                      className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
-                    >
-                      <span className="truncate text-xs">{tk.subject}</span>
-                      <Badge
-                        variant="outline"
-                        className={cn("h-5 shrink-0 text-[10px]", tk.breachedAt && "border-rose-300 text-rose-700")}
-                      >
-                        {tk.status}
-                      </Badge>
-                    </Link>
-                  ))}
-                </div>
-              )}
-
-              {/* Customer */}
-              {customer && (
-                <div className="flex items-center gap-2 border-t pt-3">
-                  <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-xs">{customer}</p>
-                    {order.contactEmail && (
-                      <p className="truncate text-[10px] text-muted-foreground">{order.contactEmail}</p>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Company */}
-              {order.companyName && order.contactId && (
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <p className="truncate text-muted-foreground text-xs">{order.companyName}</p>
-                </div>
-              )}
-
-              {/* Owner */}
-              {order.ownerName && (
-                <div className="flex items-center gap-2 border-t pt-3">
-                  <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">{t("owner")}</p>
-                    <p className="font-medium text-xs">{order.ownerName}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* What has to be known to prepare it: pickup or delivery, when, where.
-                  Written by whoever took the order — an assistant, or a person. */}
-              {order.notes && (
-                <div className="border-t pt-3">
-                  <p className="mb-1 text-muted-foreground text-xs">{t("notes")}</p>
-                  <p className="whitespace-pre-line text-xs">{order.notes}</p>
-                </div>
-              )}
-
-              {/* Dates */}
-              <div className="space-y-1.5 border-t pt-3">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    {t("orderDate")}
-                  </span>
-                  <span className="tabular-nums">{formatDateTime(order.orderDate)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {t("created")}
-                  </span>
-                  <span className="tabular-nums">{formatDateTime(order.createdAt)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* What has to be known to prepare it: pickup or delivery, when, where.
+            Written by whoever took the order — an assistant, or a person. */}
+        <div className="border-t pt-3">
+          <p className="mb-1 font-medium text-muted-foreground text-xs">{t("notes")}</p>
+          {order.notes ? (
+            <p className="whitespace-pre-line break-words text-sm">{order.notes}</p>
+          ) : (
+            <p className="text-muted-foreground text-sm">—</p>
+          )}
         </div>
-      </div>
-    </div>
+
+        {/* When the record was written and last touched: asked for rarely, so folded. */}
+        <details className="group/more rounded-md border">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-muted-foreground text-sm hover:text-foreground [&::-webkit-details-marker]:hidden">
+            {tR("showMore")}
+            <ChevronDownIcon className="size-4 transition-transform group-open/more:rotate-180" aria-hidden />
+          </summary>
+          <FieldList className="border-t px-3 py-3">
+            <Field label={t("created")}>
+              <span className="tabular-nums">{dayTime(order.createdAt)}</span>
+            </Field>
+            <Field label={tR("updated")}>
+              <span className="tabular-nums">{dayTime(order.updatedAt)}</span>
+            </Field>
+          </FieldList>
+        </details>
+      </CardContent>
+    </Card>
+  );
+
+  const invoicesCard = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ReceiptIcon className="size-4 text-muted-foreground" aria-hidden />
+          {tR("tabs.invoices")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {orderInvoices.length === 0 ? (
+          <EmptyHint>{t("noInvoices")}</EmptyHint>
+        ) : (
+          <ul className="space-y-2">
+            {orderInvoices.map((inv) => (
+              <li key={inv.id}>
+                <RelatedRow
+                  href={`/dashboard/sales/invoices/${inv.id}`}
+                  title={invoiceTitle(inv)}
+                  sub={inv.issueDate ? day(`${inv.issueDate}T12:00:00Z`) : tInv(`types.${inv.documentType as "TD01"}`)}
+                  aside={
+                    <>
+                      {/* In the invoice's own currency, which need not be the order's. */}
+                      <span className="font-semibold tabular-nums">{money(inv.total, inv.currency)}</span>
+                      <StatusBadge tone={inv.status === "issued" ? "success" : "neutral"} className="text-[11px]">
+                        {tInv(`statuses.${inv.status as "draft" | "issued"}`)}
+                      </StatusBadge>
+                    </>
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // What the customer has said about it, if anything.
+  const ticketsCard =
+    ticketsAbout.length > 0 ? (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LifeBuoyIcon className="size-4 text-muted-foreground" aria-hidden />
+            {t("openTickets")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {ticketsAbout.map((tk) => (
+              <li key={tk.id}>
+                <RelatedRow
+                  href={`/dashboard/support/tickets/${tk.id}`}
+                  title={tk.subject}
+                  sub={tk.ticketNumber}
+                  aside={
+                    <StatusBadge tone={tk.breachedAt ? "danger" : "neutral"} className="text-[11px]">
+                      {entityStatus(tk.status)}
+                    </StatusBadge>
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    ) : null;
+
+  return (
+    <RecordPage>
+      <RecordVisit type="order" id={order.id} label={order.orderNumber} sub={order.companyName ?? null} />
+      <RecordBackLink href="/dashboard/sales/orders">{t("allOrders")}</RecordBackLink>
+
+      {/* ── Hero: which order, whose, where it stands, and the next move ── */}
+      <RecordHero
+        badges={
+          <>
+            <StatusBadge tone={ORDER_STATUS_TONE[order.status] ?? "neutral"}>{statusLabel(order.status)}</StatusBadge>
+            {/* Money is only chased on an order that is going ahead: a draft is not
+                "unpaid" in any sense worth a red badge. */}
+            {(order.status === "processing" || order.status === "completed") && Number(order.totalAmount) > 0 && (
+              <StatusBadge tone={PAYMENT_TONE[summary.state]}>
+                <WalletIcon aria-hidden />
+                {tP(`state.${summary.state}`)}
+              </StatusBadge>
+            )}
+          </>
+        }
+        title={order.orderNumber}
+        meta={
+          <>
+            {order.companyName && (
+              <MetaItem
+                icon={<BuildingIcon aria-hidden />}
+                href={order.companyId ? `/dashboard/companies/${order.companyId}` : null}
+              >
+                {order.companyName}
+              </MetaItem>
+            )}
+            {contactName && (
+              <MetaItem
+                icon={<UserIcon aria-hidden />}
+                href={order.contactId ? `/dashboard/contacts/${order.contactId}` : null}
+              >
+                {contactName}
+              </MetaItem>
+            )}
+            <MetaItem icon={<UserRoundIcon aria-hidden />}>
+              {order.ownerName ? tR("assignedTo", { name: order.ownerName }) : tR("unassigned")}
+            </MetaItem>
+          </>
+        }
+        actions={
+          // A viewer with nothing to do gets no empty action row under the title.
+          (canWrite || offerInvoice || canDelete) && (
+            <>
+              {canWrite && <AdvanceStatusButton orderId={order.id} status={order.status} />}
+              {offerInvoice && (
+                <CreateInvoiceButton
+                  orderId={order.id}
+                  draftId={draftInvoice?.id ?? null}
+                  variant={canWrite && !terminal ? "outline" : "default"}
+                />
+              )}
+              <OrderMoreMenu orderId={order.id} status={order.status} canWrite={canWrite} canDelete={canDelete} />
+            </>
+          )
+        }
+      >
+        {/* The four figures an order is chased by. */}
+        <MetricStrip>
+          <Metric label={t("totalAmount")}>{money(order.totalAmount, order.currency)}</Metric>
+          <Metric label={tP("paid")} tone={summary.state === "paid" && summary.paid > 0 ? "success" : undefined}>
+            {money(summary.paid, order.currency)}
+          </Metric>
+          <Metric
+            label={summary.outstanding < 0 ? tP("credit") : tP("outstanding")}
+            tone={balanceOverdue ? "danger" : undefined}
+            hint={balanceHint}
+          >
+            {money(Math.abs(summary.outstanding), order.currency)}
+          </Metric>
+          {order.deliveredAt ? (
+            <Metric label={tP("deliveredOn")}>{day(order.deliveredAt)}</Metric>
+          ) : (
+            <Metric label={t("orderDate")}>{day(order.orderDate)}</Metric>
+          )}
+        </MetricStrip>
+
+        {terminal && (
+          <p className="text-muted-foreground text-sm">
+            {order.status === "completed" ? t("closedHint") : t("cancelledHint")}
+          </p>
+        )}
+      </RecordHero>
+
+      <RecordSections
+        label={tR("sectionsLabel")}
+        tabs={[
+          { id: "lines", label: tR("tabs.lines"), icon: <PackageIcon aria-hidden />, count: order.items.length },
+          { id: "payments", label: tR("tabs.payments"), icon: <WalletIcon aria-hidden />, count: payments.length },
+          {
+            id: "invoices",
+            label: tR("tabs.invoices"),
+            icon: <FileTextIcon aria-hidden />,
+            count: orderInvoices.length,
+          },
+          { id: "details", label: tR("tabs.details"), icon: <InfoIcon aria-hidden />, count: ticketsAbout.length },
+        ]}
+        sections={[
+          {
+            tab: "lines",
+            column: "main",
+            node: (
+              <OrderLines
+                orderId={order.id}
+                items={order.items}
+                currency={order.currency}
+                totalAmount={order.totalAmount}
+                companyId={order.companyId}
+                products={products}
+                canWrite={canWrite}
+              />
+            ),
+          },
+          {
+            tab: "payments",
+            column: "main",
+            node: (
+              <PaymentsCard
+                orderId={order.id}
+                totalAmount={order.totalAmount}
+                currency={order.currency}
+                deliveredAt={order.deliveredAt ?? null}
+                payments={payments}
+                canWrite={canWrite}
+              />
+            ),
+          },
+          { tab: "details", column: "side", node: details },
+          { tab: "invoices", column: "side", node: invoicesCard },
+          ...(ticketsCard ? [{ tab: "details", column: "side" as const, node: ticketsCard }] : []),
+        ]}
+      />
+    </RecordPage>
   );
 }

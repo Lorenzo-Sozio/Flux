@@ -17,8 +17,9 @@ export interface PaletteCommand {
   id: string;
   /** The entity it creates, whose `entities.types.<type>.new` is the label. */
   entity?: EntityType;
-  /** Otherwise, a key under `search.commands`. */
-  labelKey?: string;
+  /** Otherwise a section of the menu: its key under `nav.items`, and its group's under `nav.groups`. */
+  navTitleKey?: string;
+  navGroupKey?: string;
   group: EntityGroup;
   href: string;
   /** Extra words that should find this command, in both languages. */
@@ -44,26 +45,63 @@ const CREATE_COMMANDS: PaletteCommand[] = ENTITIES.flatMap((e) =>
     : [],
 );
 
-const NAVIGATION_COMMANDS: PaletteCommand[] = [
-  {
-    id: "dashboard",
-    labelKey: "go-to-dashboard",
-    group: "work",
-    href: "/dashboard/crm",
-    keywords: ["dashboard", "home", "today", "agenda", "day", "oggi", "giornata"],
-  },
-  {
-    id: "win-loss",
-    labelKey: "win-loss",
-    group: "sales",
-    href: "/dashboard/pipeline/win-loss",
-    keywords: ["win", "loss", "lost", "why", "analysis", "vinte", "perse"],
-    capability: "report:read",
-    module: "sales",
-  },
-];
+/**
+ * Words that should find a section besides its own name — the ones people type for it.
+ * The name itself, in the reader's language, always matches.
+ */
+const NAV_KEYWORDS: Record<string, string[]> = {
+  "/dashboard/crm": ["dashboard", "home", "today", "agenda", "day", "oggi", "giornata"],
+  "/dashboard/calendar": ["calendar", "calendario", "appointments", "appuntamenti"],
+  "/dashboard/pipeline": ["board", "deals", "trattative", "opportunità"],
+  "/dashboard/pipeline/win-loss": ["win", "loss", "lost", "why", "vinte", "perse"],
+  "/dashboard/pipeline/forecast": ["forecast", "previsione"],
+  "/dashboard/reports/scorecard": ["scorecard", "rep", "commerciale", "salesperson"],
+  "/dashboard/queue": ["queue", "coda", "calls", "chiamate"],
+};
 
-export const PALETTE_COMMANDS: PaletteCommand[] = [...CREATE_COMMANDS, ...NAVIGATION_COMMANDS];
+interface NavEntry {
+  titleKey: string;
+  url: string;
+  locked?: boolean;
+  subItems?: readonly NavEntry[];
+}
+
+/**
+ * "Go to …" for every section this person's menu holds — generated from the menu already
+ * filtered for role, plan and workspace (§4.3), never written here: two lists of
+ * destinations are two lists that disagree. What the menu leaves out as secondary is
+ * included — the palette is where somebody finds what their menu does not list.
+ *
+ * ⚠️ Locked sections are left out: the menu shows them as the upgrade prompt, and a
+ * palette row that opens the billing page would read as a broken link.
+ */
+export function navigationCommands(
+  groups: readonly { labelKey?: string; items: readonly NavEntry[] }[],
+): PaletteCommand[] {
+  const out: PaletteCommand[] = [];
+  const seen = new Set<string>();
+  const add = (entry: NavEntry, groupKey: string | undefined) => {
+    if (!entry.url || entry.locked || seen.has(entry.url)) return;
+    seen.add(entry.url);
+    out.push({
+      id: `nav:${entry.url}`,
+      navTitleKey: entry.titleKey,
+      navGroupKey: groupKey,
+      group: "work",
+      href: entry.url,
+      keywords: ["go", "open", "vai", "apri", entry.titleKey, ...(NAV_KEYWORDS[entry.url] ?? [])],
+    });
+  };
+  for (const group of groups) {
+    for (const item of group.items) {
+      add(item, group.labelKey);
+      for (const sub of item.subItems ?? []) if (!item.locked) add(sub, group.labelKey);
+    }
+  }
+  return out;
+}
+
+export const PALETTE_COMMANDS: PaletteCommand[] = CREATE_COMMANDS;
 
 export type CommandFilter = (command: PaletteCommand) => boolean;
 
@@ -79,12 +117,14 @@ export function matchCommands(
   allow: CommandFilter,
   labelOf: (command: PaletteCommand) => string,
   limit = 5,
+  commands: readonly PaletteCommand[] = PALETTE_COMMANDS,
 ): PaletteCommand[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const terms = q.split(/\s+/).filter(Boolean);
 
-  const scored = PALETTE_COMMANDS.filter(allow)
+  const scored = commands
+    .filter(allow)
     .map((command) => {
       const label = labelOf(command).toLowerCase();
       const haystack = [label, ...command.keywords.map((k) => k.toLowerCase())];

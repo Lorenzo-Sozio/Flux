@@ -178,20 +178,26 @@ export function TicketKanbanBoard({ initialTickets, canEdit = true }: { initialT
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="h-full flex gap-3 overflow-x-auto pb-4">
+      {/*
+        ⚠️ Below md a column is 85% of the screen, not `min-w-[240px]`: with
+        `flex-1` the minimum *is* the width (CLAUDE.md), so every column was
+        exactly 240px and nothing on screen said the board went on sideways.
+        The snap lands one column at a time with the edge of the next showing.
+      */}
+      <div className="h-full flex gap-3 overflow-x-auto pb-4 max-md:snap-x max-md:snap-mandatory">
         {COLUMNS.map((col) => {
           const colTickets = tickets.filter((t) => t.status === col.id);
 
           return (
             <div
               key={col.id}
-              className={`flex-1 min-w-[240px] flex flex-col rounded-xl border ${col.color} overflow-hidden shadow-sm`}
+              className={`w-[85vw] max-w-80 shrink-0 snap-start md:w-auto md:max-w-none md:flex-1 md:min-w-[240px] flex flex-col rounded-xl border ${col.color} overflow-hidden shadow-sm`}
             >
               {/* Column header */}
               <div className="px-3 py-2.5 border-b bg-background/60 backdrop-blur-sm flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.borderColor }} />
-                  <h3 className={`text-xs font-bold uppercase tracking-wide ${col.textColor}`}>{col.label}</h3>
+                  <h3 className={`truncate text-xs font-bold uppercase tracking-wide ${col.textColor}`}>{col.label}</h3>
                 </div>
                 <Badge variant="secondary" className="rounded-full h-5 text-[10px] px-2">
                   {colTickets.length}

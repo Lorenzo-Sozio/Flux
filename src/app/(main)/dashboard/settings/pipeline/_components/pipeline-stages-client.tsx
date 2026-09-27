@@ -7,12 +7,26 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createPipelineStage, deletePipelineStage, updatePipelineStage } from "@/actions/pipeline";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { kindOf, STAGE_KINDS, type StageKind, type StageKindRefusal } from "@/lib/stage-kind";
+
+import { type LossReasonRow, LossReasonsCard } from "./loss-reasons-card";
 
 type Stage = {
   id: string;
@@ -20,17 +34,38 @@ type Stage = {
   order: number;
   color: string | null;
   defaultProbability: number | null;
+  isWon: boolean;
+  isLost: boolean;
+  staleAfterDays?: number | null;
 };
 
 type StageForm = {
   name: string;
   color: string;
   defaultProbability: number;
+  kind: StageKind;
+  /** Empty for no limit. */
+  staleAfterDays: string;
 };
 
-const DEFAULT_FORM: StageForm = { name: "", color: "#94a3b8", defaultProbability: 0 };
+const DEFAULT_FORM: StageForm = { name: "", color: "#94a3b8", defaultProbability: 0, kind: "open", staleAfterDays: "" };
 
-export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[] }) {
+/** The threshold as stored: a whole number of days, or null for none. */
+const staleDays = (value: string): number | null => {
+  const n = Math.round(Number(value));
+  return value.trim() && Number.isFinite(n) && n > 0 ? Math.min(n, 365) : null;
+};
+
+export function PipelineStagesClient({
+  stages: initialStages,
+  lossReasons,
+  pipelineId,
+}: {
+  stages: Stage[];
+  lossReasons: LossReasonRow[];
+  /** The pipeline these stages belong to; a new stage goes into it. */
+  pipelineId?: string;
+}) {
   const t = useTranslations("settings.pipeline");
   const tc = useTranslations("common");
 
@@ -39,6 +74,10 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
   const [editStage, setEditStage] = useState<Stage | null>(null);
   const [form, setForm] = useState<StageForm>(DEFAULT_FORM);
   const [isPending, setIsPending] = useState(false);
+  const [deleting, setDeleting] = useState<Stage | null>(null);
+
+  // A refusal is an answer, not a failure: it says which rule the change broke.
+  const refused = (reason: StageKindRefusal) => toast.error(t(`kindRefused.${reason}`));
 
   const openAdd = () => {
     setForm(DEFAULT_FORM);
@@ -50,6 +89,8 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
       name: stage.name,
       color: stage.color ?? "#94a3b8",
       defaultProbability: stage.defaultProbability ?? 0,
+      kind: kindOf(stage),
+      staleAfterDays: stage.staleAfterDays ? String(stage.staleAfterDays) : "",
     });
     setEditStage(stage);
   };
@@ -58,12 +99,19 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
     if (!form.name.trim()) return;
     setIsPending(true);
     try {
-      const stage = await createPipelineStage({
+      const result = await createPipelineStage({
         name: form.name,
         color: form.color,
         defaultProbability: form.defaultProbability,
+        kind: form.kind,
+        staleAfterDays: form.kind === "open" ? staleDays(form.staleAfterDays) : null,
+        pipelineId,
       });
-      setStages((prev) => [...prev, stage]);
+      if (!result.ok) {
+        refused(result.reason);
+        return;
+      }
+      setStages((prev) => [...prev, result.stage]);
       toast.success(t("createSuccess"));
       setAddOpen(false);
     } catch {
@@ -77,15 +125,29 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
     if (!editStage || !form.name.trim()) return;
     setIsPending(true);
     try {
-      await updatePipelineStage(editStage.id, {
+      const result = await updatePipelineStage(editStage.id, {
         name: form.name,
         color: form.color,
         defaultProbability: form.defaultProbability,
+        kind: form.kind,
+        staleAfterDays: form.kind === "open" ? staleDays(form.staleAfterDays) : null,
       });
+      if (!result.ok) {
+        refused(result.reason);
+        return;
+      }
       setStages((prev) =>
         prev.map((s) =>
           s.id === editStage.id
-            ? { ...s, name: form.name, color: form.color, defaultProbability: form.defaultProbability }
+            ? {
+                ...s,
+                name: form.name,
+                color: form.color,
+                defaultProbability: form.defaultProbability,
+                isWon: form.kind === "won",
+                isLost: form.kind === "lost",
+                staleAfterDays: form.kind === "open" ? staleDays(form.staleAfterDays) : null,
+              }
             : s,
         ),
       );
@@ -99,7 +161,6 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
   };
 
   const handleDelete = async (stage: Stage) => {
-    if (!confirm(t("deleteConfirm"))) return;
     try {
       await deletePipelineStage(stage.id);
       setStages((prev) => prev.filter((s) => s.id !== stage.id));
@@ -160,55 +221,76 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
           ) : (
             <div className="space-y-2">
               {stages.map((stage, index) => (
+                // ⚠️ Below sm the four row buttons take a line of their own. Side by
+                // side with the name they needed 150px of a 250px row, and the name —
+                // the only thing that says which stage this is — got what was left,
+                // which on a phone was nothing. On that line they are always shown:
+                // a row of blank space waiting for a hover is not a layout.
                 <div
                   key={stage.id}
-                  className="group flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"
+                  className="group flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border bg-background px-3 py-2.5 sm:flex-nowrap"
                 >
                   <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/40" />
                   <span
                     className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/50"
                     style={{ background: stage.color ?? "#94a3b8" }}
                   />
-                  <span className="flex-1 font-medium text-sm">{stage.name}</span>
+                  <span className="min-w-0 flex-1 break-words font-medium text-sm">{stage.name}</span>
+                  {kindOf(stage) !== "open" && (
+                    <Badge
+                      variant="outline"
+                      className={
+                        stage.isWon
+                          ? "shrink-0 border-emerald-500/40 text-emerald-700 text-xs dark:text-emerald-400"
+                          : "shrink-0 border-red-500/40 text-red-700 text-xs dark:text-red-400"
+                      }
+                    >
+                      {t(`kind.${kindOf(stage)}`)}
+                    </Badge>
+                  )}
                   <Badge variant="outline" className="shrink-0 text-xs">
                     {stage.defaultProbability ?? 0}%
                   </Badge>
-                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex w-full items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100 max-sm:opacity-100 sm:w-auto">
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="size-9 sm:size-7"
                       onClick={() => handleMove(index, "up")}
                       disabled={index === 0}
                       title={t("moveUp")}
+                      aria-label={t("moveUp")}
                     >
                       <ChevronUp className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="size-9 sm:size-7"
                       onClick={() => handleMove(index, "down")}
                       disabled={index === stages.length - 1}
                       title={t("moveDown")}
+                      aria-label={t("moveDown")}
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7"
+                      className="size-9 sm:size-7"
                       onClick={() => openEdit(stage)}
                       title={t("dialog.editTitle")}
+                      aria-label={t("dialog.editTitle")}
                     >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-destructive hover:text-destructive"
-                      onClick={() => handleDelete(stage)}
+                      className="size-9 text-destructive hover:text-destructive sm:size-7"
+                      onClick={() => setDeleting(stage)}
                       title={tc("delete")}
+                      aria-label={tc("delete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
@@ -219,6 +301,34 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!deleting}
+        onOpenChange={(v) => {
+          if (!v) setDeleting(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("deleteTitle", { name: deleting?.name ?? "" })}</AlertDialogTitle>
+            <AlertDialogDescription>{t("deleteConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => {
+                if (deleting) void handleDelete(deleting);
+                setDeleting(null);
+              }}
+            >
+              {tc("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <LossReasonsCard reasons={lossReasons} />
 
       {/* Add dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -309,6 +419,38 @@ function StageFormFields({
           />
         </div>
       </div>
+      <div className="space-y-1.5">
+        <Label>{t("dialog.kindLabel")}</Label>
+        <Select value={form.kind} onValueChange={(v) => onChange({ ...form, kind: v as StageKind })}>
+          <SelectTrigger className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STAGE_KINDS.map((k) => (
+              <SelectItem key={k} value={k}>
+                {t(`kind.${k}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-muted-foreground text-xs">{t("dialog.kindHelp")}</p>
+      </div>
+      {form.kind === "open" && (
+        <div className="space-y-1.5">
+          <Label htmlFor="stage-stale">{t("dialog.staleLabel")}</Label>
+          <Input
+            id="stage-stale"
+            type="number"
+            min={1}
+            max={365}
+            placeholder={t("dialog.stalePlaceholder")}
+            value={form.staleAfterDays}
+            onChange={(e) => onChange({ ...form, staleAfterDays: e.target.value })}
+            className="sm:max-w-40"
+          />
+          <p className="text-muted-foreground text-xs">{t("dialog.staleHelp")}</p>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,9 @@
 @import "../styles/presets/brutalist.css";
 @import "../styles/presets/soft-pop.css";
 @import "../styles/presets/tangerine.css";
+@import "../styles/presets/aurora.css";
+@import "../styles/presets/atelier.css";
+@import "../styles/presets/orchid.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -63,13 +66,13 @@ These serve as the fallback; there is no separate default.css file. */
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.963 0.002 197.1);
-  --muted-foreground: oklch(0.56 0.021 213.5);
+  --muted-foreground: oklch(0.52 0.021 213.5);
   --accent: oklch(0.963 0.002 197.1);
   --accent-foreground: oklch(0.218 0.008 223.9);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.925 0.005 214.3);
   --input: oklch(0.925 0.005 214.3);
-  --ring: oklch(0.723 0.014 214.4);
+  --ring: oklch(0.6 0.018 214.4);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -82,7 +85,7 @@ These serve as the fallback; there is no separate default.css file. */
   --sidebar-accent: oklch(0.963 0.002 197.1);
   --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
   --sidebar-border: oklch(0.925 0.005 214.3);
-  --sidebar-ring: oklch(0.723 0.014 214.4);
+  --sidebar-ring: oklch(0.6 0.018 214.4);
 
   /* fonts */
   --font-sans: var(--font-inter);
@@ -98,8 +101,8 @@ These serve as the fallback; there is no separate default.css file. */
   --card-foreground: oklch(0.987 0.002 197.1);
   --popover: oklch(0.218 0.008 223.9);
   --popover-foreground: oklch(0.987 0.002 197.1);
-  --primary: oklch(0.424 0.199 265.638);
-  --primary-foreground: oklch(0.97 0.014 254.604);
+  --primary: oklch(0.7 0.15 262);
+  --primary-foreground: oklch(0.18 0.04 265);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.275 0.011 216.9);
@@ -118,7 +121,7 @@ These serve as the fallback; there is no separate default.css file. */
   --sidebar: oklch(0.218 0.008 223.9);
   --sidebar-foreground: oklch(0.987 0.002 197.1);
   --sidebar-primary: oklch(0.623 0.214 259.815);
-  --sidebar-primary-foreground: oklch(0.97 0.014 254.604);
+  --sidebar-primary-foreground: oklch(0.18 0.04 265);
   --sidebar-accent: oklch(0.275 0.011 216.9);
   --sidebar-accent-foreground: oklch(0.987 0.002 197.1);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -284,6 +287,16 @@ html {
   /* Height of the mobile tab bar, referenced by anything that must not sit
    * underneath it — the chat button, sticky form footers, toasts. */
   --mobile-nav-height: 3.75rem;
+  /* Height of the dashboard's top bar. Taller on a phone, where it carries the
+   * page title and a back arrow. Full-height screens (the chat, a ticket's
+   * conversation) subtract it instead of repeating a number that drifts. */
+  --app-header-height: 3.5rem;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --app-header-height: 3rem;
+  }
 }
 
 /* iOS Safari's `100vh` is the height of the window *without* the address bar,

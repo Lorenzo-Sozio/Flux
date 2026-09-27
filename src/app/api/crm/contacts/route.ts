@@ -2,20 +2,19 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { contacts } from "@/db/schema";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { buildContactPayload, parseOnDuplicate, validateContactInput } from "@/lib/api-import-validators";
+import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/** Marks the event as written by a machine, so an integrator does not
- *  receive its own import back and react to it. */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the idempotency ledger and the write log both
@@ -23,11 +22,27 @@ const API_ORIGIN = { via: "api" as const, actor: null };
  */
 const ENDPOINT = "/api/crm/contacts";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "contacts", access: "write" } as const;
+const READ_SCOPE = { entity: "contacts", access: "read" } as const;
+
+/**
+ * A page of contacts, oldest change first; `updatedSince` and `cursor` to reconcile
+ * (src/lib/api-read.ts). Nothing is written, so nothing is logged.
+ */
+export async function GET(req: NextRequest) {
+  const gate = await gateApiRequest(req, READ_SCOPE);
+  if (gate.response) return gate.response;
+  return listResponse(req, gate.auth, "contacts");
+}
+
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -82,7 +97,10 @@ export async function POST(req: NextRequest) {
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -105,7 +123,9 @@ export async function POST(req: NextRequest) {
   try {
     response = await (async () => {
       if (data.email) {
-        const [existing] = await db.select({ id: contacts.id }).from(contacts).where(eq(contacts.email, data.email));
+        // The whole row, not just its id: it is what the rules compare against when this
+        // becomes an update. Same statement, same cost.
+        const [existing] = await db.select().from(contacts).where(eq(contacts.email, data.email));
 
         if (existing) {
           if (onDuplicate === "error") {
@@ -122,6 +142,13 @@ export async function POST(req: NextRequest) {
               .where(eq(contacts.id, existing.id))
               .returning();
             dispatchWebhook("contact.updated", { contact: updated }, API_ORIGIN, db);
+            runRulesAfterApiWrite(tenant.id, {
+              entityType: "contact",
+              entityId: updated.id,
+              event: "onUpdate",
+              oldData: existing as Record<string, unknown>,
+              newData: updated as Record<string, unknown>,
+            });
             await logApiWrite(db, authResult, { entity: "contact", endpoint: ENDPOINT, recordId: updated.id });
             return NextResponse.json({ status: "updated", id: updated.id, data: updated });
           }
@@ -132,6 +159,15 @@ export async function POST(req: NextRequest) {
 
       const [created] = await db.insert(contacts).values(buildContactPayload(data, authResult.userId)).returning();
       dispatchWebhook("contact.created", { contact: created }, API_ORIGIN, db);
+      // The same rules a contact typed into the dashboard runs. Only here and in the single
+      // routes: see runRulesAfterApiWrite for why an import in bulk runs none.
+      runRulesAfterApiWrite(tenant.id, {
+        entityType: "contact",
+        entityId: created.id,
+        event: "onCreate",
+        oldData: {},
+        newData: created as Record<string, unknown>,
+      });
       await logApiWrite(db, authResult, { entity: "contact", endpoint: ENDPOINT, recordId: created.id });
 
       return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
@@ -143,7 +179,7 @@ export async function POST(req: NextRequest) {
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

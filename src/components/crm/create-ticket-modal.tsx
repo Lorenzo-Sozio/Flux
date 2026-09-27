@@ -238,7 +238,7 @@ function AnagraficaPicker({
                 onPopoverOpenChange(false);
               }}
               className={cn(
-                "flex flex-1 select-none items-center justify-center gap-1.5 px-2 py-1.5 transition-colors",
+                "flex min-w-0 flex-1 select-none items-center justify-center gap-1.5 px-2 py-2 transition-colors sm:py-1.5",
                 active
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -273,7 +273,7 @@ function AnagraficaPicker({
                 )}
               </span>
             ) : (
-              <span className="text-muted-foreground">
+              <span className="min-w-0 truncate text-muted-foreground">
                 {t("linkToRecord")} {typeLabel.toLowerCase()}…
               </span>
             )}
@@ -437,12 +437,14 @@ export function CreateTicketModal({
     >
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[580px]">
         {/* Header */}
-        <DialogHeader className="border-b bg-muted/30 px-4 md:px-6 pt-6 pb-5">
+        {/* `pr-12` below sm keeps the title clear of the close button, which on
+            a full-screen dialog sits in this header's top-right corner. */}
+        <DialogHeader className="shrink-0 border-b bg-muted/30 px-4 pt-5 pb-4 max-sm:pr-12 sm:pt-6 sm:pb-5 md:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <Headphones className="h-5 w-5 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <DialogTitle className="font-semibold text-lg">{t("title")}</DialogTitle>
               <DialogDescription className="mt-0.5 text-muted-foreground text-sm">{t("subtitle")}</DialogDescription>
             </div>
@@ -451,8 +453,15 @@ export function CreateTicketModal({
 
         {/* Body */}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-4 md:px-6 py-5">
+          {/*
+            ⚠️ On a phone the dialog is the whole screen and already scrolls, so
+            a body capped at 70dvh inside it was a scroller inside a scroller,
+            with the footer pushed below the fold. Below sm the form fills the
+            height instead: the body takes what is left and scrolls, and the
+            Open ticket button stays on the bottom edge where the thumb is.
+          */}
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5 sm:max-h-[70dvh] md:px-6">
               {/* Subject */}
               <FormField
                 control={form.control}
@@ -612,7 +621,7 @@ export function CreateTicketModal({
                     <FormControl>
                       <Textarea
                         placeholder={t("descriptionPlaceholder")}
-                        className="min-h-[88px] resize-none text-sm"
+                        className="min-h-[88px] resize-none"
                         maxLength={DESC_LIMIT}
                         {...field}
                       />
@@ -688,11 +697,12 @@ export function CreateTicketModal({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-3 border-t bg-muted/20 px-6 py-4">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 sm:py-4 md:px-6">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="max-sm:h-10"
                 onClick={() => {
                   onOpenChange(false);
                   form.reset();
@@ -702,7 +712,7 @@ export function CreateTicketModal({
               >
                 {t("cancelButton")}
               </Button>
-              <Button type="submit" size="sm" disabled={isLoading} className="min-w-[130px] gap-2">
+              <Button type="submit" size="sm" disabled={isLoading} className="min-w-[130px] gap-2 max-sm:h-10">
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />

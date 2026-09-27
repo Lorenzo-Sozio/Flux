@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/actions/profile.ts",
+    "description": "⚠️⚠️ il nome cambia solo sull'account: accanto a ogni trattativa resta quello vecchio",
+    "find": "        await createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl))\n          .update(users)\n          .set({ name: clean })\n          .where(eq(users.id, actor.userId));",
+    "replace": "        void tenant;"
+  },
+  {
+    "file": "src/actions/profile.ts",
+    "description": "⚠️ un workspace irraggiungibile blocca il cambio di nome negli altri",
+    "find": "      } catch (err) {\n        console.error(`[updateOwnNameAction] workspace ${tenantId} keeps the old name for now:`, err);\n      }",
+    "replace": "      } finally {\n      }"
+  },
+  {
+    "file": "src/actions/profile.ts",
+    "description": "un nome vuoto viene salvato",
+    "find": "  if (!clean) return { ok: false, reason: \"empty\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/profile.ts",
+    "description": "gli spazi in più restano nel nome",
+    "find": "  const clean = name.trim().replace(/\\s+/g, \" \");",
+    "replace": "  const clean = name;"
+  },
+  {
+    "file": "src/auth.ts",
+    "description": "⚠️⚠️ il nome nella sessione arriva dal browser invece che dall'account",
+    "find": "          if (account) token.name = account.name;",
+    "replace": "          if (account) token.name = session.name ?? account.name;"
+  }
+]

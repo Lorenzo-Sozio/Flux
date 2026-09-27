@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/app/api/unsubscribe/route.ts",
+    "description": "⚠️⚠️ aprire il link disiscrive: lo scanner della posta aziendale disiscrive chi non l'ha chiesto",
+    "find": "  const action = `/api/unsubscribe?token=${encodeURIComponent(token)}`;",
+    "replace": "  if (token) return unsubscribe(token);\n  const action = `/api/unsubscribe?token=${encodeURIComponent(token)}`;"
+  },
+  {
+    "file": "src/lib/email-provider.ts",
+    "description": "⚠️ il pulsante «annulla iscrizione» del client di posta non c'è: niente List-Unsubscribe",
+    "find": "  return { \"List-Unsubscribe\": `<${url}>`, \"List-Unsubscribe-Post\": \"List-Unsubscribe=One-Click\" };",
+    "replace": "  return {};"
+  },
+  {
+    "file": "src/lib/email-provider.ts",
+    "description": "un indirizzo di disiscrizione non https finisce nell'intestazione",
+    "find": "  if (!url || !/^https:\\/\\//.test(url)) return {};",
+    "replace": "  if (!url) return {};"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ togliere il consenso marketing dalla scheda zittisce anche i seguiti dell'assistente (lead)",
+    "find": "        { records: [{ entity: \"lead\", id }], source: \"form\", channel: \"marketing\" },",
+    "replace": "        { records: [{ entity: \"lead\", id }], source: \"form\", channel: \"all\" },"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ la sintesi scritta dall'operatore compare al cliente sulla pagina di stato",
+    "find": "  if (messages.length === 0 && ticket.description && CUSTOMER_WRITTEN.has(ticket.channel)) {",
+    "replace": "  if (messages.length === 0 && ticket.description) {"
+  },
+  {
+    "file": "src/lib/assistant-handling.ts",
+    "description": "⚠️⚠️ un'altra integrazione toglie il segno dell'assistente e la persona torna in campagne e sequenze",
+    "find": "    const mine = keyId === null ? undefined : or(isNull(table.assistantKeyId), eq(table.assistantKeyId, keyId));",
+    "replace": "    const mine = undefined;"
+  },
+  {
+    "file": "src/lib/assistant-handling.ts",
+    "description": "segnare di nuovo sposta la data in cui l'assistente ha preso la persona",
+    "find": "          assistantSince: sql`coalesce(${table.assistantSince}, ${now.toISOString()}::timestamp)`,",
+    "replace": "          assistantSince: now,"
+  },
+  {
+    "file": "src/app/api/crm/assistant/route.ts",
+    "description": "⚠️ il segno tenuto da un'altra integrazione risponde 200 come se fosse cambiato",
+    "find": "  if (ids.length === 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ una richiesta ripetuta risponde 200 dove l'originale aveva risposto 201",
+    "find": "  const response = JSON.stringify(status === 200 ? body : { $status: status, $body: body });",
+    "replace": "  const response = JSON.stringify(body);"
+  }
+]

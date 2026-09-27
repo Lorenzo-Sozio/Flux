@@ -11,12 +11,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type Cond =
   | { op: "eq"; col: string; val: unknown }
   | { op: "lte"; col: string; val: unknown }
+  | { op: "lt"; col: string; val: unknown }
   | { op: "inArray"; col: string; vals: unknown[] }
   | { op: "and"; parts: Cond[] };
 
 vi.mock("drizzle-orm", () => ({
   eq: (col: string, val: unknown) => ({ op: "eq", col, val }),
   lte: (col: string, val: unknown) => ({ op: "lte", col, val }),
+  lt: (col: string, val: unknown) => ({ op: "lt", col, val }),
   inArray: (col: string, vals: unknown[]) => ({ op: "inArray", col, vals }),
   and: (...parts: Cond[]) => ({ op: "and", parts }),
   asc: (col: string) => ({ asc: col }),
@@ -29,8 +31,10 @@ const COLUMNS: Record<string, string[]> = {
   emailJobs: ["id", "status", "sequenceEnrollmentId"],
   emailSequences: ["id", "isActive"],
   emailSequenceSteps: ["id", "sequenceId", "position"],
-  emailSequenceEnrollments: ["id", "sequenceId", "email", "status", "nextStep", "nextSendAt", "ownerId"],
+  emailSequenceEnrollments: ["id", "sequenceId", "email", "status", "nextStep", "nextSendAt", "ownerId", "enrolledAt"],
   emailSuppressions: ["email", "reason"],
+  tasks: ["id"],
+  businessCalendar: ["timeZone"],
 };
 vi.mock("@/db/schema", () =>
   Object.fromEntries(
@@ -56,6 +60,8 @@ function matches(row: Row, c: Cond): boolean {
       return row[field(c.col)] === c.val;
     case "lte":
       return row[field(c.col)] != null && (row[field(c.col)] as Date) <= (c.val as Date);
+    case "lt":
+      return row[field(c.col)] != null && (row[field(c.col)] as Date) < (c.val as Date);
     case "inArray":
       return c.vals.includes(row[field(c.col)]);
     case "and":
@@ -75,7 +81,7 @@ const db = {
         // biome-ignore lint/suspicious/noThenProperty: mimics drizzle's thenable builder
         then: (resolve: (v: Row[]) => unknown) => resolve(copy(rows())),
       });
-      return { where: (c: Cond) => chain(() => all().filter((r) => matches(r, c))) };
+      return { where: (c: Cond) => chain(() => all().filter((r) => matches(r, c))), limit: chain(all).limit };
     },
   }),
   insert: (t: { __t: string }) => ({
@@ -269,6 +275,27 @@ describe("sending", () => {
   });
 });
 
+describe("⚠️⚠️ paused sequences do not hold up the running ones", () => {
+  it("fifty due enrollments in a paused sequence do not fill the page and starve the rest", async () => {
+    db0.emailSequences.push({ id: "paused", name: "Ferma", entityType: "lead", isActive: false, ownerId: "zeno" });
+    // Due before Anna, so they would come first in a page ordered by when they are due.
+    for (let i = 0; i < 60; i++) {
+      db0.emailSequenceEnrollments.push({
+        id: `p${i}`,
+        sequenceId: "paused",
+        email: `p${i}@example.com`,
+        status: "active",
+        nextStep: 0,
+        nextSendAt: new Date(T0.getTime() - 86_400_000),
+      });
+    }
+    // Anna last in the table too: a page of the first fifty never reaches her.
+    await enrollAnna();
+    await advanceSequences(db, T0);
+    expect(jobs()).toHaveLength(1);
+  });
+});
+
 describe("stopping", () => {
   it("⚠️⚠️ stops at the next send for an address unsubscribed since enrolling", async () => {
     await enrollAnna();
@@ -277,6 +304,18 @@ describe("stopping", () => {
     await advanceSequences(db, day(3));
     expect(jobs()).toHaveLength(1);
     expect(enrollment()).toMatchObject({ status: "stopped", stopReason: "unsubscribed" });
+  });
+
+  it("⚠️⚠️ will not enroll somebody the assistant is working with, and stops them once it takes them", async () => {
+    db0.leads[0].assistantSince = T0;
+    expect(await enrollAnna()).toEqual({ ok: false, reason: "with_assistant" });
+    db0.leads[0].assistantSince = null;
+    await enrollAnna();
+    // Enrolled first; then the assistant took the person over: the next step does not go.
+    db0.leads[0].assistantSince = T0;
+    await advanceSequences(db, T0);
+    expect(jobs()).toHaveLength(0);
+    expect(enrollment().stopReason).toBe("with_assistant");
   });
 
   it("⚠️⚠️ stops when the lead is converted", async () => {
@@ -296,6 +335,15 @@ describe("stopping", () => {
     expect(notified).toEqual([expect.objectContaining({ userId: "bruno", type: "sequence_reply" })]);
     await advanceSequences(db, day(3));
     expect(jobs()).toHaveLength(1);
+  });
+
+  it("⚠️ a message written before somebody was enrolled is not a reply to that sequence", async () => {
+    await enrollAnna();
+    db0.emailSequenceEnrollments[0].enrolledAt = T0;
+    // Read late from a connected mailbox: written the day before she was enrolled.
+    expect(await stopOnReply(db, "anna@example.com", day(1), day(-1))).toBe(0);
+    expect(enrollment()).toMatchObject({ status: "active" });
+    expect(await stopOnReply(db, "anna@example.com", day(1), day(1))).toBe(1);
   });
 
   it("⚠️ does not cancel an email that has already gone", async () => {
@@ -323,5 +371,87 @@ describe("stopping", () => {
     await enrollAnna();
     await stopOnReply(db, "anna@example.com");
     expect((await enrollAnna()).ok).toBe(true);
+  });
+});
+
+describe("⚠️⚠️ one conversation: tasks, working days and replies in the thread", () => {
+  it("a task step puts a task on the salesperson's list, due today, on the record — and sends nothing", async () => {
+    db0.emailSequenceSteps[1] = {
+      ...db0.emailSequenceSteps[1],
+      kind: "task",
+      taskType: "call",
+      subject: "Chiama {{firstName}}",
+      body: "Chiedi di {{company}}",
+    };
+    await enrollAnna();
+    await advanceSequences(db, T0);
+    await advanceSequences(db, day(3));
+    expect(jobs()).toHaveLength(1);
+    expect(db0.tasks).toEqual([
+      expect.objectContaining({
+        title: "Chiama Anna",
+        description: "Chiedi di Acme",
+        type: "call",
+        status: "todo",
+        dueDate: day(3),
+        ownerId: "bruno",
+        assigneeId: "bruno",
+        leadId: "l1",
+      }),
+    ]);
+    expect(enrollment()).toMatchObject({ status: "completed" });
+  });
+
+  it("⚠️⚠️ the first email carries our Message-ID; a reply answers it, under Re: its subject", async () => {
+    Object.assign(db0.emailSequenceSteps[1], { replyInThread: true, subject: "" });
+    await enrollAnna();
+    await advanceSequences(db, T0);
+    expect(jobs()[0]).toMatchObject({
+      subject: "Ciao Anna",
+      messageHeaderId: "<seq-id1@crm.example>",
+      inReplyTo: null,
+    });
+    expect(enrollment()).toMatchObject({ threadMessageId: "<seq-id1@crm.example>", threadSubject: "Ciao Anna" });
+    await advanceSequences(db, day(3));
+    expect(jobs()[1]).toMatchObject({
+      subject: "Re: Ciao Anna",
+      messageHeaderId: null,
+      inReplyTo: "<seq-id1@crm.example>",
+    });
+  });
+
+  it("an email not marked as a reply starts no thread of its own and answers none", async () => {
+    await enrollAnna();
+    await advanceSequences(db, T0);
+    await advanceSequences(db, day(3));
+    expect(jobs()[1]).toMatchObject({ subject: "Novità?", messageHeaderId: null, inReplyTo: null });
+  });
+
+  it("⚠️ a reply whose thread was never recorded borrows the first email's subject rather than none", async () => {
+    Object.assign(db0.emailSequenceSteps[1], { replyInThread: true, subject: "" });
+    await enrollAnna();
+    // Sent before threads were recorded: the enrollment is on step two with no thread.
+    Object.assign(enrollment(), { nextStep: 1, threadMessageId: null, threadSubject: null });
+    await advanceSequences(db, T0);
+    expect(jobs()[0]).toMatchObject({ subject: "Ciao Anna", inReplyTo: null });
+  });
+
+  it("⚠️⚠️ a step given back after a failed queue gives the thread back too", async () => {
+    await enrollAnna();
+    failInsertJob = true;
+    await expect(advanceSequences(db, T0)).rejects.toThrow();
+    expect(enrollment()).toMatchObject({ nextStep: 0, threadMessageId: null, threadSubject: null });
+  });
+
+  it("⚠️⚠️ working days and a window, on the workspace's clock read from its own database", async () => {
+    db0.businessCalendar.push({ timeZone: "Europe/Rome" });
+    Object.assign(db0.emailSequences[0], { businessDays: true, sendFrom: "14:00", sendUntil: "18:00" });
+    db0.emailSequenceSteps[1].delayDays = 4;
+    await enrollAnna();
+    // Tuesday 11:00 in Rome: the first step waits for the window to open at 14:00.
+    expect(enrollment().nextSendAt).toEqual(new Date("2026-09-15T12:00:00Z"));
+    await advanceSequences(db, new Date("2026-09-15T12:00:00Z"));
+    // Four working days from Tuesday is Monday, not Saturday.
+    expect(enrollment().nextSendAt).toEqual(new Date("2026-09-21T12:00:00Z"));
   });
 });

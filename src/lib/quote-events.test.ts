@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const emessi: { evento: string; carico: Record<string, unknown>; origin: unknown }[] = [];
 let contatto: Record<string, unknown> | null = null;
 
-vi.mock("@/actions/webhooks", () => ({
+vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: async (evento: string, carico: Record<string, unknown>, origin: unknown) => {
     emessi.push({ evento, carico, origin });
   },

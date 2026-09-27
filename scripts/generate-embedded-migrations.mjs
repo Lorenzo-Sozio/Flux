@@ -20,6 +20,7 @@
  * Run after every `npm run generate:tenant-migrations`. `npm test` fails when the
  * generated file and the folder drift apart, so forgetting is caught.
  */
+import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -88,6 +89,13 @@ ${body}
 
 const migrations = readMigrations();
 writeFileSync(OUTPUT, render(migrations), "utf8");
+// Formatted as the commit hook would format it: otherwise every regeneration leaves
+// `npm run check` red until the next commit, on a file nobody is meant to edit.
+try {
+  execSync(`npx biome format --write "${OUTPUT}"`, { stdio: "ignore" });
+} catch {
+  console.warn("biome format failed; run npm run check:fix before committing");
+}
 
 console.log(`Embedded ${migrations.length} tenant migration(s) into src/db/migrations-tenant.generated.ts`);
 for (const m of migrations) {

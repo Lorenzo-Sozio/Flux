@@ -30,7 +30,7 @@
  *
  * Not «I removed the name from the card». **«From here, nobody can get back to them.»**
  */
-import { inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import {
   activities,
@@ -38,13 +38,14 @@ import {
   campaignLogs,
   contacts,
   emailJobs,
+  fieldChanges,
   leads,
   quoteActivities,
   tasks,
   ticketMessages,
   tickets,
 } from "@/db/schema";
-import { findByContactPoint, matchesContactPoint, readContactPoint } from "@/lib/contact-point";
+import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 
 export interface ErasureReport {
   /** Rows removed outright, by table. */
@@ -118,12 +119,33 @@ export async function eraseByContactPoint(
   const quanti = (righe: any) => (Array.isArray(righe) ? righe.length : 0);
 
   // ── 1. The lead goes entirely: activity, task and campaign_log cascade behind it.
+  // The leads found above, by the one definition of "this person" (src/lib/contact-point.ts).
   report.deleted.lead = quanti(
-    await db
-      .delete(leads)
-      .where(matchesContactPoint(leads, email, digits))
-      .returning({ id: leads.id }),
+    person.leadIds.length === 0
+      ? []
+      : await db.delete(leads).where(inArray(leads.id, person.leadIds)).returning({ id: leads.id }),
   );
+
+  // ── 1b. ⚠️⚠️ The record's history: every name, address and number it ever had, and when
+  // the person agreed or withdrew. It has no foreign key to the lead or the contact — a
+  // history must survive its record being edited — so nothing cascades into it, and an
+  // erasure that forgot it would leave the old email address in plain text, one table away.
+  const histories = [
+    ...(person.leadIds.length
+      ? [and(eq(fieldChanges.entityType, "lead"), inArray(fieldChanges.entityId, person.leadIds))]
+      : []),
+    ...(person.contactIds.length
+      ? [and(eq(fieldChanges.entityType, "contact"), inArray(fieldChanges.entityId, person.contactIds))]
+      : []),
+  ];
+  report.deleted.field_change = histories.length
+    ? quanti(
+        await db
+          .delete(fieldChanges)
+          .where(or(...histories))
+          .returning({ id: fieldChanges.id }),
+      )
+    : 0;
 
   const { contactIds } = person;
   if (contactIds.length > 0) {

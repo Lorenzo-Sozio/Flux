@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * Prints the root certificate a Postgres server presents, so it can be pinned in
  * src/lib/db-ssl.ts (or put in DATABASE_CA_PEM) when a provider rotates it.
@@ -35,7 +36,12 @@ socket.once("data", (answer) => {
       seen.add(cert.fingerprint256);
       if (!cert.issuerCertificate || cert.issuerCertificate.fingerprint256 === cert.fingerprint256) {
         console.error(`# root: ${cert.subject?.CN ?? "?"}  sha256 ${cert.fingerprint256}`);
-        console.log(`-----BEGIN CERTIFICATE-----\n${cert.raw.toString("base64").match(/.{1,64}/g).join("\n")}\n-----END CERTIFICATE-----`);
+        console.log(
+          `-----BEGIN CERTIFICATE-----\n${cert.raw
+            .toString("base64")
+            .match(/.{1,64}/g)
+            .join("\n")}\n-----END CERTIFICATE-----`,
+        );
         break;
       }
       cert = cert.issuerCertificate;

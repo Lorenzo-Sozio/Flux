@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/pipelines.ts",
+    "description": "⚠️⚠️ una trattativa di rinnovo chiusa finisce nella colonna Vinta della prima pipeline, e cambia board",
+    "find": "        eq(pipelineStages.pipelineId, pipelineId),\n        kind === \"won\" ? eq(pipelineStages.isWon, true) : eq(pipelineStages.isLost, true),",
+    "replace": "        kind === \"won\" ? eq(pipelineStages.isWon, true) : eq(pipelineStages.isLost, true),"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ la board mostra le trattative di tutte le pipeline nelle colonne di una",
+    "find": "    where.push(ids.length ? inArray(deals.stageId, ids) : sql`false`);",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "«tutte le pipeline» non affianca le colonne",
+    "find": "  const all = filters.pipeline === \"all\" && pipelineList.length > 1;",
+    "replace": "  const all = false;"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ segnare persa una trattativa di rinnovo la manda nella colonna Persa della prima pipeline",
+    "find": "  const pipelineId = await pipelineOfStage(db, wantedStageId ?? oldDeal?.stageId);",
+    "replace": "  const pipelineId = \"default\";"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ il report somma le fasi e le trattative di tutte le pipeline",
+    "find": "        stageIdList.length ? inArray(deals.stageId, stageIdList) : sql`false`,",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ una seconda colonna Vinta nella stessa pipeline viene accettata",
+    "find": "  const stages = await stagesOfPipeline(db, pipelineId);",
+    "replace": "  const stages = await stagesOfPipeline(db, \"__none\");"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ si può eliminare la pipeline predefinita, dove finisce ogni fase senza pipeline",
+    "find": "  if (id === DEFAULT_PIPELINE_ID) return { ok: false, reason: \"default\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ si elimina una pipeline con trattative dentro, che restano senza colonna",
+    "find": "    if (Number(n) > 0) return { ok: false, reason: \"hasDeals\" };",
+    "replace": ""
+  }
+]

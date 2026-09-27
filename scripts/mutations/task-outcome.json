@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️⚠️ una chiamata completata torna a essere una nota «✓» accanto a un secondo record da scrivere",
+    "find": "      type: activityTypeFor(type),",
+    "replace": "      type: \"note\" as const,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️⚠️ l'esito detto alla chiusura non viene conservato",
+    "find": "      outcome: outcomeFor(type, report?.outcome),",
+    "replace": "      outcome: null,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️ un esito che non appartiene al tipo di attività viene salvato",
+    "find": "      outcome: outcomeFor(type, report?.outcome),",
+    "replace": "      outcome: report?.outcome ?? null,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️ la nota scritta nel pannello si perde",
+    "find": "      content: note ? `✓ «${task.title}»\\n${note}` : `✓ «${task.title}»`,",
+    "replace": "      content: `✓ «${task.title}»`,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "l'attività registrata non dice più da quale task viene",
+    "find": "      taskId: task.id,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️ la chiamata risulta fatta da chi l'aveva annotata, non da chi l'ha fatta",
+    "find": "      ownerId: session.user.id ?? task.ownerId ?? undefined,",
+    "replace": "      ownerId: task.ownerId ?? undefined,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️⚠️ il prossimo passo pianificato nel pannello non viene creato",
+    "find": "    if (nextTitle) {",
+    "replace": "    if (nextTitle && false) {"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️ il prossimo passo nasce slegato dalla trattativa",
+    "find": "        dealId: task.dealId,\n        ticketId: task.ticketId,",
+    "replace": "        ticketId: task.ticketId,"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "il tipo scelto alla creazione non viene salvato",
+    "find": "    .values({ ...data, ownerId: data.ownerId ?? actor.user.id, type: taskTypeOf(data.type), depth })",
+    "replace": "    .values({ ...data, ownerId: data.ownerId ?? actor.user.id, type: \"todo\", depth })"
+  },
+  {
+    "file": "src/lib/task-kinds.ts",
+    "description": "⚠️ un «da fare» completato diventa una chiamata nella cronologia",
+    "find": "  return type === \"todo\" ? \"note\" : type;",
+    "replace": "  return type === \"todo\" ? \"call\" : type;"
+  },
+  {
+    "file": "src/lib/task-kinds.ts",
+    "description": "⚠️ dopo «non risponde» il pannello non propone di richiamare",
+    "find": "  return outcome === \"no_answer\" || outcome === \"voicemail\" || outcome === \"no_show\";",
+    "replace": "  return outcome === \"no_answer\";"
+  }
+]

@@ -37,12 +37,14 @@ export function CashFlowOverview({ revenueTrend }: Props) {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-        <div>
+      {/* The two totals wrap under the title on a phone rather than squeezing it
+          into a column of one word per line beside them. */}
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 space-y-0 pb-3">
+        <div className="min-w-0">
           <CardTitle className="text-base">{t("revenueTrend")}</CardTitle>
           <CardDescription className="text-xs mt-0.5">{t("revenueTrendDesc")}</CardDescription>
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
             <span className="text-muted-foreground text-xs">{t("dealsLabel")}</span>
@@ -56,10 +58,19 @@ export function CashFlowOverview({ revenueTrend }: Props) {
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <ChartContainer className="max-h-64 w-full" config={chartConfig}>
+        {/* ⚠️ A fixed height, not `aspect-video`: at phone width the ratio made the
+            chart 170px tall, bars too short to compare. */}
+        <ChartContainer className="aspect-auto h-[220px] w-full sm:h-64" config={chartConfig}>
           <BarChart margin={{ left: -25, right: 0, top: 10, bottom: 0 }} accessibilityLayer data={chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="label" tickLine={false} tickMargin={8} axisLine={false} className="text-xs" />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              tickMargin={8}
+              axisLine={false}
+              minTickGap={8}
+              className="text-xs"
+            />
             <YAxis
               axisLine={false}
               tickLine={false}
@@ -68,8 +79,10 @@ export function CashFlowOverview({ revenueTrend }: Props) {
               className="text-xs"
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel={false} />} />
-            <Bar dataKey="deals" stackId="a" fill={chartConfig.deals.color as string} radius={[0, 0, 0, 0]} />
-            <Bar dataKey="orders" stackId="a" fill={chartConfig.orders.color as string} radius={[4, 4, 0, 0]} />
+            {/* Side by side, never stacked: a won deal and the order it became are one sale,
+                and stacking them drew it twice as tall. */}
+            <Bar dataKey="deals" fill={chartConfig.deals.color as string} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="orders" fill={chartConfig.orders.color as string} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ChartContainer>
       </CardContent>

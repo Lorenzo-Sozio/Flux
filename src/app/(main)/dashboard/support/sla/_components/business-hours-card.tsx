@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 
+import Link from "next/link";
+
 import { CalendarOff, Clock, Loader2, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -55,7 +57,6 @@ export function BusinessHoursCard({
   /** False until the workspace database has the tables. */
   ready?: boolean;
 }) {
-  const [timeZone, setTimeZone] = useState(initialTimeZone);
   const [week, setWeek] = useState<WeekSchedule>(initialWeek);
   const [holidays, setHolidays] = useState<Holiday[]>(initialHolidays);
   const [newDay, setNewDay] = useState("");
@@ -69,7 +70,7 @@ export function BusinessHoursCard({
   const save = () =>
     startSaving(async () => {
       try {
-        await saveBusinessCalendarAction({ timeZone, week });
+        await saveBusinessCalendarAction({ week });
         toast.success(t("saved"));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("saveFailed"));
@@ -127,14 +128,20 @@ export function BusinessHoursCard({
           </div>
         )}
 
-        <div className="grid gap-1.5 sm:max-w-xs">
-          <Label htmlFor="tz" className="text-xs">
-            {t("timeZone")}
-          </Label>
-          {/* i18n-ignore: an example value, the same in both languages */}
-          <Input id="tz" value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="Europe/Rome" />
-          <p className="text-muted-foreground text-xs">{t("timeZoneHint")}</p>
-        </div>
+        {/* ⚠️ Shown, not edited, here: the zone governs the whole workspace — calendar,
+            reminders, every date in the reports — and it lives in Settings → General,
+            where a workspace without the support module can reach it too. */}
+        <p className="text-muted-foreground text-sm">
+          {t.rich("timeZoneElsewhere", {
+            zone: initialTimeZone,
+            b: (chunks) => <strong className="text-foreground">{chunks}</strong>,
+            link: (chunks) => (
+              <Link href="/dashboard/settings/general" className="text-primary underline-offset-2 hover:underline">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
 
         <div className="space-y-2">
           {/* Monday first: the week as it is worked, not as the array is indexed. */}
@@ -151,11 +158,14 @@ export function BusinessHoursCard({
                   {t(DAY_KEYS[index])}
                 </Label>
 
+                {/* The two times do not fit beside the day on a phone, so below sm
+                    they take a line of their own, indented under the day name
+                    (the switch is 2rem, plus the row's gap). */}
                 {day ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 max-sm:basis-full max-sm:pl-11">
                     <Input
                       type="time"
-                      className="h-8 w-28 tabular-nums"
+                      className="h-9 min-w-0 flex-1 tabular-nums sm:h-8 sm:w-28 sm:flex-none"
                       value={toTime(day.openMinute)}
                       onChange={(e) => {
                         const m = toMinutes(e.target.value);
@@ -165,7 +175,7 @@ export function BusinessHoursCard({
                     <span className="text-muted-foreground text-xs">{t("to")}</span>
                     <Input
                       type="time"
-                      className="h-8 w-28 tabular-nums"
+                      className="h-9 min-w-0 flex-1 tabular-nums sm:h-8 sm:w-28 sm:flex-none"
                       value={toTime(day.closeMinute)}
                       onChange={(e) => {
                         const m = toMinutes(e.target.value);
@@ -203,12 +213,12 @@ export function BusinessHoursCard({
             <ul className="divide-y rounded-md border">
               {holidays.map((holiday) => (
                 <li key={holiday.id} className="flex items-center gap-3 px-3 py-2">
-                  <span className="font-mono text-sm tabular-nums">{holiday.day}</span>
+                  <span className="shrink-0 font-mono text-sm tabular-nums">{holiday.day}</span>
                   <span className="min-w-0 flex-1 truncate text-muted-foreground text-sm">{holiday.name ?? ""}</span>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="size-9 shrink-0 text-muted-foreground hover:text-destructive sm:size-7"
                     onClick={() => removeHoliday(holiday.id)}
                     disabled={saving}
                     aria-label={t("remove", { day: holiday.day })}
@@ -220,32 +230,41 @@ export function BusinessHoursCard({
             </ul>
           )}
 
+          {/* Below sm the date takes a row and the name shares the next with Add:
+              beside a 160px date and the button, the name field was squeezed
+              to a sliver. */}
           <div className="flex flex-wrap items-end gap-2">
-            <div className="grid gap-1.5">
+            <div className="grid gap-1.5 max-sm:basis-full">
               <Label htmlFor="holiday-day" className="text-xs">
                 {t("date")}
               </Label>
               <Input
                 id="holiday-day"
                 type="date"
-                className="h-8 w-40"
+                className="h-9 w-full sm:h-8 sm:w-40"
                 value={newDay}
                 onChange={(e) => setNewDay(e.target.value)}
               />
             </div>
-            <div className="grid flex-1 gap-1.5">
+            <div className="grid min-w-0 flex-1 gap-1.5">
               <Label htmlFor="holiday-name" className="text-xs">
                 {t("name")}
               </Label>
               <Input
                 id="holiday-name"
-                className="h-8"
+                className="h-9 sm:h-8"
                 placeholder={t("optional")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={addHoliday} disabled={saving}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 shrink-0 gap-1.5 sm:h-8"
+              onClick={addHoliday}
+              disabled={saving}
+            >
               <Plus className="h-3.5 w-3.5" /> {t("add")}
             </Button>
           </div>

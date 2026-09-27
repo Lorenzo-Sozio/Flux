@@ -1,0 +1,8 @@
+[
+  {
+    "file": "src/actions/activities.ts",
+    "description": "⚠️⚠️ registrare una chiamata torna a scrivere al cliente: la nota interna del commerciale arriva al contatto come oggetto dell'email",
+    "find": "  // the screen and carries an iCalendar invitation (see src/actions/appointments.ts).\n  return result[0];",
+    "replace": "  if (data.type === \"call\" && data.contactId && data.content) {\n    const [c] = await db.select().from(activities).where(eq(activities.id, data.contactId));\n    if (c) await (await import(\"@/lib/email-provider\")).sendEmail({ to: \"x\", subject: data.content, html: data.content } as never);\n  }\n  return result[0];"
+  }
+]

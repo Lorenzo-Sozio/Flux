@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/sample-data.ts",
+    "description": "⚠️⚠️ i dati d'esempio si mescolano a un workspace che ha già record suoi",
+    "find": "  if (await hasOwnRecords(db)) return { ok: false, reason: \"notEmpty\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sample-data.ts",
+    "description": "i dati d'esempio si caricano due volte",
+    "find": "  if (await hasSampleData(db)) return { ok: false, reason: \"alreadyLoaded\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sample-data.ts",
+    "description": "⚠️⚠️ i contatti d'esempio risultano iscritti al marketing e le campagne li raggiungono",
+    "find": "      companyId: id(\"company\", companyOf[i]),\n      ownerId: owner,\n      marketingConsent: false,",
+    "replace": "      companyId: id(\"company\", companyOf[i]),\n      ownerId: owner,\n      marketingConsent: true,"
+  },
+  {
+    "file": "src/lib/sample-data.ts",
+    "description": "⚠️ la rimozione lascia i lead d'esempio",
+    "find": "  await db.delete(leads).where(like(leads.id, prefix));",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sample-data.ts",
+    "description": "⚠️ la conferma non dice che le note aggiunte ai record d'esempio se ne vanno con loro",
+    "find": "  return Number(row?.n ?? 0) + Number(taskRow?.n ?? 0);",
+    "replace": "  return Number(taskRow?.n ?? 0);"
+  },
+  {
+    "file": "src/lib/onboarding.ts",
+    "description": "⚠️⚠️ i dati d'esempio spuntano «importa i contatti»",
+    "find": "          (exists (select 1 from contact where id not like ${prefix})\n            or exists (select 1 from company where id not like ${prefix})) as contacts,",
+    "replace": "          (exists (select 1 from contact)\n            or exists (select 1 from company)) as contacts,"
+  },
+  {
+    "file": "src/lib/onboarding.ts",
+    "description": "⚠️ l'indirizzo segnaposto di un'impostazione mai compilata conta come posta collegata",
+    "find": "                      and from_email <> ${PLACEHOLDER_FROM})",
+    "replace": "                      )"
+  },
+  {
+    "file": "src/lib/onboarding.ts",
+    "description": "un invito in sospeso non conta come squadra invitata",
+    "find": "    team: team.members > 1 || team.pendingInvitations > 0,",
+    "replace": "    team: team.members > 1,"
+  },
+  {
+    "file": "src/lib/onboarding.ts",
+    "description": "«vanno bene così» non spunta le fasi",
+    "find": "    stages: Boolean(facts.stages) || flag(ONBOARDING_KEYS.stagesReviewed),",
+    "replace": "    stages: Boolean(facts.stages),"
+  },
+  {
+    "file": "src/lib/onboarding.ts",
+    "description": "⚠️ nascosta la scheda, il pulsante per togliere i dati d'esempio sparisce con lei",
+    "find": "  return state.sample || (!state.dismissed && state.done < ONBOARDING_STEPS.length);",
+    "replace": "  return !state.dismissed && state.done < ONBOARDING_STEPS.length;"
+  }
+]

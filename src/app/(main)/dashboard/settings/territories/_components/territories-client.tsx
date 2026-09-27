@@ -146,10 +146,10 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
         <div className="space-y-3">
           {items.map((territory) => (
             <Card key={territory.id}>
-              <CardContent className="flex items-start gap-4 p-4">
+              <CardContent className="flex items-start gap-2 p-4 sm:gap-4">
                 <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <p className="font-semibold text-sm">{territory.name}</p>
+                  <p className="break-words font-semibold text-sm">{territory.name}</p>
                   {territory.description && <p className="text-muted-foreground text-xs">{territory.description}</p>}
                   <div className="flex flex-wrap gap-1">
                     {territory.countries.length === 0 ? (
@@ -179,7 +179,7 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="size-9 sm:size-8"
                     onClick={() => openEdit(territory)}
                     aria-label={t("editTerritory")}
                   >
@@ -188,7 +188,7 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="size-9 text-destructive hover:text-destructive sm:size-8"
                     onClick={() => setDeleteId(territory.id)}
                     aria-label={t("delete")}
                   >
@@ -299,11 +299,15 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
               {form.countries.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {form.countries.map((code) => (
-                    <Badge key={code} variant="secondary" className="gap-1 pr-1">
+                    // ⚠️ Taller on a phone so the remove button fits: a badge is
+                    // `h-5 overflow-hidden`, which clips a bigger target to the same
+                    // 16px the icon already had — hit testing included.
+                    <Badge key={code} variant="secondary" className="gap-1 pr-1 max-sm:h-8">
                       {countryName.get(code) ?? code}
                       <button
                         type="button"
-                        className="rounded-sm p-0.5 hover:bg-background/60"
+                        className="rounded-sm p-1.5 hover:bg-background/60 sm:p-0.5"
+                        data-no-touch-target
                         aria-label={`${t("delete")} ${countryName.get(code) ?? code}`}
                         onClick={() => setForm((f) => ({ ...f, countries: f.countries.filter((c) => c !== code) }))}
                       >

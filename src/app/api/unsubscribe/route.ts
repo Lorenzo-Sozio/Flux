@@ -2,23 +2,59 @@
  * Unsubscribe endpoint.
  * URL: /api/unsubscribe?token=<signed_token>
  *
- * Verifies the HMAC token, adds the email to email_suppression,
- * updates the campaign log, and returns an HTML confirmation page.
+ * ⚠️⚠️ **Opening the link unsubscribes nobody.** A GET shows the address and one button; the
+ * button POSTs. Corporate mail scanners open every link in a message — and a GET that acted
+ * unsubscribed people who never asked, and now told every integration (consent.withdrawn) that
+ * they had. Decided 27 September 2026.
+ *
+ * The POST is also RFC 8058's one-click: the emails carry `List-Unsubscribe` and
+ * `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, so the unsubscribe button Gmail and
+ * Outlook draw posts here directly, with the token in the address. A scanner does not POST.
+ *
+ * Verifies the HMAC token, adds the email to email_suppression, updates the campaign log, and
+ * returns an HTML confirmation page.
  */
 
 import type { NextRequest } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-import { campaignLogs, contacts, emailSequenceEnrollments, emailSuppressions, leads } from "@/db/schema";
+import { campaignLogs, emailSequenceEnrollments, emailSuppressions } from "@/db/schema";
+import { announceOptOut } from "@/lib/consent-events";
+import { withdrawConsent } from "@/lib/consent-withdraw";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { SEQUENCE_TOKEN_PREFIX, stopForAddress } from "@/lib/sequence-runner";
 import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
+/** The page the link opens: who is about to be unsubscribed, and the button that does it. */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
+  const payload = token ? verifyUnsubscribeToken(token) : null;
+  if (!token || !payload) {
+    return htmlResponse("Invalid link", "This unsubscribe link is invalid or has expired.", false);
+  }
+  const action = `/api/unsubscribe?token=${encodeURIComponent(token)}`;
+  return htmlResponse(
+    "Unsubscribe?",
+    `Stop marketing emails to <strong>${escapeHtml(payload.email)}</strong>?`,
+    null,
+    `<form method="post" action="${escapeHtml(action)}"><button type="submit">Unsubscribe</button></form>`,
+  );
+}
 
+/** The button on that page, and the one-click unsubscribe of a mail client (RFC 8058). */
+export async function POST(req: NextRequest) {
+  let token = req.nextUrl.searchParams.get("token");
+  if (!token) {
+    const form = await req.formData().catch(() => null);
+    const fromBody = form?.get("token");
+    token = typeof fromBody === "string" ? fromBody : null;
+  }
+  return unsubscribe(token);
+}
+
+async function unsubscribe(token: string | null): Promise<Response> {
   if (!token) {
     return htmlResponse("Invalid link", "This unsubscribe link is invalid or has expired.", false);
   }
@@ -55,11 +91,27 @@ export async function GET(req: NextRequest) {
         .select({ leadId: emailSequenceEnrollments.leadId, contactId: emailSequenceEnrollments.contactId })
         .from(emailSequenceEnrollments)
         .where(eq(emailSequenceEnrollments.id, enrollmentId));
+      // Dated and sourced, and in the record's history (src/lib/consent-withdraw.ts).
       if (enrollment?.leadId) {
-        await sdb.update(leads).set({ marketingConsent: false }).where(eq(leads.id, enrollment.leadId));
+        await withdrawConsent(sdb, "lead", enrollment.leadId, "unsubscribe");
       } else if (enrollment?.contactId) {
-        await sdb.update(contacts).set({ marketingConsent: false }).where(eq(contacts.id, enrollment.contactId));
+        await withdrawConsent(sdb, "contact", enrollment.contactId, "unsubscribe");
       }
+      // The other systems writing to this person hear it too (src/lib/consent-events.ts).
+      await announceOptOut(
+        sdb,
+        {
+          records: enrollment?.leadId
+            ? [{ entity: "lead", id: enrollment.leadId }]
+            : enrollment?.contactId
+              ? [{ entity: "contact", id: enrollment.contactId }]
+              : [],
+          email,
+          source: "unsubscribe",
+          channel: "email",
+        },
+        { via: "user", actor: null },
+      );
     } catch {
       // Same stance as below: the page still confirms, and the send-time check on
       // the suppression list is what actually keeps the next email from going out.
@@ -109,10 +161,25 @@ export async function GET(req: NextRequest) {
 
     // Sync marketingConsent on the originating record so the CRM reflects reality
     if (log?.leadId) {
-      await db.update(leads).set({ marketingConsent: false }).where(eq(leads.id, log.leadId));
+      await withdrawConsent(db, "lead", log.leadId, "unsubscribe");
     } else if (log?.contactId) {
-      await db.update(contacts).set({ marketingConsent: false }).where(eq(contacts.id, log.contactId));
+      await withdrawConsent(db, "contact", log.contactId, "unsubscribe");
     }
+    // The other systems writing to this person hear it too (src/lib/consent-events.ts).
+    await announceOptOut(
+      db,
+      {
+        records: log?.leadId
+          ? [{ entity: "lead", id: log.leadId }]
+          : log?.contactId
+            ? [{ entity: "contact", id: log.contactId }]
+            : [],
+        email,
+        source: "unsubscribe",
+        channel: "email",
+      },
+      { via: "user", actor: null },
+    );
   } catch {
     // Ignore DB errors — still show success to the user
   }
@@ -124,9 +191,10 @@ export async function GET(req: NextRequest) {
   );
 }
 
-function htmlResponse(title: string, message: string, success: boolean) {
-  const color = success ? "#16a34a" : "#dc2626";
-  const icon = success ? "✓" : "✗";
+function htmlResponse(title: string, message: string, success: boolean | null, action = "") {
+  // null: a question, not an outcome.
+  const color = success === null ? "#2563eb" : success ? "#16a34a" : "#dc2626";
+  const icon = success === null ? "?" : success ? "✓" : "✗";
 
   const html = `<!DOCTYPE html>
 <html lang="en">
@@ -141,6 +209,8 @@ function htmlResponse(title: string, message: string, success: boolean) {
     .icon { width: 56px; height: 56px; border-radius: 50%; background: ${color}20; color: ${color}; font-size: 24px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; }
     h1 { margin: 0 0 12px; font-size: 22px; color: #111827; }
     p { margin: 0; color: #6b7280; font-size: 15px; line-height: 1.6; }
+    form { margin-top: 24px; }
+    button { background: #111827; color: #fff; border: 0; border-radius: 8px; padding: 12px 24px; font-size: 15px; cursor: pointer; min-height: 44px; }
   </style>
 </head>
 <body>
@@ -148,6 +218,7 @@ function htmlResponse(title: string, message: string, success: boolean) {
     <div class="icon">${icon}</div>
     <h1>${title}</h1>
     <p>${message}</p>
+    ${action}
   </div>
 </body>
 </html>`;

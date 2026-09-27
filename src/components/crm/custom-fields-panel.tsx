@@ -145,7 +145,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
                       <Badge
                         key={opt}
                         variant={selected ? "default" : "outline"}
-                        className="cursor-pointer text-xs h-5"
+                        className="cursor-pointer text-xs h-5 max-sm:h-8 max-sm:px-3"
                         onClick={() => {
                           const current = value ? value.split(",").filter(Boolean) : [];
                           const next = selected ? current.filter((v) => v !== opt) : [...current, opt];

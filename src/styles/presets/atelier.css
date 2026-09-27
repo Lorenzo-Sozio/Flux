@@ -1,0 +1,98 @@
+/*
+label: Atelier
+value: atelier
+*/
+
+/*
+ * Atelier — editorial: ink buttons on warm ivory with champagne-gold detail and
+ * crisper corners; by night, onyx and gold. Quiet luxury that leaves the content
+ * the loudest thing on the screen.
+ *
+ * Every text/background pair here clears WCAG AA (4.5:1, 3:1 for the focus
+ * ring), in light and dark: src/styles/presets.test.ts measures them.
+ */
+
+:root[data-theme-preset="atelier"] {
+  --radius: 0.375rem;
+  --background: oklch(0.975 0.008 85);
+  --foreground: oklch(0.22 0.01 60);
+  --card: oklch(0.995 0.004 85);
+  --card-foreground: oklch(0.22 0.01 60);
+  --popover: oklch(0.995 0.004 85);
+  --popover-foreground: oklch(0.22 0.01 60);
+  --primary: oklch(0.25 0.012 60);
+  --primary-foreground: oklch(0.97 0.018 85);
+  --secondary: oklch(0.94 0.014 82);
+  --secondary-foreground: oklch(0.29 0.018 60);
+  --muted: oklch(0.945 0.011 82);
+  --muted-foreground: oklch(0.46 0.016 62);
+  --accent: oklch(0.925 0.05 86);
+  --accent-foreground: oklch(0.32 0.06 66);
+  --destructive: oklch(0.52 0.18 27);
+  --border: oklch(0.885 0.016 80);
+  --input: oklch(0.855 0.02 80);
+  --ring: oklch(0.58 0.11 74);
+  --chart-1: oklch(0.66 0.12 78);
+  --chart-2: oklch(0.34 0.015 60);
+  --chart-3: oklch(0.62 0.07 150);
+  --chart-4: oklch(0.6 0.12 40);
+  --chart-5: oklch(0.55 0.07 250);
+  --sidebar: oklch(0.955 0.014 82);
+  --sidebar-foreground: oklch(0.24 0.012 60);
+  --sidebar-primary: oklch(0.5 0.1 70);
+  --sidebar-primary-foreground: oklch(0.98 0.015 85);
+  --sidebar-accent: oklch(0.91 0.035 84);
+  --sidebar-accent-foreground: oklch(0.24 0.02 60);
+  --sidebar-border: oklch(0.89 0.016 80);
+  --sidebar-ring: oklch(0.58 0.11 74);
+  --shadow-2xs: 0px 1px 2px 0px hsl(30 25% 12% / 0.035);
+  --shadow-xs: 0px 1px 2px 0px hsl(30 25% 12% / 0.042);
+  --shadow-sm: 0px 1px 3px 0px hsl(30 25% 12% / 0.07), 0px 1px 2px -1px hsl(30 25% 12% / 0.07);
+  --shadow: 0px 1px 3px 0px hsl(30 25% 12% / 0.07), 0px 1px 2px -1px hsl(30 25% 12% / 0.07);
+  --shadow-md: 0px 2px 6px -1px hsl(30 25% 12% / 0.07700000000000001), 0px 2px 4px -2px hsl(30 25% 12% / 0.07);
+  --shadow-lg: 0px 8px 16px -4px hsl(30 25% 12% / 0.084), 0px 4px 6px -2px hsl(30 25% 12% / 0.07);
+  --shadow-xl: 0px 16px 28px -8px hsl(30 25% 12% / 0.098), 0px 8px 10px -6px hsl(30 25% 12% / 0.07);
+  --shadow-2xl: 0px 28px 48px -12px hsl(30 25% 12% / 0.17500000000000002);
+}
+
+.dark:root[data-theme-preset="atelier"] {
+  --background: oklch(0.165 0.005 60);
+  --foreground: oklch(0.94 0.012 85);
+  --card: oklch(0.205 0.006 60);
+  --card-foreground: oklch(0.94 0.012 85);
+  --popover: oklch(0.225 0.007 60);
+  --popover-foreground: oklch(0.94 0.012 85);
+  --primary: oklch(0.82 0.11 82);
+  --primary-foreground: oklch(0.2 0.02 60);
+  --secondary: oklch(0.265 0.008 60);
+  --secondary-foreground: oklch(0.93 0.014 85);
+  --muted: oklch(0.255 0.008 60);
+  --muted-foreground: oklch(0.74 0.02 80);
+  --accent: oklch(0.3 0.03 76);
+  --accent-foreground: oklch(0.93 0.06 86);
+  --destructive: oklch(0.71 0.16 25);
+  --border: oklch(0.3 0.01 60);
+  --input: oklch(0.34 0.012 60);
+  --ring: oklch(0.78 0.11 82);
+  --chart-1: oklch(0.8 0.11 82);
+  --chart-2: oklch(0.72 0.02 80);
+  --chart-3: oklch(0.72 0.08 150);
+  --chart-4: oklch(0.7 0.13 40);
+  --chart-5: oklch(0.68 0.08 250);
+  --sidebar: oklch(0.135 0.005 60);
+  --sidebar-foreground: oklch(0.9 0.012 85);
+  --sidebar-primary: oklch(0.82 0.11 82);
+  --sidebar-primary-foreground: oklch(0.2 0.02 60);
+  --sidebar-accent: oklch(0.245 0.02 70);
+  --sidebar-accent-foreground: oklch(0.95 0.05 86);
+  --sidebar-border: oklch(0.25 0.008 60);
+  --sidebar-ring: oklch(0.78 0.11 82);
+  --shadow-2xs: 0px 1px 2px 0px hsl(30 20% 2% / 0.2);
+  --shadow-xs: 0px 1px 2px 0px hsl(30 20% 2% / 0.24);
+  --shadow-sm: 0px 1px 3px 0px hsl(30 20% 2% / 0.4), 0px 1px 2px -1px hsl(30 20% 2% / 0.4);
+  --shadow: 0px 1px 3px 0px hsl(30 20% 2% / 0.4), 0px 1px 2px -1px hsl(30 20% 2% / 0.4);
+  --shadow-md: 0px 2px 6px -1px hsl(30 20% 2% / 0.44000000000000006), 0px 2px 4px -2px hsl(30 20% 2% / 0.4);
+  --shadow-lg: 0px 8px 16px -4px hsl(30 20% 2% / 0.48), 0px 4px 6px -2px hsl(30 20% 2% / 0.4);
+  --shadow-xl: 0px 16px 28px -8px hsl(30 20% 2% / 0.5599999999999999), 0px 8px 10px -6px hsl(30 20% 2% / 0.4);
+  --shadow-2xl: 0px 28px 48px -12px hsl(30 20% 2% / 1);
+}

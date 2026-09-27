@@ -12,6 +12,7 @@ import {
   type EntityType,
   type FieldType,
 } from "@/actions/custom-fields";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -156,51 +157,87 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                 {t("noFieldsForEntity", { entity: t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`) })}
               </p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t("columns.name")}</TableHead>
-                    <TableHead>{t("columns.slug")}</TableHead>
-                    <TableHead>{t("columns.type")}</TableHead>
-                    <TableHead>{t("required")}</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupedByEntity[et].map((field) => (
-                    <TableRow key={field.id}>
-                      <TableCell className="font-medium">{field.name}</TableCell>
-                      <TableCell>
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs">{field.slug}</code>
-                      </TableCell>
-                      <TableCell>
+              <ResponsiveRecordList
+                cards={
+                  <RecordCards
+                    items={groupedByEntity[et].map((field) => ({
+                      id: field.id,
+                      title: field.name,
+                      subtitle: <code className="rounded bg-muted px-1 py-0.5 text-xs">{field.slug}</code>,
+                      badge: field.isRequired ? (
+                        <Badge variant="destructive" className="text-[10px]">
+                          {t("requiredBadge")}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">{t("optionalLabel")}</span>
+                      ),
+                      meta: (
                         <Badge variant="outline" className="capitalize">
                           {field.fieldType}
                         </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {field.isRequired ? (
-                          <Badge variant="destructive" className="text-[10px]">
-                            {t("requiredBadge")}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">{t("optionalLabel")}</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
+                      ),
+                      actions: (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive"
                           onClick={() => handleDelete(field.id)}
+                          aria-label={tc("delete")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      ),
+                    }))}
+                  />
+                }
+                table={
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t("columns.name")}</TableHead>
+                        <TableHead>{t("columns.slug")}</TableHead>
+                        <TableHead>{t("columns.type")}</TableHead>
+                        <TableHead>{t("required")}</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupedByEntity[et].map((field) => (
+                        <TableRow key={field.id}>
+                          <TableCell className="font-medium">{field.name}</TableCell>
+                          <TableCell>
+                            <code className="rounded bg-muted px-1 py-0.5 text-xs">{field.slug}</code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">
+                              {field.fieldType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {field.isRequired ? (
+                              <Badge variant="destructive" className="text-[10px]">
+                                {t("requiredBadge")}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">{t("optionalLabel")}</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(field.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                }
+              />
             )}
           </CardContent>
         </Card>
@@ -221,7 +258,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>{t("entityType")}</Label>
                 <Select

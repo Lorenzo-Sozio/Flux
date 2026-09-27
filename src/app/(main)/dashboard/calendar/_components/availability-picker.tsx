@@ -6,12 +6,15 @@ import { Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { type BusySlot, getColleagueAvailability } from "@/actions/appointments";
+import { addMinutesToWall, toWallDate, wallMinutes } from "@/lib/wall-clock";
 
 interface Props {
   userIds: string[];
   users: { id: string; name: string | null }[];
-  date: string; // yyyy-MM-dd
-  onSelect: (startAt: string, endAt: string) => void; // datetime-local values
+  date: string; // yyyy-MM-dd on the workspace's clock
+  /** The workspace's zone: the busy times and the slots are read on its clock. */
+  timeZone: string;
+  onSelect: (startAt: string, endAt: string) => void; // wall-clock values on that clock
 }
 
 const SLOTS = (() => {
@@ -29,24 +32,18 @@ const SLOTS = (() => {
   return out;
 })();
 
-function toLocalDatetime(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` + `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
-}
-
-function overlaps(slots: BusySlot[], h: number, m: number): boolean {
+function overlaps(slots: BusySlot[], h: number, m: number, date: string, timeZone: string): boolean {
   const slotStart = h * 60 + m;
   const slotEnd = slotStart + 30;
   return slots.some((b) => {
-    const bs = b.startAt.getHours() * 60 + b.startAt.getMinutes();
-    const be = b.endAt.getHours() * 60 + b.endAt.getMinutes();
+    // A meeting that began the day before, or runs into the next, covers the edge of this one.
+    const bs = toWallDate(b.startAt, timeZone) < date ? 0 : wallMinutes(b.startAt, timeZone);
+    const be = toWallDate(b.endAt, timeZone) > date ? 1440 : wallMinutes(b.endAt, timeZone);
     return slotStart < be && slotEnd > bs;
   });
 }
 
-export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
+export function AvailabilityPicker({ userIds, users, date, timeZone, onSelect }: Props) {
   const t = useTranslations("appointment.availability");
   const tc = useTranslations("common");
   const userIdsKey = userIds.join(",");
@@ -57,7 +54,7 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
     const ids = userIdsKey.split(",").filter(Boolean);
     if (ids.length === 0 || !date) return;
     setLoading(true);
-    getColleagueAvailability(ids, new Date(date))
+    getColleagueAvailability(ids, date)
       .then(setBusy)
       .finally(() => setLoading(false));
   }, [userIdsKey, date]);
@@ -90,7 +87,9 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
         </thead>
         <tbody>
           {SLOTS.map((slot) => {
-            const busyFlags = visibleUsers.map((u) => overlaps(busy[u.id] ?? [], slot.hour, slot.minute));
+            const busyFlags = visibleUsers.map((u) =>
+              overlaps(busy[u.id] ?? [], slot.hour, slot.minute, date, timeZone),
+            );
             const allFree = busyFlags.every((f) => !f);
             return (
               <tr key={slot.label} className="border-t">
@@ -118,10 +117,8 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
                     <button
                       type="button"
                       onClick={() => {
-                        const start = new Date(`${date}T${slot.label}:00`);
-                        const end = new Date(start);
-                        end.setHours(end.getHours() + 1);
-                        onSelect(toLocalDatetime(start), toLocalDatetime(end));
+                        const start = `${date}T${slot.label}`;
+                        onSelect(start, addMinutesToWall(start, 60));
                       }}
                       className="rounded bg-green-100 px-2 py-0.5 font-medium text-[10px] text-green-700 transition-colors hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-950/60"
                     >

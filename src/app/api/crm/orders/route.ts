@@ -1,22 +1,22 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
-import { inArray } from "drizzle-orm";
-
-import { dispatchWebhook } from "@/actions/webhooks";
-import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
-import { contacts, notifications, orderItems, orders, users } from "@/db/schema";
+import { contacts, notifications, orderItems, orders } from "@/db/schema";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
+import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { computeDocument } from "@/lib/document-totals";
 import { getTenantById } from "@/lib/get-tenant";
+import { composeNotification } from "@/lib/notification-text";
 import { nextOrderNumber } from "@/lib/order-number";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
+import { membersWith } from "@/lib/workspace-members";
 
 /** One line each, so whoever prepares the order reads them one under the other. */
 const SEPARATORE = String.fromCharCode(10);
@@ -69,6 +69,20 @@ interface RigaIn {
  */
 const ENDPOINT = "/api/crm/orders";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "orders", access: "write" } as const;
+const READ_SCOPE = { entity: "orders", access: "read" } as const;
+
+/**
+ * A page of orders, oldest change first; `updatedSince` and `cursor` to reconcile
+ * (src/lib/api-read.ts). Nothing is written, so nothing is logged.
+ */
+export async function GET(req: NextRequest) {
+  const gate = await gateApiRequest(req, READ_SCOPE);
+  if (gate.response) return gate.response;
+  return listResponse(req, gate.auth, "orders");
+}
+
 /**
  * Record an order an assistant took from a customer, in words, on the phone or in chat.
  *
@@ -104,10 +118,12 @@ const ENDPOINT = "/api/crm/orders";
  * what to do with it. Marking it `processing` would say that somebody had picked it up.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -231,7 +247,10 @@ export async function POST(req: NextRequest) {
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -341,7 +360,7 @@ export async function POST(req: NextRequest) {
         // one must fire — otherwise the owner's «tell me about new customers» rule would be
         // blind exactly to the customers the assistant brings in.
         if (creato && contactId) {
-          runAutomations({
+          runRulesAfterApiWrite(tenant.id, {
             entityType: "contact",
             entityId: contactId,
             event: "onCreate",
@@ -370,17 +389,21 @@ export async function POST(req: NextRequest) {
       // a feature that was broken from the first line. It cost one measurement to find that out.
       after(async () => {
         try {
-          const destinatari = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(inArray(users.role, ["admin", "owner"]));
+          // The workspace's admins and owner, from the registry. The workspace's `user` table
+          // holds a copy of the role, refreshed only on a dashboard visit and never removed
+          // when somebody leaves: see membersWith.
+          const destinatari = await membersWith(tenant.id, "settings:manage");
           if (destinatari.length === 0) return;
+          // Composed like every other notification, so the bell shows it in the reader's language.
+          const params = { number: String(ordine.orderNumber), total: String(totali.total), lines: righe.length };
+          const text = await composeNotification("orderCreated", params);
           await db.insert(notifications).values(
-            destinatari.map((u) => ({
-              userId: u.id,
+            destinatari.map((userId) => ({
+              userId,
               type: "order_created",
-              title: `New order ${ordine.orderNumber}`,
-              message: `${totali.total} — ${righe.length} line${righe.length === 1 ? "" : "s"}.`,
+              ...text,
+              titleKey: "orderCreated",
+              params,
               link: `/dashboard/sales/orders/${ordine.id}`,
             })),
           );
@@ -405,7 +428,7 @@ export async function POST(req: NextRequest) {
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

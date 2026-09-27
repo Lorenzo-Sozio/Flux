@@ -18,6 +18,9 @@ import { useSidebar } from "@/components/ui/sidebar";
  *
  * So: a hamburger below md and the panel glyph from md up, one button, and a
  * name in the reader's own language rather than a hidden English one.
+ *
+ * The layout draws it from md up only now: on a phone the bottom bar's Menu
+ * opens the navigation hub, and this would be a second way to a worse menu.
  */
 export function MenuTrigger() {
   const { toggleSidebar, openMobile } = useSidebar();

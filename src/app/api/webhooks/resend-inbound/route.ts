@@ -19,6 +19,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { simpleParser } from "mailparser";
 import { Resend } from "resend";
 
+import { addressHeaderText } from "@/lib/email-parser";
 import type { InboundAttachment } from "@/lib/ticket-from-email";
 import { processInboundEmail } from "@/lib/ticket-from-email";
 
@@ -121,6 +122,10 @@ export async function POST(req: NextRequest) {
   let inboundMessageId: string | null = typeof eventData.message_id === "string" ? eventData.message_id : null;
   let inReplyTo: string | null = null;
   const attachments: InboundAttachment[] = [];
+  let cc = addressHeaderText(eventData.cc);
+  // Where it was delivered. A Bcc'd archive address (src/lib/mail-archive.ts) is in no
+  // header anybody else sees: only here, and in the delivery headers of the raw message.
+  const recipients = [eventData.bcc, eventData.to].map(addressHeaderText).filter(Boolean);
 
   const rawUrl: string | undefined = (emailMeta as { raw?: { download_url?: string } }).raw?.download_url;
   if (rawUrl) {
@@ -135,6 +140,11 @@ export async function POST(req: NextRequest) {
       // Threading headers
       inboundMessageId = inboundMessageId ?? parsed.messageId ?? null;
       inReplyTo = parsed.inReplyTo ?? null;
+      cc = cc || addressHeaderText(parsed.cc);
+      for (const name of ["delivered-to", "x-original-to", "envelope-to", "x-forwarded-to"]) {
+        const text = addressHeaderText(parsed.headers.get(name));
+        if (text) recipients.push(text);
+      }
 
       // Collect real attachments, skip inline images (contentId set = embedded in HTML)
       for (const att of parsed.attachments) {
@@ -160,6 +170,8 @@ export async function POST(req: NextRequest) {
   const result = await processInboundEmail({
     fromRaw,
     to: typeof to === "string" ? to : "",
+    cc,
+    recipients,
     subject,
     htmlBody,
     textBody,

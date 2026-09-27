@@ -10,6 +10,7 @@
  * This is the cheapest possible guard: the day the two files disagree, this goes
  * red instead of a customer finding out.
  */
+import { type MessageFormatElement, parse, TYPE } from "@formatjs/icu-messageformat-parser";
 import { describe, expect, it } from "vitest";
 
 import en from "../../messages/en.json";
@@ -35,14 +36,31 @@ const flatEn = flatten(en as Tree);
 const flatIt = flatten(itMessages as Tree);
 
 /**
- * Top-level ICU arguments: `{count}`, `{name}`, `{count, plural, ...}`.
+ * Every ICU argument a message uses: `{count}`, `{name}`, `{count, plural, ...}`, and the
+ * arguments inside select and plural branches.
  *
- * Deliberately not every `{` in the string — a plural branch like
- * `one {Propagated 1 task}` opens a brace too, and counting those compares
- * translated words rather than arguments.
+ * ⚠️ Read with the ICU parser next-intl itself uses, not a regular expression. The regex
+ * took a branch body like `call {Call}` for an argument named `Call`, and missed its Italian
+ * `{Attività}` because `\w` has no accented letters — so it compared translated words, and
+ * called a correct translation broken.
  */
 function placeholders(message: string): string[] {
-  return [...message.matchAll(/\{\s*(\w+)\s*[,}]/g)].map((m) => m[1]).sort();
+  const names = new Set<string>();
+  const walk = (nodes: MessageFormatElement[]) => {
+    for (const n of nodes) {
+      if ("value" in n && typeof n.value === "string" && n.type !== TYPE.literal) {
+        names.add(n.value);
+      }
+      if ("options" in n) for (const option of Object.values(n.options)) walk(option.value);
+      if ("children" in n) walk(n.children);
+    }
+  };
+  try {
+    walk(parse(message, { ignoreTag: true }));
+  } catch {
+    return [`<unparseable: ${message.slice(0, 30)}>`];
+  }
+  return [...names].sort();
 }
 
 describe("translation files", () => {

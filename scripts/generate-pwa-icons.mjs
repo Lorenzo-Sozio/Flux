@@ -10,7 +10,7 @@
  *
  * Run with: node scripts/generate-pwa-icons.mjs
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import sharp from "sharp";
@@ -73,3 +73,69 @@ for (const icon of ICONS) {
 // The favicon, as an SVG the browser can scale by itself.
 await writeFile(path.join(OUT, "icon.svg"), markSvg({ size: 64, inset: 0.18, radius: 14, background: BRAND }));
 console.log("icon.svg                   vector");
+
+// ── Launch screens for iOS ──────────────────────────────────────────────────
+//
+// ⚠️ iOS does not build a launch screen from the manifest, as Android does: an
+// installed web app with no `apple-touch-startup-image` for the exact screen size
+// opens on white, then flashes to the page. One image per device size, matched by
+// media query in src/app/layout.tsx from the same list (src/config/splash-screens.json).
+//
+// The artwork is the first frame of the HTML splash (src/components/pwa/splash-screen.tsx)
+// at its final state: same gradient, same glass mark in the same place, so the
+// system's image hands over to the page without a jump. No text: the name would
+// need a font the machine running this may not have, and the page's own splash
+// writes it a moment later anyway.
+
+const SPLASH_OUT = path.join(process.cwd(), "public", "splash");
+const screens = JSON.parse(await readFile(path.join(process.cwd(), "src", "config", "splash-screens.json"), "utf8"));
+const GLYPH = "M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3";
+
+function splashSvg({ width, height, ratio }) {
+  const W = width * ratio;
+  const H = height * ratio;
+  const r = ratio;
+  // Where the HTML splash puts the mark: its column (mark, gap, name) is centred,
+  // so the mark sits half the gap-plus-name above the middle.
+  const cx = W / 2;
+  const cy = H / 2 - 29.5 * r;
+  const mark = 104 * r;
+  const glyph = 52 * r;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0" r="1" gradientTransform="translate(0.5 0) scale(1.2 0.75) translate(-0.5 0)">
+      <stop offset="0" stop-color="#3a6bff"/><stop offset="0.38" stop-color="#1447e6"/>
+      <stop offset="0.72" stop-color="#0c2fa8"/><stop offset="1" stop-color="#071d6e"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#8cafff" stop-opacity="0.55"/><stop offset="0.4" stop-color="#5a82ff" stop-opacity="0.18"/>
+      <stop offset="0.7" stop-color="#5a82ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.26"/><stop offset="1" stop-color="#fff" stop-opacity="0.07"/>
+    </linearGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="${24 * r}" stdDeviation="${22 * r}" flood-color="#020a32" flood-opacity="0.6"/>
+    </filter>
+  </defs>
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+  <circle cx="${cx}" cy="${H / 2 - 20 * r}" r="${280 * r}" fill="url(#glow)"/>
+  <rect x="${cx - mark / 2}" y="${cy - mark / 2}" width="${mark}" height="${mark}" rx="${28 * r}" fill="url(#glass)"
+    stroke="#fff" stroke-opacity="0.3" stroke-width="${r}" filter="url(#shadow)"/>
+  <g transform="translate(${cx - glyph / 2} ${cy - glyph / 2}) scale(${glyph / 24})">
+    <path d="${GLYPH}" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>`;
+}
+
+await mkdir(SPLASH_OUT, { recursive: true });
+for (const screen of screens) {
+  const file = `launch-${screen.width}x${screen.height}@${screen.ratio}x.png`;
+  // A smooth gradient bands at 8 bits a channel unless dithered, and palette PNGs
+  // band worst of all: full-colour PNG, maximum compression.
+  const png = await sharp(Buffer.from(splashSvg(screen)))
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer();
+  await writeFile(path.join(SPLASH_OUT, file), png);
+  console.log(`splash/${file.padEnd(30)} ${(png.length / 1024).toFixed(0)} kB  ${screen.devices}`);
+}

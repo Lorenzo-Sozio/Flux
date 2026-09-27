@@ -99,7 +99,7 @@ describe("a relation to a user", () => {
     // The public quote endpoint answers whoever holds the link, which is a
     // customer, not a colleague. Even the summary set is more than they need:
     // an internal id has no use outside the workspace.
-    const route = read("src/app/api/quotes/public/route.ts");
+    const route = read("src/lib/quote-public.ts");
     expect(route).toContain("owner: { columns: PUBLIC_CONTACT_COLUMNS }");
     expect(route).not.toContain("USER_SUMMARY_COLUMNS");
   });

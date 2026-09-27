@@ -10,38 +10,24 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { allocateWorkload, countOverloads, DAILY_CAPACITY_HOURS, localDayKey } from "@/lib/workload-allocation";
 import type { RawTask } from "@/stores/gantt-store";
 import { useGanttStore } from "@/stores/gantt-store";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CAPACITY = 8;
+const CAPACITY = DAILY_CAPACITY_HOURS;
 const VISIBLE_DAYS = 14; // 2 working weeks
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function toDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+const toDateStr = localDayKey;
 
 function getNextWorkingDays(from: Date, count: number): Date[] {
   const days: Date[] = [];
   const d = new Date(from);
   d.setHours(0, 0, 0, 0);
   while (days.length < count) {
-    if (!isWeekend(d)) days.push(new Date(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return days;
-}
-
-function getWorkingDaysInRange(start: Date, end: Date): Date[] {
-  const days: Date[] = [];
-  const d = new Date(start);
-  d.setHours(0, 0, 0, 0);
-  const e = new Date(end);
-  e.setHours(23, 59, 59, 999);
-  while (d <= e) {
     if (!isWeekend(d)) days.push(new Date(d));
     d.setDate(d.getDate() + 1);
   }
@@ -64,39 +50,39 @@ type UserLoad = {
   conflicts: number;
 };
 
-function computeWorkload(tasks: RawTask[], visibleDays: Date[]): { users: UserLoad[]; totalConflicts: number } {
-  const visibleSet = new Set(visibleDays.map(toDateStr));
-  const userMap = new Map<string, { name: string; dayHours: Record<string, number> }>();
+/**
+ * The same rule as the workload page (src/lib/workload-allocation.ts), on the tasks the
+ * Gantt already holds, keyed by the person's own calendar days.
+ */
+function computeWorkload(
+  tasks: RawTask[],
+  visibleDays: Date[],
+  names: ReadonlyMap<string, string>,
+): { users: UserLoad[]; totalConflicts: number } {
+  const load = allocateWorkload(
+    tasks.map((t) => ({
+      id: t.id,
+      startDay: t.startDate ? localDayKey(new Date(t.startDate)) : null,
+      dueDay: t.dueDate ? localDayKey(new Date(t.dueDate)) : null,
+      estimatedHours: t.estimatedHours,
+      people: [t.assigneeId, ...(t.responsibleIds ?? [])],
+      parentId: t.parentId,
+      status: t.status,
+    })),
+    visibleDays.map(localDayKey),
+  );
+  const assigneeNames = new Map(tasks.map((t) => [t.assigneeId ?? "", t.assigneeName ?? ""]));
 
-  for (const task of tasks) {
-    if (!task.assigneeId || !task.startDate || !task.dueDate || !task.estimatedHours) continue;
-    const taskDays = getWorkingDaysInRange(task.startDate, task.dueDate);
-    if (taskDays.length === 0) continue;
-    const hoursPerDay = task.estimatedHours / taskDays.length;
-
-    let user = userMap.get(task.assigneeId);
-    if (!user) {
-      user = { name: task.assigneeName ?? task.assigneeId, dayHours: {} };
-      userMap.set(task.assigneeId, user);
-    }
-
-    for (const day of taskDays) {
-      const ds = toDateStr(day);
-      if (!visibleSet.has(ds)) continue;
-      user.dayHours[ds] = (user.dayHours[ds] ?? 0) + hoursPerDay;
-    }
-  }
-
-  let totalConflicts = 0;
-  const users: UserLoad[] = [...userMap.entries()]
-    .map(([userId, { name, dayHours }]) => {
-      const conflicts = Object.values(dayHours).filter((h) => h > CAPACITY).length;
-      totalConflicts += conflicts;
+  const users: UserLoad[] = [...load.entries()]
+    .map(([userId, byDay]) => {
+      const name = names.get(userId) || assigneeNames.get(userId) || userId;
+      const dayHours = Object.fromEntries([...byDay].map(([day, cell]) => [day, cell.hours]));
+      const conflicts = [...byDay.values()].filter((c) => c.hours > CAPACITY).length;
       return { userId, name, initials: userInitials(name), dayHours, conflicts };
     })
     .sort((a, b) => b.conflicts - a.conflicts);
 
-  return { users, totalConflicts };
+  return { users, totalConflicts: countOverloads(load) };
 }
 
 function cellBg(hours: number): string {
@@ -115,7 +101,7 @@ export function useWorkloadConflictCount(viewDate: Date): number {
   const rawTasks = useGanttStore((s) => s.rawTasks);
   return useMemo(() => {
     const days = getNextWorkingDays(viewDate, VISIBLE_DAYS);
-    return computeWorkload(rawTasks, days).totalConflicts;
+    return computeWorkload(rawTasks, days, new Map()).totalConflicts;
   }, [rawTasks, viewDate]);
 }
 
@@ -124,15 +110,21 @@ export function useWorkloadConflictCount(viewDate: Date): number {
 interface Props {
   viewDate: Date;
   onClose: () => void;
+  /** Names for the people responsible who are nobody's assignee. */
+  users?: { id: string; name: string | null }[];
 }
 
-export function WorkloadPanel({ viewDate, onClose }: Props) {
+export function WorkloadPanel({ viewDate, onClose, users: people = [] }: Props) {
   const t = useTranslations("tasks.gantt");
   const locale = useLocale();
   const rawTasks = useGanttStore((s) => s.rawTasks);
 
   const visibleDays = useMemo(() => getNextWorkingDays(viewDate, VISIBLE_DAYS), [viewDate]);
-  const { users, totalConflicts } = useMemo(() => computeWorkload(rawTasks, visibleDays), [rawTasks, visibleDays]);
+  const names = useMemo(() => new Map(people.map((p) => [p.id, p.name ?? ""])), [people]);
+  const { users, totalConflicts } = useMemo(
+    () => computeWorkload(rawTasks, visibleDays, names),
+    [rawTasks, visibleDays, names],
+  );
 
   const todayStr = toDateStr(new Date());
   const week1Start = visibleDays[0];
@@ -144,7 +136,8 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
   // 320px beside the chart is the whole of a phone. Below lg it is a full-width
   // strip under the chart instead of a column beside it.
   return (
-    <div className="flex w-full shrink-0 flex-col border-t bg-background lg:w-80 lg:border-t-0 lg:border-l">
+    // Under the chart it is capped at half the height, so opening it does not push the chart off the screen.
+    <div className="flex w-full shrink-0 flex-col border-t bg-background max-lg:max-h-[50%] lg:w-80 lg:border-t-0 lg:border-l">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -156,7 +149,13 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
             </span>
           )}
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 max-md:size-9"
+          onClick={onClose}
+          aria-label={t("workloadToggle")}
+        >
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>

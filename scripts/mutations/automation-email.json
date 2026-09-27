@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/tracking-token.ts",
+    "description": "⚠️⚠️ i link tracciati tornano senza firma: il cliente clicca e la rotta di tracciamento risponde 400",
+    "find": "      `&url=${encodeURIComponent(url)}` +\n      `&sig=${encodeURIComponent(sig)}`;",
+    "replace": "      `&url=${encodeURIComponent(url)}`;"
+  },
+  {
+    "file": "src/components/crm/automation/merge-data.ts",
+    "description": "⚠️⚠️ il record torna solo in forma piatta: {{deal.name}} resta letterale",
+    "find": "    [context.entityType]: self,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/merge-data.ts",
+    "description": "⚠️⚠️ una regola su una trattativa torna a non raggiungere il suo contatto: {{contact.email}} non si risolve e l'invio fallisce",
+    "find": "    if (contact) data.contact = withName(contact);",
+    "replace": "    void contact;"
+  },
+  {
+    "file": "src/components/crm/automation/merge-data.ts",
+    "description": "⚠️⚠️ il titolare torna a essere la riga utente intera: {{owner.password}} manda l'hash della password al cliente",
+    "find": "      .select({ id: users.id, name: users.name, email: users.email })",
+    "replace": "      .select()"
+  },
+  {
+    "file": "src/components/crm/automation/email-service.ts",
+    "description": "un campo vuoto torna a scrivere «null» nell'email",
+    "find": "    if (value === null) return \"\";\n",
+    "replace": ""
+  }
+]

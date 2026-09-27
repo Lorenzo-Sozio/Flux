@@ -30,3 +30,26 @@ export function verifyTrackingUrl(logId: string, url: string, sig: string): bool
     return false;
   }
 }
+
+/**
+ * Every external link in `html`, rewritten to pass through the click tracker, signed.
+ *
+ * ⚠️⚠️ **One copy.** Campaigns and automations each had their own, and the automation's
+ * left the signature off: the click route refuses an unsigned link with a 400, so every
+ * tracked link in every automated email led to an error page. A second copy of a
+ * function with a security property is where that property goes missing.
+ *
+ * Links already pointing at the tracker or at unsubscribe are left alone.
+ */
+export function trackLinks(html: string, logId: string, appBase: string): string {
+  return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
+    if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
+    const sig = signTrackingUrl(logId, url);
+    const tracked =
+      `${appBase}/api/track/click` +
+      `?log=${encodeURIComponent(logId)}` +
+      `&url=${encodeURIComponent(url)}` +
+      `&sig=${encodeURIComponent(sig)}`;
+    return `href="${tracked}"`;
+  });
+}

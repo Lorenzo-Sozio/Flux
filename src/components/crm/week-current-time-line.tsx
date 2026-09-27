@@ -2,19 +2,37 @@
 
 import { useEffect, useState } from "react";
 
-export function WeekCurrentTimeLine({ hourStart, hourHeight }: { hourStart: number; hourHeight: number }) {
+import { wallMinutes } from "@/lib/wall-clock";
+
+/**
+ * The red "now" line. Read on the clock the grid is drawn on — the workspace's —
+ * so it crosses the meeting that is actually happening, not the one an hour away
+ * in the browser's zone.
+ */
+export function WeekCurrentTimeLine({
+  hourStart,
+  hourHeight,
+  hourEnd = 24,
+  timeZone,
+}: {
+  hourStart: number;
+  hourHeight: number;
+  hourEnd?: number;
+  timeZone?: string;
+}) {
   const [topPx, setTopPx] = useState<number | null>(null);
 
   useEffect(() => {
     const calc = () => {
       const now = new Date();
-      const mins = now.getHours() * 60 + now.getMinutes();
+      const mins = timeZone ? wallMinutes(now, timeZone) : now.getHours() * 60 + now.getMinutes();
+      if (mins > hourEnd * 60) return setTopPx(null);
       setTopPx(((mins - hourStart * 60) / 60) * hourHeight);
     };
     calc();
     const id = setInterval(calc, 60_000);
     return () => clearInterval(id);
-  }, [hourStart, hourHeight]);
+  }, [hourStart, hourHeight, hourEnd, timeZone]);
 
   if (topPx === null || topPx < 0) return null;
 

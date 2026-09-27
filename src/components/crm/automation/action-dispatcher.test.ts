@@ -13,11 +13,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const emessi: { evento: string; carico: Record<string, unknown>; origin: unknown }[] = [];
 const grezzi: unknown[] = [];
 
-vi.mock("@/actions/webhooks", () => ({
-  dispatchWebhook: async (evento: string, carico: Record<string, unknown>, origin: unknown) => {
+// A rule's own event goes through dispatchRuleEvent; both doors are recorded the same way.
+vi.mock("@/lib/webhook-dispatch", () => {
+  const registra = async (evento: string, carico: Record<string, unknown>, origin: unknown) => {
     emessi.push({ evento, carico, origin });
-  },
-}));
+  };
+  return { dispatchWebhook: registra, dispatchRuleEvent: registra };
+});
 vi.mock("../../crm/automation/webhook-service", () => ({
   sendWebhook: async (...a: unknown[]) => {
     grezzi.push(a);

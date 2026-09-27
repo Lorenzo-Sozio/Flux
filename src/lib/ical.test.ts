@@ -194,3 +194,78 @@ describe("generateICS still invites", () => {
     expect(generateICS(invite).endsWith("END:VCALENDAR\r\n")).toBe(true);
   });
 });
+
+describe("repeating and all-day events", () => {
+  const base = {
+    uid: "series-1@flux",
+    title: "Weekly sync",
+    sequence: 0,
+    organizer: { email: "anna@example.com", name: "Anna Rossi" },
+    attendees: [],
+  };
+
+  it("⚠️ writes a repeating event on its zone's clock, with the zone declared", () => {
+    const ics = lines(
+      generateICS({
+        ...base,
+        startAt: new Date("2026-10-05T08:00:00Z"),
+        endAt: new Date("2026-10-05T09:00:00Z"),
+        timeZone: "Europe/Rome",
+        recurrenceRule: "FREQ=WEEKLY;BYDAY=MO",
+        recurrenceExceptions: ["2026-10-12T08:00:00.000Z"],
+      }),
+    );
+    expect(ics).toContain("DTSTART;TZID=Europe/Rome:20261005T100000");
+    expect(ics).toContain("DTEND;TZID=Europe/Rome:20261005T110000");
+    expect(ics).toContain("RRULE:FREQ=WEEKLY;BYDAY=MO");
+    expect(ics).toContain("EXDATE;TZID=Europe/Rome:20261012T100000");
+    expect(ics).toContain("TZID:Europe/Rome");
+    // Rome's two changes, as yearly rules.
+    expect(ics).toContain("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU");
+    expect(ics).toContain("RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU");
+    expect(ics).toContain("TZOFFSETTO:+0200");
+  });
+
+  it("keeps a single event in UTC, as before", () => {
+    const ics = lines(
+      generateICS({
+        ...base,
+        startAt: new Date("2026-10-05T08:00:00Z"),
+        endAt: new Date("2026-10-05T09:00:00Z"),
+        timeZone: "Europe/Rome",
+      }),
+    );
+    expect(ics).toContain("DTSTART:20261005T080000Z");
+    expect(ics.some((l) => l.startsWith("BEGIN:VTIMEZONE"))).toBe(false);
+  });
+
+  it("writes an all-day event as dates, the end exclusive", () => {
+    const ics = lines(
+      generateICS({
+        ...base,
+        startAt: new Date("2026-10-04T22:00:00Z"),
+        endAt: new Date("2026-10-06T22:00:00Z"),
+        timeZone: "Europe/Rome",
+        allDay: true,
+        recurrenceRule: "FREQ=YEARLY;UNTIL=20301004T215959Z",
+      }),
+    );
+    expect(ics).toContain("DTSTART;VALUE=DATE:20261005");
+    expect(ics).toContain("DTEND;VALUE=DATE:20261007");
+    expect(ics).toContain("RRULE:FREQ=YEARLY;UNTIL=20301004");
+  });
+
+  it("declares a zone once in a feed, however many series use it", () => {
+    const series = {
+      uid: "s@flux",
+      title: "S",
+      startAt: new Date("2026-10-05T08:00:00Z"),
+      endAt: new Date("2026-10-05T09:00:00Z"),
+      timeZone: "Europe/Rome",
+      recurrenceRule: "FREQ=DAILY",
+    };
+    const ics = lines(generateFeedICS([series, { ...series, uid: "t@flux" }], { name: "x" }));
+    expect(ics.filter((l) => l === "BEGIN:VTIMEZONE")).toHaveLength(1);
+    expect(ics.indexOf("BEGIN:VTIMEZONE")).toBeLessThan(ics.indexOf("BEGIN:VEVENT"));
+  });
+});

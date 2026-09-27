@@ -28,14 +28,15 @@ import { getWorkloadMatrix, rescheduleTaskDueDate } from "@/actions/workload";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
   matrix: WorkloadRow[];
-  startDate: Date;
-  endDate: Date;
+  /** The first day shown, `YYYY-MM-DD`: a calendar day, read as a local date here. */
+  start: string;
 }
 
 type SelectedCell = {
@@ -197,8 +198,9 @@ function TaskCard({
           </span>
           <Link
             href={`/dashboard/tasks?task=${task.id}`}
-            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-md:-m-2 max-md:p-2.5"
             title={t("openTask")}
+            aria-label={t("openTask")}
           >
             <ExternalLink className="h-3 w-3" />
           </Link>
@@ -273,13 +275,17 @@ function TaskCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function WorkloadClient({ matrix, startDate }: Props) {
+export function WorkloadClient({ matrix, start }: Props) {
+  const [sy, sm, sd] = start.split("-").map(Number);
+  const startDate = new Date(sy, sm - 1, sd);
   const t = useTranslations("tasks.workload");
   const tTasks = useTranslations("tasks");
   const tc = useTranslations("common");
   const locale = useLocale();
   const router = useRouter();
   const [, startRouterTransition] = useTransition();
+  // Two months side by side are ~560px: wider than a phone, so the range picker shows one there.
+  const isMobile = useIsMobile();
 
   // ── Period state ────────────────────────────────────────────────────────────
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
@@ -337,7 +343,8 @@ export function WorkloadClient({ matrix, startDate }: Props) {
   const fetchMatrix = async (start: Date, end: Date) => {
     setIsFetching(true);
     try {
-      const newMatrix = await getWorkloadMatrix(start, end);
+      // Calendar days, not instants: a local midnight sent to a server on UTC is yesterday.
+      const newMatrix = await getWorkloadMatrix(toLocalStr(start), toLocalStr(end));
       setCurrentMatrix(newMatrix);
     } catch {
       toast.error(t("loadError"));
@@ -453,19 +460,22 @@ export function WorkloadClient({ matrix, startDate }: Props) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* Header */}
-      <div className="flex shrink-0 flex-col gap-2 border-b px-6 py-3">
+      {/* No side padding below sm: the page around it already has 16px. Every
+          row wraps, because none of them fits 343px in one line: the legend
+          alone is 330px, and the date walker with a two-month range as much. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b py-3 sm:px-4 md:px-6">
         {/* Row 1: back + title | legend */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-              <Link href="/dashboard/tasks">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button variant="ghost" size="icon" asChild className="h-8 w-8 max-md:size-9">
+              <Link href="/dashboard/tasks" aria-label={tTasks("title")}>
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <BarChart3 className="h-5 w-5 text-muted-foreground" />
-            <h1 className="font-semibold text-lg">{t("title")}</h1>
+            <BarChart3 className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <h1 className="truncate font-semibold text-lg">{t("title")}</h1>
           </div>
-          <div className="flex items-center gap-3 text-[11px]">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
             <span className="font-medium text-muted-foreground">{t("legend")}:</span>
             {LEGEND.map(({ bg, label }) => (
               <span key={label} className="flex items-center gap-1">
@@ -489,13 +499,23 @@ export function WorkloadClient({ matrix, startDate }: Props) {
               {tTasks("today")}
             </Button>
 
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev} disabled={isFetching}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 max-md:size-9"
+              onClick={handlePrev}
+              disabled={isFetching}
+            >
               <ChevronLeft className="h-4 w-4" />
             </Button>
 
             <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="h-8 gap-2 px-3 font-normal text-sm" disabled={isFetching}>
+                <Button
+                  variant="outline"
+                  className="h-8 min-w-0 gap-2 px-3 font-normal text-sm max-sm:px-2"
+                  disabled={isFetching}
+                >
                   {isFetching ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
                   ) : (
@@ -504,7 +524,8 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                   <span>
                     {periodStart.toLocaleDateString(locale, { day: "2-digit", month: "short" })}
                     {" – "}
-                    {periodEnd.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
+                    {periodEnd.toLocaleDateString(locale, { day: "2-digit", month: "short" })}
+                    <span className="max-sm:hidden"> {periodEnd.toLocaleDateString(locale, { year: "numeric" })}</span>
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -513,12 +534,18 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                   mode="range"
                   selected={{ from: periodStart, to: periodEnd }}
                   onSelect={handleRangeSelect}
-                  numberOfMonths={2}
+                  numberOfMonths={isMobile ? 1 : 2}
                 />
               </PopoverContent>
             </Popover>
 
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNext} disabled={isFetching}>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 max-md:size-9"
+              onClick={handleNext}
+              disabled={isFetching}
+            >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -545,12 +572,12 @@ export function WorkloadClient({ matrix, startDate }: Props) {
 
         {/* Row 3: stats */}
         {currentMatrix.length > 0 && (
-          <div className="flex items-center gap-5 text-xs">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs">
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Users className="h-3.5 w-3.5" />
               {t("membersCount", { count: currentMatrix.length })}
             </span>
-            <span className="select-none text-border">|</span>
+            <span className="select-none text-border max-sm:hidden">|</span>
             <span className="flex items-center gap-2">
               <span className="text-muted-foreground">{t("avgUtilLabel")}</span>
               <span className="font-semibold tabular-nums">{avgUtil}%</span>
@@ -572,7 +599,9 @@ export function WorkloadClient({ matrix, startDate }: Props) {
       </div>
 
       {/* Body */}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ⚠️ A column below lg: the side panel is full width there, and in a row
+          it took the whole width and left the grid none. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Grid */}
         <div className="relative flex-1 overflow-auto">
           {/* Loading overlay */}
@@ -599,7 +628,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                 <thead>
                   {/* Week groups */}
                   <tr>
-                    <th className="sticky left-0 z-10 min-w-[168px] border-r border-b bg-muted/20 px-3 py-2 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
+                    <th className="sticky left-0 z-10 min-w-[112px] border-r sm:min-w-[168px] border-b bg-muted/20 px-3 py-2 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
                       {t("teamMember")}
                     </th>
                     {weekGroups.map((week, wi) => (
@@ -619,7 +648,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                   <tr>
                     <th className="sticky left-0 z-10 border-r border-b bg-background" />
                     {days.map((d) => {
-                      const ds = d.toISOString().slice(0, 10);
+                      const ds = toLocalStr(d);
                       const isToday = ds === TODAY_STR;
                       return (
                         <th
@@ -653,11 +682,12 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[9px] text-muted-foreground">
                             {userInitials(row.userName)}
                           </span>
-                          <span className="font-medium text-[12px]">{row.userName}</span>
+                          {/* The sticky column is a third of a phone; a long name must not make it half. */}
+                          <span className="truncate font-medium text-[12px] max-sm:max-w-[72px]">{row.userName}</span>
                         </div>
                       </td>
                       {days.map((d) => {
-                        const ds = d.toISOString().slice(0, 10);
+                        const ds = toLocalStr(d);
                         const cell = row.days[ds] ?? { hours: 0, capacity: 8, tasks: [] };
                         const pct = cell.capacity > 0 ? cell.hours / cell.capacity : 0;
                         const isSelected = selected?.userId === row.userId && selected?.date === ds;
@@ -708,7 +738,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
 
         {/* Right panel */}
         {panelOpen && (
-          <div className="flex w-full shrink-0 flex-col overflow-hidden border-t lg:w-80 lg:border-t-0 lg:border-l">
+          <div className="flex w-full shrink-0 flex-col overflow-hidden border-t max-lg:max-h-[55%] lg:w-80 lg:border-t-0 lg:border-l">
             {/* ── Conflicts panel ─────────────────────────────────────── */}
             {showConflicts && (
               <>
@@ -723,8 +753,9 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 shrink-0"
+                    className="h-7 w-7 shrink-0 max-md:size-9"
                     onClick={() => setShowConflicts(false)}
+                    aria-label={tc("close")}
                   >
                     <X className="h-3.5 w-3.5" />
                   </Button>
@@ -751,8 +782,8 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                 <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
                   {conflicts.map((conflict) => (
                     <div key={`${conflict.userId}-${conflict.date}`} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[8px] text-muted-foreground">
                             {userInitials(conflict.userName)}
                           </span>
@@ -808,7 +839,13 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                       })}
                     </p>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setSelected(null)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 shrink-0 max-md:size-9"
+                    onClick={() => setSelected(null)}
+                    aria-label={tc("close")}
+                  >
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 </div>

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/availability.ts",
+    "description": "⚠️ si può prenotare un incontro che inizia tra dieci minuti",
+    "find": "      if (!start || start.getTime() < earliest) continue;",
+    "replace": "      if (!start) continue;"
+  },
+  {
+    "file": "src/lib/availability.ts",
+    "description": "⚠️ la pagina offre il sabato e la domenica a chi lavora dal lunedì al venerdì",
+    "find": "    if (!window.weekdays.includes(String(weekday))) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/availability.ts",
+    "description": "il margine tra un incontro e l'altro non viene rispettato",
+    "find": "        (b) => start.getTime() < b.endAt.getTime() + buffer && end > b.startAt.getTime() - buffer,",
+    "replace": "        (b) => start.getTime() < b.endAt.getTime() && end > b.startAt.getTime(),"
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "⚠️⚠️ un orario mai offerto — sabato, fuori orario, già occupato — viene prenotato lo stesso",
+    "find": "  if (!offered.some((s) => s.getTime() === input.start.getTime())) return { ok: false, reason: \"taken\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "⚠️⚠️ due visitatori nello stesso istante: il secondo riceve un errore invece di «già preso»",
+    "find": "    .onConflictDoNothing()\n    .returning({ id: appointments.id });",
+    "replace": "    .returning({ id: appointments.id });"
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "⚠️ un contatto con l'indirizzo scritto in maiuscolo diventa un lead doppione",
+    "find": "    .where(sql`lower(${contacts.email}) = ${email}`)",
+    "replace": "    .where(eq(contacts.email, email))"
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "⚠️ il nuovo lead creato dalla prenotazione non è di nessuno",
+    "find": "        ownerId: link.userId,\n        marketingConsent: false,",
+    "replace": "        marketingConsent: false,"
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "⚠️⚠️ chi prenota risulta iscritto al marketing",
+    "find": "        ownerId: link.userId,\n        marketingConsent: false,",
+    "replace": "        ownerId: link.userId,\n        marketingConsent: true,"
+  },
+  {
+    "file": "src/lib/booking.ts",
+    "description": "una pagina chiusa risponde «già preso» invece di «chiusa»",
+    "find": "  if (!link.enabled) return { ok: false, reason: \"closed\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/booking/route.ts",
+    "description": "⚠️⚠️ un robot che compila il campo nascosto prenota davvero",
+    "find": "  if (str(\"website\", 200)) return NextResponse.json({ ok: true });",
+    "replace": ""
+  }
+]

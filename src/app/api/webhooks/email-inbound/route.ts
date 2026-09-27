@@ -11,6 +11,9 @@
  * {
  *   from:      "Name <email@example.com>",
  *   to:        "support@yourdomain.com",
+ *   cc:        "someone@example.com",                // optional
+ *   recipients: ["crm+acme.xxxx@in.example.com"],   // optional: envelope recipients —
+ *                                                    // how a Bcc'd archive address is found
  *   subject:   "Re: [TKT-202401-ABCDEF] Issue title",
  *   html:      "<p>Reply body...</p>",
  *   text:      "Reply body...",
@@ -29,8 +32,35 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { addressHeaderText } from "@/lib/email-parser";
 import type { InboundAttachment } from "@/lib/ticket-from-email";
 import { processInboundEmail } from "@/lib/ticket-from-email";
+
+/**
+ * Where the message was actually delivered, as each bridge names it: Mailgun's `recipient`,
+ * SendGrid's `envelope` (a JSON *string*), Postmark's `OriginalRecipient`. A Bcc recipient
+ * appears nowhere else.
+ */
+function envelopeRecipients(body: Record<string, unknown>): string[] {
+  let envelope = body.envelope;
+  if (typeof envelope === "string") {
+    try {
+      envelope = JSON.parse(envelope);
+    } catch {
+      envelope = null;
+    }
+  }
+  return [
+    body.recipients,
+    body.recipient,
+    (envelope as { to?: unknown } | null)?.to,
+    body.OriginalRecipient,
+    body.bcc,
+    body.Bcc,
+  ]
+    .map(addressHeaderText)
+    .filter(Boolean);
+}
 
 function parseAttachments(raw: unknown): InboundAttachment[] {
   if (!Array.isArray(raw)) return [];
@@ -86,6 +116,8 @@ export async function POST(req: NextRequest) {
   const result = await processInboundEmail({
     fromRaw,
     to,
+    cc: addressHeaderText(body.cc ?? body.Cc),
+    recipients: envelopeRecipients(body),
     subject,
     htmlBody: body.html ?? "",
     textBody: body.text ?? "",

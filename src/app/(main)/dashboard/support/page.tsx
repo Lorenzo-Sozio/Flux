@@ -4,7 +4,17 @@ import { useEffect, useState } from "react";
 
 import Link from "next/link";
 
-import { AlertCircle, CheckCircle2, Clock, Mail, MessageCircle, MessageSquare, Phone, Users } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Globe,
+  Mail,
+  MessageCircle,
+  MessageSquare,
+  Phone,
+  Users,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { getSLAs, getTickets } from "@/actions/support";
@@ -16,12 +26,16 @@ import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { isTicketOpen } from "@/lib/ticket-states";
 
 const CHANNEL_META: Record<string, { icon: React.ElementType; color: string; barClass: string }> = {
   email: { icon: Mail, color: "#3b82f6", barClass: "bg-blue-500" },
   chat: { icon: MessageCircle, color: "#22c55e", barClass: "bg-green-500" },
   phone: { icon: Phone, color: "#f97316", barClass: "bg-orange-500" },
   social: { icon: Users, color: "#a855f7", barClass: "bg-purple-500" },
+  // From the workspace's public form (V3.6): a real channel, unlike the three above, which
+  // are labels an agent picks by hand.
+  web: { icon: Globe, color: "#14b8a6", barClass: "bg-teal-500" },
 };
 
 const PRIORITY_BORDER: Record<string, string> = {
@@ -58,9 +72,12 @@ export default function SupportDashboard() {
     loadData();
   }, []);
 
-  const openTickets = tickets.filter((tk) => tk.status === "open");
+  // ⚠️ Open is everything not finished (src/lib/ticket-states.ts): this counted `open` only,
+  // so a ticket that had just arrived — `new` — was not open here. Resolved counts `closed`
+  // too: the auto-close job moves resolved tickets there, and the rate fell as it worked.
+  const openTickets = tickets.filter((tk) => isTicketOpen(tk.status));
   const totalTickets = tickets.length;
-  const resolvedTickets = tickets.filter((tk) => tk.status === "resolved");
+  const resolvedTickets = tickets.filter((tk) => !isTicketOpen(tk.status));
   const resolutionRate = totalTickets > 0 ? Math.round((resolvedTickets.length / totalTickets) * 100) : 0;
 
   const avgResolutionTime = (() => {
@@ -87,26 +104,20 @@ export default function SupportDashboard() {
    * under a heading reading "SLA performance", which is exactly the kind of
    * number somebody repeats in a meeting.
    *
-   * The satisfaction dial is gone rather than fixed. A measurement the product
-   * does not take should not have a place on the screen waiting to be filled.
+   * The satisfaction dial was taken away rather than fixed, and came back only once
+   * the product asked (V3.10): it is now the customers' own answers, and empty — not
+   * 92 — until there are some.
    */
   const calculateSLAMetrics = (): { onTime: number | null; firstResponse: number | null } => {
     let onTimeCount = 0;
     let firstResponseCount = 0;
 
+    // ⚠️ Read from what the SLA engine recorded, not recomputed here. This added the SLA's
+    // minutes to the creation time on the wall clock — no business hours, no holidays, no
+    // pauses — and could call "on time" a ticket the SLA job had flagged as breached.
     tickets.forEach((ticket) => {
-      if (ticket.resolvedAt && ticket.sla) {
-        const resolutionTarget = new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60000;
-        if (new Date(ticket.resolvedAt).getTime() <= resolutionTarget) {
-          onTimeCount++;
-        }
-      }
-      if (ticket.firstResponseAt && ticket.sla) {
-        const responseTarget = new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60000;
-        if (new Date(ticket.firstResponseAt).getTime() <= responseTarget) {
-          firstResponseCount++;
-        }
-      }
+      if (ticket.resolvedAt && ticket.sla && !ticket.slaBreachedAt) onTimeCount++;
+      if (ticket.firstResponseAt && ticket.sla && !ticket.firstResponseBreachedAt) firstResponseCount++;
     });
 
     const resolvedWithSLA = tickets.filter((tk) => tk.resolvedAt && tk.sla).length;
@@ -119,6 +130,9 @@ export default function SupportDashboard() {
   };
 
   const metrics = calculateSLAMetrics();
+  const rated = tickets.filter((tk) => tk.csatRating === "good" || tk.csatRating === "bad");
+  const satisfaction =
+    rated.length > 0 ? Math.round((rated.filter((tk) => tk.csatRating === "good").length / rated.length) * 100) : null;
   const onTimeResolution = metrics.onTime;
   const firstResponseTime = metrics.firstResponse;
 
@@ -127,21 +141,27 @@ export default function SupportDashboard() {
     chat: tickets.filter((tk) => tk.channel === "chat").length,
     phone: tickets.filter((tk) => tk.channel === "phone").length,
     social: tickets.filter((tk) => tk.channel === "social").length,
+    web: tickets.filter((tk) => tk.channel === "web").length,
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* The title block shrinks and the button does not: without `min-w-0` a
+          long subtitle pushed "New ticket" past the right edge of a phone. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-1">
           <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">{t("title")}</h1>
           <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
         </div>
-        <CreateTicketButton />
+        <div className="shrink-0">
+          <CreateTicketButton />
+        </div>
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Metrics. Two abreast on a phone: four full-width cards stacked were a
+          screen and a half of scrolling before the first ticket. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <MetricCard
           icon={AlertCircle}
           label={t("openTickets")}
@@ -229,7 +249,9 @@ export default function SupportDashboard() {
                           <div className="mt-1 flex items-center gap-3">
                             <span className="flex items-center gap-1 text-muted-foreground text-xs">
                               <ChannelIcon className="h-3 w-3" />
-                              {ticket.contact?.name ?? t("noContact")}
+                              {/* A contact has a first and last name, not a `name`: every row said "no contact". */}
+                              {[ticket.contact?.firstName, ticket.contact?.lastName].filter(Boolean).join(" ") ||
+                                t("noContact")}
                             </span>
                           </div>
                         </div>
@@ -318,6 +340,18 @@ export default function SupportDashboard() {
                 color="green"
                 emptyLabel={t("noData")}
               />
+              <SLAGauge
+                label={t("satisfaction", { count: rated.length })}
+                percentage={satisfaction}
+                color="green"
+                emptyLabel={t("noRatings")}
+              />
+              <Link
+                href="/dashboard/support/agents"
+                className="block text-muted-foreground text-xs underline-offset-2 hover:text-foreground hover:underline"
+              >
+                {t("byAgent")}
+              </Link>
             </CardContent>
           </Card>
 
@@ -345,7 +379,7 @@ export default function SupportDashboard() {
                       <div className="flex items-center justify-between text-xs">
                         <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                           <Icon className="h-3.5 w-3.5" />
-                          {t(`channelLabels.${key as "email" | "chat" | "phone" | "social"}`)}
+                          {t(`channelLabels.${key as "email" | "chat" | "phone" | "social" | "web"}`)}
                         </span>
                         <span className="font-semibold tabular-nums">
                           {count}

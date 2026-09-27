@@ -7,6 +7,8 @@
  * - Timeout configurabile
  */
 
+import { validateWebhookUrl } from "@/lib/webhook-validator";
+
 import { replaceMergeFields } from "./email-service";
 import { executeWithRetryTracked } from "./retry-engine";
 
@@ -42,8 +44,14 @@ export async function sendWebhook(
 ): Promise<WebhookResult> {
   const { url, method, headers = {}, body, timeoutMs = 10000, retryCount = 3 } = payload;
 
-  // Sostituisci merge fields nella URL
   const resolvedUrl = replaceMergeFields(url, context);
+
+  // ⚠️⚠️ Checked after the merge, not before: a `{{…}}` in the address can put any host
+  // there. The settings webhooks were validated against private addresses, loopback and the
+  // metadata range; a rule's webhook was not, and an editor could make the platform call
+  // its own internals. Same validator, same refusal.
+  const refusal = validateWebhookUrl(resolvedUrl);
+  if (refusal) return { success: false, message: `Webhook refused: ${refusal}`, retryCount: 0 };
 
   // Sostituisci merge fields negli headers
   const resolvedHeaders: Record<string, string> = {};
@@ -70,6 +78,8 @@ export async function sendWebhook(
       ...resolvedHeaders,
     },
     signal: AbortSignal.timeout(timeoutMs),
+    // A redirect would take the request to a destination nobody validated.
+    redirect: "manual",
   };
 
   if (resolvedBody && ["POST", "PUT", "PATCH"].includes(method)) {

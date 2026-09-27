@@ -1,0 +1,11 @@
+-- The figure a deal was written with, in its own currency.
+--
+-- `amount` is EUR and stays EUR: every total, the forecast and every report add it up.
+-- But the edit form showed that EUR figure beside the deal's own currency and converted
+-- it again on save, so a USD deal lost the exchange rate on every edit, and the board
+-- printed the EUR number with a dollar sign. `amount_original` keeps what was typed;
+-- editing edits it and converts again. Deals written before this have it null, and are
+-- edited in EUR — see src/lib/deal-amount.ts.
+--
+-- Additive and re-runnable, like every tenant migration.
+ALTER TABLE "deal" ADD COLUMN IF NOT EXISTS "amount_original" numeric(12, 2);

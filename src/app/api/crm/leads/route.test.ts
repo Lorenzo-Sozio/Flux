@@ -10,14 +10,29 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const emessi: { evento: string; origin: unknown }[] = [];
 let esistente: { id: string }[] = [];
+const regole: { tenantId: string; ctx: Record<string, unknown> }[] = [];
 
-vi.mock("@/actions/webhooks", () => ({
+vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: (evento: string, _p: unknown, origin: unknown) => {
     emessi.push({ evento, origin });
   },
 }));
+vi.mock("@/lib/api-automations", () => ({
+  runRulesAfterApiWrite: (tenantId: string, ctx: Record<string, unknown>) => {
+    regole.push({ tenantId, ctx });
+  },
+}));
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: {
+      via: "apikey",
+      userId: null,
+      role: "editor",
+      tenantId: "t1",
+      scopes: null,
+      key: { id: "k1", name: "Assistente" },
+    },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -46,6 +61,7 @@ function richiesta(body: Record<string, unknown>) {
 
 beforeEach(() => {
   emessi.length = 0;
+  regole.length = 0;
   esistente = [];
 });
 
@@ -55,7 +71,7 @@ describe("who the events from this route say caused them", () => {
 
     expect(emessi).toHaveLength(1);
     expect(emessi[0].evento).toBe("lead.created");
-    expect(emessi[0].origin).toEqual({ via: "api", actor: null });
+    expect(emessi[0].origin).toEqual({ via: "api", actor: null, key: { id: "k1", name: "Assistente" } });
   });
 
   it("says a machine when a duplicate is updated instead", async () => {
@@ -66,6 +82,36 @@ describe("who the events from this route say caused them", () => {
     await POST(richiesta({ email: "anna@example.test", onDuplicate: "update" }));
 
     expect(emessi[0].evento).toBe("lead.updated");
-    expect(emessi[0].origin).toEqual({ via: "api", actor: null });
+    expect(emessi[0].origin).toEqual({ via: "api", actor: null, key: { id: "k1", name: "Assistente" } });
+  });
+});
+
+describe("⚠️⚠️ the workspace's rules run for a lead the API writes", () => {
+  // A lead typed into the dashboard gets its round-robin owner, its sequence and its
+  // notification from the rules. One filed by an assistant got none of them: the route
+  // never asked, and the four routes that did asked outside the workspace.
+  it("on a creation, in the caller's workspace", async () => {
+    await POST(richiesta({ phone: "+39 333 111 2223" }));
+
+    expect(regole).toHaveLength(1);
+    expect(regole[0].tenantId).toBe("t1");
+    expect(regole[0].ctx).toMatchObject({ entityType: "lead", entityId: "nuovo", event: "onCreate" });
+  });
+
+  it("on an update, with the row as it was", async () => {
+    esistente = [{ id: "gia-la" }];
+
+    await POST(richiesta({ email: "anna@example.test", onDuplicate: "update" }));
+
+    expect(regole).toHaveLength(1);
+    expect(regole[0].ctx).toMatchObject({ event: "onUpdate", entityId: "vecchio", oldData: { id: "gia-la" } });
+  });
+
+  it("not for a duplicate that was skipped: nothing changed", async () => {
+    esistente = [{ id: "gia-la" }];
+
+    await POST(richiesta({ email: "anna@example.test" }));
+
+    expect(regole).toEqual([]);
   });
 });

@@ -65,7 +65,6 @@ const COLS: Record<string, ColMap> = {
     currency: deals.currency,
     probability: deals.probability,
     status: deals.status,
-    healthScore: deals.healthScore,
     expectedCloseDate: deals.expectedCloseDate,
     createdAt: deals.createdAt,
   },

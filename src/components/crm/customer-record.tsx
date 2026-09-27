@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { FileText, Handshake, LifeBuoy, ShoppingCart } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import type { CustomerRecord, CustomerRecordRow } from "@/actions/customer-record";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
  * added this morning is a screen apologising for itself. When every group is
  * empty the panel says so once, which is a different sentence and a true one.
  */
+
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 
 const STATUS_TONE: Record<string, string> = {
   won: "border-emerald-300 text-emerald-700 dark:border-emerald-800 dark:text-emerald-400",
@@ -51,6 +53,8 @@ function Group({
   moreLabel: string;
   formatAmount: (n: number, currency: string) => string;
 }) {
+  const tStatus = useTranslations("entities.statuses");
+  const format = useFormatter();
   if (rows.length === 0) return null;
 
   return (
@@ -68,18 +72,32 @@ function Group({
               href={row.href}
               className="flex items-center justify-between gap-3 px-3 py-2 transition-colors hover:bg-muted/40"
             >
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="truncate font-medium text-sm">{row.label}</p>
-                {row.sub && <p className="truncate text-muted-foreground text-xs">{row.sub}</p>}
+                {row.sub && (
+                  <p className="truncate text-muted-foreground text-xs">
+                    {/* A deal's expected close arrives as an ISO day; shown raw it
+                        read "2026-10-21" in the middle of an Italian screen. */}
+                    {ISO_DAY.test(row.sub)
+                      ? format.dateTime(new Date(`${row.sub}T12:00:00`), {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : row.sub}
+                  </p>
+                )}
               </div>
-              <div className="flex shrink-0 items-center gap-2">
+              {/* On a phone the amount and the status stack: side by side they
+                  took half the row and left a quote number three characters. */}
+              <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
                 {row.amount !== null && (
                   <span className="font-medium text-sm tabular-nums">
                     {formatAmount(row.amount, row.currency ?? "EUR")}
                   </span>
                 )}
                 <Badge variant="outline" className={cn("h-5 text-[10px] capitalize", STATUS_TONE[row.status])}>
-                  {row.status.replace(/_/g, " ")}
+                  {tStatus.has(row.status as never) ? tStatus(row.status as never) : row.status.replace(/_/g, " ")}
                 </Badge>
               </div>
             </Link>
@@ -100,14 +118,22 @@ export function CustomerRecordPanel({
   record,
   companyId,
   contactId,
+  canWrite = true,
 }: {
   record: CustomerRecord;
   companyId?: string;
   contactId?: string;
+  /** False for a viewer: New quote and New order lead to forms that would refuse them. */
+  canWrite?: boolean;
 }) {
   const t = useTranslations("customerRecord");
-  const { formatMoney } = useCurrency();
+  const { formatMoney, formatAmount: formatEur } = useCurrency();
+  // Documents carry their own currency and are shown in it.
   const formatAmount = (n: number, currency: string) => formatMoney(n, currency);
+  // ⚠️ A deal's `amount` is EUR at rest whatever `currency` says (that column
+  // records what was typed), so it goes through the EUR formatter: shown with its
+  // own currency code, a deal typed in dollars printed its euro figure with a $.
+  const formatDealAmount = (n: number) => formatEur(n);
 
   // Starting a quote, an order or a ticket from here carries the customer with
   // it. Without this the path was: read the customer, go to the module, find the
@@ -125,17 +151,17 @@ export function CustomerRecordPanel({
 
   return (
     <Card>
-      {/* ⚠️ Two buttons that will not shrink beside a title that will: the
-          heading came out one word per line in a 40px column while the buttons
-          overflowed the card. The row wraps, so the buttons take their own line
-          on a phone and the sentence gets the width it was written for. */}
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      {/* ⚠️ Title first, buttons on a row of their own under it, at every width.
+          The panel lives in the record pages' narrow side column (a third of the
+          width), where buttons beside the title squeezed the description to one
+          word per line. */}
+      <CardHeader className="space-y-3">
+        <div className="min-w-0">
           <CardTitle>{t("title")}</CardTitle>
           <CardDescription>{t("subtitle")}</CardDescription>
         </div>
-        {record.modules.sales && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
+        {record.modules.sales && canWrite && (
+          <div className="flex flex-wrap items-center gap-2 max-sm:[&>*]:flex-1">
             <Button asChild variant="outline" size="sm">
               <Link href={`/dashboard/sales/quotes/new${query}`}>{t("newQuote")}</Link>
             </Button>
@@ -157,7 +183,7 @@ export function CustomerRecordPanel({
               more={record.more.deals}
               moreHref="/dashboard/pipeline"
               moreLabel={t("seeAllDeals")}
-              formatAmount={formatAmount}
+              formatAmount={formatDealAmount}
             />
             <Group
               icon={FileText}

@@ -1,5 +1,5 @@
 /**
- * Lead and contact hold the same twenty-three columns, and must keep holding them.
+ * Lead and contact hold the same twenty-six columns, and must keep holding them.
  *
  * The audit's M-02 asked for the two tables to be merged and the answer was no,
  * with reasons: seventy-five files name leads, the conversion flow had just been
@@ -39,8 +39,13 @@ function columnsOf(table: string): string[] {
 
 /** Held by both, and the reason the two tables shadow each other. */
 const SHARED = [
+  // Being worked by an assistant (migration 0048): a person, on whichever record they are.
+  "assistantKeyId",
+  "assistantName",
+  "assistantSince",
   "city",
   "consentDate",
+  "consentSource",
   "country",
   "createdAt",
   "email",
@@ -86,7 +91,7 @@ describe("the columns lead and contact share", () => {
   const lead = columnsOf("leads");
   const contact = columnsOf("contacts");
 
-  it("⚠️ are the same twenty-three, and change only on purpose", () => {
+  it("⚠️ are the same twenty-six, and change only on purpose", () => {
     const shared = lead.filter((c) => contact.includes(c));
     expect([...shared].sort()).toEqual([...SHARED].sort());
   });

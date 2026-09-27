@@ -945,32 +945,37 @@ export function EmailBuilder({
   return (
     <div className="h-dvh flex flex-col bg-background overflow-hidden">
       {/* ── Top bar ── */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b bg-card shrink-0">
+      {/* ⚠️ On a phone the back button, three fields and five controls came to
+          some 330px of fixed width in a 343px row. Below sm the fields take a
+          line of their own under the controls, and the preview buttons keep
+          only their icons. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 border-b bg-card shrink-0 sm:flex-nowrap sm:px-4">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
+          className="size-9 sm:size-8"
           onClick={() => router.push("/dashboard/marketing/templates")}
+          aria-label={tc("back")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="flex-1 flex items-center gap-3 min-w-0">
+        <div className="order-last flex min-w-0 basis-full items-center gap-2 sm:order-none sm:flex-1 sm:basis-auto sm:gap-3">
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder={t("namePlaceholder")}
-            className="h-8 text-sm max-w-48 font-medium"
+            className="h-8 min-w-0 text-sm max-w-48 font-medium"
           />
           <Input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             placeholder={t("subjectPlaceholder")}
-            className="h-8 text-sm max-w-72"
+            className="h-8 min-w-0 text-sm max-w-72"
           />
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="h-8 rounded-md border border-input bg-background px-2 text-xs"
+            className="h-8 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
           >
             {["general", "welcome", "followup", "promotional", "transactional"].map((c) => (
               <option key={c} value={c} className="capitalize">
@@ -980,7 +985,7 @@ export function EmailBuilder({
           </select>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {/* Size indicator */}
           <Badge variant={sizeInfo.warning ? "destructive" : "secondary"} className="text-[10px] font-mono">
             {sizeInfo.kb} KB
@@ -990,10 +995,11 @@ export function EmailBuilder({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8"
+            className="size-9 sm:size-8"
             onClick={undo}
             disabled={history.length === 0}
             title={t("undo")}
+            aria-label={t("undo")}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
@@ -1004,18 +1010,22 @@ export function EmailBuilder({
             size="sm"
             className="h-8 gap-1 text-xs"
             onClick={() => setPreview(preview === "desktop" ? null : "desktop")}
+            aria-label={t("desktop")}
+            aria-pressed={preview === "desktop"}
           >
             <Monitor className="h-3.5 w-3.5" />
-            {t("desktop")}
+            <span className="hidden sm:inline">{t("desktop")}</span>
           </Button>
           <Button
             variant={preview === "mobile" ? "default" : "outline"}
             size="sm"
             className="h-8 gap-1 text-xs"
             onClick={() => setPreview(preview === "mobile" ? null : "mobile")}
+            aria-label={t("mobile")}
+            aria-pressed={preview === "mobile"}
           >
             <Smartphone className="h-3.5 w-3.5" />
-            {t("mobile")}
+            <span className="hidden sm:inline">{t("mobile")}</span>
           </Button>
 
           <Button size="sm" className="h-8 gap-1 text-xs" onClick={handleSave} disabled={saving}>
@@ -1143,7 +1153,7 @@ export function EmailBuilder({
                                 {/* biome-ignore lint/a11y/noStaticElementInteractions: dragHandleProps supplies the role and the tabIndex; these handlers only stop propagation */}
                                 <div
                                   {...drag.dragHandleProps}
-                                  className="h-6 w-6 flex items-center justify-center rounded bg-primary text-primary-foreground cursor-grab active:cursor-grabbing"
+                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-primary text-primary-foreground cursor-grab active:cursor-grabbing"
                                   // The handle only stops the click reaching the block
                                   // behind it; the library supplies its own role, focus
                                   // and drag keys through dragHandleProps.
@@ -1154,7 +1164,7 @@ export function EmailBuilder({
                                 </div>
                                 <button
                                   type="button"
-                                  className="h-6 w-6 flex items-center justify-center rounded bg-background border hover:bg-muted"
+                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-background border hover:bg-muted"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     duplicateBlock(block.id);
@@ -1165,7 +1175,7 @@ export function EmailBuilder({
                                 </button>
                                 <button
                                   type="button"
-                                  className="h-6 w-6 flex items-center justify-center rounded bg-background border hover:bg-destructive hover:text-destructive-foreground"
+                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-background border hover:bg-destructive hover:text-destructive-foreground"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     deleteBlock(block.id);

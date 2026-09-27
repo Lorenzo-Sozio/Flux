@@ -8,7 +8,7 @@ import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from "dr
 import type { z } from "zod";
 
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
-import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
+import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
 import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { documentLanguage, fill, formatDocumentDate, formatDocumentMoney, QUOTE_TEXT } from "@/lib/document-language";
@@ -20,9 +20,18 @@ import { notify, notifyMany } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
-import { approvalPolicyFrom, approvalRequiredReason, canTransition, transitionError } from "@/lib/quote-status";
+import { generateQuoteNumber } from "@/lib/quote-number";
+import {
+  approvalRequiredReason,
+  canTransition,
+  decideQuoteSend,
+  revisionNumber,
+  transitionError,
+} from "@/lib/quote-status";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
+import { membersWith } from "@/lib/workspace-members";
+import { defaultExpiry, readApprovalPolicy, readQuoteDefaults } from "@/lib/workspace-preferences";
 
 // --- HELPERS ---
 
@@ -52,14 +61,6 @@ function buildQuoteTotals(
     discountPercent,
     taxPercent: headerTaxPercent && headerTaxPercent > 0 ? headerTaxPercent : undefined,
   });
-}
-
-function generateQuoteNumber(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const random = crypto.randomBytes(4).toString("hex").toUpperCase();
-  return `QT-${year}${month}-${random}`;
 }
 
 async function logQuoteActivity(
@@ -116,6 +117,15 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
 
     const totals = buildQuoteTotals(validated.items, validated.discountPercent || 0, validated.taxPercent);
 
+    // The workspace's standard validity and conditions (Settings → General), for what the
+    // form left empty. Copied into the quote, never read again: a change to the defaults
+    // does not rewrite a quote already sent.
+    const defaults = await readQuoteDefaults(db);
+    const expiresAt = validated.expiresAt
+      ? new Date(validated.expiresAt)
+      : defaultExpiry(new Date(), defaults.validityDays);
+    const notes = validated.notes?.trim() ? validated.notes : defaults.terms || validated.notes || null;
+
     const quoteNumber = generateQuoteNumber();
     // Chosen here rather than by the database default, so the lines can be written
     // in the same transaction as the header instead of waiting to learn the id.
@@ -162,8 +172,8 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
           taxAmount: totals.taxAmount.toString(),
           taxPercent: (validated.taxPercent || 0).toString(),
           totalAmount: totals.total.toString(),
-          expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
-          notes: validated.notes,
+          expiresAt,
+          notes,
         })
         .returning(),
       db.insert(quoteItems).values(itemRows),
@@ -214,7 +224,7 @@ export async function getQuoteById(quoteId: string) {
 
     // Check permission: owner, deal owner, or admin
     const isAuthorized =
-      actor.userId === quote.ownerId || actor.userId === quote.deal.ownerId || actor.tenantRole === "admin";
+      actor.userId === quote.ownerId || actor.userId === quote.deal.ownerId || can(actor, "record:manageAny");
 
     if (!isAuthorized) {
       throw new Error("Unauthorized");
@@ -270,6 +280,23 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     if (actor.userId !== quote.ownerId && !mayEditOthers) {
       throw new ForbiddenError("Only the quote's owner or a workspace admin can change it.");
     }
+    // ⚠️⚠️ What was sent does not change under the customer. Lines, prices, notes, expiry and
+    // recipient are a draft's to change: after it, the customer may be reading — or signing —
+    // the old text (src/lib/quote-signature.ts builds the PDF from the rows at that moment), and
+    // an approved quote would change after its approval. Another version is a revision (§7.3).
+    const CONTENT = [
+      "items",
+      "notes",
+      "discountPercent",
+      "taxPercent",
+      "dealId",
+      "companyId",
+      "contactId",
+      "expiresAt",
+    ] as const;
+    if (quote.status !== "draft" && CONTENT.some((k) => validated[k] !== undefined)) {
+      throw new Error("Only a draft can be edited. Create a revision to change a quote that has left draft.");
+    }
 
     // A status could previously be set to anything from anything: `sent` straight
     // from a draft that needed approval, or `accepted` rolled back to `draft`,
@@ -284,7 +311,11 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       if (validated.status === "sent" && quote.status !== "approved") {
         const tenantId = await getCurrentTenantId();
         const tenant = tenantId ? await getTenantById(tenantId) : null;
-        const reason = approvalRequiredReason(quote, approvalPolicyFrom(tenant?.settings));
+        const lines = await db
+          .select({ discountPercent: quoteItems.discountPercent })
+          .from(quoteItems)
+          .where(eq(quoteItems.quoteId, quoteId));
+        const reason = approvalRequiredReason(quote, await readApprovalPolicy(db, tenant?.settings), lines);
         if (reason) {
           throw new Error(`${reason} Submit it for approval before sending.`);
         }
@@ -350,6 +381,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       updateData.acceptedAt = new Date();
     } else if (validated.status === "declined") {
       updateData.declinedAt = new Date();
+      if (validated.declineReason?.trim()) updateData.declineReason = validated.declineReason.trim();
     }
 
     if (rewriteItems) await rewriteItems();
@@ -392,6 +424,74 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
   }
 }
 
+/**
+ * "The customer wants 5% less": a new revision of a quote already sent (§7.3).
+ *
+ * ⚠️ Only a draft could be edited and `version` never grew, so a counter-offer meant typing
+ * the quote again from nothing — and the one the customer holds said something else, with
+ * no trace of which was current. A revision copies the quote and its lines as a new draft
+ * at the next version, and marks the one it replaces as superseded: its public page can no
+ * longer be accepted, and the timeline says what replaced it.
+ */
+export async function createQuoteRevisionAction(quoteId: string): Promise<{ quoteId: string; quoteNumber: string }> {
+  const actor = await requireCapability("quote:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
+  if (!quote) throw new Error("Quote not found");
+  if (!canTransition(quote.status, "superseded")) throw new Error(transitionError(quote.status, "superseded"));
+  if (actor.userId !== quote.ownerId && !can(actor, "quote:approve")) {
+    throw new ForbiddenError("Only the quote's owner or a workspace admin can revise it.");
+  }
+  const lines = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+
+  const version = (quote.version ?? 1) + 1;
+  const newId = crypto.randomUUID();
+  const newNumber = revisionNumber(quote.quoteNumber, version);
+  const now = new Date();
+  const {
+    id: _id,
+    quoteNumber: _number,
+    publicToken: _token,
+    createdAt: _created,
+    updatedAt: _updated,
+    ...header
+  } = quote;
+  await db.batch([
+    db.insert(quotes).values({
+      ...header,
+      id: newId,
+      quoteNumber: newNumber,
+      version,
+      status: "draft",
+      ownerId: actor.userId,
+      approvalNote: null,
+      approvedById: null,
+      approvedAt: null,
+      issuedAt: now,
+      sentAt: null,
+      viewedAt: null,
+      acceptedAt: null,
+      declinedAt: null,
+      declineReason: null,
+    }),
+    ...(lines.length
+      ? [
+          db
+            .insert(quoteItems)
+            .values(lines.map(({ id: _lineId, quoteId: _q, ...line }) => ({ ...line, quoteId: newId }))),
+        ]
+      : []),
+    db.update(quotes).set({ status: "superseded", updatedAt: now }).where(eq(quotes.id, quoteId)),
+  ] as unknown as Parameters<typeof db.batch>[0]);
+  await logQuoteActivity(quoteId, "superseded", actor.userId);
+  await logQuoteActivity(newId, "created", actor.userId);
+
+  revalidatePath("/dashboard/sales/quotes");
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
+  return { quoteId: newId, quoteNumber: newNumber };
+}
+
 export async function deleteQuoteAction(quoteId: string) {
   const db = await getDb();
   try {
@@ -411,7 +511,7 @@ export async function deleteQuoteAction(quoteId: string) {
     }
 
     // Check permission
-    if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin") {
+    if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) {
       throw new Error("Unauthorized");
     }
 
@@ -444,9 +544,23 @@ export async function sendQuoteEmailAction(quoteId: string, toEmail: string, sub
     }
 
     // Check permission
-    if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin") {
+    if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) {
       throw new Error("Unauthorized");
     }
+
+    // Decided before anything leaves: see decideQuoteSend. A refusal here costs nothing; a
+    // refusal after the send is an email the customer has and the salesperson thinks failed.
+    const tenantId = await getCurrentTenantId();
+    const tenant = tenantId ? await getTenantById(tenantId) : null;
+    const lines = await db
+      .select({ discountPercent: quoteItems.discountPercent })
+      .from(quoteItems)
+      .where(eq(quoteItems.quoteId, quoteId));
+    const decision = decideQuoteSend(
+      quote.status,
+      approvalRequiredReason(quote, await readApprovalPolicy(db, tenant?.settings), lines),
+    );
+    if (decision.kind === "refuse") throw new Error(decision.reason);
 
     // ⚠️ The link used a fresh hash of the id and the time, saved nowhere, so every
     // customer received a "View quote" button that opened a not-found page. The
@@ -478,16 +592,18 @@ export async function sendQuoteEmailAction(quoteId: string, toEmail: string, sub
       </div>
     `;
 
-    // Send email
-    await sendEmail({
-      to: toEmail,
-      subject,
-      html,
-    });
+    // ⚠️ `sendEmail` reports a failure, it does not throw: unchecked, a quote whose email
+    // never left was marked sent, and the follow-up engine then waited on a customer who
+    // had received nothing.
+    const result = await sendEmail({ to: toEmail, subject, html });
+    if (!result.success) throw new Error(result.error ?? "The email could not be sent.");
 
-    // Update status and log activity
-    await updateQuoteAction(quoteId, { status: "sent" });
-    await logQuoteActivity(quoteId, "sent", actor.userId, toEmail);
+    if (decision.kind === "first") {
+      await updateQuoteAction(quoteId, { status: "sent" });
+      await logQuoteActivity(quoteId, "sent", actor.userId, toEmail);
+    } else {
+      await logQuoteActivity(quoteId, "reminded", actor.userId, toEmail);
+    }
 
     return { success: true };
   } catch (error) {
@@ -530,26 +646,25 @@ export async function requestApprovalAction(quoteId: string) {
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
   if (quote.status !== "draft") throw new Error("Only draft quotes can be submitted for approval");
-  if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin" && actor.tenantRole !== "owner") {
+  if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) {
     throw new Error("Unauthorized");
   }
 
-  const admins = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(inArray(users.role, ["admin", "owner"]));
+  // Whoever may approve, in this workspace. See membersWith for why not `users.role`.
+  const tenantId = await getCurrentTenantId();
+  const approvers = tenantId ? await membersWith(tenantId, "quote:approve") : [];
 
   await Promise.all([
     db.update(quotes).set({ status: "pending_approval", updatedAt: new Date() }).where(eq(quotes.id, quoteId)),
     logQuoteActivity(quoteId, "approval_requested", actor.userId),
     notifyMany(
-      admins
-        .filter((u) => u.id !== actor.userId)
-        .map((u) => ({
-          userId: u.id,
+      approvers
+        .filter((id) => id !== actor.userId)
+        .map((id) => ({
+          userId: id,
           type: "quote_approval_requested",
-          title: "Quote awaiting your approval",
-          message: `Quote ${quote.quoteNumber} needs your approval before it can be sent.`,
+          key: "quoteApprovalRequested" as const,
+          params: { number: quote.quoteNumber },
           link: `/dashboard/sales/quotes/${quoteId}`,
         })),
     ),
@@ -589,8 +704,8 @@ export async function approveQuoteAction(quoteId: string) {
     await notify({
       userId: quote.ownerId,
       type: "quote_approved",
-      title: "Quote approved",
-      message: `Quote ${quote.quoteNumber} is approved. You can send it to the customer.`,
+      key: "quoteApproved",
+      params: { number: quote.quoteNumber },
       link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
@@ -622,8 +737,8 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
     await notify({
       userId: quote.ownerId,
       type: "quote_rejected",
-      title: "Quote sent back",
-      message: `Quote ${quote.quoteNumber} was not approved.${note ? ` Reason: ${note}` : ""}`,
+      key: "quoteRejected",
+      params: { number: quote.quoteNumber, hasReason: note ? "yes" : "no", reason: note ?? "" },
       link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
@@ -674,7 +789,14 @@ export async function getQuoteFormData() {
       .orderBy(products.name),
   ]);
 
-  return { deals: dealList, companies: companyList, contacts: contactList, products: productList };
+  return {
+    deals: dealList,
+    companies: companyList,
+    contacts: contactList,
+    products: productList,
+    // What a new quote starts with: prefilled in the form, so what is sent is what is seen.
+    defaults: await readQuoteDefaults(db),
+  };
 }
 
 // ── One page of quotes ────────────────────────────────────────────────────────
@@ -708,7 +830,12 @@ export async function listQuotes(params: ListParams, status?: string) {
 
   const term = params.search.trim();
   const clauses: (SQL | undefined)[] = [
-    status && status !== "all" ? eq(quotes.status, status) : undefined,
+    // "awaiting": with the customer, sent or opened — the figure the home page adds up.
+    status === "awaiting"
+      ? inArray(quotes.status, ["sent", "viewed"])
+      : status && status !== "all"
+        ? eq(quotes.status, status)
+        : undefined,
     term
       ? or(
           ilike(quotes.quoteNumber, `%${term}%`),

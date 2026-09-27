@@ -38,7 +38,7 @@ export type Claim =
   /** This request owns the key and should do the work. */
   | { kind: "proceed"; key: string; endpoint: string }
   /** Already answered. Send this body back rather than importing anything. */
-  | { kind: "replay"; body: unknown }
+  | { kind: "replay"; body: unknown; status?: number }
   /** The same key is in flight somewhere else, right now. */
   | { kind: "in-flight" }
   /** The same key, a different body. */
@@ -54,7 +54,7 @@ export type Claim =
  * against an empty one.
  */
 export type Verdict =
-  | { kind: "replay"; body: unknown }
+  | { kind: "replay"; body: unknown; status?: number }
   | { kind: "in-flight" }
   | { kind: "mismatch" }
   | { kind: "stale" };
@@ -86,7 +86,7 @@ export function decide(row: StoredAttempt, requestHash: string, now: Date): Verd
   if (row.status === "done") {
     // A row marked done with nothing stored is a bug on our side, and not a
     // reason to import the batch a second time.
-    return { kind: "replay", body: row.response ? safeParse(row.response) : null };
+    return replayOf(row.response);
   }
 
   // ⚠️ Still running, as far as anything here can tell. Taking it over now would
@@ -173,12 +173,33 @@ export async function claim(
   return won.length > 0 ? { kind: "proceed", key: trimmed, endpoint } : { kind: "in-flight" };
 }
 
+/**
+ * What a stored answer replays as. ⚠️ With its status: a repeat of a request that answered 201
+ * answered 200, and a client that checks for 201 took the replay for a different outcome.
+ * An answer stored before the status was kept (or a plain 200) is the body alone.
+ */
+function replayOf(response: string | null): Verdict {
+  if (!response) return { kind: "replay", body: null };
+  const parsed = safeParse(response) as { $status?: unknown; $body?: unknown } | null;
+  if (parsed && typeof parsed === "object" && typeof parsed.$status === "number" && "$body" in parsed) {
+    return { kind: "replay", body: parsed.$body, status: parsed.$status };
+  }
+  return { kind: "replay", body: parsed };
+}
+
 /** Stores the answer, so a repeat gets this and not a second import. */
-export async function remember(db: TenantDb, claimed: Claim, body: unknown, now = new Date()): Promise<void> {
+export async function remember(
+  db: TenantDb,
+  claimed: Claim,
+  body: unknown,
+  now = new Date(),
+  status = 200,
+): Promise<void> {
   if (claimed.kind !== "proceed") return;
+  const response = JSON.stringify(status === 200 ? body : { $status: status, $body: body });
   await db
     .update(apiIdempotency)
-    .set({ status: "done", response: JSON.stringify(body), completedAt: now })
+    .set({ status: "done", response, completedAt: now })
     .where(and(eq(apiIdempotency.endpoint, claimed.endpoint), eq(apiIdempotency.key, claimed.key)));
 }
 

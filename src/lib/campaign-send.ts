@@ -15,10 +15,11 @@ import {
   marketingCampaigns,
 } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
+import { notWithAssistant } from "@/lib/assistant-handling";
 import { resolveSegmentIds } from "@/lib/campaign-segment";
 import { ensureUnsubscribe, renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { getDb } from "@/lib/tenant-context";
-import { signTrackingUrl } from "@/lib/tracking-token";
+import { trackLinks } from "@/lib/tracking-token";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 // Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
@@ -29,19 +30,6 @@ function appBase(): string {
 }
 
 type Recipient = { id: string; email: string | null; firstName: string; lastName: string };
-
-function wrapLinksForTracking(html: string, logId: string): string {
-  return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
-    if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
-    const sig = signTrackingUrl(logId, url);
-    const tracked =
-      `${appBase()}/api/track/click` +
-      `?log=${encodeURIComponent(logId)}` +
-      `&url=${encodeURIComponent(url)}` +
-      `&sig=${encodeURIComponent(sig)}`;
-    return `href="${tracked}"`;
-  });
-}
 
 export async function executeCampaignSend(data: {
   campaignId: string;
@@ -89,16 +77,21 @@ export async function executeCampaignSend(data: {
     recipients = [];
   } else if (recipientType === "contacts") {
     const filter = recipientIds?.length
-      ? and(eq(contacts.marketingConsent, true), inArray(contacts.id, recipientIds))
-      : eq(contacts.marketingConsent, true);
+      ? and(eq(contacts.marketingConsent, true), notWithAssistant.contacts, inArray(contacts.id, recipientIds))
+      : and(eq(contacts.marketingConsent, true), notWithAssistant.contacts);
     recipients = await db
       .select({ id: contacts.id, email: contacts.email, firstName: contacts.firstName, lastName: contacts.lastName })
       .from(contacts)
       .where(filter);
   } else {
     const filter = recipientIds?.length
-      ? and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), inArray(leads.id, recipientIds))
-      : and(eq(leads.marketingConsent, true), eq(leads.isConverted, false));
+      ? and(
+          eq(leads.marketingConsent, true),
+          eq(leads.isConverted, false),
+          notWithAssistant.leads,
+          inArray(leads.id, recipientIds),
+        )
+      : and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), notWithAssistant.leads);
     recipients = await db
       .select({ id: leads.id, email: leads.email, firstName: leads.firstName, lastName: leads.lastName })
       .from(leads)
@@ -141,7 +134,7 @@ export async function executeCampaignSend(data: {
     // {{nome}}" went out saying exactly that.
     const subject = renderPlaceholders(template.subject, values);
 
-    html = wrapLinksForTracking(html, log.id);
+    html = trackLinks(html, log.id, appBase());
     html = `${html}\n<img src="${appBase()}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
 
     await db.insert(emailJobs).values({

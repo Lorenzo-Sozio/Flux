@@ -8,8 +8,8 @@
   {
     "file": "src/app/api/crm/close/route.ts",
     "description": "⚠️⚠️ le regole del titolare non scattano sulla trattativa chiusa: chi la sorvegliava non lo sa, comprese le regole che la riaprirebbero",
-    "find": "    after(() =>\n      runAutomations({",
-    "replace": "    if (false)\n    after(() =>\n      runAutomations({"
+    "find": "    runRulesAfterApiWrite(tenant.id, {\n      entityType: \"deal\",",
+    "replace": "    if (false)\n    runRulesAfterApiWrite(tenant.id, {\n      entityType: \"deal\","
   },
   {
     "file": "src/app/api/crm/close/route.ts",
@@ -34,5 +34,17 @@
     "description": "nessuna trattativa da chiudere diventa un successo silenzioso: chi ha chiamato non distingue «non c'era niente» da «l'ho chiusa»",
     "find": "  if (aperti.length === 0) {\n    return NextResponse.json({ error: \"No deal to close for that contact point\" }, { status: 404 });\n  }",
     "replace": "  if (aperti.length === 0) {\n    return NextResponse.json({ status: \"closed\", ids: [] }, { status: 200 });\n  }"
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️⚠️ la trattativa chiusa dall'API resta nella colonna aperta: persa nel report, lavoro aperto sulla board",
+    "find": "        ...(lostStage ? { stageId: lostStage.id } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️ la trattativa chiusa dall'API non ricorda in che fase è stata persa",
+    "find": "        lostAtStageId: affare.stageId,",
+    "replace": ""
   }
 ]

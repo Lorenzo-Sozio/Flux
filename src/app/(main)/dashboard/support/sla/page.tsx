@@ -2,20 +2,24 @@ import { getTranslations } from "next-intl/server";
 
 import { getAllSlas } from "@/actions/sla";
 import { getBusinessCalendar } from "@/actions/support";
+import { getCsatSetting } from "@/actions/support-report";
 import { getGroupsForSelect } from "@/actions/user-groups";
+import { getAppUrlOrNull } from "@/lib/app-url";
 import { requirePageCapability } from "@/lib/page-guard";
 
 import { BusinessHoursCard } from "./_components/business-hours-card";
+import { CsatCard } from "./_components/csat-card";
 import { SlaClient } from "./_components/sla-client";
 
 export default async function SlaPage() {
   await requirePageCapability("sla:manage", "/dashboard/support/sla");
 
-  const [slaList, calendar, groups, t] = await Promise.all([
+  const [slaList, calendar, groups, csat, t] = await Promise.all([
     getAllSlas(),
     getBusinessCalendar(),
     // The policy escalates to a group, so the form has to know which ones exist.
     getGroupsForSelect(),
+    getCsatSetting(),
     getTranslations("support.sla"),
   ]);
 
@@ -35,6 +39,9 @@ export default async function SlaPage() {
         holidays={calendar.holidays}
         ready={calendar.ready}
       />
+
+      {/* The other half of a promise: asking whether it was kept (src/lib/ticket-public.ts). */}
+      <CsatCard enabled={csat.enabled} ready={getAppUrlOrNull() !== null} />
     </div>
   );
 }

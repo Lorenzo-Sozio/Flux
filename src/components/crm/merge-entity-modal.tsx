@@ -127,15 +127,19 @@ export function MergeEntityModal<T extends object>({
           </div>
         ) : keepEntity && mergeEntity ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-[140px_1fr_1fr] gap-3 border-b pb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+            <div className="grid grid-cols-[88px_minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b sm:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)] sm:gap-3 pb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
               <div />
               <div className="text-center">
                 {t("keep")}
-                <div className="mt-0.5 font-normal text-foreground normal-case">{getDisplayName(keepEntity)}</div>
+                <div className="mt-0.5 break-words font-normal text-foreground normal-case">
+                  {getDisplayName(keepEntity)}
+                </div>
               </div>
               <div className="text-center">
                 {t("mergeWillBeDeleted")}
-                <div className="mt-0.5 font-normal text-foreground normal-case">{getDisplayName(mergeEntity)}</div>
+                <div className="mt-0.5 break-words font-normal text-foreground normal-case">
+                  {getDisplayName(mergeEntity)}
+                </div>
               </div>
             </div>
 
@@ -143,8 +147,11 @@ export function MergeEntityModal<T extends object>({
               <div className="space-y-1">
                 <p className="mb-2 font-medium text-muted-foreground text-xs">{t("clickToSelect")}</p>
                 {diffFields.map((field) => (
-                  <div key={field.key} className="grid grid-cols-[140px_1fr_1fr] items-start gap-3 py-1.5">
-                    <span className="pt-1 text-muted-foreground text-xs">{field.label}</span>
+                  <div
+                    key={field.key}
+                    className="grid grid-cols-[88px_minmax(0,1fr)_minmax(0,1fr)] items-start gap-2 py-1.5 sm:grid-cols-[140px_minmax(0,1fr)_minmax(0,1fr)] sm:gap-3"
+                  >
+                    <span className="min-w-0 break-words pt-1 text-muted-foreground text-xs">{field.label}</span>
                     {(["keep", "merge"] as const).map((side) => {
                       const entity = side === "keep" ? keepEntity : mergeEntity;
                       const selected = (choices[field.key] ?? "keep") === side;
@@ -153,7 +160,7 @@ export function MergeEntityModal<T extends object>({
                           key={side}
                           type="button"
                           onClick={() => setChoices((c) => ({ ...c, [field.key]: side }))}
-                          className={`rounded border px-2 py-1.5 text-left text-sm transition-colors ${
+                          className={`min-w-0 break-words rounded border px-2 py-1.5 text-left text-sm transition-colors ${
                             selected
                               ? "border-primary bg-primary/5 font-medium"
                               : "border-transparent text-muted-foreground hover:border-muted-foreground/30"

@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ la lavagna torna a caricare ogni trattativa mai vinta o persa",
+    "find": "    where.push(or(eq(deals.status, \"open\"), gte(deals.closedAt, new Date(Date.now() - RECENTLY_CLOSED_DAYS * DAY_MS))));",
+    "replace": "    where.push(undefined);"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ i giorni nella fase tornano a essere l'età della trattativa",
+    "find": "    daysInStage: daysBetween(since ?? deal.createdAt, now),",
+    "replace": "    daysInStage: daysBetween(deal.createdAt, now),"
+  },
+  {
+    "file": "src/app/(main)/dashboard/pipeline/page.tsx",
+    "description": "⚠️ la lavagna si apre sulle trattative di tutti",
+    "find": "      next.set(\"owners\", actor.userId);",
+    "replace": "      next.set(\"owners\", \"all\");"
+  }
+]

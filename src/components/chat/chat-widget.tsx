@@ -2,17 +2,20 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
+import { usePathname } from "next/navigation";
+
 import {
   ArrowLeft,
   BellOff,
   Check,
+  ChevronUp,
   Edit,
   LogOut,
   MessageCircle,
   MoreVertical,
+  Paperclip,
   Plus,
   Search,
-  Send,
   Trash2,
   User,
   Users,
@@ -33,8 +36,17 @@ import {
   leaveConversation,
   markConversationRead,
   muteConversation,
-  sendMessage,
 } from "@/actions/chat-internal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +64,9 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useLivePoll } from "@/hooks/use-live-poll";
 import { cn } from "@/lib/utils";
 
+import { ChatComposer } from "./chat-composer";
+import { type ChatAttachment, ChatMessageBody, type ChatPerson } from "./chat-message-body";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type ConvMember = {
@@ -66,7 +81,13 @@ type Conversation = {
   name: string | null;
   updatedAt: Date;
   members: ConvMember[];
-  messages: { id: string; content: string; senderId: string | null; createdAt: Date }[];
+  messages: {
+    id: string;
+    content: string;
+    senderId: string | null;
+    createdAt: Date;
+    attachments?: { name: string }[];
+  }[];
   unread: number;
   muted: boolean;
   mutedUntil: Date | null;
@@ -78,11 +99,29 @@ type Message = {
   senderId: string | null;
   createdAt: Date;
   sender: { id: string; name: string | null; email: string | null } | null;
+  attachments?: ChatAttachment[];
 };
 
 type ChatUser = { id: string; name: string | null; email: string | null };
 type TabValue = "all" | "direct" | "groups";
 type View = { kind: "list" } | { kind: "thread"; conv: Conversation } | { kind: "new-dm" } | { kind: "new-group" };
+
+/**
+ * The chat's unread count, broadcast for the menus: the sidebar's "Chat" entry and
+ * the phone's Menu hub show it without polling the server a second time.
+ */
+export const CHAT_UNREAD_EVENT = "flux:chat-unread";
+
+/** A page of history, as `getMessages` returns it. */
+const MESSAGE_PAGE = 50;
+
+/** The newest page merged into what is on screen, keeping any older pages loaded. */
+function mergeMessages(prev: Message[], newest: Message[]): Message[] {
+  if (newest.length === 0) return prev.length === 0 ? prev : [];
+  const firstNew = new Date(newest[0].createdAt).getTime();
+  const older = prev.filter((m) => new Date(m.createdAt).getTime() < firstNew && !newest.some((n) => n.id === m.id));
+  return [...older, ...newest];
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -142,6 +181,7 @@ function ConvItem({
   onDelete: (convId: string) => void;
 }) {
   const t = useTranslations("chat");
+  const tc = useTranslations("common");
   const format = useFormatter();
   const isGroup = conv.type === "group";
   const last = conv.messages[0];
@@ -190,6 +230,11 @@ function ConvItem({
                 <BellOff className="h-2.5 w-2.5 shrink-0" />
                 {muteText}
               </span>
+            ) : last && !last.content && last.attachments?.[0] ? (
+              <span className="flex items-center gap-1">
+                <Paperclip className="h-2.5 w-2.5 shrink-0" aria-hidden />
+                <span className="truncate">{last.attachments[0].name}</span>
+              </span>
             ) : (
               (last?.content ?? t("noMessagesConv"))
             )}
@@ -221,7 +266,8 @@ function ConvItem({
             <Button
               variant="ghost"
               size="icon"
-              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              aria-label={tc("more")}
+              className="size-9 text-muted-foreground hover:text-foreground md:size-6"
               onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-3.5 w-3.5" />
@@ -253,20 +299,20 @@ function ConvItem({
                 <DropdownMenuItem onClick={() => onMute(conv.id, 999_999_999)}>{t("muteForever")}</DropdownMenuItem>
               </>
             )}
-            {isGroup && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onLeave(conv.id)} className="text-destructive focus:text-destructive">
-                  <LogOut className="mr-2 h-3.5 w-3.5" />
-                  {t("leaveGroup")}
-                </DropdownMenuItem>
-              </>
-            )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onDelete(conv.id)} className="text-destructive focus:text-destructive">
-              <Trash2 className="mr-2 h-3.5 w-3.5" />
-              {t("delete")}
-            </DropdownMenuItem>
+            {/* A group is left; only a direct conversation is deleted, and then for
+                both people, which the confirmation says. */}
+            {isGroup ? (
+              <DropdownMenuItem onClick={() => onLeave(conv.id)} className="text-destructive focus:text-destructive">
+                <LogOut className="mr-2 h-3.5 w-3.5" />
+                {t("leaveGroup")}
+              </DropdownMenuItem>
+            ) : (
+              <DropdownMenuItem onClick={() => onDelete(conv.id)} className="text-destructive focus:text-destructive">
+                <Trash2 className="mr-2 h-3.5 w-3.5" />
+                {t("delete")}
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -298,21 +344,26 @@ function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
 
 export function ChatWidget({ userId }: { userId: string }) {
   const t = useTranslations("chat");
+  const tc = useTranslations("common");
   const format = useFormatter();
+  const pathname = usePathname();
+  // The chat page is the chat: a bubble opening a second copy of it on top was noise.
+  const onChatPage = pathname?.startsWith("/dashboard/chat") ?? false;
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });
   const [tab, setTab] = useState<TabValue>("all");
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadTotal, setUnreadTotal] = useState(0);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
   const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [groupName, setGroupName] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ kind: "leave" | "delete"; convId: string } | null>(null);
 
   // ── Loaders ───────────────────────────────────────────────────────────────
 
@@ -345,9 +396,13 @@ export function ChatWidget({ userId }: { userId: string }) {
     const data = (await getMessages(convId)) as Message[];
     let arrived = false;
     setMessages((prev) => {
-      arrived = prev.length !== data.length || data.at(-1)?.id !== prev.at(-1)?.id;
-      return arrived ? data : prev;
+      arrived = data.at(-1)?.id !== prev.at(-1)?.id || (prev.length === 0 && data.length > 0);
+      return arrived ? mergeMessages(prev, data) : prev;
     });
+    // ⚠️ A message that arrives in the conversation on screen has been read. The
+    // conversation was marked read only when it was opened, so everything that
+    // came in while it stayed open was counted again on the bubble once it closed.
+    if (arrived) markConversationRead(convId).catch(() => undefined);
     return arrived;
   }, []);
 
@@ -385,11 +440,41 @@ export function ChatWidget({ userId }: { userId: string }) {
 
   useLivePoll(pollThread, { baseMs: 4_000, maxMs: 45_000, enabled: threadId !== null });
 
-  // ── Auto-scroll + mark read ───────────────────────────────────────────────
+  // While the panel is open the badge poll is off and the list poll is on, so the
+  // total is the list's: otherwise it froze at whatever it was when the panel opened.
+  useEffect(() => {
+    if (open) setUnreadTotal(conversations.reduce((sum, c) => sum + (c.unread ?? 0), 0));
+  }, [open, conversations]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
+    (window as Window & { __fluxChatUnread?: number }).__fluxChatUnread = unreadTotal;
+    window.dispatchEvent(new CustomEvent(CHAT_UNREAD_EVENT, { detail: unreadTotal }));
+  }, [unreadTotal]);
+
+  // ── Auto-scroll + mark read ───────────────────────────────────────────────
+
+  // ⚠️ To the newest message whenever the conversation or its newest message
+  // changes. With no dependencies this ran once, before any message existed, so a
+  // conversation opened at its top and new messages arrived out of sight.
+  const newestId = messages.at(-1)?.id;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the conversation and its newest message
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ block: "end" });
+  }, [threadId, newestId]);
+
+  const loadOlder = async () => {
+    if (view.kind !== "thread" || loadingOlder || messages.length === 0) return;
+    setLoadingOlder(true);
+    try {
+      const older = (await getMessages(view.conv.id, new Date(messages[0].createdAt).toISOString())) as Message[];
+      setMessages((prev) => [...older.filter((o) => !prev.some((m) => m.id === o.id)), ...prev]);
+      setHasOlder(older.length >= MESSAGE_PAGE);
+    } catch {
+      toast.error(t("loadOlderFailed"));
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   useEffect(() => {
     if (view.kind !== "thread") return;
@@ -434,29 +519,29 @@ export function ChatWidget({ userId }: { userId: string }) {
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const openThread = (conv: Conversation) => {
+    setMessages([]);
     setView({ kind: "thread", conv });
-    setInput("");
+    setConversations((prev) => prev.map((c) => (c.id === conv.id ? { ...c, unread: 0 } : c)));
+    getMessages(conv.id)
+      .then((data) => setHasOlder((data as Message[]).length >= MESSAGE_PAGE))
+      .catch(() => undefined);
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || sending || view.kind !== "thread") return;
-    setSending(true);
-    const text = input.trim();
-    try {
-      await sendMessage(view.conv.id, text);
-      setInput("");
-      await loadMessages(view.conv.id);
-      loadConvs();
-    } catch {
-      // The message did not go. Putting the text back in the box is the only
-      // honest outcome: it used to vanish and look sent.
-      setInput(text);
-      toast.error(t("widget.sendFailed"));
-    } finally {
-      setSending(false);
-      inputRef.current?.focus();
-    }
+  // A message that did not go says so in the composer, which keeps its text.
+  const afterSend = async () => {
+    if (view.kind !== "thread") return;
+    await loadMessages(view.conv.id).catch(() => undefined);
+    loadConvs().catch(() => undefined);
   };
+
+  // Everyone in the open conversation, for the names picked out in its messages;
+  // the others, in a group, are who may be mentioned.
+  const people: ChatPerson[] =
+    view.kind === "thread"
+      ? view.conv.members.map((m) => ({ userId: m.userId, name: m.user?.name ?? null, email: m.user?.email ?? null }))
+      : [];
+  const mentionable =
+    view.kind === "thread" && view.conv.type === "group" ? people.filter((p) => p.userId !== userId) : [];
 
   const handleStartDM = async (otherUserId: string) => {
     try {
@@ -496,51 +581,70 @@ export function ChatWidget({ userId }: { userId: string }) {
     }
   };
 
-  const handleLeave = async (convId: string) => {
-    if (!confirm(t("leaveGroupConfirm"))) return;
-    try {
-      await leaveConversation(convId);
-      setConversations((prev) => prev.filter((c) => c.id !== convId));
-      if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
-    } catch {
-      // The row was already removed from the list, so say it did not stick.
-      toast.error(t("widget.leaveFailed"));
-      loadConvs();
-    }
-  };
+  // In a real dialog, not the browser's `confirm()`, which the rest of the product
+  // no longer uses and which a phone draws as a system alert.
+  const handleLeave = (convId: string) => setPendingAction({ kind: "leave", convId });
+  const handleDelete = (convId: string) => setPendingAction({ kind: "delete", convId });
 
-  const handleDelete = async (convId: string) => {
-    if (!confirm(t("widget.deleteConfirm"))) return;
+  const confirmPending = async () => {
+    const action = pendingAction;
+    setPendingAction(null);
+    if (!action) return;
     try {
-      await deleteConversation(convId);
-      setConversations((prev) => prev.filter((c) => c.id !== convId));
-      if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
+      if (action.kind === "leave") await leaveConversation(action.convId);
+      else await deleteConversation(action.convId);
+      setConversations((prev) => prev.filter((c) => c.id !== action.convId));
+      if (view.kind === "thread" && view.conv.id === action.convId) setView({ kind: "list" });
       loadUnread();
     } catch {
-      toast.error(t("widget.deleteFailed"));
+      toast.error(action.kind === "leave" ? t("widget.leaveFailed") : t("widget.deleteFailed"));
       loadConvs();
     }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
 
+  // ⚠️ Full screen below md, not below sm. Between the two the tab bar is still
+  // there and so is the bubble above it, and a 580px panel floating at bottom-20
+  // sat on top of both — on a phone held sideways it was taller than the screen.
+  //
+  // ⚠️ The safe area is an inset, not padding (CLAUDE.md, the full-screen dialog):
+  // the panel stops at the notch and the home indicator, and a plain backdrop
+  // behind it paints those strips so the page does not show through them.
   const panelClass = cn(
     "fixed z-50 flex flex-col overflow-hidden border bg-background shadow-2xl transition-all duration-200",
-    // Mobile: full screen overlay
-    "max-sm:inset-0 max-sm:rounded-none max-sm:pt-[var(--safe-top)] max-sm:pb-[var(--safe-bottom)]",
+    // Phone: the whole screen, inside the safe area
+    "max-md:inset-x-0 max-md:top-[var(--safe-top)] max-md:bottom-[var(--safe-bottom)] max-md:rounded-none max-md:border-0 max-md:shadow-none",
     // Desktop: floating panel bottom-right
-    "sm:bottom-20 sm:right-5 sm:w-[400px] sm:h-[580px] sm:rounded-2xl",
+    "md:bottom-20 md:right-5 md:h-[580px] md:max-h-[calc(100dvh-7rem)] md:w-[400px] md:rounded-2xl",
   );
+
+  if (onChatPage) return null;
 
   return (
     <>
       {/* ── Floating button ── */}
+      {/*
+        Below md the tab bar owns the bottom of the screen; the button sits
+        above it rather than on top of the last two tabs.
+
+        ⚠️ And there it sits exactly on the send button of any page whose reply
+        box is pinned to the bottom — a ticket, the chat page. Such a page
+        marks itself with `data-bottom-composer` and the bubble steps aside
+        below md, rather than this file keeping a list of routes that would
+        drift from the pages it names.
+
+        ⚠️ A page with a save bar pinned to the bottom (contract, quote edit,
+        sequence, draft invoice) marks it `data-bottom-bar`: the bubble steps
+        aside on a phone and rises above the bar on a desktop, where it sat on
+        the Save button itself.
+      */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        // Below md the tab bar owns the bottom of the screen; the button sits
-        // above it rather than on top of the last two tabs.
-        className="fixed right-4 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95 md:right-5 md:bottom-5 md:z-50"
+        aria-label={open ? tc("close") : t("widget.openChat")}
+        aria-expanded={open}
+        className="fixed right-4 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95 max-md:[body:has([data-bottom-composer])_&]:hidden max-md:[body:has([data-bottom-bar])_&]:hidden md:right-5 md:bottom-5 md:z-50 md:[body:has([data-bottom-bar])_&]:bottom-24"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
         {!open && unreadTotal > 0 && (
@@ -551,12 +655,13 @@ export function ChatWidget({ userId }: { userId: string }) {
       </button>
 
       {/* ── Chat panel ── */}
+      {open && <div aria-hidden="true" className="fixed inset-0 z-50 bg-background md:hidden" />}
       {open && (
         <div className={panelClass}>
           {/* ─ Header ─ */}
           <div className="shrink-0 border-b bg-muted/20">
             {/* Title row */}
-            <div className="flex items-center justify-between px-4 pt-3 pb-2">
+            <div className="flex items-center justify-between gap-2 px-3 pt-2 pb-2 md:px-4 md:pt-3">
               {view.kind === "list" ? (
                 <>
                   <span className="font-semibold text-sm">{t("messages")}</span>
@@ -564,23 +669,31 @@ export function ChatWidget({ userId }: { userId: string }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7"
+                      className="size-9 md:size-7"
                       onClick={() => setView({ kind: "new-dm" })}
                       title={t("newDmTitle")}
+                      aria-label={t("newDmTitle")}
                     >
-                      <Edit className="h-3.5 w-3.5" />
+                      <Edit className="h-4 w-4 md:h-3.5 md:w-3.5" />
                     </Button>
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7"
+                      className="size-9 md:size-7"
                       onClick={() => setView({ kind: "new-group" })}
                       title={t("newGroupTitle")}
+                      aria-label={t("newGroupTitle")}
                     >
-                      <Users className="h-3.5 w-3.5" />
+                      <Users className="h-4 w-4 md:h-3.5 md:w-3.5" />
                     </Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setOpen(false)}>
-                      <X className="h-3.5 w-3.5" />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-9 md:size-7"
+                      onClick={() => setOpen(false)}
+                      aria-label={tc("close")}
+                    >
+                      <X className="h-4 w-4 md:h-3.5 md:w-3.5" />
                     </Button>
                   </div>
                 </>
@@ -590,8 +703,9 @@ export function ChatWidget({ userId }: { userId: string }) {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-7 w-7 shrink-0"
+                      className="size-9 shrink-0 md:size-7"
                       onClick={() => setView({ kind: "list" })}
+                      aria-label={tc("back")}
                     >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
@@ -616,7 +730,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   {/* Thread quick actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0">
+                      <Button size="icon" variant="ghost" className="size-9 shrink-0 md:size-7" aria-label={tc("more")}>
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -657,19 +771,42 @@ export function ChatWidget({ userId }: { userId: string }) {
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  {/* Below md the panel covers the bubble that closes it, and back
+                      then close was two taps to leave a conversation. */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-9 shrink-0 md:hidden"
+                    onClick={() => setOpen(false)}
+                    aria-label={tc("close")}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </>
               ) : (
                 <>
-                  <div className="flex items-center gap-2">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setView({ kind: "list" })}>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-9 shrink-0 md:size-7"
+                      onClick={() => setView({ kind: "list" })}
+                      aria-label={tc("back")}
+                    >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    <span className="font-semibold text-sm">
+                    <span className="truncate font-semibold text-sm">
                       {view.kind === "new-dm" ? t("newMessageBtn") : t("newGroupBtn")}
                     </span>
                   </div>
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setOpen(false)}>
-                    <X className="h-3.5 w-3.5" />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-9 shrink-0 md:size-7"
+                    onClick={() => setOpen(false)}
+                    aria-label={tc("close")}
+                  >
+                    <X className="h-4 w-4 md:h-3.5 md:w-3.5" />
                   </Button>
                 </>
               )}
@@ -679,8 +816,8 @@ export function ChatWidget({ userId }: { userId: string }) {
             {view.kind === "list" && (
               <div className="px-3 pb-2">
                 <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
-                  <TabsList className="h-8 w-full">
-                    <TabsTrigger value="all" className="h-6 flex-1 gap-1 text-xs">
+                  <TabsList className="h-10 w-full md:h-8">
+                    <TabsTrigger value="all" className="h-8 flex-1 gap-1 text-xs md:h-6">
                       {t("allTab")}
                       {unreadTotal > 0 && (
                         <span className="rounded-full bg-primary/20 px-1 font-semibold text-[10px] text-primary leading-4">
@@ -688,11 +825,11 @@ export function ChatWidget({ userId }: { userId: string }) {
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="direct" className="h-6 flex-1 gap-1 text-xs">
+                    <TabsTrigger value="direct" className="h-8 flex-1 gap-1 text-xs md:h-6">
                       <User className="h-3 w-3" /> {t("widget.directTab")}
                       {directCount > 0 && <span className="text-[10px] text-muted-foreground">({directCount})</span>}
                     </TabsTrigger>
-                    <TabsTrigger value="groups" className="h-6 flex-1 gap-1 text-xs">
+                    <TabsTrigger value="groups" className="h-8 flex-1 gap-1 text-xs md:h-6">
                       <Users className="h-3 w-3" /> {t("groupsTab")}
                       {groupCount > 0 && (
                         <span
@@ -824,6 +961,20 @@ export function ChatWidget({ userId }: { userId: string }) {
           {view.kind === "thread" && (
             <>
               <ScrollArea className="flex-1 px-3 py-3">
+                {hasOlder && (
+                  <div className="mb-2 flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadOlder}
+                      disabled={loadingOlder}
+                      className="h-8 gap-1.5"
+                    >
+                      <ChevronUp className="size-4" aria-hidden />
+                      {t("loadOlder")}
+                    </Button>
+                  </div>
+                )}
                 {messages.length === 0 && (
                   <div className="flex justify-center py-8">
                     <p className="text-muted-foreground text-xs">{t("noMessagesYet")}</p>
@@ -850,16 +1001,14 @@ export function ChatWidget({ userId }: { userId: string }) {
                               {msg.sender?.name ?? msg.sender?.email}
                             </span>
                           )}
-                          <div
-                            className={cn(
-                              "whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm leading-relaxed",
-                              isMe
-                                ? "rounded-tr-sm bg-primary text-primary-foreground"
-                                : "rounded-tl-sm bg-muted text-foreground",
-                            )}
-                          >
-                            {msg.content}
-                          </div>
+                          <ChatMessageBody
+                            content={msg.content}
+                            attachments={msg.attachments}
+                            people={people}
+                            myId={userId}
+                            isMe={isMe}
+                            bubbleClassName="px-3 py-2"
+                          />
                           {(!sameAuthor || i === messages.length - 1) && (
                             <span className="px-1 text-[9px] text-muted-foreground">
                               {formatTime(msg.createdAt, format, t)}
@@ -873,31 +1022,16 @@ export function ChatWidget({ userId }: { userId: string }) {
                 <div ref={messagesEndRef} />
               </ScrollArea>
 
-              <div className="flex shrink-0 items-center gap-2 border-t px-3 py-2">
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSend();
-                    }
-                  }}
-                  placeholder={t("typeMessage")}
-                  className="h-9 text-sm"
-                  disabled={sending}
-                  autoFocus
-                />
-                <Button
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={handleSend}
-                  disabled={!input.trim() || sending}
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
-              </div>
+              <ChatComposer
+                key={view.conv.id}
+                conversationId={view.conv.id}
+                people={mentionable}
+                onSent={afterSend}
+                textareaRef={inputRef}
+                compact
+                autoFocus
+                className="px-3 py-2"
+              />
             </>
           )}
 
@@ -911,14 +1045,17 @@ export function ChatWidget({ userId }: { userId: string }) {
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     placeholder={t("widget.searchPeople")}
-                    className="h-8 pl-8 text-sm"
+                    className="h-9 pl-8 md:h-8"
                     autoFocus
                   />
                 </div>
               </div>
               <ScrollArea className="flex-1">
                 {filteredUsers.length === 0 ? (
-                  <p className="py-10 text-center text-muted-foreground text-xs">{t("widget.noUsers")}</p>
+                  <p className="px-6 py-10 text-center text-muted-foreground text-xs">
+                    {/* Nobody at all is a different sentence from nobody matching. */}
+                    {chatUsers.length === 0 ? t("noColleagues") : t("widget.noUsers")}
+                  </p>
                 ) : (
                   filteredUsers.map((u) => (
                     <button
@@ -951,7 +1088,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
                   placeholder={t("groupNamePlaceholder")}
-                  className="h-8 text-sm"
+                  className="h-9 md:h-8"
                   autoFocus
                 />
                 <div className="relative">
@@ -960,7 +1097,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
                     placeholder={t("widget.addMembers")}
-                    className="h-8 pl-8 text-sm"
+                    className="h-9 pl-8 md:h-8"
                   />
                 </div>
                 {selectedIds.length > 0 && (
@@ -970,7 +1107,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                       return (
                         <Badge key={id} variant="secondary" className="h-5 gap-1 rounded-full pr-1 pl-2 text-xs">
                           {u?.name ?? u?.email ?? id}
-                          <button type="button" onClick={() => setSelectedIds((s) => s.filter((x) => x !== id))}>
+                          <button
+                            type="button"
+                            aria-label={tc("remove")}
+                            className="-my-1 -mr-0.5 rounded-full p-1"
+                            onClick={() => setSelectedIds((s) => s.filter((x) => x !== id))}
+                          >
                             <X className="h-2.5 w-2.5" />
                           </button>
                         </Badge>
@@ -1022,6 +1164,25 @@ export function ChatWidget({ userId }: { userId: string }) {
           )}
         </div>
       )}
+
+      <AlertDialog open={pendingAction !== null} onOpenChange={(v) => !v && setPendingAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAction?.kind === "leave" ? t("leaveGroup") : t("deleteConvTitle")}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.kind === "leave" ? t("leaveGroupConfirm") : t("widget.deleteConfirm")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPending} className="bg-destructive text-white hover:bg-destructive/90">
+              {pendingAction?.kind === "leave" ? t("leaveGroup") : t("delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

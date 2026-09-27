@@ -20,7 +20,7 @@
   {
     "file": "src/lib/order-payment.ts",
     "description": "⚠️ a zero or negative amount can be recorded as a payment: a refund entered as a negative payment makes the total say something that never happened",
-    "find": "  return Number.isFinite(n) && n > 0;",
-    "replace": "  return Number.isFinite(n);"
+    "find": "  return cents >= 0.01 && cents <= MAX_PAYMENT ? cents : null;",
+    "replace": "  return cents;"
   }
 ]

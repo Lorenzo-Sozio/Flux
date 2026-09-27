@@ -57,3 +57,20 @@ describe("rewriting an email credential", () => {
     }
   });
 });
+
+describe("rewriting a connected mailbox's tokens", () => {
+  it("⚠️⚠️ targets the token named, and skips one a refresh rewrote since it was read", () => {
+    for (const column of ["access_token", "refresh_token"] as const) {
+      const { sql, params } = conditionalWrite(
+        db,
+        { table: "mail_connection", column, id: "m-1" },
+        "OLD",
+        "NEW",
+      ).toSQL();
+      const q = flat(sql);
+      expect(q.startsWith(`update "mail_connection" set "${column}" = $1 where`)).toBe(true);
+      expect(q).toContain(`"mail_connection"."${column}" = $3`);
+      expect(params).toEqual(["NEW", "m-1", "OLD"]);
+    }
+  });
+});

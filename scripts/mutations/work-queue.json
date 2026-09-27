@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/record-reach.ts",
+    "description": "⚠️ la coda propone il fisso invece del cellulare",
+    "find": "          phone: p.mobile || p.phone || null,",
+    "replace": "          phone: p.phone || p.mobile || null,"
+  },
+  {
+    "file": "src/lib/record-reach.ts",
+    "description": "⚠️ una trattativa senza contatto non mostra il centralino dell'azienda",
+    "find": "      const who = contactOf(d?.contactId ?? null) ?? companyOf(d?.companyId ?? null);",
+    "replace": "      const who = contactOf(d?.contactId ?? null);"
+  },
+  {
+    "file": "src/actions/activities.ts",
+    "description": "⚠️⚠️ l'esito detto nella coda si perde",
+    "find": "    outcome: outcomeFor(kind, input.outcome),",
+    "replace": "    outcome: null,"
+  },
+  {
+    "file": "src/actions/activities.ts",
+    "description": "⚠️ un esito che non appartiene al tipo di contatto viene salvato",
+    "find": "    outcome: outcomeFor(kind, input.outcome),",
+    "replace": "    outcome: input.outcome ?? null,"
+  },
+  {
+    "file": "src/actions/activities.ts",
+    "description": "un tipo di record sconosciuto viene accettato",
+    "find": "  if (!column || !input.target.id) throw new Error(\"Invalid record.\");",
+    "replace": ""
+  }
+]

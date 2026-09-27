@@ -4,41 +4,64 @@ import { notFound } from "next/navigation";
 
 import { eq } from "drizzle-orm";
 import {
+  BotIcon,
   BriefcaseIcon,
   BuildingIcon,
   CalendarIcon,
   CheckCircle2Icon,
+  ChevronDownIcon,
   ClockIcon,
+  FileTextIcon,
+  InfoIcon,
   LinkedinIcon,
+  ListChecksIcon,
   MailIcon,
-  MapPinIcon,
   PencilIcon,
   PhoneIcon,
+  PlusIcon,
   SmartphoneIcon,
   StarIcon,
-  TagIcon,
   Trash2Icon,
-  UserCheckIcon,
   UserIcon,
+  UserRoundIcon,
 } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
-import { createActivity, getActivitiesByContact } from "@/actions/activities";
+import { createActivity } from "@/actions/activities";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getCustomerRecord } from "@/actions/customer-record";
 import { getEmailTemplates } from "@/actions/marketing";
-import { deleteTask, getAllUsers, getTasksByContact, updateTaskStatus } from "@/actions/tasks";
+import { deleteTask, getAllUsers, getTasksByContact } from "@/actions/tasks";
 import { ContactModal } from "@/app/(main)/dashboard/contacts/_components/contact-modal";
 import { auth } from "@/auth";
-import { ActivityTimeline } from "@/components/crm/activity-timeline";
+import { ActivityModal } from "@/components/crm/activity-modal";
+import { ConsentDetail } from "@/components/crm/consent-detail";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { CustomerRecordPanel } from "@/components/crm/customer-record";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { EnrollInSequence } from "@/components/crm/enroll-in-sequence";
 import { FormattedDate } from "@/components/crm/formatted-date";
+import { PrivacyCard } from "@/components/crm/privacy-card";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
+import {
+  EmptyHint,
+  Field,
+  FieldList,
+  MetaItem,
+  Metric,
+  MetricStrip,
+  RecordAvatar,
+  RecordBackLink,
+  RecordHero,
+  RecordPage,
+  StatusBadge,
+  type Tone,
+} from "@/components/crm/record/record-page";
+import { RecordComposer, RecordSections } from "@/components/crm/record/record-sections";
+import { RecordTimeline } from "@/components/crm/record-timeline";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { TaskDoneButton } from "@/components/crm/task-done-button";
 import { TaskModal } from "@/components/crm/task-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,26 +70,63 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts } from "@/db/schema";
 import { getTenantEntitlements } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
+import { recordTimelineSummary } from "@/lib/record-timeline";
 import { getDb } from "@/lib/tenant-context";
+import { cn } from "@/lib/utils";
 
-const STATUS_STYLES: Record<string, string> = {
-  active: "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400",
-  inactive: "border-gray-400 text-gray-500 dark:border-gray-600 dark:text-gray-400",
+import { OpenDealsValue } from "./_components/open-deals-value";
+
+const DAY = 86_400_000;
+
+/** How many rows a list shows before the rest folds away behind "show more". */
+const FIRST = 5;
+
+const STATUS_TONE: Record<string, Tone> = { active: "success", inactive: "neutral" };
+
+const PRIORITY_KEY: Record<string, string> = {
+  low: "priorityLow",
+  normal: "priorityNormal",
+  high: "priorityHigh",
+  critical: "priorityCritical",
+  blocker: "priorityBlocker",
 };
 
-function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
-      <div className="font-medium text-sm">{children}</div>
-    </div>
-  );
-}
+const PRIORITY_STYLES: Record<string, string> = {
+  low: "text-muted-foreground",
+  normal: "text-muted-foreground",
+  high: "text-amber-700 dark:text-amber-400",
+  critical: "text-destructive",
+  blocker: "text-destructive",
+};
 
+/** Midnight of a date, so "due today" does not turn overdue at 9am. */
+const dayOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+
+/** A link in a field row: a thumb's height on a phone, one text line from md up. */
+const TAP_LINK = "inline-flex max-w-full items-center gap-1.5 text-primary hover:underline max-md:min-h-11";
+
+/**
+ * One person, laid out for whoever has to talk to them next.
+ *
+ * ⚠️ Built on the deal page's model (src/components/crm/record/): the hero says
+ * who they are and puts the three everyday gestures — call, write, edit — under
+ * the thumb; the figures say whether anything is waiting (a task due, deals open,
+ * how long since anyone spoke to them); the work column is what gets done today
+ * (the next steps, then the timeline, email history included); the reference
+ * column is everything looked up rather than acted on. The previous page opened
+ * on a phone with four cards of read-only fields and put the tasks last, below
+ * a timeline of every activity the contact ever had.
+ */
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: contactId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
+  // The workspace role, never `session.user.role` (Flux's own staff scale, see
+  // CLAUDE.md). A viewer reads the contact; the controls that would only answer
+  // "forbidden" are not drawn for them.
+  const tenantRole = session?.user?.tenantRole ?? null;
+  const canWrite = can(tenantRole, "record:write");
   const db = await getDb();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
@@ -94,8 +154,24 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 
   const { contact: cData, companyName } = contactRow;
 
-  const [activitiesList, tasksList, allUsers, customFieldDefs, customFieldVals, record, t, tD] = await Promise.all([
-    getActivitiesByContact(contactId),
+  const [
+    timelineSummary,
+    tasksList,
+    allUsers,
+    customFieldDefs,
+    customFieldVals,
+    record,
+    t,
+    tD,
+    tR,
+    tX,
+    tP,
+    tC,
+    format,
+  ] = await Promise.all([
+    // What the timeline holds — this person's and their deals' — for the tab's count and
+    // the last contact, so neither disagrees with the list.
+    recordTimelineSummary(db, { type: "contact", id: contactId }),
     getTasksByContact(contactId),
     getAllUsers(),
     getCustomFieldDefinitions("contact"),
@@ -104,14 +180,16 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     getCustomerRecord({ contactId }),
     getTranslations("contacts"),
     getTranslations("entityDetail"),
+    getTranslations("record"),
+    getTranslations("pipeline.detail"),
+    getTranslations("pipeline"),
+    getTranslations("contacts.detail"),
+    getFormatter(),
   ]);
   const tc = await getTranslations("common");
 
-  const ownerName = allUsers.find((u) => u.id === cData.ownerId)?.name ?? null;
-  const fullName = [cData.firstName, cData.lastName].filter(Boolean).join(" ");
-  const initials = [cData.firstName?.[0], cData.lastName?.[0]].filter(Boolean).join("").toUpperCase();
-  const hasAddressInfo = !!(cData.street || cData.city || cData.state || cData.zipCode || cData.country);
-  const hasContactInfo = !!(cData.email || cData.phone || cData.mobile || cData.linkedinUrl);
+  // ── Server actions scoped to this contact ──
+  const pagePath = `/dashboard/contacts/${contactId}`;
 
   async function handleAddActivity(formData: FormData) {
     "use server";
@@ -123,436 +201,554 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     }
   }
 
-  async function toggleTask(taskId: string, currentStatus: string) {
-    "use server";
-    const newStatus = currentStatus === "done" ? "todo" : "done";
-    await updateTaskStatus(taskId, newStatus, `/dashboard/contacts/${contactId}`);
-  }
+  // ── Derived ──
+  const now = new Date();
+  const today = dayOf(now);
+  const ownerName = allUsers.find((u) => u.id === cData.ownerId)?.name ?? null;
+  const fullName = [cData.firstName, cData.lastName].filter(Boolean).join(" ");
+  const initials = [cData.firstName?.[0], cData.lastName?.[0]].filter(Boolean).join("").toUpperCase();
+  const role = [cData.jobTitle, cData.department].filter(Boolean).join(" · ");
+  // The mobile first: it is the number that reaches the person rather than a desk.
+  const callNumber = cData.mobile || cData.phone;
+  const statusLabel = t.has(`statuses.${cData.status}` as never)
+    ? t(`statuses.${cData.status}` as never)
+    : cData.status;
+  const sourceLabel =
+    cData.source && t.has(`sources.${cData.source}` as never) ? t(`sources.${cData.source}` as never) : cData.source;
+  const address = [
+    cData.street,
+    [cData.zipCode, cData.city, cData.state].filter(Boolean).join(" "),
+    cData.country,
+  ].filter(Boolean);
+
+  // A timed task is late the minute it passes; an all-day one only once its day has.
+  const isOverdue = (task: (typeof tasksList)[number]) =>
+    task.status !== "done" &&
+    task.dueDate != null &&
+    (task.allDay ? dayOf(new Date(task.dueDate)) < today : new Date(task.dueDate) < now);
+
+  // Open tasks first, the most urgent on top; what is done folds away underneath.
+  const byDue = (a: (typeof tasksList)[number], b: (typeof tasksList)[number]) =>
+    (a.dueDate ? new Date(a.dueDate).getTime() : Number.POSITIVE_INFINITY) -
+    (b.dueDate ? new Date(b.dueDate).getTime() : Number.POSITIVE_INFINITY);
+  const openTasks = tasksList.filter((tk) => tk.status !== "done").sort(byDue);
+  const doneTasks = tasksList.filter((tk) => tk.status === "done");
+
+  // The next thing due, and how far away it is: "14 Oct" asks the reader to work
+  // out whether that is next week or last week, and last week is what needs acting on.
+  const nextDue = openTasks.find((tk) => tk.dueDate != null) ?? null;
+  const nextDueDate = nextDue?.dueDate ? new Date(nextDue.dueDate) : null;
+  const daysToNext = nextDueDate ? Math.round((dayOf(nextDueDate) - today) / DAY) : null;
+  const nextOverdue = nextDue ? isOverdue(nextDue) : false;
+
+  // When anyone last dealt with them — on this contact or on any of their deals — counting
+  // only what has happened, not a meeting booked for next week.
+  const lastActivity = timelineSummary.lastContactAt;
+  const daysSinceActivity = lastActivity ? Math.max(0, Math.round((today - dayOf(lastActivity)) / DAY)) : null;
+
+  // ⚠️ The open-deals figure is only drawn when it is the whole truth.
+  // `getCustomerRecord` reads the five newest deals and a sixth to know there are
+  // more; with more, a sum of the five would be a plausible, wrong number. An
+  // exact count would need a query of its own, which this page does not add.
+  const openDeals = record.deals.filter((d) => d.status === "open");
+  const openDealsExact = !record.more.deals;
+  const openDealsValue = openDeals.reduce((sum, d) => sum + (d.amount ?? 0), 0);
+
+  const salesCount = record.deals.length + record.quotes.length + record.orders.length + record.tickets.length;
+  const salesCapped = record.more.deals || record.more.quotes || record.more.orders || record.more.tickets;
+
+  const renderTask = (task: (typeof tasksList)[number]) => {
+    const done = task.status === "done";
+    const overdue = isOverdue(task);
+    return (
+      <li key={task.id} className="flex items-start gap-2 py-2 text-sm">
+        <TaskDoneButton task={task} canWrite={canWrite} revalidate={`/dashboard/contacts/${contactId}`} />
+        <div className="min-w-0 flex-1 pt-1.5 max-md:pt-2.5">
+          <p className={cn("break-words font-medium", done && "font-normal text-muted-foreground line-through")}>
+            {task.title}
+          </p>
+          {task.description && !done && (
+            <p className="mt-0.5 line-clamp-2 break-words text-muted-foreground text-xs">{task.description}</p>
+          )}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-muted-foreground text-xs">
+            {task.dueDate && !done && (
+              <span className={cn("flex items-center gap-1", overdue && "font-medium text-destructive")}>
+                <ClockIcon className="size-3" aria-hidden />
+                <FormattedDate date={task.dueDate} includeTime={!task.allDay} />
+                {overdue && <span>· {tX("overdue")}</span>}
+              </span>
+            )}
+            {task.startDate && !done && (
+              <span className="flex items-center gap-1">
+                <CalendarIcon className="size-3" aria-hidden />
+                {tD("startLabel")} <FormattedDate date={task.startDate} includeTime={!task.allDay} />
+              </span>
+            )}
+            {done && task.completedAt && (
+              <span className="flex items-center gap-1">
+                <CheckCircle2Icon className="size-3" aria-hidden />
+                {tD("completedLabel")} <FormattedDate date={task.completedAt} />
+              </span>
+            )}
+            {!done && PRIORITY_KEY[task.priority] && task.priority !== "normal" && (
+              <span className={PRIORITY_STYLES[task.priority]}>{tD(PRIORITY_KEY[task.priority] as never)}</span>
+            )}
+            <span className="flex min-w-0 items-center gap-1">
+              <UserRoundIcon className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">{task.assigneeName || tD("myself")}</span>
+            </span>
+          </p>
+        </div>
+        {canWrite && (
+          <div className="flex shrink-0 items-center">
+            <TaskModal task={task} users={allUsers} revalidatePathStr={pagePath} />
+            <form
+              action={async () => {
+                "use server";
+                await deleteTask(task.id, `/dashboard/contacts/${contactId}`);
+              }}
+            >
+              <button
+                type="submit"
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-destructive max-md:size-9"
+                title={tc("delete")}
+                aria-label={tc("delete")}
+              >
+                <Trash2Icon className="size-3.5" />
+              </button>
+            </form>
+          </div>
+        )}
+      </li>
+    );
+  };
+
+  /** The rest of a long list, folded: the first few are what is read, the others are one tap away. */
+  const Folded = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <details className="group/more rounded-md border">
+      <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-muted-foreground text-sm hover:text-foreground max-md:min-h-11 [&::-webkit-details-marker]:hidden">
+        {label}
+        <ChevronDownIcon className="size-4 shrink-0 transition-transform group-open/more:rotate-180" aria-hidden />
+      </summary>
+      <div className="border-t p-2">{children}</div>
+    </details>
+  );
+
+  // ── Sections ──
+  const nextSteps = (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <CardTitle className="text-base">{tD("tasksNextStepsTitle")}</CardTitle>
+          <p className="text-muted-foreground text-xs">{tP("openTasksCount", { count: openTasks.length })}</p>
+        </div>
+        {/* A sequence is a plan of next steps that runs itself, so enrolling sits
+            beside the tasks rather than among the hero's everyday actions. */}
+        {canWrite && hasMarketing && <EnrollInSequence entity="contact" recordId={cData.id} />}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {canWrite && (
+          <RecordComposer label={tD("createTask")} icon={<PlusIcon aria-hidden />}>
+            <QuickTaskForm entityType="contact" entityId={contactId} userId={userId ?? ""} />
+          </RecordComposer>
+        )}
+
+        {openTasks.length === 0 ? (
+          <EmptyHint>{tX("noOpenTasks")}</EmptyHint>
+        ) : (
+          <ul className="divide-y">{openTasks.slice(0, FIRST).map(renderTask)}</ul>
+        )}
+        {openTasks.length > FIRST && (
+          <Folded label={tC("moreTasks", { count: openTasks.length - FIRST })}>
+            <ul className="divide-y">{openTasks.slice(FIRST).map(renderTask)}</ul>
+          </Folded>
+        )}
+
+        {doneTasks.length > 0 && (
+          <Folded label={tX("completedTasks", { count: doneTasks.length })}>
+            <ul className="divide-y">{doneTasks.map(renderTask)}</ul>
+          </Folded>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  // Every email sent from here is an activity of type "email", so the timeline is
+  // also the email history; there is no second list to keep in step with it.
+  const activity = (
+    <Card>
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
+        <CardTitle className="text-base">{tD("timelineTitle")}</CardTitle>
+        {canWrite && (
+          <ActivityModal
+            mode="create"
+            entityType="contact"
+            entityId={contactId}
+            ownerId={userId}
+            revalidatePathStr={pagePath}
+          />
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {canWrite && (
+          /* On a phone the note takes the first line on its own and the type
+             and the button share the second: three controls in one 280px row
+             left the note about 120px to be typed into. */
+          <RecordComposer label={tD("logActivity")} icon={<PlusIcon aria-hidden />}>
+            <form action={handleAddActivity} className="flex flex-wrap gap-2 sm:flex-nowrap">
+              <select
+                name="type"
+                aria-label={tD("typeLabel")}
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm max-sm:h-11 max-sm:flex-1"
+              >
+                <option value="note">{tD("activityTypes.note")}</option>
+                <option value="call">{tD("activityTypes.call")}</option>
+                <option value="meeting">{tD("activityTypes.meeting")}</option>
+              </select>
+              <Textarea
+                name="content"
+                required
+                aria-label={tD("activityPlaceholder")}
+                placeholder={tD("activityPlaceholder")}
+                className="h-9 min-h-[36px] flex-1 resize-none py-1.5 max-sm:order-first max-sm:h-11 max-sm:min-h-11 max-sm:basis-full md:text-sm"
+              />
+              <Button type="submit" size="sm" className="max-sm:h-11">
+                {tP("logBtn")}
+              </Button>
+            </form>
+          </RecordComposer>
+        )}
+
+        {/* Pages of its own, with "load more", in place of the first five and a fold. */}
+        <RecordTimeline scope={{ type: "contact", id: contactId }} revalidatePathStr={pagePath} canWrite={canWrite} />
+      </CardContent>
+    </Card>
+  );
+
+  const contactInfo = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{tD("sectionContactInfo")}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {cData.email || cData.phone || cData.mobile || cData.linkedinUrl ? (
+          <FieldList>
+            <Field label={tD("fieldEmail")}>
+              {cData.email && (
+                <a href={`mailto:${cData.email}`} className={TAP_LINK}>
+                  <MailIcon className="size-3.5 shrink-0" aria-hidden />
+                  <span className="break-all">{cData.email}</span>
+                </a>
+              )}
+            </Field>
+            <Field label={tD("fieldMobile")}>
+              {cData.mobile && (
+                <a href={`tel:${cData.mobile}`} className={TAP_LINK}>
+                  <SmartphoneIcon className="size-3.5 shrink-0" aria-hidden />
+                  {cData.mobile}
+                </a>
+              )}
+            </Field>
+            <Field label={tD("fieldPhone")}>
+              {cData.phone && (
+                <a href={`tel:${cData.phone}`} className={TAP_LINK}>
+                  <PhoneIcon className="size-3.5 shrink-0" aria-hidden />
+                  {cData.phone}
+                </a>
+              )}
+            </Field>
+            <Field label={tD("fieldLinkedIn")}>
+              {cData.linkedinUrl && (
+                <a href={cData.linkedinUrl} target="_blank" rel="noopener noreferrer" className={TAP_LINK}>
+                  <LinkedinIcon className="size-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{tD("fieldLinkedIn")}</span>
+                </a>
+              )}
+            </Field>
+          </FieldList>
+        ) : (
+          <EmptyHint>{tC("noContactInfo")}</EmptyHint>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  const details = (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{tR("detailsTitle")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FieldList>
+          <Field label={tD("fieldCompany")} always>
+            {cData.companyId && companyName ? (
+              <Link href={`/dashboard/companies/${cData.companyId}`} className={TAP_LINK}>
+                <BuildingIcon className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{companyName}</span>
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">{tD("noCompanyLinked")}</span>
+            )}
+          </Field>
+          <Field label={tD("fieldJobTitle")}>{cData.jobTitle}</Field>
+          <Field label={tD("fieldDepartment")}>{cData.department}</Field>
+          <Field label={tD("fieldOwner")} always>
+            {ownerName ?? tR("unassigned")}
+          </Field>
+          <Field label={tD("fieldStatus")}>
+            <StatusBadge tone={STATUS_TONE[cData.status] ?? "neutral"}>{statusLabel}</StatusBadge>
+          </Field>
+          <Field label={tD("fieldScore")}>
+            {cData.leadScore != null && (
+              <span className="flex items-center gap-2">
+                <Progress value={cData.leadScore} className="h-2 max-w-32 flex-1" />
+                <span className="font-semibold tabular-nums">{cData.leadScore}</span>
+              </span>
+            )}
+          </Field>
+          <Field label={tD("fieldSource")}>{sourceLabel}</Field>
+          <Field label={tD("fieldTags")}>
+            {cData.tags && cData.tags.length > 0 && (
+              <span className="flex flex-wrap gap-1.5">
+                {cData.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag}
+                  </Badge>
+                ))}
+              </span>
+            )}
+          </Field>
+          <Field label={tC("fieldMarketing")} always>
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <StatusBadge tone={cData.marketingConsent ? "success" : "neutral"}>
+                {cData.marketingConsent ? tD("marketingAgreed") : tD("marketingNoConsent")}
+              </StatusBadge>
+              <ConsentDetail
+                granted={cData.marketingConsent}
+                decidedAt={cData.consentDate}
+                source={cData.consentSource}
+              />
+            </span>
+          </Field>
+          <Field label={tD("sectionAddress")}>
+            {address.length > 0 && (
+              <address className="not-italic">
+                {address.map((line) => (
+                  <span key={line} className="block">
+                    {line}
+                  </span>
+                ))}
+              </address>
+            )}
+          </Field>
+        </FieldList>
+
+        {/* Dates are looked up, not read: folded, like every rarely used field. */}
+        <details className="group/dates">
+          <summary className="flex min-h-9 w-fit cursor-pointer list-none items-center gap-1 text-muted-foreground text-xs hover:text-foreground max-md:min-h-11 [&::-webkit-details-marker]:hidden">
+            <span className="group-open/dates:hidden">{tR("showMore")}</span>
+            <span className="hidden group-open/dates:inline">{tR("showLess")}</span>
+            <ChevronDownIcon className="size-3.5 transition-transform group-open/dates:rotate-180" aria-hidden />
+          </summary>
+          <FieldList className="pt-2">
+            <Field label={tR("created")}>
+              <FormattedDate date={cData.createdAt} />
+            </Field>
+            <Field label={tR("updated")}>
+              <FormattedDate date={cData.updatedAt} />
+            </Field>
+          </FieldList>
+        </details>
+
+        <div className="border-t pt-3">
+          <p className="mb-1 font-medium text-muted-foreground text-xs">{tD("fieldNotes")}</p>
+          {cData.notes ? (
+            <p className="whitespace-pre-wrap break-words text-sm">{cData.notes}</p>
+          ) : (
+            <p className="text-muted-foreground text-sm">—</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="flex flex-col gap-6">
+    <RecordPage>
       <RecordVisit
         type="contact"
         id={contactId}
         label={fullName || cData.email || contactId}
         sub={cData.email ?? null}
       />
+      <RecordBackLink href="/dashboard/contacts">{t("title")}</RecordBackLink>
 
-      {/* ── Hero ── */}
-      <Card>
-        <CardContent className="pt-6 pb-5">
-          <div className="flex flex-col items-start gap-4 sm:flex-row">
-            <div className="flex h-16 w-16 flex-shrink-0 select-none items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xl">
-              {initials || <UserIcon className="h-7 w-7" />}
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <h1 className="font-bold text-2xl leading-tight">{fullName}</h1>
-              {(cData.jobTitle || cData.department || companyName) && (
-                <p className="mt-0.5 text-muted-foreground text-sm">
-                  {[cData.jobTitle, cData.department, companyName].filter(Boolean).join(" · ")}
-                </p>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge variant="outline" className={`capitalize ${STATUS_STYLES[cData.status] ?? ""}`}>
-                  {cData.status}
-                </Badge>
-                {cData.leadScore != null && (
-                  <Badge variant="secondary" className="gap-1">
-                    <StarIcon className="h-3 w-3" />
-                    {tD("fieldScore")}: {cData.leadScore}
-                  </Badge>
-                )}
-              </div>
-            </div>
-
-            <div className="flex flex-shrink-0 items-center gap-2">
+      {/* ── Hero: who they are, where they work, how to reach them ── */}
+      <RecordHero
+        avatar={<RecordAvatar>{initials || <UserIcon className="size-6" />}</RecordAvatar>}
+        badges={
+          <>
+            <StatusBadge tone={STATUS_TONE[cData.status] ?? "neutral"}>{statusLabel}</StatusBadge>
+            {cData.leadScore != null && (
+              <StatusBadge tone={cData.leadScore >= 70 ? "success" : cData.leadScore >= 40 ? "warning" : "neutral"}>
+                <StarIcon aria-hidden />
+                {tD("fieldScore")}: {cData.leadScore}
+              </StatusBadge>
+            )}
+            {cData.assistantSince && (
+              // Being worked by an AI assistant (src/lib/assistant-handling.ts): Flux's own
+              // sequences and campaigns leave this person alone while it lasts.
+              <StatusBadge tone="info">
+                <BotIcon aria-hidden />
+                {tR("withAssistant", {
+                  name: cData.assistantName ?? "API",
+                  date: format.dateTime(new Date(cData.assistantSince), { day: "numeric", month: "short" }),
+                })}
+              </StatusBadge>
+            )}
+          </>
+        }
+        title={fullName || cData.email || tR("notSet")}
+        meta={
+          <>
+            {role && <MetaItem icon={<BriefcaseIcon aria-hidden />}>{role}</MetaItem>}
+            {companyName && (
+              <MetaItem
+                icon={<BuildingIcon aria-hidden />}
+                href={cData.companyId ? `/dashboard/companies/${cData.companyId}` : null}
+              >
+                {companyName}
+              </MetaItem>
+            )}
+            <MetaItem icon={<UserRoundIcon aria-hidden />}>
+              {ownerName ? tR("assignedTo", { name: ownerName }) : tR("unassigned")}
+            </MetaItem>
+          </>
+        }
+        actions={
+          <>
+            {callNumber && (
+              <Button asChild size="sm" variant="outline">
+                <a href={`tel:${callNumber}`}>
+                  <PhoneIcon className="size-3.5" aria-hidden />
+                  {tR("call")}
+                </a>
+              </Button>
+            )}
+            {/* Sending logs an activity and needs write access; without an address
+                the dialog could only answer that there is nowhere to send it. */}
+            {canWrite && cData.email && (
+              <SendEmailModal entity={cData} entityType="contact" templates={templates} ownerId={userId} />
+            )}
+            {canWrite && (
               <ContactModal contact={cData}>
                 <Button variant="outline" size="sm">
-                  <PencilIcon className="mr-1.5 h-4 w-4" />
-                  {t("editContact")}
+                  <PencilIcon className="size-3.5" aria-hidden />
+                  {tR("edit")}
                 </Button>
               </ContactModal>
-              <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
-              {hasMarketing && <EnrollInSequence entity="contact" recordId={cData.id} />}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── 3-column body ── */}
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        {/*
-          ⚠️ Below lg the two columns become one, and in source order that puts
-          four cards of read-only fields — contact details, company details, CRM
-          details, custom fields — above the two things this page is opened for:
-          what has been sold to this customer, and what has happened. About a
-          thousand pixels of scrolling before the first useful line.
-
-          `order` fixes it without moving anything in the markup, so the desktop
-          two-column arrangement is untouched: sidebar left, record right.
-        */}
-        {/* Sidebar */}
-        <div className="order-2 flex flex-col gap-6 lg:order-none">
-          {/* Contact Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{tD("sectionContactInfo")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {cData.email && (
-                <InfoRow label={tD("fieldEmail")}>
-                  <a
-                    href={`mailto:${cData.email}`}
-                    className="flex items-center gap-1.5 break-all text-primary hover:underline"
-                  >
-                    <MailIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    {cData.email}
-                  </a>
-                </InfoRow>
-              )}
-              {cData.phone && (
-                <InfoRow label={tD("fieldPhone")}>
-                  <a href={`tel:${cData.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                    <PhoneIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    {cData.phone}
-                  </a>
-                </InfoRow>
-              )}
-              {cData.mobile && (
-                <InfoRow label={tD("fieldMobile")}>
-                  <a href={`tel:${cData.mobile}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                    <SmartphoneIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    {cData.mobile}
-                  </a>
-                </InfoRow>
-              )}
-              {cData.linkedinUrl && (
-                <InfoRow label={tD("fieldLinkedIn")}>
-                  <a
-                    href={cData.linkedinUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 truncate text-primary hover:underline"
-                  >
-                    <LinkedinIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    LinkedIn
-                  </a>
-                </InfoRow>
-              )}
-              {!hasContactInfo && <p className="text-muted-foreground text-sm italic">{tD("notApplicable")}</p>}
-            </CardContent>
-          </Card>
-
-          {/* Company */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{tD("sectionCompanyInfo")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <InfoRow label={tD("fieldCompany")}>
-                {cData.companyId ? (
-                  <Link
-                    href={`/dashboard/companies/${cData.companyId}`}
-                    className="flex items-center gap-1.5 text-primary hover:underline"
-                  >
-                    <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                    {companyName}
-                  </Link>
-                ) : (
-                  <span className="text-muted-foreground text-sm italic">{tD("noCompanyLinked")}</span>
-                )}
-              </InfoRow>
-              {cData.jobTitle && (
-                <InfoRow label={tD("fieldJobTitle")}>
-                  <span className="flex items-center gap-1.5">
-                    <BriefcaseIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {cData.jobTitle}
-                  </span>
-                </InfoRow>
-              )}
-              {cData.department && <InfoRow label={tD("fieldDepartment")}>{cData.department}</InfoRow>}
-            </CardContent>
-          </Card>
-
-          {/* CRM Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">{tD("sectionCrmInfo")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <InfoRow label={tD("fieldStatus")}>
-                <Badge variant="outline" className={`capitalize ${STATUS_STYLES[cData.status] ?? ""}`}>
-                  {cData.status}
-                </Badge>
-              </InfoRow>
-              {cData.leadScore != null && (
-                <InfoRow label={tD("fieldScore")}>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Progress value={cData.leadScore} className="h-2 flex-1" />
-                    <span className="w-8 text-right font-semibold text-sm tabular-nums">{cData.leadScore}</span>
-                  </div>
-                </InfoRow>
-              )}
-              {cData.source && (
-                <InfoRow label={tD("fieldSource")}>
-                  <span className="capitalize">{cData.source}</span>
-                </InfoRow>
-              )}
-              {ownerName && (
-                <InfoRow label={tD("fieldOwner")}>
-                  <span className="flex items-center gap-1.5">
-                    <UserIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {ownerName}
-                  </span>
-                </InfoRow>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Address */}
-          {hasAddressInfo && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <MapPinIcon className="h-4 w-4 text-muted-foreground" />
-                  {tD("sectionAddress")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <address className="space-y-0.5 text-foreground/80 text-sm not-italic">
-                  {cData.street && <p>{cData.street}</p>}
-                  {(cData.city || cData.state || cData.zipCode) && (
-                    <p>{[cData.city, cData.state, cData.zipCode].filter(Boolean).join(", ")}</p>
-                  )}
-                  {cData.country && <p>{cData.country}</p>}
-                </address>
-              </CardContent>
-            </Card>
+            )}
+          </>
+        }
+      >
+        {/* Whether anything is waiting on this person. */}
+        <MetricStrip>
+          <Metric
+            label={tC("metricNextDue")}
+            tone={nextOverdue ? "danger" : undefined}
+            hint={
+              daysToNext != null
+                ? nextOverdue
+                  ? daysToNext < 0
+                    ? tR("overdueBy", { days: -daysToNext })
+                    : tR("overdue")
+                  : daysToNext === 0
+                    ? tR("today")
+                    : tR("inDays", { days: daysToNext })
+                : undefined
+            }
+          >
+            {nextDueDate
+              ? format.dateTime(nextDueDate, { day: "numeric", month: "short" })
+              : openTasks.length > 0
+                ? tR("notSet")
+                : "—"}
+          </Metric>
+          <Metric
+            label={tC("metricLastActivity")}
+            hint={
+              lastActivity
+                ? format.dateTime(lastActivity, { day: "numeric", month: "short", year: "numeric" })
+                : undefined
+            }
+          >
+            {daysSinceActivity == null
+              ? "—"
+              : daysSinceActivity === 0
+                ? tR("today")
+                : tR("daysAgo", { days: daysSinceActivity })}
+          </Metric>
+          {openDealsExact && (
+            <Metric label={tC("metricOpenDeals")} hint={tC("dealsCount", { count: openDeals.length })}>
+              <OpenDealsValue value={openDealsValue} />
+            </Metric>
           )}
+        </MetricStrip>
+      </RecordHero>
 
-          {/* Tags */}
-          {cData.tags && cData.tags.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <TagIcon className="h-4 w-4 text-muted-foreground" />
-                  {tD("fieldTags")}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-1.5">
-                  {cData.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Marketing Consent */}
-          <Card className="bg-muted/30">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                  {tD("marketingLabel")}
-                </span>
-                <Badge variant={cData.marketingConsent ? "default" : "outline"} className="text-[10px]">
-                  {cData.marketingConsent ? tD("marketingAgreed") : tD("marketingNoConsent")}
-                </Badge>
-              </div>
-              {cData.marketingConsent && cData.consentDate && (
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  <FormattedDate date={cData.consentDate} />
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          {cData.notes && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">{tD("fieldNotes")}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="whitespace-pre-wrap text-foreground/80 text-sm">{cData.notes}</p>
-              </CardContent>
-            </Card>
-          )}
-
-          <CustomFieldsPanel
-            entityType="contact"
-            entityId={contactId}
-            definitions={customFieldDefs}
-            values={customFieldVals}
-          />
-
-          <DocumentPanel entityType="contact" entityId={contactId} />
-        </div>
-
-        {/* ── Main: Timeline + Tasks ── */}
-        <div className="order-1 flex flex-col gap-6 lg:order-none lg:col-span-2">
-          {/* Above the notes on purpose: what happened commercially outranks what
-              somebody wrote down about it. */}
-          <CustomerRecordPanel record={record} contactId={contactId} />
-
-          {/* Timeline */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{tD("timelineTitle")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <form action={handleAddActivity} className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
-                <Textarea name="content" placeholder={tD("activityPlaceholder")} required className="bg-background" />
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <p className="font-bold text-[10px] text-muted-foreground uppercase">{tD("typeLabel")}</p>
-                    <select
-                      name="type"
-                      className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
-                    >
-                      <option value="note">{tD("activityTypes.note")}</option>
-                      <option value="call">{tD("activityTypes.call")}</option>
-                      <option value="meeting">{tD("activityTypes.meeting")}</option>
-                    </select>
-                  </div>
-                  <Button type="submit" size="sm">
-                    {tD("logActivity")}
-                  </Button>
-                </div>
-              </form>
-
-              <ActivityTimeline activities={activitiesList} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
-            </CardContent>
-          </Card>
-
-          {/* Tasks */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{tD("tasksNextStepsTitle")}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <QuickTaskForm entityType="contact" entityId={contactId} userId={userId ?? ""} />
-
-              <div className="mt-2 space-y-3">
-                {tasksList.length === 0 ? (
-                  <p className="py-6 text-center text-muted-foreground text-sm">{tD("noTasks")}</p>
-                ) : (
-                  tasksList.map((task) => (
-                    <div
-                      key={task.id}
-                      className={`rounded-lg border p-4 transition-all ${task.status === "done" ? "bg-muted/20 opacity-60" : "bg-card shadow-sm"}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-start gap-3">
-                          <div
-                            className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 ${
-                              task.status === "done" ? "border-primary bg-primary" : "border-muted-foreground"
-                            }`}
-                          >
-                            {task.status === "done" && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
-                          </div>
-                          <div className="min-w-0">
-                            <p
-                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "text-muted-foreground line-through" : ""}`}
-                            >
-                              {task.title}
-                            </p>
-                            {task.description && (
-                              <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{task.description}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex flex-shrink-0 items-center gap-1.5">
-                          <Badge
-                            variant={
-                              task.priority === "blocker" || task.priority === "high"
-                                ? "destructive"
-                                : task.priority === "low"
-                                  ? "secondary"
-                                  : "default"
-                            }
-                            className={`text-[10px] uppercase ${task.priority === "critical" ? "border-orange-400 text-orange-600 dark:text-orange-400" : ""}`}
-                          >
-                            {task.priority}
-                          </Badge>
-                          <TaskModal
-                            task={task}
-                            users={allUsers}
-                            revalidatePathStr={`/dashboard/contacts/${contactId}`}
-                          />
-                          <form
-                            action={async () => {
-                              "use server";
-                              await deleteTask(task.id, `/dashboard/contacts/${contactId}`);
-                            }}
-                          >
-                            <button
-                              type="submit"
-                              className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                              title={tc("delete")}
-                            >
-                              <Trash2Icon className="h-3.5 w-3.5" />
-                            </button>
-                          </form>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between border-t border-dashed pt-3">
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <ClockIcon className="h-3 w-3" />
-                            {tD("createdLabel")} <FormattedDate date={task.createdAt} />
-                          </span>
-                          {task.status === "done" && task.completedAt && (
-                            <span className="flex items-center gap-1 font-medium text-green-600">
-                              <CheckCircle2Icon className="h-3 w-3" />
-                              {tD("completedLabel")} <FormattedDate date={task.completedAt} />
-                            </span>
-                          )}
-                          {task.startDate && (
-                            <span className="flex items-center gap-1">
-                              <CalendarIcon className="h-3 w-3" />
-                              {tD("startLabel")} <FormattedDate date={task.startDate} includeTime={!task.allDay} />
-                            </span>
-                          )}
-                          {task.dueDate && (
-                            <span
-                              className={`flex items-center gap-1 font-semibold ${
-                                task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : ""
-                              }`}
-                            >
-                              <CalendarIcon className="h-3 w-3" />
-                              {tD("dueLabel")} <FormattedDate date={task.dueDate} includeTime={!task.allDay} />
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <UserCheckIcon className="h-3 w-3" />
-                            {tD("toLabel")} {task.assigneeName || tD("myself")}
-                          </span>
-                        </div>
-                        <form
-                          action={async () => {
-                            "use server";
-                            await toggleTask(task.id, task.status);
-                          }}
-                        >
-                          <Button variant="outline" size="sm" className="h-6 bg-background px-2 text-[10px]">
-                            {task.status === "done" ? tD("undo") : tD("markDone")}
-                          </Button>
-                        </form>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
+      <RecordSections
+        label={tR("sectionsLabel")}
+        tabs={[
+          { id: "next", label: tR("tabs.nextSteps"), icon: <ListChecksIcon aria-hidden />, count: openTasks.length },
+          { id: "activity", label: tR("tabs.activity"), icon: <ClockIcon aria-hidden />, count: timelineSummary.count },
+          { id: "details", label: tR("tabs.details"), icon: <InfoIcon aria-hidden /> },
+          {
+            id: "sales",
+            label: tR("tabs.sales"),
+            icon: <FileTextIcon aria-hidden />,
+            // Five of each are loaded; a count of the loaded rows would understate
+            // a busy customer, so none is shown rather than a wrong one.
+            count: salesCapped ? undefined : salesCount,
+          },
+        ]}
+        sections={[
+          { tab: "next", column: "main", node: nextSteps },
+          { tab: "activity", column: "main", node: activity },
+          { tab: "details", column: "side", node: contactInfo },
+          { tab: "details", column: "side", node: details },
+          {
+            tab: "details",
+            column: "side",
+            node: (
+              <CustomFieldsPanel
+                entityType="contact"
+                entityId={contactId}
+                definitions={customFieldDefs}
+                values={customFieldVals}
+              />
+            ),
+          },
+          {
+            tab: "sales",
+            column: "side",
+            node: <CustomerRecordPanel record={record} contactId={contactId} canWrite={canWrite} />,
+          },
+          { tab: "sales", column: "side", node: <DocumentPanel entityType="contact" entityId={contactId} /> },
+          ...(can(tenantRole, "privacy:manage")
+            ? [
+                {
+                  tab: "details" as const,
+                  column: "side" as const,
+                  node: (
+                    <PrivacyCard
+                      contactPoint={cData.email ?? cData.phone ?? cData.mobile ?? null}
+                      listPath="/dashboard/contacts"
+                    />
+                  ),
+                },
+              ]
+            : []),
+        ]}
+      />
+    </RecordPage>
   );
 }

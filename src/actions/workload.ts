@@ -2,12 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
+import { addDaysToDate, fromWallValue, toWallDate } from "@/lib/wall-clock";
+import { allocateWorkload, DAILY_CAPACITY_HOURS, workingDayKeys } from "@/lib/workload-allocation";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -29,34 +32,27 @@ export type WorkloadCell = {
 export type WorkloadRow = {
   userId: string;
   userName: string;
-  days: Record<string, WorkloadCell>; // ISO date string → cell
+  days: Record<string, WorkloadCell>; // calendar day (YYYY-MM-DD) → cell
 };
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getWorkingDays(start: Date, end: Date): Date[] {
-  const days: Date[] = [];
-  const d = new Date(start);
-  d.setHours(0, 0, 0, 0);
-  const e = new Date(end);
-  e.setHours(0, 0, 0, 0);
-  while (d <= e) {
-    const dow = d.getDay();
-    if (dow !== 0 && dow !== 6) days.push(new Date(d));
-    d.setDate(d.getDate() + 1);
-  }
-  return days;
-}
-
-function toDateStr(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
-export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise<WorkloadRow[]> {
+/**
+ * Hours per person per working day from `from` to `to` (calendar days, `YYYY-MM-DD`),
+ * by the rule in src/lib/workload-allocation.ts. A task's dates become days on the
+ * workspace's clock: on Workers the server is UTC, and a task due at 00:30 in Rome is due
+ * that day, not the one before.
+ */
+export async function getWorkloadMatrix(from: string, to: string): Promise<WorkloadRow[]> {
   await requireCapability("report:read");
+  const days = workingDayKeys(from, to);
+  if (days.length === 0) return [];
   const db = await getDb();
+  const timeZone = await getWorkspaceTimeZone();
+  const windowStart = fromWallValue(from, timeZone);
+  const windowEnd = fromWallValue(addDaysToDate(to, 1), timeZone);
+  if (!windowStart || !windowEnd) return [];
+
   const taskList = await db
     .select({
       id: tasks.id,
@@ -66,122 +62,76 @@ export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise
       estimatedHours: tasks.estimatedHours,
       assigneeId: tasks.assigneeId,
       parentId: tasks.parentId,
+      status: tasks.status,
     })
     .from(tasks)
-    // overlap: task overlaps [startDate, endDate] iff dueDate >= startDate AND (startDate IS NULL OR startDate <= endDate)
+    // Overlaps the window: due on or after its start, and started (if at all) before its end.
     .where(
       and(
         isNotNull(tasks.dueDate),
-        gte(tasks.dueDate, startDate),
-        or(isNull(tasks.startDate), lte(tasks.startDate, endDate)),
+        gte(tasks.dueDate, windowStart),
+        or(isNull(tasks.startDate), lt(tasks.startDate, windowEnd)),
       ),
     );
 
   const taskIds = taskList.map((t) => t.id);
-
-  const raciAll =
+  const [raciAll, parentRows] = await Promise.all([
     taskIds.length > 0
-      ? await db
+      ? db
           .select({ taskId: taskAssignees.taskId, userId: taskAssignees.userId })
           .from(taskAssignees)
           .where(inArray(taskAssignees.taskId, taskIds))
-      : [];
+      : Promise.resolve([] as { taskId: string; userId: string }[]),
+    // Parents across every task, not only this window: a parent whose subtasks fall in view
+    // may itself start before it.
+    db
+      .selectDistinct({ id: tasks.parentId })
+      .from(tasks)
+      .where(isNotNull(tasks.parentId)),
+  ]);
 
   const raciByTask: Record<string, string[]> = {};
-  for (const r of raciAll) {
-    if (!raciByTask[r.taskId]) raciByTask[r.taskId] = [];
-    raciByTask[r.taskId].push(r.userId);
-  }
+  for (const r of raciAll) raciByTask[r.taskId] = [...(raciByTask[r.taskId] ?? []), r.userId];
 
-  const userIdSet = new Set<string>();
-  for (const t of taskList) {
-    if (t.assigneeId) userIdSet.add(t.assigneeId);
-    for (const uid of raciByTask[t.id] ?? []) userIdSet.add(uid);
-  }
+  const dayOf = (d: Date | null) => (d ? toWallDate(new Date(d), timeZone) : null);
+  const byId = new Map(taskList.map((t) => [t.id, t]));
+  const load = allocateWorkload(
+    taskList.map((t) => ({
+      id: t.id,
+      startDay: dayOf(t.startDate),
+      dueDay: dayOf(t.dueDate),
+      estimatedHours: t.estimatedHours ? parseFloat(t.estimatedHours) : null,
+      people: [t.assigneeId, ...(raciByTask[t.id] ?? [])],
+      parentId: t.parentId,
+      status: t.status,
+    })),
+    days,
+    new Set(parentRows.map((r: { id: string | null }) => r.id as string)),
+  );
 
   const allUsers = await db.select({ id: users.id, name: users.name }).from(users);
-  const displayUsers = allUsers.filter((u) => userIdSet.has(u.id));
-
-  const capacity = 8;
-  const allDays = getWorkingDays(startDate, endDate);
-
-  const matrix: Record<string, Record<string, WorkloadCell>> = {};
-  for (const u of displayUsers) {
-    matrix[u.id] = {};
-    for (const d of allDays) {
-      matrix[u.id][toDateStr(d)] = { hours: 0, capacity, tasks: [] };
-    }
-  }
-
-  // Tasks whose ID appears as parentId of another task are "containers" — skip them
-  // to avoid double-counting (their work is represented by their subtasks)
-  const parentTaskIds = new Set(taskList.map((t) => t.parentId).filter(Boolean));
-
-  for (const task of taskList) {
-    if (parentTaskIds.has(task.id)) continue;
-    const estH = task.estimatedHours ? parseFloat(task.estimatedHours) : 1; // default 1h when no estimate
-
-    // biome-ignore lint/style/noNonNullAssertion: filtered by isNotNull above
-    const end = new Date(task.dueDate!);
-    const start = task.startDate ? new Date(task.startDate) : new Date(startDate);
-    const allDayStrs = new Set(allDays.map(toDateStr));
-    const totalWorkDays = getWorkingDays(start, end);
-    const visibleWorkDays = totalWorkDays.filter((d) => allDayStrs.has(toDateStr(d)));
-    if (visibleWorkDays.length === 0) continue;
-
-    // divide by TOTAL span so partially-visible tasks don't inflate the daily rate
-    const hoursPerDay = estH / totalWorkDays.length;
-    const assignedUsers = new Set<string>();
-    if (task.assigneeId) assignedUsers.add(task.assigneeId);
-    for (const uid of raciByTask[task.id] ?? []) assignedUsers.add(uid);
-
-    for (const uid of assignedUsers) {
-      if (!matrix[uid]) continue;
-      for (const d of visibleWorkDays) {
-        const ds = toDateStr(d);
-        if (!matrix[uid][ds]) continue;
-        matrix[uid][ds].hours = Math.round((matrix[uid][ds].hours + hoursPerDay) * 100) / 100;
-        matrix[uid][ds].tasks.push({
-          id: task.id,
-          title: task.title,
-          hours: Math.round(hoursPerDay * 100) / 100,
-          estimatedHours: estH,
-          startDate: task.startDate ? toDateStr(new Date(task.startDate)) : null,
-          // biome-ignore lint/style/noNonNullAssertion: filtered above
-          dueDate: toDateStr(new Date(task.dueDate!)),
-        });
+  return allUsers
+    .filter((u: { id: string }) => load.has(u.id))
+    .map((u: { id: string; name: string | null }) => {
+      const cells: Record<string, WorkloadCell> = {};
+      for (const day of days) {
+        const cell = load.get(u.id)?.get(day);
+        cells[day] = {
+          hours: cell?.hours ?? 0,
+          capacity: DAILY_CAPACITY_HOURS,
+          tasks: (cell?.tasks ?? []).map((entry) => {
+            const task = byId.get(entry.id);
+            return {
+              ...entry,
+              title: task?.title ?? "",
+              startDate: dayOf(task?.startDate ?? null),
+              dueDate: dayOf(task?.dueDate ?? null) ?? "",
+            };
+          }),
+        };
       }
-    }
-  }
-
-  return displayUsers.map((u) => ({
-    userId: u.id,
-    userName: u.name ?? u.id,
-    days: matrix[u.id] ?? {},
-  }));
-}
-
-export type WorkloadConflict = {
-  userId: string;
-  userName: string;
-  date: string;
-  hours: number;
-  capacity: number;
-  tasks: WorkloadTaskEntry[];
-};
-
-export async function getWorkloadConflicts(startDate: Date, endDate: Date): Promise<WorkloadConflict[]> {
-  await requireCapability("report:read");
-  const matrix = await getWorkloadMatrix(startDate, endDate);
-  const conflicts: WorkloadConflict[] = [];
-  for (const row of matrix) {
-    for (const [date, cell] of Object.entries(row.days)) {
-      if (cell.hours > cell.capacity) {
-        conflicts.push({ userId: row.userId, userName: row.userName, date, ...cell });
-      }
-    }
-  }
-  return conflicts.sort((a, b) => a.date.localeCompare(b.date));
+      return { userId: u.id, userName: u.name ?? u.id, days: cells };
+    });
 }
 
 export async function rescheduleTaskDueDate(

@@ -75,7 +75,28 @@
       "participantsNamePlaceholder": "Name",
       "participantsEmailPlaceholder": "Email",
       "participantsNone": "No participants added.",
-      "participantsInternal": "internal"
+      "participantsInternal": "internal",
+      "durationLabel": "Duration",
+      "relatedLabel": "Related to",
+      "relatedPlaceholder": "Link a contact, company, deal or lead…",
+      "relatedSearch": "Type at least two letters…",
+      "relatedNone": "Nothing found.",
+      "relatedClear": "Remove the link",
+      "reminderAtStart": "When it starts",
+      "reminderMinutes": "{count, plural, one {# minute before} other {# minutes before}}",
+      "reminderHours": "{count, plural, one {# hour before} other {# hours before}}",
+      "reminderDays": "{count, plural, one {# day before} other {# days before}}",
+      "reminderHint": "You and the colleagues invited get a notification; external guests get the reminder in their own calendar.",
+      "roleRequired": "required",
+      "roleOptional": "optional",
+      "roleToggleHint": "Switch between required and optional",
+      "participantsAdd": "Add participant",
+      "participantsRemove": "Remove {name}",
+      "allDay": "All day",
+      "startDateLabel": "From",
+      "endDateLabel": "To",
+      "timeZoneHint": "Times are in the workspace's time zone ({zone}).",
+      "reminderHintAllDay": "For an all-day appointment the reminder counts back from midnight at its start."
     },
     "rsvp": {
       "accepted": "Accepted",
@@ -95,7 +116,17 @@
       "conflict": "<strong>Possible overlap</strong> with: {titles}",
       "jitsiHint": "A Jitsi Meet link will be generated automatically and included in the invitation.",
       "noParticipants": "No participants added. You can still create the appointment without any.",
-      "checkAvailability": "Check colleagues' availability"
+      "checkAvailability": "Check colleagues' availability",
+      "duplicateTitle": "Duplicate appointment",
+      "invalidEmail": "That email address is not valid.",
+      "invalidLink": "The video call link must start with http:// or https://.",
+      "timeChangedHint": "The time has changed: participants will be asked to answer again.",
+      "jitsiKept": "The existing room is kept: {link}",
+      "notifyCreate": "Email the invitation to the participants",
+      "notifyUpdate": "Email the update to the participants",
+      "save": "Save changes",
+      "createOnly": "Create appointment",
+      "updated": "Appointment updated."
     },
     "detail": {
       "cancelled": "Appointment cancelled.",
@@ -111,12 +142,145 @@
       "confirmTitle": "Cancel this appointment?",
       "confirmBody": "All participants will receive a cancellation notice by email. This cannot be undone.",
       "confirmBack": "No, go back",
-      "confirmYes": "Yes, cancel it"
+      "confirmYes": "Yes, cancel it",
+      "description": "Details, participants and actions for this appointment.",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "moreActions": "More actions",
+      "markCompleted": "Mark as held",
+      "markScheduled": "Mark as not held",
+      "markedCompleted": "Marked as held.",
+      "markedScheduled": "Back on the schedule.",
+      "delete": "Delete",
+      "deleteError": "Failed to delete the appointment.",
+      "deleteConfirmTitle": "Delete this appointment?",
+      "deleteConfirmBody": "It is removed for good, with its participants and their answers.",
+      "deleteYes": "Yes, delete it",
+      "confirmBodyShort": "It stays in the calendar history as cancelled. This cannot be undone.",
+      "notifyOnRemove": "{count, plural, one {Email a cancellation notice to the participant} other {Email a cancellation notice to the # participants}}",
+      "notFound": "This appointment no longer exists.",
+      "join": "Join video call",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied.",
+      "copyFailed": "Could not copy the link.",
+      "organizer": "Organizer",
+      "lastUpdated": "Last updated {date}",
+      "restore": "Restore",
+      "restored": "Appointment back on the calendar.",
+      "resend": "Send the invitation again",
+      "resent": "Invitation sent again.",
+      "downloadIcs": "Add to my calendar (.ics)",
+      "detachedOccurrence": "Changed on its own from a repeating appointment.",
+      "setAnswer": "Record an answer",
+      "setAnswerFor": "Record the answer of {name}",
+      "answerSaved": "Answer recorded.",
+      "seriesAnswers": "Answers apply to the whole series.",
+      "occurrencesRemoved": "Removed from the series.",
+      "close": "Close",
+      "back": "Back to the details",
+      "tally": {
+        "accepted": "{count} yes",
+        "tentative": "{count} maybe",
+        "declined": "{count} no",
+        "pending": "{count} awaiting"
+      }
     },
     "availability": {
       "time": "Time",
       "busy": "Busy",
       "free": "Free"
+    },
+    "status": {
+      "scheduled": "Scheduled",
+      "completed": "Held",
+      "cancelled": "Cancelled"
+    },
+    "duration": {
+      "minutes": "{m} min",
+      "hours": "{h} h",
+      "hoursMinutes": "{h} h {m} min",
+      "days": "{d, plural, one {# day} other {# days}}",
+      "daysHours": "{d, plural, one {# day} other {# days}} {h} h"
+    },
+    "recurrence": {
+      "label": "Repeat",
+      "badge": "Repeats",
+      "none": "Does not repeat",
+      "custom": "Custom…",
+      "every": "Every",
+      "interval": "How often",
+      "frequency": "Unit",
+      "unit": {
+        "DAILY": {
+          "one": "day",
+          "other": "days"
+        },
+        "WEEKLY": {
+          "one": "week",
+          "other": "weeks"
+        },
+        "MONTHLY": {
+          "one": "month",
+          "other": "months"
+        },
+        "YEARLY": {
+          "one": "year",
+          "other": "years"
+        }
+      },
+      "ends": "Ends",
+      "endNever": "never",
+      "endUntil": "on a date",
+      "endCount": "after a number of times",
+      "occurrences": {
+        "one": "time",
+        "other": "times"
+      },
+      "daily": "{n, plural, one {Every day} other {Every # days}}",
+      "weekdays": "Every weekday (Monday to Friday)",
+      "weekly": "{n, plural, one {Every week} other {Every # weeks}} on {days}",
+      "monthlyDay": "{n, plural, one {Every month} other {Every # months}} on day {day}",
+      "monthlyNth": "{n, plural, one {Every month} other {Every # months}} on the {ordinal} {weekday}",
+      "yearly": "{n, plural, one {Every year} other {Every # years}} on {date}",
+      "count": "{count, plural, one {# time} other {# times}}",
+      "until": "until {date}",
+      "ordinal": {
+        "m": {
+          "1": "first",
+          "2": "second",
+          "3": "third",
+          "4": "fourth",
+          "last": "last"
+        },
+        "f": {
+          "1": "first",
+          "2": "second",
+          "3": "third",
+          "4": "fourth",
+          "last": "last"
+        }
+      }
+    },
+    "scope": {
+      "label": "Which events",
+      "this": "This event",
+      "following": "This and following events",
+      "all": "All events in the series",
+      "editTitle": "Edit a repeating appointment",
+      "editBody": "Which occurrences should the change apply to?",
+      "continue": "Continue",
+      "removeBody": "Which occurrences should be removed?",
+      "editing": {
+        "this": "You are changing this occurrence only: it will become a separate appointment.",
+        "following": "You are changing this occurrence and every one after it.",
+        "all": "You are changing every occurrence in the series. Times move by as much as this one does."
+      }
+    },
+    "drag": {
+      "moved": "Appointment moved.",
+      "confirmTitle": "Move this appointment?",
+      "confirmBody": "From {from} to {to}.",
+      "confirmYes": "Move it"
     }
   },
   "auth": {
@@ -235,6 +399,19 @@
       "password": "Password",
       "copyPassword": "Copy password",
       "fill": "Fill the fields"
+    },
+    "workspaces": {
+      "title": "Choose a workspace",
+      "subtitle": "Choose the workspace you want to open.",
+      "switchFailed": "This workspace could not be opened.",
+      "unexpected": "Something unexpected went wrong. Please try again.",
+      "noneTitle": "Your account is ready",
+      "noneLead": "You are not part of any workspace yet.",
+      "invitedTitle": "Were you invited?",
+      "invitedBody": "Open the link in the invitation email: it takes you straight into your team's workspace. If you cannot find it, check your spam folder or ask whoever invited you to send it again.",
+      "newTitle": "Want a workspace for your company?",
+      "newBody": "The Flux team has your request and will write to {email} as soon as the workspace is ready.",
+      "signOut": "Sign out"
     }
   },
   "automation": {
@@ -280,7 +457,9 @@
       "onUpdate": "On Update",
       "onCreateDesc": "Runs when a new record is created",
       "onUpdateDesc": "Runs when a record is modified",
-      "scheduled": "Scheduled"
+      "scheduled": "Scheduled",
+      "scheduledInactive": "Schedule not active",
+      "scheduledInactiveHint": "Scheduled rules do not run. Open the rule to remove the schedule."
     },
     "cron": {
       "daily": "Daily at {hour}:{minute}",
@@ -413,7 +592,9 @@
         "slaBreach": "SLA Breach",
         "orSchedule": "Or schedule this automation:",
         "dailySchedule": "Daily Schedule (time)",
-        "scheduledAt": "Scheduled daily at {time}"
+        "scheduledAt": "Scheduled daily at {time}",
+        "scheduleUnavailable": "This rule has a daily schedule (at {time}) that does not run: scheduled rules are not active yet. Remove it, and leave whatever must happen to a rule that fires on an event.",
+        "onSchedule": "Every morning, when the conditions hold"
       },
       "conditions": {
         "empty": "No conditions added",
@@ -439,7 +620,10 @@
         "is_not_empty": "is not empty",
         "changed": "changed",
         "changed_to": "changed to",
-        "changed_from": "changed from"
+        "changed_from": "changed from",
+        "date_in_past": "is in the past",
+        "date_within_days": "is within the next (days)",
+        "older_than_days": "is more than (days) ago"
       },
       "actionTypes": {
         "create_task": "Create Task",
@@ -544,7 +728,7 @@
         "currency": "Currency",
         "probability": "Probability (%)",
         "status": "Status",
-        "stageId": "Stage (ID)",
+        "stageId": "Stage",
         "notes": "Notes",
         "firstName": "First Name",
         "lastName": "Last Name",
@@ -564,7 +748,10 @@
         "subject": "Subject",
         "totalAmount": "Total",
         "discountPercent": "Discount (%)",
-        "orderNumber": "Order number"
+        "orderNumber": "Order number",
+        "ownerId": "Owner",
+        "expectedCloseDate": "Expected close date",
+        "idleDays": "Days without activity"
       },
       "options": {
         "deal": {
@@ -632,6 +819,18 @@
         "triggerRequired": "Select at least one trigger event",
         "conditionRequired": "At least one condition is required",
         "actionRequired": "At least one action is required"
+      },
+      "test": {
+        "title": "Test on a record",
+        "pick": "Choose a record",
+        "none": "No records of this kind yet",
+        "run": "Test",
+        "wouldRun": "The rule would run on this record.",
+        "wouldNotRun": "The rule would not run on this record.",
+        "holds": "holds",
+        "fails": "does not hold",
+        "line": "{field}: {actual}",
+        "empty": "(empty)"
       }
     },
     "expressionEditor": {
@@ -669,8 +868,6 @@
     "title": "Opening hours",
     "description": "Policies set to working hours count only the time inside these windows, so a promise made on a Friday evening is not broken overnight.",
     "notMigrated": "The workspace database has not been migrated for this yet, so these are the defaults and cannot be saved. Run Migrate DB from the platform admin panel, then reload.",
-    "timeZone": "Time zone",
-    "timeZoneHint": "An IANA name, such as Europe/Rome or America/New_York.",
     "to": "to",
     "closed": "Closed",
     "save": "Save hours",
@@ -692,7 +889,8 @@
     "wednesday": "Wednesday",
     "thursday": "Thursday",
     "friday": "Friday",
-    "saturday": "Saturday"
+    "saturday": "Saturday",
+    "timeZoneElsewhere": "Hours are counted on the workspace's time zone, <b>{zone}</b>, which is set in <link>Settings → General</link>."
   },
   "calendar": {
     "title": "Calendar",
@@ -751,7 +949,15 @@
     "noEventsThisDay": "No events scheduled for this day",
     "previousPeriod": "Previous period",
     "nextPeriod": "Next period",
-    "newAppointment": "New appointment"
+    "newAppointment": "New appointment",
+    "newAppointmentAt": "New appointment at {time}",
+    "newAppointmentOn": "New appointment on this day",
+    "list": "List",
+    "listEmpty": "Nothing in the next {days} days.",
+    "dragHint": "Drag an appointment to move it, or its lower edge to change its length. Click an empty slot to add one.",
+    "newAllDayOn": "New all-day appointment on this day",
+    "viewLabel": "Calendar view",
+    "filterLabel": "Whose appointments"
   },
   "calendarFeed": {
     "subscribe": "Subscribe",
@@ -825,7 +1031,7 @@
     "mutedForever": "Muted forever",
     "mutedDays": "Muted {count}d",
     "mutedHours": "Muted {count}h",
-    "leaveGroupConfirm": "Leave this group?",
+    "leaveGroupConfirm": "You will leave the group and stop receiving its messages. The other members will keep it.",
     "deleteConvConfirm": "Delete this conversation? This cannot be undone.",
     "groupNamePlaceholder": "Group name…",
     "selectMembers": "Select members",
@@ -840,7 +1046,7 @@
       "createGroupFailed": "The group could not be created.",
       "muteFailed": "The mute setting could not be saved.",
       "leaveFailed": "Could not leave the group.",
-      "deleteConfirm": "Delete this conversation? All messages will be permanently removed.",
+      "deleteConfirm": "The conversation and all its messages will be deleted for both of you. This cannot be undone.",
       "deleteFailed": "The conversation could not be deleted.",
       "directTab": "Direct",
       "noGroups": "No groups yet",
@@ -852,7 +1058,19 @@
       "noUsers": "No users found",
       "addMembers": "Add members…",
       "createGroupWithCount": "Create group ({count, plural, one {# member} other {# members}})"
-    }
+    },
+    "loadOlder": "Load earlier messages",
+    "loadOlderFailed": "Could not load the earlier messages.",
+    "deleteConvTitle": "Delete this conversation?",
+    "noColleagues": "There are no colleagues in this workspace to write to yet. Invite them from Users.",
+    "attach": "Attach a file",
+    "removeAttachment": "Remove the file",
+    "attachmentHint": "PDF, Office documents, images or text, up to 10 MB.",
+    "attachmentTooLarge": "The file is larger than 10 MB.",
+    "download": "Download {name}",
+    "mentionPeople": "Mention someone",
+    "mentionNoMatch": "Nobody in this conversation by that name",
+    "youWereMentioned": "You were mentioned"
   },
   "common": {
     "actions": "Actions",
@@ -1115,6 +1333,19 @@
     },
     "fields": {
       "priceList": "Price list"
+    },
+    "detail": {
+      "metricPipeline": "Open pipeline",
+      "openDeals": "{count, plural, =0 {No open deals} one {# open deal} other {# open deals}}",
+      "metricWon": "Won revenue",
+      "wonDeals": "{count, plural, =0 {No deals won yet} one {# deal won} other {# deals won}}",
+      "metricTickets": "Open tickets",
+      "metricLastActivity": "Last activity",
+      "score": "Score {score}",
+      "noPeople": "Nobody from this company is in the CRM yet.",
+      "peopleShown": "Showing {shown} of {total}",
+      "callPerson": "Call {name}",
+      "emailPerson": "Email {name}"
     }
   },
   "contacts": {
@@ -1219,6 +1450,16 @@
     "modal": {
       "departmentPlaceholder": "Sales, Marketing…",
       "similarExist": "Similar contacts already exist:"
+    },
+    "detail": {
+      "metricNextDue": "Next task due",
+      "metricLastActivity": "Last activity",
+      "metricOpenDeals": "Open deals",
+      "dealsCount": "{count, plural, =0 {No open deals} one {# deal} other {# deals}}",
+      "moreTasks": "{count, plural, one {Show # more task} other {Show # more tasks}}",
+      "earlierActivity": "{count, plural, one {Show # earlier activity} other {Show # earlier activities}}",
+      "noContactInfo": "No email or phone number yet.",
+      "fieldMarketing": "Marketing consent"
     }
   },
   "crm": {
@@ -1245,7 +1486,7 @@
     "noOpenTickets": "No open tickets",
     "noUrgentTickets": "No urgent tickets",
     "openDeals": "Open Deals",
-    "openQuotesCount": "{count} open quotes",
+    "openQuotesCount": "{count} awaiting the customer",
     "openTickets": "Open Tickets",
     "overdueLabel": "{count} Overdue",
     "overview": "Overview",
@@ -1329,7 +1570,17 @@
       "viewAllTasks": "View all tasks",
       "schedule": "Schedule",
       "noTimedItems": "No appointments scheduled"
-    }
+    },
+    "viewLabel": "Whose numbers",
+    "viewMe": "Me",
+    "viewTeam": "Team",
+    "myWon": "Won this month",
+    "myWonOf": "of a target of",
+    "myWonNoTarget": "No target set for this month",
+    "myBareDeals": "Deals with no next step",
+    "myBareDealsDesc": "Open deals of yours with nothing planned",
+    "myToday": "Today",
+    "myTodayDesc": "Tasks, calls and meetings on your agenda"
   },
   "currency": {
     "switchCurrency": "Switch currency",
@@ -1480,7 +1731,10 @@
     "fieldEmployees": "Employees",
     "fieldRevenue": "Annual Revenue",
     "fieldDescription": "Description",
-    "fieldSdiCode": "SDI Code"
+    "fieldSdiCode": "SDI Code",
+    "callAction": "Call",
+    "undoFailed": "Could not reopen the task.",
+    "emailFrom": "From"
   },
   "errors": {
     "404": "Page not found",
@@ -1589,7 +1843,10 @@
       "companyCategoryId": "Category",
       "companyTypeId": "Activity Type",
       "leadTypeId": "Lead Type",
-      "leadCategoryId": "Lead Category"
+      "leadCategoryId": "Lead Category",
+      "ownerId": "Owner",
+      "tags": "Tags",
+      "lastActivity": "Last activity"
     },
     "cancel": "Cancel",
     "save": "Save",
@@ -1602,7 +1859,11 @@
       "saved": "Filter saved.",
       "saveFailed": "Failed to save filter.",
       "deleted": "Filter deleted.",
-      "deleteFailed": "Failed to delete filter."
+      "deleteFailed": "Failed to delete filter.",
+      "team": "Team",
+      "pin": "Pin above the list",
+      "share": "Share with the team",
+      "pinnedLabel": "Pinned views"
     },
     "optionValues": {
       "new": "New",
@@ -1649,7 +1910,7 @@
     "lastMonth": "Last Month",
     "thisYear": "This Year",
     "lastYear": "Last Year",
-    "totalRevenue": "Total Revenue",
+    "totalRevenue": "Value won",
     "totalExpenses": "Total Expenses",
     "netProfit": "Net Profit",
     "averageOrderValue": "Avg. Order Value",
@@ -1657,15 +1918,13 @@
     "overviewSubtitle": "Revenue performance, pipeline value and deal win rate.",
     "viewPipeline": "View Pipeline",
     "pipelineValue": "Pipeline Value",
-    "winRate": "Win Rate",
     "lastMonthRevenue": "{amount} last month",
-    "dealsAndOrders": "Deals won + Orders completed",
-    "dealsAndOrdersShort": "Deals won + Orders",
+    "dealsAndOrders": "Deals closed as won, all time",
+    "dealsAndOrdersShort": "Deals closed as won this month",
     "pipelineWeighted": "{raw} raw · weighted by probability",
     "vsLastMonth": "{delta}% vs last month",
-    "winRateDesc": "{won} won · {lost} lost · last 90 days",
     "revenueTrend": "Revenue Trend",
-    "revenueTrendDesc": "Won deals and completed orders — last 12 months",
+    "revenueTrendDesc": "Won deals and completed orders, side by side and not added up — last 12 months",
     "dealsLabel": "Deals",
     "ordersLabel": "Orders",
     "dealsWonLabel": "Deals Won",
@@ -1674,11 +1933,6 @@
     "revenueSources": "Revenue Sources",
     "revenueSourcesDesc": "Breakdown of total revenue by source",
     "total": "Total",
-    "pipelineHealth": "Pipeline Health",
-    "openDealsByStage": "Open deals by stage",
-    "viewArrow": "View →",
-    "openDealsInPipeline": "{count, plural, one {# open deal in pipeline} other {# open deals in pipeline}}",
-    "noOpenDeals": "No open deals in pipeline.",
     "cardOverview": {
       "title": "My card",
       "description": "1 of 4 cards added · Overview of your primary card and upcoming payments",
@@ -1697,6 +1951,33 @@
       "rent": "Apartment rent",
       "electricity": "Electricity bill",
       "creditCard": "Credit card payment"
+    },
+    "ordersThisMonth": "Orders completed this month",
+    "ordersThisMonthDesc": "{count, plural, one {# order} other {# orders}}",
+    "ordersThisMonthUnconverted": "{count, plural, one {# order} other {# orders}}, {unconverted} in a currency with no known rate left out",
+    "receivables": {
+      "title": "Receivables",
+      "subtitle": "Issued invoices still owed something, the most overdue first. Record a payment on the invoice.",
+      "empty": "Nothing is owed: every issued invoice is paid.",
+      "owed": "{amount} owed",
+      "overdue": "{amount} overdue",
+      "daysOverdue": "{days, plural, one {# day late} other {# days late}}",
+      "notDue": "Not yet due",
+      "bucket": {
+        "current": "Not yet due",
+        "1-30": "1–30 days",
+        "31-60": "31–60 days",
+        "61-90": "61–90 days",
+        "90+": "Over 90 days"
+      },
+      "cols": {
+        "invoice": "Invoice",
+        "customer": "Customer",
+        "due": "Due",
+        "status": "Status",
+        "total": "Due amount",
+        "outstanding": "Outstanding"
+      }
     }
   },
   "leads": {
@@ -1822,7 +2103,19 @@
     },
     "detail": {
       "convertedTo": "Converted to",
-      "convertedOn": "Converted on <date></date>"
+      "convertedOn": "Converted on <date></date>",
+      "convertedContact": "Contact",
+      "convertedDeal": "Deal",
+      "convertedGone": "The records created from this lead have since been deleted.",
+      "metricLastContact": "Last contact",
+      "neverContacted": "Never",
+      "metricNextStep": "Next step",
+      "nothingPlanned": "None",
+      "stepOf": "Step {current} of {total}",
+      "marketingConsent": "Marketing consent",
+      "statusChanged": "Status: {status}",
+      "statusFailed": "Could not change the status. Try again.",
+      "moveTo": "Set status to {status}"
     }
   },
   "lostDeal": {
@@ -2025,7 +2318,14 @@
         "unsubscribedCount": "{count} unsubscribed",
         "complaintsCount": "{count, plural, one {# complaint} other {# complaints}}",
         "sendLogTitle": "Send Log",
-        "sendLogDesc": "{count, plural, one {# total recipient} other {# total recipients}} — filter by status or search by name / email"
+        "sendLogDesc": "{count, plural, one {# total recipient} other {# total recipients}} — filter by status or search by name / email",
+        "recipientsHint": "{sent, number} sent{queued, plural, =0 {} other { · # queued}}{failed, plural, =0 {} other { · # failed}}",
+        "ofSent": "{count, number} of {sent, number} sent",
+        "openTemplate": "Open in the editor",
+        "previewTextLabel": "Preview text",
+        "segmentLabel": "Segment",
+        "segmentNotVisible": "A saved filter you cannot see",
+        "trackingLabel": "Tracking"
       }
     },
     "templateCategories": {
@@ -2357,7 +2657,7 @@
     "items": {
       "apiKeys": "API keys",
       "automations": "Automations",
-      "billing": "Billing",
+      "billing": "Subscription",
       "assistantContribution": "Assistant's contribution",
       "calendar": "Calendar",
       "campaigns": "Campaigns",
@@ -2399,11 +2699,20 @@
       "sequences": "Sequences",
       "invoicing": "E-invoicing",
       "invoices": "Invoices",
-      "priceLists": "Price lists"
+      "priceLists": "Price lists",
+      "features": "Features",
+      "general": "General",
+      "lists": "Lists",
+      "notificationSettings": "My notifications",
+      "profile": "Profile",
+      "repScorecard": "Per salesperson",
+      "webForms": "Forms",
+      "supportAgents": "Support by agent",
+      "commissions": "Commissions"
     },
     "user": {
       "profile": "Profile",
-      "billing": "Billing",
+      "billing": "Subscription",
       "notifications": "Notifications",
       "logout": "Log out",
       "unknownUser": "Unknown User"
@@ -2413,6 +2722,30 @@
     "notInPlan": "{title} — not included in your plan",
     "accountSwitcher": {
       "account": "Account"
+    },
+    "mobile": {
+      "barLabel": "Main navigation",
+      "create": "Create",
+      "menu": "Menu",
+      "createTitle": "Create",
+      "menuTitle": "Menu",
+      "menuDescription": "Every section of the CRM, your account and preferences.",
+      "shortcutsTitle": "Bar shortcuts",
+      "shortcutsHint": "{count, plural, one {Choose the section} other {Choose up to # sections}} to keep in the bottom bar, in order.",
+      "shortcutsReset": "Restore defaults",
+      "shortcutsDone": "Done",
+      "shortcutsEdit": "Edit",
+      "shortcutsDefault": "default",
+      "preferences": "Preferences",
+      "language": "Language",
+      "currency": "Currency",
+      "theme": "Theme",
+      "switchWorkspace": "Switch workspace",
+      "back": "Back"
+    },
+    "scope": {
+      "showAll": "Show all sections ({count} more)",
+      "essentials": "Show only the essentials"
     }
   },
   "nextActions": {
@@ -2436,7 +2769,22 @@
     "shouldHaveClosed": "Should have closed {n}d ago",
     "noContactFor": "No contact for {n}d",
     "arrivedNeverContacted": "Arrived {n}d ago, never contacted",
-    "failed": "This list could not be loaded. Everything else on the page is fine."
+    "failed": "This list could not be loaded. Everything else on the page is fine.",
+    "dealNoNextStep": "Plan the next step",
+    "replyDue": "Reply",
+    "quoteToOrder": "Turn it into an order",
+    "nothingPlanned": "Nothing planned, idle {n} d",
+    "waitingReply": "Waiting {n} d for your answer",
+    "acceptedWaiting": "Accepted {n} d ago",
+    "rowActions": "Actions for {title}",
+    "replied": "Replied",
+    "planFollowUp": "Plan the follow-up",
+    "snoozeTomorrow": "Not today",
+    "snooze3": "In 3 days",
+    "snoozeWeek": "In a week",
+    "snoozed": "Put aside for {days, plural, one {a day} other {# days}}.",
+    "actionFailed": "Could not do that.",
+    "startQueue": "Work through them"
   },
   "orders": {
     "title": "Orders",
@@ -2575,7 +2923,10 @@
       "totalCol": "Total",
       "closedHint": "Closed. Change the status to reopen it.",
       "cancelledHint": "Cancelled.",
-      "openTickets": "Open tickets about this order"
+      "openTickets": "Open tickets about this order",
+      "sourceQuote": "From quote",
+      "sourceDeal": "From deal",
+      "noInvoices": "Not invoiced yet."
     },
     "payments": {
       "title": "Payment",
@@ -2602,7 +2953,114 @@
       }
     }
   },
+  "record": {
+    "sectionsLabel": "Record sections",
+    "tabs": {
+      "overview": "Overview",
+      "nextSteps": "Next steps",
+      "activity": "Activity",
+      "details": "Details",
+      "sales": "Sales",
+      "deals": "Deals",
+      "contacts": "Contacts",
+      "people": "People",
+      "tickets": "Tickets",
+      "documents": "Documents",
+      "files": "Files",
+      "lines": "Lines",
+      "payments": "Payments",
+      "history": "History",
+      "settings": "Settings",
+      "invoices": "Invoices",
+      "quotes": "Quotes",
+      "orders": "Orders",
+      "steps": "Steps",
+      "enrollments": "Enrolled",
+      "conversation": "Conversation",
+      "recipients": "Recipients",
+      "content": "Content",
+      "prices": "Prices",
+      "terms": "Terms",
+      "comments": "Comments",
+      "tasks": "Tasks"
+    },
+    "email": "Email",
+    "call": "Call",
+    "edit": "Edit",
+    "more": "More",
+    "assignedTo": "Assigned to {name}",
+    "unassigned": "Unassigned",
+    "notSet": "Not set",
+    "today": "Today",
+    "inDays": "{days, plural, one {in # day} other {in # days}}",
+    "daysAgo": "{days, plural, one {# day ago} other {# days ago}}",
+    "overdueBy": "{days, plural, one {# day overdue} other {# days overdue}}",
+    "overdue": "overdue",
+    "created": "Created",
+    "updated": "Last updated",
+    "owner": "Owner",
+    "notes": "Notes",
+    "detailsTitle": "Details",
+    "showMore": "Show more",
+    "showLess": "Show less",
+    "nothingYet": "Nothing here yet.",
+    "withAssistant": "With {name} since {date}"
+  },
   "pipeline": {
+    "detail": {
+      "stagePathLabel": "Pipeline stages",
+      "stepOf": "Stage {current} of {total}",
+      "noStages": "This pipeline has no stages yet.",
+      "moveToStage": "Move to {stage}",
+      "stageMoved": "Moved to {stage}",
+      "moveFailed": "Could not update the deal. Try again.",
+      "markWon": "Mark as won",
+      "markLost": "Mark as lost",
+      "markedWon": "Deal marked as won",
+      "markedLost": "Deal closed as lost",
+      "wonTitle": "Close “{name}” as won?",
+      "wonDescription": "The deal leaves the open pipeline and counts as revenue from today. Integrations and automations are notified. You can reopen it later.",
+      "cancel": "Cancel",
+      "wonOn": "Won on {date}",
+      "lostOn": "Lost on {date}",
+      "closedWon": "Won",
+      "closedLost": "Lost",
+      "reopen": "Reopen",
+      "reopened": "Deal reopened",
+      "assignedTo": "Assigned to {name}",
+      "unassigned": "Unassigned",
+      "email": "Email",
+      "metricValue": "Value",
+      "metricProbability": "Probability",
+      "metricWeighted": "Weighted value",
+      "metricClose": "Expected close",
+      "metricClosed": "Closed on",
+      "notSet": "Not set",
+      "today": "Today",
+      "inDays": "{days, plural, one {in # day} other {in # days}}",
+      "overdueBy": "{days, plural, one {# day overdue} other {# days overdue}}",
+      "overdue": "overdue",
+      "noOpenTasks": "Nothing planned. What is the next step?",
+      "completedTasks": "Completed ({count})",
+      "tabActivity": "Activity",
+      "tabComments": "Comments",
+      "detailsTitle": "Details",
+      "fieldStage": "Stage",
+      "fieldOwner": "Owner",
+      "fieldCompany": "Company",
+      "fieldContact": "Contact",
+      "fieldCreated": "Created",
+      "fieldUpdated": "Last updated",
+      "fieldLostAt": "Stopped at",
+      "fieldLossReason": "Loss reason",
+      "fieldCompetitor": "Lost to",
+      "fieldLossNote": "Note",
+      "salesTitle": "Quotes & orders",
+      "quotesHeading": "Quotes",
+      "ordersHeading": "Orders",
+      "changeStage": "Change stage",
+      "addQuote": "New quote"
+    },
     "title": "Pipeline",
     "newDeal": "New Deal",
     "editDeal": "Edit Deal",
@@ -2653,7 +3111,7 @@
     "probabilityAdjusted": "Probability-adjusted",
     "stageBreakdown": "Stage Breakdown",
     "deals": "Deals",
-    "avgDays": "Avg. Days",
+    "avgDays": "Days in stage",
     "charts": {
       "valueByStage": "Value by Stage",
       "dealVelocity": "Deal Velocity (avg days in stage)",
@@ -2713,13 +3171,13 @@
       "title": "Revenue Forecast",
       "subtitle": "Weighted forecast for the next 6 months based on deal probability",
       "totalPipeline": "Total Pipeline",
-      "totalPipelineDesc": "Weighted by probability (all open deals)",
+      "totalPipelineDesc": "Weighted by probability: open deals closing in the next six months",
       "bestCase": "Best Case",
       "bestCaseDesc": "Deals with probability ≥ 50%",
       "committed": "Committed",
       "committedDesc": "Deals with probability ≥ 80%",
       "vsTarget": "vs. Target",
-      "vsTargetDesc": "Committed vs {amount} target",
+      "vsTargetDesc": "{won} already won + {committed} committed, against a {amount} target",
       "noTarget": "No target set.",
       "setTargets": "Set targets →",
       "monthlyChart": "Monthly Forecast — Next 6 Months",
@@ -2732,7 +3190,12 @@
       "noAssignedDeals": "No assigned deals",
       "colOwner": "Owner",
       "colDeals": "Deals",
-      "colWeightedValue": "Weighted Value"
+      "colWeightedValue": "Weighted Value",
+      "outsideTitle": "Outside the forecast",
+      "outsideOverdue": "{count, plural, one {# open deal has} other {# open deals have}} a close date already past · {amount}",
+      "outsideUnscheduled": "{count, plural, one {# open deal has} other {# open deals have}} no close date in the next six months · {amount}",
+      "outsideHint": "They are not in the figures above: they need a date, or a decision.",
+      "outsideOpenBoard": "Open the pipeline"
     },
     "comments": {
       "placeholder": "Add a comment…",
@@ -2803,7 +3266,6 @@
       "stageRequired": "Stage is required",
       "probabilityRange": "Enter a value between 0 and 100"
     },
-    "healthScore": "Health: {score}/100",
     "deleteTask": "Delete task",
     "noData": "No data",
     "views": {
@@ -2813,7 +3275,8 @@
       "winLoss": "Won / Lost",
       "targets": "Targets",
       "territories": "Territories",
-      "report": "Report"
+      "report": "Report",
+      "commissions": "Commissions"
     },
     "filters": {
       "sections": "Pipeline sections",
@@ -2840,11 +3303,72 @@
         "lost": "Lost"
       },
       "searchDeals": "Search deals…",
-      "reset": "Reset filters"
+      "reset": "Reset filters",
+      "closedIn": "Closed in {period}",
+      "closedRemove": "Remove filter: closed in {period}",
+      "pipeline": "Pipeline",
+      "allPipelines": "All pipelines",
+      "sectionPicker": "Section: {section}. Change section",
+      "filters": "Filters",
+      "filtersAria": "{count, plural, =0 {Filters} one {Filters, # on} other {Filters, # on}}",
+      "activeFilters": "Active filters",
+      "removeFilter": "Remove the filter: {label}",
+      "showResults": "Show results",
+      "statusAllShort": "All",
+      "agentsTitle": "Agents"
     },
     "reportSubtitlePeriod": "Open pipeline as of today; won and lost closed in the last {days} days.",
     "foldStage": "Fold this stage",
-    "unfoldStage": "Unfold this stage"
+    "unfoldStage": "Unfold this stage",
+    "signals": {
+      "noNextStep": "No next step planned",
+      "idle": "Idle {days, plural, one {# day} other {# days}}"
+    },
+    "weighted": "{amount} weighted",
+    "weightedHelp": "Each open deal counted at its probability: what the column is worth on the odds.",
+    "quickActions": "Quick actions for {name}",
+    "quick": {
+      "log": "Log activity",
+      "plan": "Plan next step",
+      "won": "Mark as won",
+      "lost": "Mark as lost"
+    },
+    "nextStepOn": "Next step {date}",
+    "nextStepUndated": "Next step planned, no date",
+    "daysInStage": "{days, plural, =0 {In this stage since today} one {# day in this stage} other {# days in this stage}}",
+    "avgDaysHelp": "Average days the deals that left this stage spent in it — not their age.",
+    "conversion": "Moves on",
+    "conversionHelp": "Of the deals that left this stage, the share that reached a later stage or were won.",
+    "stale": "Stuck",
+    "staleHelp": "Open deals here longer than the stage allows (set in the pipeline settings).",
+    "velocity": "Sales velocity",
+    "velocityHelp": "Open deals × average won value × win rate ÷ average days to win: what the pipeline turns into revenue each day at the current pace.",
+    "velocityPerDay": "per day, on a {days}-day average cycle",
+    "velocityUnknown": "Needs deals won and lost in the period",
+    "stuckInStage": "{days, plural, one {Stuck: # day in this stage} other {Stuck: # days in this stage}}",
+    "list": {
+      "subtitle": "Tap ⇄ to move a deal to another stage",
+      "viewLabel": "View",
+      "viewBoard": "Kanban",
+      "viewList": "List",
+      "move": "Move to another stage",
+      "moveTitle": "Move to stage",
+      "moveAria": "Stage of {name}: {stage}. Tap to move it",
+      "open": "Open",
+      "value": "Value",
+      "weighted": "Weighted",
+      "attention": "Needs attention",
+      "attentionHelp": "Open deals with no next step, stuck in their stage, left untouched, or past their expected close date.",
+      "attentionNone": "Nothing needs attention: every open deal has a next step and none is stuck.",
+      "sortBy": "Sort by",
+      "sort": {
+        "close": "Expected close",
+        "amount": "Value",
+        "idle": "Longest untouched",
+        "name": "Name"
+      },
+      "emptyStage": "No deals in this stage."
+    }
   },
   "placeholders": {
     "unknown": "Nothing will fill in {list}. It will reach the recipient exactly as written.",
@@ -2990,7 +3514,9 @@
       "expired": "Expired",
       "approved": "Approved",
       "viewed": "Viewed",
-      "converted": "Converted"
+      "converted": "Converted",
+      "superseded": "Superseded",
+      "awaiting": "Awaiting the customer"
     },
     "columns": {
       "number": "Number",
@@ -3147,8 +3673,31 @@
         "updated": "Quote updated",
         "approval_requested": "Approval requested",
         "approved": "Quote approved",
-        "rejected": "Quote rejected at approval"
-      }
+        "rejected": "Quote rejected at approval",
+        "proposed": "Proposed as a draft by the assistant"
+      },
+      "validUntil": "Valid until",
+      "noExpiry": "No expiry",
+      "expiredAgo": "{days, plural, one {expired # day ago} other {expired # days ago}}",
+      "trackingTitle": "Sharing and tracking",
+      "notSentYet": "Not sent yet",
+      "notOpenedYet": "Not opened yet",
+      "emailOpens": "Email opens",
+      "linkClicks": "Link clicks",
+      "declineReason": "Reason for declining",
+      "publicLink": "Customer's page",
+      "openPublicPage": "Open the page",
+      "newRevision": "New revision",
+      "revisionCreated": "Revision {quoteNumber} created as a draft.",
+      "revisionFailed": "Could not create the revision.",
+      "declineTitle": "Mark as declined",
+      "declineReasonPlaceholder": "Why did they say no? (optional)",
+      "signatureTitle": "Simple electronic signature",
+      "signedBy": "Signed by",
+      "signedAt": "Signed on",
+      "signedIp": "From address",
+      "signedFingerprint": "Fingerprint of the signed PDF (SHA-256)",
+      "downloadSigned": "Download the signed PDF"
     },
     "createModal": {
       "addQuote": "Add quote",
@@ -3325,7 +3874,6 @@
         "currency": "Currency",
         "probability": "Probability (%)",
         "status": "Status",
-        "healthScore": "Health Score",
         "expectedCloseDate": "Expected Close",
         "createdAt": "Created At",
         "firstName": "First Name",
@@ -3453,82 +4001,60 @@
     "vsPrevPeriod": "{pct}% vs prev. period",
     "noActivity": "No activity recorded yet.",
     "noTaskData": "No task data for selected period.",
-    "noCampaigns": "No campaigns in selected period.",
-    "auditNoActivity": "No activity recorded yet. Actions performed by users will appear here.",
-    "auditDesc": "Last {count} events — most recent first",
     "kpi": {
-      "trackedActions": "Tracked Actions",
-      "trackedActionsSub": "Total audit events in period",
+      "trackedActions": "Logged activities",
+      "trackedActionsSub": "Calls, meetings, emails and notes in the period",
       "tasksCompleted": "Tasks Completed",
       "tasksCompletedSub": "{rate}% completion rate",
       "dealsWon": "Deals Won",
-      "dealsWonSub": "{rate}% win rate",
+      "dealsWonSub": "Win rate: {rate}",
       "newLeads": "New Leads",
       "newLeadsSub": "Leads added in period",
       "quotesCreated": "Quotes Created",
       "quotesCreatedSub": "All statuses",
       "openTickets": "Open Tickets",
-      "openTicketsSub": "Open + in progress + waiting",
+      "openTicketsSub": "Everything not yet resolved or closed",
       "winRate": "Win Rate",
-      "winRateSub": "Deals won vs. created",
+      "winRateSub": "Won out of all closed in the period",
       "taskRate": "Task Rate",
       "taskRateSub": "Tasks done vs. total",
-      "totalRevenue": "Total Revenue",
-      "totalRevenueSub": "Deals won + Orders completed",
+      "totalRevenue": "Value won",
+      "totalRevenueSub": "Deals closed as won in the period",
       "dealsWonSales": "Deals Won",
-      "dealsWonSalesSub": "€{value} revenue",
+      "dealsWonSalesSub": "{value} won",
       "quotesAccepted": "Quotes Accepted",
-      "quotesAcceptedSub": "€{value} value",
+      "quotesAcceptedSub": "{value} in value",
       "ordersCompleted": "Orders Completed",
-      "ordersCompletedSub": "€{value} revenue"
+      "ordersCompletedSub": "{value} in revenue",
+      "ordersCompletedSubUnconverted": "{value} in revenue; {count, plural, one {# order in another currency with no known rate is left out} other {# orders in another currency with no known rate are left out}}"
     },
     "tabs": {
       "activity": "Activity",
       "performance": "Performance",
-      "sales": "Sales",
-      "campaigns": "Campaigns",
-      "auditLog": "Audit Log"
+      "sales": "Sales"
     },
     "charts": {
       "dailyTrend": "Daily Activity Trend",
-      "dailyTrendDesc": "Actions logged per day",
-      "actionsByType": "Actions by Type",
-      "actionsByTypeDesc": "Distribution of tracked operations",
-      "userLeaderboard": "User Activity Leaderboard",
-      "userLeaderboardDesc": "Ranked by total tracked actions",
+      "dailyTrendDesc": "Activities logged per day",
+      "actionsByType": "Activities by type",
+      "actionsByTypeDesc": "Calls, meetings, emails and notes",
+      "userLeaderboard": "Activities by person",
+      "userLeaderboardDesc": "Sorted by activities logged",
       "taskPerf": "Task Performance by User",
       "taskPerfDesc": "Completion rate, totals, overdue tasks",
       "monthlyRevenue": "Monthly Revenue (Deals Won)",
       "monthlyRevenueDesc": "Revenue from closed-won deals by month",
       "revenueByStage": "Revenue by Pipeline Stage",
       "revenueByStageDesc": "Won deal revenue grouped by last stage",
-      "campaignEngagement": "Campaign Engagement",
-      "campaignEngagementDesc": "Open and click rates per campaign",
-      "campaignVolume": "Campaign Volume",
-      "campaignVolumeDesc": "Emails sent per campaign",
-      "campaignSummary": "Campaign Summary Table",
-      "actionsLabel": "Actions",
-      "revenueLabel": "Revenue",
-      "openPct": "Open %",
-      "clickPct": "Click %"
+      "actionsLabel": "Activities",
+      "revenueLabel": "Revenue"
     },
     "cols": {
       "user": "User",
       "total": "Total",
       "done": "Done",
       "overdue": "Overdue",
-      "completionRate": "Completion Rate",
-      "time": "Time",
-      "action": "Action",
-      "entity": "Entity",
-      "ipAddress": "IP Address",
-      "campaign": "Campaign",
-      "status": "Status",
-      "recipients": "Recipients",
-      "opens": "Opens",
-      "clicks": "Clicks",
-      "openPct": "Open%",
-      "clickPct": "Click%"
+      "completionRate": "Completion Rate"
     },
     "actionLabels": {
       "login": "Login",
@@ -3562,6 +4088,33 @@
     "overviewPage": {
       "title": "Reports & Analytics",
       "subtitle": "Monitor user activity, performance metrics, and campaign results. Admin only."
+    },
+    "scorecard": {
+      "title": "Per salesperson",
+      "subtitle": "Won against target, pipeline coverage and the work behind it, for each person in the period.",
+      "unassigned": "Nobody",
+      "former": "{name} (no longer in the workspace)",
+      "total": "Team",
+      "empty": "Nobody in this workspace yet.",
+      "days": "{days, plural, one {# day} other {# days}}",
+      "coverageValue": "{value}×",
+      "activityValue": "{calls} calls · {meetings} meetings · {emails} emails",
+      "coverageHelp": "Open pipeline divided by what is left of the target. 3× means three times as much is in play as still needs winning.",
+      "cycleHelp": "Average days from creation to win, over the deals won in the period.",
+      "openHelp": "Open now, whatever the period.",
+      "footnote": "Won and lost are dated by when the deal closed, values are in euro converted to your currency, and the win rate is won out of those decided in the period — the same figures as the Pipeline pages. Each amount opens the deals it counts.",
+      "cols": {
+        "rep": "Salesperson",
+        "won": "Won",
+        "target": "Target",
+        "coverage": "Coverage",
+        "winRate": "Win rate",
+        "lost": "Lost",
+        "avgWon": "Average won",
+        "cycle": "Cycle",
+        "open": "Open",
+        "activity": "Activity"
+      }
     }
   },
   "roles": {
@@ -3590,12 +4143,7 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": [
-        "All admin permissions",
-        "Transfer workspace ownership",
-        "Delete workspace",
-        "Manage billing"
-      ],
+      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
       "admin": [
         "All user permissions",
         "Invite and manage users",
@@ -3631,14 +4179,14 @@
   },
   "search": {
     "buttonLabel": "Search",
-    "placeholder": "Search contacts, leads, deals, tickets, quotes…",
+    "placeholder": "Search names, emails, phone numbers, document numbers…",
     "clear": "Clear",
     "quickAccess": "Quick access",
     "keepTyping": "Keep typing to search…",
     "noResults": "No results for",
     "noResultsTip": "Try a different name, number, email, or subject.",
     "resultsHeading": "Results",
-    "foundCount": "{count} found",
+    "foundCount": "{count, plural, one {# result} other {# results}}",
     "navigate": "navigate",
     "open": "open",
     "close": "close",
@@ -3661,37 +4209,25 @@
       "quote": "Quote",
       "order": "Order"
     },
-    "commands": {
-      "go-to-dashboard": "Go to dashboard",
-      "new-company": "New company",
-      "new-contact": "New contact",
-      "new-deal": "New deal",
-      "new-lead": "New lead",
-      "new-order": "New order",
-      "new-quote": "New quote",
-      "new-task": "New task",
-      "new-ticket": "New ticket",
-      "win-loss": "Win / loss"
-    },
     "commandGroups": {
       "crm": "CRM",
       "sales": "Sales",
       "support": "Support",
       "work": "Work"
-    }
+    },
+    "placeholderShort": "Search everything…",
+    "tip": "Find people and companies by name, email or phone number (at least 4 digits), and documents by their number.",
+    "clearLabel": "Clear the search",
+    "searching": "Searching…",
+    "error": "The search did not go through. Check your connection and try again.",
+    "retry": "Try again",
+    "seeAll": "See all {type}",
+    "searchEverywhere": "Search every section",
+    "noResultsFor": "Nothing found for “{query}”",
+    "noResultsIn": "Nothing found for “{query}” in {section}"
   },
   "settings": {
     "title": "Settings",
-    "general": {
-      "title": "General Settings",
-      "companyName": "Company Name",
-      "timezone": "Timezone",
-      "dateFormat": "Date Format",
-      "currency": "Currency",
-      "language": "Language",
-      "logo": "Logo",
-      "favicon": "Favicon"
-    },
     "customFields": {
       "title": "Custom Fields",
       "newField": "New Field",
@@ -3844,16 +4380,35 @@
         "createWebhook": "Create Webhook"
       },
       "webhookEvents": {
-        "contactCreated": "Contact Created",
-        "contactUpdated": "Contact Updated",
-        "contactDeleted": "Contact Deleted",
-        "leadCreated": "Lead Created",
-        "leadConverted": "Lead Converted",
-        "dealCreated": "Deal Created",
-        "dealStageChanged": "Deal Stage Changed",
-        "dealWon": "Deal Won",
-        "dealLost": "Deal Lost",
-        "taskCompleted": "Task Completed"
+        "all": "Everything, including your rules' events",
+        "contact_created": "Contact created",
+        "contact_updated": "Contact updated",
+        "contact_deleted": "Contact deleted",
+        "company_created": "Company created",
+        "company_updated": "Company updated",
+        "consent_withdrawn": "Consent withdrawn (someone asked to stop)",
+        "lead_created": "Lead created",
+        "lead_updated": "Lead updated",
+        "lead_converted": "Lead converted",
+        "deal_created": "Deal created",
+        "deal_stage_changed": "Deal moved to another stage",
+        "deal_won": "Deal won",
+        "deal_lost": "Deal lost",
+        "activity_created": "Activity recorded",
+        "task_completed": "Task completed",
+        "quote_sent": "Quote sent",
+        "quote_accepted": "Quote accepted by the customer",
+        "quote_declined": "Quote declined by the customer",
+        "order_created": "Order created",
+        "order_draft": "Order back to draft",
+        "order_processing": "Order in progress",
+        "order_completed": "Order completed",
+        "order_cancelled": "Order cancelled",
+        "invoice_issued": "Invoice issued",
+        "ticket_created": "Ticket opened",
+        "ticket_resolved": "Ticket resolved",
+        "ticket_rated": "Ticket rated by the customer",
+        "invoice_paid": "Invoice paid"
       },
       "fillAllFields": "Please fill all fields and select at least one event.",
       "secretMissing": "This webhook has no signing secret: recreate it.",
@@ -3884,7 +4439,12 @@
         "creating": "Creating…",
         "saving": "Saving…",
         "createStage": "Create Stage",
-        "saveChanges": "Save Changes"
+        "saveChanges": "Save Changes",
+        "kindLabel": "Type",
+        "kindHelp": "A deal moved into a Won or Lost stage is closed; one moved back to an open stage is reopened.",
+        "staleLabel": "Stuck after (days)",
+        "stalePlaceholder": "No limit",
+        "staleHelp": "An open deal here longer than this is marked stuck on the board and counted in the pipeline report."
       },
       "createSuccess": "Stage created.",
       "createFailed": "Failed to create stage.",
@@ -3892,7 +4452,49 @@
       "updateFailed": "Failed to update stage.",
       "deleteConfirm": "Delete this stage? All deals must be moved to another stage first.",
       "deleteSuccess": "Stage deleted.",
-      "deleteFailed": "Cannot delete a stage that has active deals."
+      "deleteFailed": "Cannot delete a stage that has active deals.",
+      "deleteTitle": "Delete “{name}”?",
+      "kind": {
+        "open": "Open",
+        "won": "Won",
+        "lost": "Lost"
+      },
+      "kindRefused": {
+        "anotherWon": "Another stage already closes deals as won. Change that one first.",
+        "anotherLost": "Another stage already closes deals as lost. Change that one first.",
+        "hasDeals": "This stage has deals in it. Move them before changing what the stage means."
+      },
+      "lossReasons": {
+        "title": "Loss reasons",
+        "description": "What people choose from when they mark a deal as lost. Turn one off to stop offering it; deals already closed under it keep it.",
+        "empty": "No loss reasons yet.",
+        "nameLabel": "Reason",
+        "placeholder": "e.g. Price too high",
+        "add": "Add",
+        "rename": "Rename",
+        "offered": "Offered when closing a deal",
+        "retired": "Not offered",
+        "saveFailed": "Could not save the loss reason."
+      },
+      "pipelines": {
+        "label": "Pipelines",
+        "new": "New pipeline",
+        "newTitle": "New pipeline",
+        "newHelp": "It starts with the usual stages, a Won and a Lost column included: rename and reorder them as you sell.",
+        "create": "Create",
+        "rename": "Rename",
+        "renameTitle": "Rename pipeline",
+        "name": "Name",
+        "delete": "Delete pipeline",
+        "deleteTitle": "Delete “{name}”?",
+        "deleteBody": "Its stages are deleted with it. A pipeline with deals in it cannot be deleted: move or close them first.",
+        "oneHelp": "Selling in more than one way — new business and renewals, products and services? Each can have a pipeline of its own.",
+        "failed": "That did not work. Try again.",
+        "refused": {
+          "default": "The first pipeline cannot be deleted.",
+          "hasDeals": "There are deals in this pipeline: move or close them first."
+        }
+      }
     },
     "targets": {
       "title": "Sales Targets",
@@ -3916,7 +4518,7 @@
       "removeTarget": "Remove target"
     },
     "billing": {
-      "title": "Billing & Subscription",
+      "title": "Subscription",
       "description": "Manage your subscription plan, usage, add-ons, and invoices.",
       "upgradeNoticeSuffix": "is not included in your current plan. Upgrade below to unlock it.",
       "tabs": {
@@ -4102,22 +4704,177 @@
       "description": "Legal name, VAT number, tax regime and office of whoever issues the invoices."
     },
     "apiKey": {
-      "cardDescription": "The key an external system uses to write in here, and the identifier of this business.",
-      "createFailed": "Couldn't create the key.",
-      "revoked": "Key revoked: calls made with that key stop working immediately.",
-      "revokeFailed": "Couldn't revoke the key.",
-      "title": "API key",
-      "description": "It lets an external system write in here: contacts, notes, collected fields. It is nobody's password, and it is tied to this business.",
+      "title": "API keys",
+      "description": "Each key lets one external system read or write in here — exactly the parts you tick, and nothing else. It is nobody's password, and it is tied to this business.",
+      "cardDescription": "The keys external systems use to read and write in here, and the identifier of this business.",
+      "none": "No keys yet.",
+      "new": "New key",
+      "name": "Name",
+      "namePlaceholder": "What uses it — e.g. Website form, Zapier",
+      "scopesTitle": "What it may do",
+      "scopesHelp": "Writing does not include reading. Give each integration only what it needs: a website form needs to write leads, not to read your customers.",
+      "read": "Read",
+      "write": "Write",
+      "entities": {
+        "contacts": "Contacts",
+        "leads": "Leads",
+        "companies": "Companies",
+        "deals": "Deals",
+        "orders": "Orders",
+        "activities": "Activities and notes",
+        "custom_fields": "Custom fields",
+        "privacy": "Opt-outs and erasure",
+        "webhooks": "Event subscriptions (Zapier, Make)",
+        "assistant": "Mark whom the assistant is working with",
+        "products": "Products and customer prices",
+        "quotes": "Draft quotes"
+      },
+      "create": "Create key",
+      "cancel": "Cancel",
       "copyNow": "Copy it now: it won't be shown again.",
       "copyKey": "Copy key",
-      "exists": "A key already exists. It can't be read back: if you've lost it, create a new one — the old one stops working at the same moment.",
-      "createNew": "Create a new key",
-      "create": "Create key",
+      "madeBy": "Made by {who} on {date}",
+      "lastUsed": "last used {date}",
+      "neverUsed": "never used",
       "revoke": "Revoke",
-      "rotateWarning": "Creating a new one makes the previous key stop working immediately: the integration using it must be updated at the same moment.",
+      "revokeConfirm": "Revoke this key? Whatever uses it stops working immediately.",
+      "revoked": "Key revoked: calls made with that key stop working immediately.",
+      "revokeFailed": "Couldn't revoke the key.",
+      "createFailed": "Couldn't create the key.",
+      "legacyTitle": "Key from before permissions",
+      "legacyDescription": "It writes everything and reads nothing, as it always did.",
+      "legacyHelp": "Keys can now be limited to what they need. Create one for the integration using this key, switch it over, then revoke this one.",
       "tenantIdTitle": "Identifier of this business",
       "tenantIdDescription": "Used to build the address an external system sends its events to.",
       "copyTenantId": "Copy identifier"
+    },
+    "features": {
+      "title": "Features",
+      "description": "Choose which optional parts of the product this workspace uses.",
+      "intro": "Switching a feature off removes it from everyone's menu and closes its pages; the data stays, and switching it back on brings everything back as it was.",
+      "projects": {
+        "label": "Projects: Gantt and workload",
+        "help": "Planning with dependencies between tasks and a workload matrix per person. Useful to whoever runs projects; usually extra for a sales team."
+      },
+      "chat": {
+        "label": "Internal chat",
+        "help": "Direct and group messages between colleagues, with the window at the bottom of every page. Off, the page and the window disappear and stop polling the server every thirty seconds."
+      },
+      "saved": "Setting saved.",
+      "failed": "The setting could not be saved. Please try again."
+    },
+    "indexSubtitle": "What you can change — for yourself, and for the workspace.",
+    "generalPage": {
+      "title": "General",
+      "subtitle": "The workspace's clock, what a new quote starts with, and the logo on its documents.",
+      "save": "Save",
+      "saved": "Saved.",
+      "failed": "Could not save.",
+      "timeZone": {
+        "title": "Time zone",
+        "help": "The clock of the whole workspace: the calendar, reminders, what counts as today, and every date in the reports.",
+        "search": "Search a time zone…",
+        "invalid": "That is not a time zone this system knows."
+      },
+      "quotes": {
+        "title": "Quotes",
+        "help": "What every new quote starts with. It is copied into the quote, so changing it later does not rewrite quotes already sent.",
+        "validity": "Valid for (days)",
+        "validityHelp": "0 leaves the expiry date empty.",
+        "terms": "Standard conditions",
+        "termsPlaceholder": "Payment terms, delivery, validity…",
+        "termsHelp": "Filled into the notes of every new quote, where it can still be changed."
+      },
+      "logo": {
+        "title": "Logo",
+        "help": "Printed at the top of quote PDFs. PNG or JPEG, up to 512 KB.",
+        "alt": "Workspace logo",
+        "none": "No logo",
+        "upload": "Upload logo",
+        "replace": "Replace",
+        "remove": "Remove",
+        "errors": {
+          "missing": "Choose an image first.",
+          "tooBig": "The image is larger than 512 KB.",
+          "notImage": "Only PNG and JPEG images can go on a PDF.",
+          "storage": "The logo could not be stored. Check that document storage is configured."
+        }
+      },
+      "approval": {
+        "title": "Quote approval",
+        "help": "A quote above these limits needs an approver's signature before it can be sent. Line discounts count as well as the discount on the whole quote.",
+        "maxDiscount": "Highest discount without approval (%)",
+        "maxTotal": "Highest total without approval",
+        "zeroOff": "0 switches that limit off."
+      }
+    },
+    "lists": {
+      "title": "Lists",
+      "subtitle": "Company categories and types: rename them, merge duplicates, remove what is not used.",
+      "category": {
+        "title": "Company categories",
+        "help": "What kind of business a company is."
+      },
+      "type": {
+        "title": "Company types",
+        "help": "What a company is to you."
+      },
+      "lossReasons": {
+        "title": "Loss reasons",
+        "help": "What people choose from when a deal is lost — managed beside the pipeline stages."
+      },
+      "empty": "Nothing here yet: entries are created from the company form.",
+      "companies": "{count, plural, one {# company} other {# companies}}",
+      "rename": "Rename",
+      "merge": "Merge",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Saved.",
+      "merged": "Merged.",
+      "deleted": "Deleted.",
+      "failed": "Could not complete the change.",
+      "mergeTitle": "Merge “{name}” into…",
+      "mergeHelp": "{count, plural, =0 {It has no companies.} one {Its # company moves to the one you choose.} other {Its # companies move to the one you choose.}} Then it is removed.",
+      "mergeInto": "Choose where to merge it",
+      "deleteTitle": "Delete “{name}”?",
+      "deleteHelp": "{count, plural, =0 {No company uses it.} one {# company will be left without one.} other {# companies will be left without one.}}",
+      "refused": {
+        "empty": "A name is needed.",
+        "taken": "Another entry already has that name. Merge them instead.",
+        "same": "Choose a different entry to merge into."
+      }
+    },
+    "sla": {
+      "title": "SLA and opening hours",
+      "description": "Response and resolution promises, working hours and holidays."
+    },
+    "forms": {
+      "title": "Forms",
+      "description": "Public forms a website can send leads and support requests through: a link, a frame on your site, or your own form posting to Flux.",
+      "open": "Open: accepting submissions",
+      "closed": "Closed",
+      "nobody": "Nobody",
+      "link": "Page",
+      "embed": "To put it on your site",
+      "copy": "Copy",
+      "copied": "Copied",
+      "preview": "Open the page",
+      "saved": "Saved",
+      "failed": "That did not work. Try again.",
+      "ownForm": "Or your own form: POST to {endpoint} with workspace={workspace}, token={token} and the fields {fields}. Add a redirect field to send the visitor to a page of yours afterwards.",
+      "turnstileOn": "Protected against spam by Cloudflare Turnstile, a hidden field and a limit of five submissions a minute per address.",
+      "turnstileOff": "Protected against spam by a hidden field and a limit of five submissions a minute per address. Set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY to add Cloudflare Turnstile.",
+      "lead": {
+        "name": "Contact form",
+        "help": "Files a new lead — or, for somebody already in the CRM, adds the message to their timeline instead of a duplicate. Marketing consent is only what the visitor ticks.",
+        "owner": "Leads go to"
+      },
+      "ticket": {
+        "name": "Support request form",
+        "help": "Opens a ticket, with the sender found among the contacts or added as one. The ticket follows your support rules like any other.",
+        "owner": "Also tell"
+      }
     }
   },
   "support": {
@@ -4142,10 +4899,10 @@
       "seeAll": "See all →",
       "noResolvedYet": "No resolved tickets yet.",
       "slaPerformance": "SLA Performance",
-      "currentMonth": "Current month",
+      "currentMonth": "Last 30 days, plus every ticket still open",
       "onTimeResolution": "On-time Resolution",
       "firstResponse": "First Response",
-      "satisfaction": "Satisfaction",
+      "satisfaction": "Satisfaction ({count, plural, one {# answer} other {# answers}})",
       "channels": "Channels",
       "channelsDesc": "Ticket volume by source",
       "manageAllTickets": "Manage All Tickets",
@@ -4157,9 +4914,12 @@
         "email": "Email",
         "chat": "Chat",
         "phone": "Phone",
-        "social": "Social"
+        "social": "Social",
+        "web": "Web form"
       },
-      "noData": "n/d"
+      "noData": "n/d",
+      "noRatings": "No answers yet",
+      "byAgent": "By agent →"
     },
     "tickets": {
       "title": "Tickets",
@@ -4387,7 +5147,65 @@
         "reassigning": "Reassigning…",
         "deleteConfirm": "Are you sure you want to delete <strong>{number}</strong>? This will permanently remove the ticket and all its messages.",
         "deleting": "Deleting…",
-        "delete": "Delete"
+        "delete": "Delete",
+        "viewDetails": "Details",
+        "viewConversation": "Conversation",
+        "reply": "Reply",
+        "resolve": "Resolve",
+        "reopen": "Reopen",
+        "readOnly": "You can read this ticket, but your role does not allow replying to it.",
+        "messagesCount": "{count, plural, =0 {No messages} one {# message} other {# messages}}",
+        "duration": {
+          "days": "{days}d {hours}h",
+          "hours": "{hours}h {minutes}m",
+          "minutes": "{minutes}m"
+        },
+        "metrics": {
+          "resolutionDue": "Resolution due",
+          "overdue": "{duration} overdue",
+          "after": "after {duration}",
+          "notYet": "Not yet",
+          "age": "Open for",
+          "since": "since {date}",
+          "closedOn": "closed {date}",
+          "messages": "Messages"
+        },
+        "sla": {
+          "title": "SLA",
+          "policy": "Policy",
+          "dueAt": "due {date}",
+          "paused": "SLA paused",
+          "pausedSince": "Paused since",
+          "breachedAt": "Breached",
+          "state": {
+            "breached": "SLA breached",
+            "atRisk": "SLA at risk",
+            "paused": "SLA paused",
+            "met": "SLA met",
+            "onTrack": "SLA on track"
+          }
+        },
+        "fields": {
+          "type": "Type",
+          "component": "Component",
+          "team": "Team",
+          "dueDate": "Due date"
+        },
+        "types": {
+          "support": "Support",
+          "bug": "Bug",
+          "complaint": "Complaint",
+          "info_request": "Information request",
+          "internal_task": "Internal task"
+        },
+        "csat": {
+          "label": "Customer rating",
+          "good": "Went well",
+          "bad": "Did not go well",
+          "noComment": "No comment",
+          "askedOn": "Asked on {date}",
+          "waiting": "Not answered yet"
+        }
       }
     },
     "sla": {
@@ -4484,6 +5302,62 @@
       "create": "Create",
       "saving": "Saving…",
       "variables": "Variables"
+    },
+    "agents": {
+      "title": "Support by agent",
+      "subtitle": "What arrived, what was solved and how fast, which promises were kept, and what the customers said — person by person.",
+      "unassigned": "Unassigned",
+      "former": "Former member",
+      "total": "Whole desk",
+      "empty": "No tickets moved in this period.",
+      "minutes": "{n} min",
+      "hours": "{n} h",
+      "days": "{n} d",
+      "priorities": {
+        "urgent": "Urgent",
+        "high": "High",
+        "normal": "Normal",
+        "low": "Low"
+      },
+      "cols": {
+        "agent": "Agent",
+        "received": "Received",
+        "solved": "Solved",
+        "openNow": "Open now",
+        "firstResponse": "First answer",
+        "resolution": "Time to solve",
+        "firstOnTime": "First answer on time",
+        "resolvedOnTime": "Solved on time",
+        "missed": "Missed, by priority",
+        "csat": "Satisfaction"
+      },
+      "help": {
+        "received": "Tickets created in the period and assigned to them now.",
+        "solved": "Resolved, or closed without a resolution, in the period — and still so. A reopened ticket is not a solve.",
+        "openNow": "Everything not finished today, whatever the period.",
+        "firstResponse": "Median time from arrival to the first public answer, for answers given in the period.",
+        "resolution": "Median time from arrival to solve, for tickets solved in the period.",
+        "firstOnTime": "Of the first answers that fell due in the period, the share given in time. One not yet due is not counted.",
+        "resolvedOnTime": "Of the tickets solved in the period with a deadline, the share solved in time, paused time given back.",
+        "missed": "Promises missed in the period, first answer or resolution, by the ticket's priority.",
+        "csat": "Of the customers who answered in the period, the share who said it went well."
+      },
+      "csatOff": "Satisfaction stays empty until customers are asked.",
+      "csatOffLink": "Turn it on in the SLA settings",
+      "backlogTitle": "Open tickets, week by week",
+      "backlogHelp": "How many tickets were still open at the end of each week: what the desk was carrying.",
+      "truncated": "Only the first 20,000 tickets were read: the figures cover part of the period.",
+      "footnote": "Times are wall-clock, from arrival. On-time shares use each ticket's own SLA; a ticket without one is not counted."
+    },
+    "csat": {
+      "title": "Customer satisfaction",
+      "description": "When a ticket is resolved, the customer receives an email saying so, with two buttons: it went well, or it did not.",
+      "label": "Email the customer when a ticket is resolved, and ask how it went",
+      "on": "Customers will be asked from the next resolved ticket.",
+      "off": "Customers will no longer be asked.",
+      "failed": "That did not work. Try again.",
+      "notReady": "The deployment has no public address (NEXT_PUBLIC_APP_URL), so the email's links would point nowhere. Set it first.",
+      "help": "Asked once per ticket, in the customer's language. A reply to that email reopens the ticket. A bad answer is sent to whoever handled it."
     }
   },
   "tasks": {
@@ -4709,6 +5583,17 @@
         "SS": "Start → Start",
         "FF": "Finish → Finish",
         "SF": "Start → Finish"
+      },
+      "sections": {
+        "time": "Time"
+      },
+      "hero": {
+        "due": "Due {date}",
+        "timeSpent": "Time spent",
+        "hours": "{hours} h",
+        "ofEstimate": "of {hours} h estimated",
+        "noEstimate": "No estimate",
+        "depsDone": "All completed"
       }
     },
     "newTaskDialog": {
@@ -4903,7 +5788,10 @@
       "storageNote": "*Preferences use cookies by default. You can switch between cookies, localStorage, or no storage in code."
     },
     "presets": {
-      "default": "Default"
+      "default": "Default",
+      "aurora": "Aurora",
+      "atelier": "Atelier",
+      "orchid": "Orchid"
     }
   },
   "handover": {
@@ -5086,6 +5974,42 @@
       "sequence_reply": {
         "label": "Someone replies to a sequence",
         "help": "A person one of your follow-up sequences writes to has replied; the automatic emails have stopped."
+      },
+      "appointment_reminder": {
+        "label": "An appointment I am going to is about to start",
+        "help": "The reminder set on the appointment: 15 minutes before, a day before, whatever was chosen."
+      },
+      "task_completed": {
+        "label": "A task I own or was given is completed",
+        "help": "When a colleague completes a task you own or are assigned to. Never for the ones you complete yourself."
+      },
+      "email_reply": {
+        "label": "A customer of mine writes to me",
+        "help": "An email from a contact or lead you own, outside any support ticket. It is on their timeline, and a task to answer it is on your list for today."
+      },
+      "quote_viewed": {
+        "label": "A customer opens my quote",
+        "help": "The first time they open the link you sent."
+      },
+      "quote_accepted": {
+        "label": "A customer accepts my quote",
+        "help": "From the quote's own page."
+      },
+      "quote_declined": {
+        "label": "A customer declines my quote",
+        "help": "From the quote's own page, with their reason if they gave one."
+      },
+      "booking_received": {
+        "label": "Someone books time with me",
+        "help": "A visitor booked a meeting from your booking page. It is already in your calendar."
+      },
+      "ticket_rated_bad": {
+        "label": "A customer rates my ticket badly",
+        "help": "After a ticket you handled was resolved, the customer answered that it did not go well."
+      },
+      "chat_mention": {
+        "label": "A mention in the chat",
+        "help": "A colleague names you in a conversation (@Name), even one you have muted."
       }
     },
     "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered.",
@@ -5207,7 +6131,14 @@
       "notesPlaceholder": "Particular terms, references, what it covers"
     },
     "searchPlaceholder": "Search by title, customer or owner…",
-    "back": "Back to contracts"
+    "back": "Back to contracts",
+    "detail": {
+      "perYearHint": "{amount} a year",
+      "tabCustomer": "Customer",
+      "tabValue": "Value",
+      "tabTerm": "Term",
+      "tabNotes": "Notes"
+    }
   },
   "sequences": {
     "title": "Follow-up sequences",
@@ -5274,14 +6205,45 @@
       "missing_email": "No email",
       "record_deleted": "Record deleted",
       "email_changed": "Email changed",
-      "manual": "Stopped by hand"
+      "manual": "Stopped by hand",
+      "with_assistant": "With the assistant"
     },
     "sequenceButton": "Sequence",
     "noSequencesFor": "No active sequences for this kind of record.",
     "chooseSequence": "Choose a sequence…",
     "enroll": "Enroll",
     "enrolledToast": "Enrolled in the sequence.",
-    "close": "Close"
+    "close": "Close",
+    "detail": {
+      "active": "Active",
+      "paused": "Paused",
+      "forEntity": "{entity, select, lead {For leads} contact {For contacts} other {}}",
+      "stepCount": "{count, plural, one {# step} other {# steps}}",
+      "stepDelay": "{days, plural, =0 {right away} one {after # day} other {after # days}}",
+      "noSubject": "No subject yet"
+    },
+    "businessDays": "Count working days only (Monday to Friday)",
+    "sendWindow": "Send between",
+    "sendFrom": "From",
+    "sendUntil": "Until",
+    "sendWindowHelp": "On the workspace's clock. A step that falls outside waits for the next opening. Leave empty to send at any hour.",
+    "stepKind": "Step",
+    "kinds": {
+      "email": "Send an email",
+      "task": "Create a task"
+    },
+    "taskType": "Task type",
+    "taskTypes": {
+      "call": "Call",
+      "email": "Email",
+      "meeting": "Meeting",
+      "todo": "To-do"
+    },
+    "taskTitle": "Task title",
+    "taskNote": "Note for the salesperson",
+    "replyInThread": "Send as a reply in the same thread (Re: the first email's subject)",
+    "taskSummary": "{type}: {title}",
+    "replySummary": "Reply in the thread"
   },
   "invoicing": {
     "title": "E-invoicing",
@@ -5520,6 +6482,9 @@
       "creditsInvoice": "Credits",
       "residualLeft": "{amount} left to credit",
       "noteNumber": "Credit note no. {number}"
+    },
+    "payments": {
+      "due": "Due after credit notes"
     }
   },
   "entities": {
@@ -5655,7 +6620,8 @@
       "waiting": "Waiting",
       "resolved": "Resolved",
       "closed": "Closed",
-      "sending": "Sending"
+      "sending": "Sending",
+      "superseded": "Superseded"
     },
     "attachedTo": "Attached to: {type}",
     "search": {
@@ -5695,21 +6661,12 @@
     "tagsPlaceholder": "tech, startup, b2b"
   },
   "importExport": {
-    "selectFile": "Please select a CSV file.",
     "csvOnly": "Only CSV files are supported.",
     "importFailed": "Import failed.",
     "importFailedRetry": "Import failed. Please try again.",
-    "complete": "Import complete: {created} created, {skipped} skipped.",
-    "completeWithDuplicates": "Import complete: {created} created, {skipped} skipped ({duplicates, plural, one {# duplicate} other {# duplicates}}).",
     "exportCsv": "Export CSV",
     "importCsv": "Import CSV",
-    "required": "Required:",
-    "optional": "Optional:",
-    "semicolonSeparated": ";-separated",
-    "dedup": "Duplicates are detected by <b>{field}</b> and skipped automatically.",
-    "csvFile": "CSV File",
     "importing": "Importing…",
-    "import": "Import",
     "titles": {
       "contacts": "Import contacts",
       "leads": "Import leads",
@@ -5768,7 +6725,9 @@
     "setStatus": "Set Status",
     "changeStatusTo": "Change status to",
     "assign": "Assign",
-    "assignTo": "Assign to"
+    "assignTo": "Assign to",
+    "confirmDeleteTitle": "{count, plural, one {Delete # record?} other {Delete # records?}}",
+    "confirmDeleteBody": "Their activities, tasks and notes are deleted with them. This cannot be undone."
   },
   "recordTable": {
     "selectRecord": "Select {name}"
@@ -5858,7 +6817,7 @@
           },
           "t04": {
             "q": "Can I import leads from an Excel or CSV file?",
-            "a": "Yes. In the Leads list you will find the 'Import CSV' button. Prepare the file with the required columns (first name, last name, email, etc.), upload it and the system will import the records, skipping duplicates automatically (same email = update of the existing record)."
+            "a": "Yes. In the Leads list, 'Import CSV' (it needs the editor role or above) opens a guided import. Choose the file — from Excel, save as CSV; semicolons are fine. Then say which field each column fills: Flux suggests it from the column names, in Italian or English, and a Flux export maps itself. Choose what happens to a lead whose email is already there (in any capitals, or repeated in the file): skip it, update it with the row's filled-in cells, or create it anyway. The preview shows how many leads will be created, updated and skipped, and which rows have errors, before anything is written. Every lead needs at least one of first name, last name, email and phone. Up to 5,000 rows per file; a file that would take you past your plan's record limit is not imported at all, and the preview says so. Importing does not run automations."
           },
           "t05": {
             "q": "How do I use filters and saved filters?",
@@ -6391,11 +7350,11 @@
         "topics": {
           "t01": {
             "q": "How do I connect an external program to Flux?",
-            "a": "Settings → API, where you generate the workspace key. It is sent as the header `Authorization: Bearer <key>` and is valid only for this workspace: the key itself says which one, so whoever integrates does not have to state it anywhere else and cannot hit the wrong workspace by mistake. The same page shows this business's identifier, which is what integration addresses are built from.\nThere is one key per workspace and you see it once, when it is created: it cannot be read back. If you lose it you create another, and the old one stops working at that same moment — so the integration has to be updated at the same moment. 'Revoke' switches it off immediately without creating a new one. Flux does not record when a key was last used: to see whether an integration is working, look at the Assistant's contribution."
+            "a": "Settings → API, where you create one key per integration, with a name and with what it may do. It is sent as the header `Authorization: Bearer <key>` and is valid only for this workspace: the key itself says which one, so whoever integrates does not have to state it anywhere else and cannot hit the wrong workspace by mistake.\nYou see a key once, when it is created: it cannot be read back, and you tell it apart from the others by its name and its last four characters. To change it you create a new one, update the integration, then revoke the old one, which stops working immediately. Each key shows when it was last used, to the day. The full reference — every route, what it answers, which permission it needs — is at /developers, and the same in OpenAPI at /api/openapi.json."
           },
           "t02": {
             "q": "What can an API key do?",
-            "a": "Write, not read. The routes available are all POST and cover contacts, leads, companies, notes, orders, activities (including activities on a contact, a lead, a company or a deal), custom fields, moving a lead to another stage, closing a person's deals, opting a contact point out, and GDPR erasure. Nearly all of them also have a 'bulk' version for sending several records at once.\n⚠️ There is no read route at all: from outside you cannot read back a list of contacts or orders, so reconciling weeks later against what the CRM actually holds is not possible and has to be done from the screens. A key is the equivalent of a user who can write records, not an administrator: it changes no settings. Calls are counted against the workspace's plan, and past the limit the answer is 429."
+            "a": "What you tick, entity by entity: reading and writing contacts, leads, companies, deals and orders; writing activities and notes, custom fields, opt-outs and erasures. Writing does not include reading, and whatever a key does not cover gets a 403 naming the missing permission.\nReads return one page at a time, oldest change first, with `updatedSince` to pick up from the last sync: that is how an integration reconciles what it holds with what the CRM contains. A deleted record does not appear in reads: the webhooks say so. The key made before permissions keeps writing everything and reading nothing. No key changes settings, and calls are counted against the workspace's plan: past the limit the answer is 429."
           },
           "t03": {
             "q": "What does a request with several records answer?",
@@ -6407,7 +7366,7 @@
           },
           "t05": {
             "q": "What does the 'Assistant's contribution' page show?",
-            "a": "What came into the CRM from integrations, in the current month: how many records were written, in how many requests, when the last one arrived, and a table by kind — contacts, companies, leads, notes, activities, orders, custom fields, closed deals, withdrawn consents, erasures. It sits under Analysis, not inside Reports, because whoever connects an integration needs to be able to check it whether or not they bought the reporting module.\nThree warnings. It counts only writes that arrived through the API routes: what the team does inside Flux does not go through them and does not appear, so this is not a comparison between people and the assistant. One request can write many rows — a five-hundred-contact import is one request and five hundred rows — which is why the two columns are separate. And a key identifies the workspace, not who is using it: with two integrations connected the figures are their sum. Erasures are counted without saying who they were about, so as to leave no trail back to someone who asked to disappear."
+            "a": "What came into the CRM from integrations, in the current month: how many records were written, in how many requests, when the last one arrived, and a table by kind — contacts, companies, leads, notes, activities, orders, custom fields, closed deals, withdrawn consents, erasures. It sits under Analysis, not inside Reports, because whoever connects an integration needs to be able to check it whether or not they bought the reporting module.\nThree warnings. It counts only writes that arrived through the API routes: what the team does inside Flux does not go through them and does not appear, so this is not a comparison between people and the assistant. One request can write many rows — a five-hundred-contact import is one request and five hundred rows — which is why the two columns are separate. And the log says «integration», not which key: with two integrations connected the figures are their sum. Erasures are counted without saying who they were about, so as to leave no trail back to someone who asked to disappear."
           }
         }
       },
@@ -6668,7 +7627,13 @@
       "archiveFailed": "The files could not be stored.",
       "emailInvalid": "The email address is not valid.",
       "sendOnlyIssued": "Only an issued invoice can be sent.",
-      "emailNotSent": "The email could not be sent."
+      "emailNotSent": "The email could not be sent.",
+      "payment": {
+        "invalid_amount": "Enter an amount greater than zero.",
+        "not_found": "This invoice no longer exists.",
+        "not_receivable": "Only an issued invoice can be paid: not a draft, not a credit note.",
+        "invalid_date": "Enter the day the payment arrived."
+      }
     },
     "contracts": {
       "notFound": "This contract no longer exists."
@@ -6684,7 +7649,8 @@
         "missingEmail": "This record has no email address.",
         "converted": "This lead has already been converted.",
         "recordDeleted": "This record no longer exists.",
-        "unknown": "Could not enroll."
+        "unknown": "Could not enroll.",
+        "withAssistant": "An assistant is working with this person: Flux's sequences leave them alone until it lets go."
       }
     },
     "territories": {
@@ -6795,7 +7761,8 @@
       "quoteAlreadyConverted": "This quote is already marked as converted.",
       "quoteNotAccepted": "Only an accepted quote becomes an order. Record the customer's answer first.",
       "quoteHasNoLines": "This quote has no lines to order.",
-      "paymentPositive": "A payment has to be a positive amount."
+      "paymentPositive": "A payment has to be a positive amount.",
+      "paymentDate": "Enter the day the payment arrived."
     },
     "products": {
       "nameRequired": "Name is required.",
@@ -6848,6 +7815,10 @@
       "nameRequired": "Give the price list a name",
       "adjustmentRange": "The adjustment must be between -100% and +100%",
       "priceNegative": "The price cannot be negative"
+    },
+    "apiKeys": {
+      "nameRequired": "Give the key a name: it is how you will tell it apart later.",
+      "scopesRequired": "Tick at least one thing the key may do."
     }
   },
   "priceLists": {
@@ -6946,7 +7917,699 @@
       "customerRemoved": "Customer removed from the price list.",
       "customerFailed": "The customers of this price list could not be updated.",
       "noCustomers": "No customers assigned",
-      "noCustomersDesc": "Until somebody is on this list, the prices named here appear on no document."
+      "noCustomersDesc": "Until somebody is on this list, the prices named here appear on no document.",
+      "adjustmentHint": "On every product without a named price"
     }
+  },
+  "notificationTexts": {
+    "taskCompleted": {
+      "title": "Task completed",
+      "message": "{completer} completed “{title}”."
+    },
+    "taskDueToday": {
+      "title": "Task due today: “{title}”",
+      "message": "This task is due today."
+    },
+    "activityToday": {
+      "title": "{kind, select, call {Call} meeting {Meeting} other {Activity}} today: “{description}”",
+      "message": "{kind, select, call {You have a call scheduled today.} meeting {You have a meeting scheduled today.} other {You have an activity scheduled today.}}"
+    },
+    "activityReminder": {
+      "title": "{kind, select, call {Upcoming call} meeting {Upcoming meeting} other {Upcoming activity}}: “{description}”",
+      "message": "Scheduled for {time}"
+    },
+    "taskOverdue": {
+      "title": "Task “{title}” is overdue",
+      "message": "{count, plural, one {# dependent task is} other {# dependent tasks are}} at risk. Consider rescheduling."
+    },
+    "leadAssigned": {
+      "title": "Lead assigned to you",
+      "message": "{name} has been assigned to you."
+    },
+    "contactAssigned": {
+      "title": "Contact assigned to you",
+      "message": "{name} has been assigned to you."
+    },
+    "companyAssigned": {
+      "title": "Company assigned to you",
+      "message": "{name} has been assigned to you."
+    },
+    "dealWon": {
+      "title": "Deal won! 🏆",
+      "message": "“{name}” has been marked as won."
+    },
+    "quoteApprovalRequested": {
+      "title": "Quote awaiting your approval",
+      "message": "Quote {number} needs your approval before it can be sent."
+    },
+    "quoteApproved": {
+      "title": "Quote approved",
+      "message": "Quote {number} is approved. You can send it to the customer."
+    },
+    "quoteRejected": {
+      "title": "Quote sent back",
+      "message": "{hasReason, select, yes {Quote {number} was not approved. Reason: {reason}} other {Quote {number} was not approved.}}"
+    },
+    "chatMessage": {
+      "title": "New message from {sender}",
+      "message": "{preview}"
+    },
+    "orderCreated": {
+      "title": "New order {number}",
+      "message": "{total} — {lines, plural, one {# line} other {# lines}}."
+    },
+    "slaBreach": {
+      "title": "SLA missed — {ticket}",
+      "message": "{subject}"
+    },
+    "slaWarning": {
+      "title": "{percent} of the SLA used — {ticket}",
+      "message": "{subject}"
+    },
+    "appointmentReminder": {
+      "title": "Upcoming appointment: “{title}”",
+      "message": "Starts in {unit, select, minute {{count, plural, one {# minute} other {# minutes}}} hour {{count, plural, one {# hour} other {# hours}}} other {{count, plural, one {# day} other {# days}}}}."
+    },
+    "contractRenewal": {
+      "title": "Contract “{title}” is due for a decision",
+      "message": "{autoRenew, select, yes {It renews itself on {renewsOn} unless notice is given by {deadline}.} other {It ends on {end}. Notice to renew or cancel is due by {deadline}.}}"
+    },
+    "sequenceReply": {
+      "title": "{email} replied",
+      "message": "The sequence “{sequence}” has stopped writing to them."
+    },
+    "emailReply": {
+      "title": "{who} wrote to you",
+      "message": "{subject}"
+    },
+    "quoteViewed": {
+      "title": "{number} opened by the customer",
+      "message": "They are reading it now: a good moment to call."
+    },
+    "quoteAccepted": {
+      "title": "{number} accepted by the customer",
+      "message": "Turn it into an order to book the win."
+    },
+    "quoteDeclined": {
+      "title": "{number} declined by the customer",
+      "message": "{hasReason, select, yes {Their reason: {reason}} other {No reason given.}}"
+    },
+    "automationQuota": {
+      "title": "Automations paused for the month",
+      "message": "The workspace has used its automation runs for this month: {rules, plural, one {# rule was} other {# rules were}} skipped. See the plan to raise the limit."
+    },
+    "mailArchiveUnmatched": {
+      "title": "Not archived: “{subject}”",
+      "message": "None of its addresses belongs to a contact or a lead. Add them, then send it to your archive address again."
+    },
+    "bookingReceived": {
+      "title": "{who} booked a meeting",
+      "message": "{when}"
+    },
+    "webFormLead": {
+      "title": "{who} wrote through the contact form",
+      "message": "It is on their record."
+    },
+    "webFormTicket": {
+      "title": "Support request {number}",
+      "message": "{subject}"
+    },
+    "ticketRatedBad": {
+      "title": "{ticket}: the customer says it did not go well",
+      "message": "Open the ticket to read their comment, if they left one."
+    },
+    "quoteProposed": {
+      "title": "{who} proposed quote {number}",
+      "message": "A draft with the customer's prices, waiting for you to check and send it."
+    },
+    "chatMention": {
+      "title": "{sender} mentioned you in {conversation}",
+      "message": "{preview}"
+    }
+  },
+  "taskTypes": {
+    "label": "Type",
+    "call": "Call",
+    "email": "Email",
+    "meeting": "Meeting",
+    "todo": "To do"
+  },
+  "taskOutcome": {
+    "title": "How did it go?",
+    "outcomeLabel": "Outcome",
+    "outcomes": {
+      "reached": "Reached",
+      "no_answer": "No answer",
+      "voicemail": "Voicemail",
+      "sent": "Sent",
+      "held": "Held",
+      "no_show": "No-show",
+      "done": "Done"
+    },
+    "noteLabel": "Note",
+    "notePlaceholder": "What was said, what was agreed…",
+    "nextLabel": "Next step",
+    "nextTitleLabel": "What to do next",
+    "nextTitlePlaceholder": "e.g. Send the revised quote",
+    "nextHint": "Leave it empty if there is nothing to plan.",
+    "dateLabel": "Date",
+    "timeLabel": "Time (optional)",
+    "quick": {
+      "tomorrow": "Tomorrow",
+      "in3": "In 3 days",
+      "nextWeek": "Next week"
+    },
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Done — recorded in the timeline.",
+    "savedWithNext": "Done — recorded, and the next step is planned.",
+    "failed": "Could not complete the task."
+  },
+  "importWizard": {
+    "steps": {
+      "file": "Choose a CSV file exported from a spreadsheet or another CRM.",
+      "map": "Say which field each column fills. The suggestions come from the column names.",
+      "preview": "This is what importing the file will do. Nothing has been written yet."
+    },
+    "chooseFile": "Choose a CSV file",
+    "fileHint": "Comma or semicolon separated, first row as column names, up to {max} rows.",
+    "noColumns": "The file has no column names in its first row.",
+    "tooManyRows": "The file has more than {max} rows. Split it and import the parts one at a time.",
+    "fileSummary": "{name}: {rows, plural, one {# row} other {# rows}}, separated by “{delimiter}”.",
+    "emptyColumn": "(empty)",
+    "mapTo": "Field for column {column}",
+    "ignore": "— Don't import —",
+    "missingRequired": "Choose a column for: {fields}.",
+    "duplicatesLabel": "When the {field} is already in the CRM",
+    "duplicates": {
+      "skip": "Skip the row",
+      "skipHelp": "The existing record stays as it is.",
+      "update": "Update the record",
+      "updateHelp": "The row's filled-in cells replace what is there; empty cells change nothing. The owner is kept.",
+      "create": "Create it anyway",
+      "createHelp": "A new record for every row, even when one already exists."
+    },
+    "counts": {
+      "created": "to create",
+      "updated": "to update",
+      "skipped": "duplicates skipped",
+      "invalid": "rows with errors"
+    },
+    "errorsTitle": "Rows that will not be imported",
+    "errorLine": "Row {line}: {detail}",
+    "nothingToDo": "There is nothing to import with these choices.",
+    "back": "Back",
+    "preview": "Preview",
+    "checking": "Checking…",
+    "confirm": "Import {count, plural, one {# record} other {# records}}",
+    "done": "Import complete: {created} created, {updated} updated, {skipped} skipped.",
+    "fields": {
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "phone": "Phone",
+      "mobile": "Mobile",
+      "jobTitle": "Job title",
+      "street": "Street",
+      "city": "City",
+      "state": "Province / state",
+      "zipCode": "Postcode",
+      "country": "Country",
+      "source": "Source",
+      "notes": "Notes",
+      "tags": "Tags",
+      "marketingConsent": "Marketing consent",
+      "leadScore": "Lead score",
+      "department": "Department",
+      "linkedinUrl": "LinkedIn",
+      "company": "Company",
+      "companyName": "Company",
+      "industry": "Industry",
+      "website": "Website",
+      "status": "Status",
+      "rating": "Rating",
+      "name": "Company name",
+      "description": "Description",
+      "type": "Type",
+      "employeeCount": "Employees",
+      "annualRevenue": "Annual revenue",
+      "mainPhone": "Phone",
+      "mainEmail": "Email",
+      "vatNumber": "VAT number",
+      "sdiCode": "SDI code",
+      "fiscalCode": "Tax code",
+      "pec": "PEC",
+      "language": "Language"
+    },
+    "missingOneOf": "Choose a column for at least one of: {fields}."
+  },
+  "recordTimeline": {
+    "filterLabel": "Show",
+    "filters": {
+      "all": "All",
+      "activity": "Activities",
+      "change": "Changes",
+      "quote": "Quotes"
+    },
+    "nothing": "Nothing has happened here yet.",
+    "nothingOfKind": "Nothing of this kind on the pages loaded.",
+    "loadMore": "Load earlier",
+    "loading": "Loading…",
+    "loadFailed": "Could not load earlier entries.",
+    "deleteFailed": "Could not delete the activity.",
+    "via": "on {name}",
+    "changed": "<b>{who}</b> changed <b>{field}</b>:",
+    "someone": "Someone",
+    "empty": "(empty)",
+    "fields": {
+      "name": "Name",
+      "amount": "Amount",
+      "currency": "Currency",
+      "stageId": "Stage",
+      "status": "Status",
+      "probability": "Probability",
+      "expectedCloseDate": "Expected close",
+      "ownerId": "Owner",
+      "companyId": "Company",
+      "contactId": "Contact",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "phone": "Phone",
+      "mobile": "Mobile",
+      "jobTitle": "Job title",
+      "type": "Type",
+      "industry": "Industry",
+      "website": "Website",
+      "mainEmail": "Email",
+      "mainPhone": "Phone",
+      "city": "City",
+      "vatNumber": "VAT number",
+      "priceListId": "Price list",
+      "companyName": "Company",
+      "rating": "Rating",
+      "marketingConsent": "Marketing consent"
+    },
+    "statuses": {
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost",
+      "active": "Active",
+      "inactive": "Inactive",
+      "new": "New",
+      "contacting": "Contacting",
+      "engaged": "Engaged",
+      "qualified": "Qualified",
+      "unqualified": "Unqualified"
+    },
+    "quoteEvents": {
+      "created": "created",
+      "updated": "updated",
+      "sent": "sent",
+      "reminded": "sent again as a reminder",
+      "viewed": "opened by the customer",
+      "opened_email": "email opened",
+      "clicked_email": "link in the email clicked",
+      "accepted": "accepted",
+      "declined": "declined",
+      "superseded": "replaced by a new revision",
+      "proposed": "proposed as a draft by the assistant"
+    },
+    "consentGiven": "given",
+    "consentWithdrawn": "withdrawn"
+  },
+  "profile": {
+    "title": "Profile",
+    "subtitle": "Your own account: your name, your password, what reaches your phone.",
+    "save": "Save",
+    "saved": "Saved.",
+    "failed": "Could not save.",
+    "name": {
+      "title": "Name",
+      "help": "How colleagues see you, beside every record you own and in every workspace you belong to.",
+      "label": "Name",
+      "errors": {
+        "empty": "A name is needed.",
+        "tooLong": "The name is too long."
+      }
+    },
+    "email": {
+      "label": "Email",
+      "help": "Your sign-in address. To change it, ask an administrator."
+    },
+    "password": {
+      "title": "Password",
+      "help": "Change the password you sign in with.",
+      "social": "You sign in with Google, so there is no password to change here.",
+      "current": "Current password",
+      "new": "New password",
+      "confirm": "Repeat the new password",
+      "rule": "At least 8 characters.",
+      "submit": "Change password",
+      "changed": "Password changed.",
+      "tooShort": "The new password needs at least 8 characters.",
+      "mismatch": "The two new passwords are not the same."
+    },
+    "notifications": {
+      "title": "My notifications",
+      "help": "What reaches your phone, and what only the bell shows."
+    },
+    "archive": {
+      "title": "Email archive",
+      "help": "Put this address in Bcc when you write to a customer from Gmail or Outlook: the email is filed on the contact or lead it was sent to.",
+      "label": "Your archive address",
+      "copy": "Copy",
+      "copied": "Address copied",
+      "howMatched": "It is filed on every contact and open lead whose email address is among the sender and recipients. When none matches, you are told in the notifications.",
+      "secret": "Anyone who knows this address can file email in your name. If you shared it by mistake, create a new one: the old one stops working at once.",
+      "rotate": "New address",
+      "rotateTitle": "Replace your archive address?",
+      "rotateBody": "Emails sent to the current address will no longer be filed. Update any saved Bcc in your mail client.",
+      "rotated": "New address created",
+      "notConfigured": "Not available on this installation: an inbound email domain has not been configured. Ask whoever manages Flux to set it up.",
+      "readOnly": "Your role in this workspace is read-only, so email cannot be filed in your name."
+    },
+    "booking": {
+      "title": "Booking page",
+      "help": "A link you can share so people book time with you: it offers only the times free in your calendar, inside the hours below.",
+      "open": "Open: people can book",
+      "closed": "Closed",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "preview": "Open the page",
+      "meetingTitle": "Meeting name",
+      "meetingTitlePlaceholder": "e.g. Introductory call",
+      "duration": "Length",
+      "daysAhead": "How far ahead",
+      "from": "From",
+      "to": "To",
+      "buffer": "Gap around other meetings",
+      "noBuffer": "None",
+      "minutes": "{count} minutes",
+      "days": "{count} days",
+      "weekdays": "Days",
+      "weekday": {
+        "1": "Mon",
+        "2": "Tue",
+        "3": "Wed",
+        "4": "Thu",
+        "5": "Fri",
+        "6": "Sat",
+        "7": "Sun"
+      },
+      "whatHappens": "A booking appears in your calendar, the visitor gets an invitation, and they are filed as the contact or lead they are — or as a new lead of yours.",
+      "invalid": "Check the hours and pick at least one day.",
+      "readOnly": "Your role in this workspace is read-only, so nobody can book time with you here.",
+      "notConfigured": "Not available on this installation."
+    },
+    "mailbox": {
+      "title": "Your mailbox and calendar",
+      "description": "Connect your own Google or Microsoft 365 account so the CRM works with the mailbox and calendar you already use.",
+      "does": {
+        "send": "Emails you write from a contact or lead go out from your own address and stay in your Sent folder.",
+        "file": "Mail you exchange with contacts and open leads is filed on their timeline. Nothing else is kept.",
+        "busy": "Your busy time blocks your booking page and shows to colleagues planning a meeting.",
+        "mirror": "Appointments you organise appear in your calendar (repeating ones not yet)."
+      },
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft 365"
+      },
+      "connect": {
+        "google": "Connect Google",
+        "microsoft": "Connect Microsoft 365"
+      },
+      "status": {
+        "active": "Connected",
+        "revoked": "Needs reconnecting"
+      },
+      "mailSynced": "Mail last read",
+      "busySynced": "Calendar last read",
+      "never": "not yet",
+      "lastError": "Last problem ({when}):",
+      "reconnect": "Reconnect",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect your mailbox?",
+      "disconnectBody": "Flux stops sending from it and reading it. What is already on the timelines stays, and so do events already in your calendar.",
+      "cancel": "Cancel",
+      "disconnected": "Mailbox disconnected.",
+      "readOnly": "Read-only access: connecting a mailbox writes to the records, so it is not available to you.",
+      "notAvailable": "Not available on this installation yet: it needs the provider's credentials and its verification of the app.",
+      "beingVerified": "Waiting for the provider to verify the app: not available yet.",
+      "testingNote": "Test mode: only Flux staff can connect until the provider has verified the app.",
+      "outcome": {
+        "connected": "Mailbox connected.",
+        "denied": "Connection cancelled at the consent screen.",
+        "error": "The mailbox could not be connected. Try again.",
+        "unavailable": "Connecting a mailbox is not available here."
+      }
+    }
+  },
+  "planFollowUp": {
+    "title": "What is the next step?",
+    "plan": "Plan it",
+    "notNow": "Not now",
+    "planned": "Planned.",
+    "failed": "Could not plan the task."
+  },
+  "digestSetting": {
+    "title": "Morning summary by email",
+    "help": "One email each morning with what is due today, what is late, deals with nothing planned and customers waiting for your answer — in place of one email per task.",
+    "saved": "Saved.",
+    "failed": "Could not save."
+  },
+  "workQueue": {
+    "title": "Work queue",
+    "progress": "{current} of {total}",
+    "progressLabel": "Progress through the queue",
+    "email": "Email",
+    "openRecord": "Open the record",
+    "noReach": "No phone number or email on this record.",
+    "skip": "Skip",
+    "saveNext": "Save and next",
+    "logged": "Logged.",
+    "failed": "Could not save.",
+    "emptyTitle": "Nothing waiting",
+    "empty": "The work list is empty: every deal, quote and ticket you follow is on track.",
+    "doneTitle": "Queue done",
+    "doneBody": "{n, plural, =0 {Nothing logged this time.} one {# contact logged.} other {# contacts logged.}}",
+    "backHome": "Back to the home"
+  },
+  "periods": {
+    "quarter": "Q{quarter} {year}",
+    "kind": "Period",
+    "kinds": {
+      "month": "Month",
+      "quarter": "Quarter",
+      "year": "Year"
+    },
+    "previous": "Previous period",
+    "next": "Next period",
+    "current": "Current period"
+  },
+  "onboarding": {
+    "title": "Get your workspace ready",
+    "subtitle": "{done} of {total} done. Each step ticks itself when it is done.",
+    "dismiss": "Hide these steps",
+    "done": "Done",
+    "todo": "To do",
+    "open": "Open",
+    "failed": "That did not work. Try again in a moment.",
+    "steps": {
+      "company": {
+        "title": "Your company's details",
+        "help": "Legal name and VAT number for documents, or at least a logo."
+      },
+      "team": {
+        "title": "Invite your team",
+        "help": "A CRM for one is a notebook: invite the people who sell and support."
+      },
+      "contacts": {
+        "title": "Import your contacts",
+        "help": "From a spreadsheet or another CRM, with the columns matched for you."
+      },
+      "stages": {
+        "title": "Review the pipeline stages",
+        "help": "Rename, add or remove stages so they match how you sell.",
+        "fine": "They are fine"
+      },
+      "email": {
+        "title": "Connect email",
+        "help": "A sending account, so emails leave from your address and replies come back."
+      }
+    },
+    "sample": {
+      "help": "Want to look around first? Load a few sample companies, deals and tasks.",
+      "load": "Load sample data",
+      "loaded": "Sample data is in the workspace. Remove it before you start for real.",
+      "loadedToast": "Sample data loaded",
+      "remove": "Remove sample data",
+      "removeTitle": "Remove the sample data?",
+      "removeBody": "The sample companies, contacts, leads, deals, activities and tasks will be deleted. Nothing you created is touched.",
+      "removeBodyDependents": "The sample companies, contacts, leads, deals, activities and tasks will be deleted, together with {count, plural, one {# note or task you added} other {# notes and tasks you added}} to them.",
+      "removed": "Sample data removed",
+      "errors": {
+        "notEmpty": "This workspace already has its own deals or contacts: sample data would mix into your real figures.",
+        "alreadyLoaded": "Sample data is already loaded.",
+        "noStages": "The pipeline has no open stages to put sample deals in."
+      }
+    }
+  },
+  "privacy": {
+    "title": "Privacy",
+    "help": "The rights of the person reachable at {contactPoint}: a copy of their data, or erasure — across every record of theirs, not only this one.",
+    "noContactPoint": "No email or phone on this record: a person is found by the address or number they give, so there is nothing to export or erase by.",
+    "export": "Export their data",
+    "exported": "Data exported. Send the file to the person through a secure channel.",
+    "erase": "Erase this person",
+    "eraseTitle": "Erase this person?",
+    "eraseBody": "Everything reachable at {contactPoint} goes: {leads, plural, =0 {no leads} one {# lead} other {# leads}} deleted with their activities and tasks, {contacts, plural, =0 {no contacts} one {# contact} other {# contacts}} anonymised, their history, messages and email trail removed.",
+    "eraseKeeps": "Deals, quotes and orders stay, without the person. The address stays on the suppression list, so nothing is sent to it again. This cannot be undone.",
+    "typeToConfirm": "Type {contactPoint} to confirm",
+    "eraseConfirm": "Erase for good",
+    "erased": "Person erased.",
+    "invalid": "That is not an email address or a phone number.",
+    "failed": "That did not work. Nothing was changed; try again in a moment.",
+    "consent": {
+      "since": "since {date}",
+      "withdrawnOn": "withdrawn on {date}",
+      "sources": {
+        "form": "recorded in Flux",
+        "import": "from an import",
+        "api": "through the API",
+        "unsubscribe": "by unsubscribing",
+        "conversion": "carried over from the lead",
+        "web": "through a web form"
+      }
+    }
+  },
+  "booking": {
+    "pageTitle": "Book a time with {name}",
+    "closedTitle": "Booking page",
+    "defaultTitle": "Meeting",
+    "duration": "{minutes} minutes with {name} · times in {zone}",
+    "noSlots": "No free times in the coming days. Try again later.",
+    "formTitle": "{day}, {time}",
+    "name": "Your name",
+    "email": "Your email",
+    "phone": "Phone (optional)",
+    "note": "Anything to share beforehand? (optional)",
+    "privacy": "Your name and email are shared with {name} to arrange the meeting, and you will receive a calendar invitation.",
+    "confirm": "Confirm booking",
+    "confirmedTitle": "You're booked",
+    "confirmedBody": "{day} at {time} ({zone}) with {name}. A calendar invitation is on its way to your inbox.",
+    "errors": {
+      "taken": "That time has just been taken. Please choose another.",
+      "invalid": "Please check your name and email address.",
+      "tooMany": "Too many attempts. Please wait a minute and try again.",
+      "notFound": "This booking page is no longer available.",
+      "failed": "The booking did not go through. Please try again."
+    }
+  },
+  "webForm": {
+    "closed": "Form",
+    "name": "Your name",
+    "email": "Your email",
+    "phone": "Phone (optional)",
+    "company": "Company (optional)",
+    "message": "Your message",
+    "subject": "Subject",
+    "description": "Describe the problem",
+    "consent": "I agree to receive news and offers from {name} by email. I can unsubscribe at any time.",
+    "send": "Send",
+    "lead": {
+      "title": "Get in touch with {name}",
+      "help": "Leave your details and we will be in touch.",
+      "doneTitle": "Thank you",
+      "doneBody": "Your message has reached {name}. We will be in touch soon."
+    },
+    "ticket": {
+      "title": "Support request to {name}",
+      "help": "Tell us what is happening: every request gets a number and an answer by email.",
+      "doneTitle": "Request received",
+      "doneBody": "Your request is number {number}. Keep it: the answer will arrive by email and refer to it."
+    },
+    "errors": {
+      "invalid": "Please fill in your name, a valid email and the required fields.",
+      "captcha": "The anti-spam check did not pass. Please try again.",
+      "notFound": "This form is no longer available.",
+      "tooMany": "Too many attempts. Please wait a minute and try again.",
+      "failed": "The form could not be sent. Please try again."
+    }
+  },
+  "commissions": {
+    "title": "Commissions",
+    "subtitleManager": "What each person's won deals earned, month by month. Approve a month once it is over to freeze what is paid.",
+    "subtitleOwn": "What your won deals earned, month by month.",
+    "unassigned": "Nobody",
+    "former": "{name} (former)",
+    "someone": "Someone no longer here",
+    "pipelineGone": "A deleted pipeline",
+    "allPipelines": "Every pipeline",
+    "everyone": "Everyone",
+    "approvedToast": "{month} approved: {lines, plural, one {# deal} other {# deals}}, {total}.",
+    "reopenedToast": "{month} reopened: it is computed again from today's deals and rates.",
+    "errors": {
+      "invalid": "That is not a month.",
+      "not_over": "A month can be approved only once it is over.",
+      "already": "This month is already approved.",
+      "invalidRule": "Enter a rate between 0 and 100 and a valid start date."
+    },
+    "drift": {
+      "deleted": "Deal deleted since",
+      "reopened": "Reopened since",
+      "owner": "Owner changed since",
+      "amount": "Amount changed since"
+    },
+    "state": {
+      "approved": "Approved",
+      "late": "Won after approval",
+      "noRule": "No rate",
+      "noOwner": "No owner",
+      "accruing": "To approve"
+    },
+    "monthApproved": "Approved {date} by {by}",
+    "monthWaiting": "Waiting for approval",
+    "monthRunning": "In progress",
+    "approve": "Approve",
+    "approveTitle": "Approve {month}?",
+    "approveBody": "Each won deal of the month is frozen with its amount and rate. Later changes to a deal will not change what this month pays: they will be flagged here instead.",
+    "reopen": "Reopen",
+    "reopenTitle": "Reopen {month}?",
+    "reopenBody": "The approved lines are discarded and the month is computed again from today's deals and rates. Do this only if the month has not been paid.",
+    "cancel": "Cancel",
+    "byPerson": "By person",
+    "empty": "No won deals in this period.",
+    "total": "Total",
+    "lines": "Deals",
+    "linesHelp": "Every won deal in the period, with the rate that applies to it.",
+    "unpaidHelp": "Won deals no rate applies to: nobody is paid for them until a rule covers them.",
+    "cols": {
+      "person": "Person",
+      "deals": "Won deals",
+      "base": "Won value",
+      "amount": "Commission",
+      "approved": "Of which approved",
+      "unpaid": "No rate",
+      "deal": "Deal",
+      "won": "Won on",
+      "rate": "Rate",
+      "state": "Status"
+    },
+    "rules": "Rates",
+    "rulesHelp": "The most specific rate applies: person and pipeline, then person, then pipeline, then everyone. To change a rate, add a new one from a later date: deals already won keep theirs.",
+    "noRules": "No rates yet: won deals earn nothing until you add one.",
+    "ruleLine": "{rate}% from {from}",
+    "deleteRule": "Delete rate",
+    "addRule": "Add rate",
+    "ruleSaved": "Rate saved.",
+    "fields": {
+      "person": "Person",
+      "pipeline": "Pipeline",
+      "rate": "Rate (%)",
+      "from": "From"
+    },
+    "footnote": "Commissions accrue when a deal is won, on its value in EUR, at the rate in force that day. Months not yet approved follow today's deals and rates."
   }
 }

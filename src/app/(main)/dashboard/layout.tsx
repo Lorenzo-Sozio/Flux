@@ -19,7 +19,6 @@ import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { APP_CONFIG } from "@/config/app-config";
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
 import { tenantMembers, tenants, users } from "@/db/schema";
@@ -29,12 +28,14 @@ import { can, normalizeTenantRole } from "@/lib/permissions";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
+import { readWorkspaceFeatures } from "@/lib/workspace-features";
 import { computeNavAccess } from "@/navigation/sidebar/filter-nav";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
 
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { MenuTrigger } from "./_components/sidebar/menu-trigger";
+import { MobilePageTitle } from "./_components/sidebar/mobile-page-title";
 import { MobileTabBar } from "./_components/sidebar/mobile-tab-bar";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
@@ -88,6 +89,9 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   // The sidebar is built from the membership role read above — the authoritative
   // one — rather than the platform staff field the pages used to consult.
   const entitlements = await getTenantEntitlements().catch(() => null);
+  // The optional parts the workspace uses — the menu drops the rest, and the chat widget,
+  // which polls from every open tab, is not mounted at all when chat is off.
+  const features = await readWorkspaceFeatures(db);
   // Strings only. Sending the filtered menu itself carried each entry's `icon`,
   // a React component, which cannot cross into a Client Component — and took every
   // dashboard page down with it.
@@ -98,6 +102,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
       isPlatformStaff: false,
     },
     enabledModules: entitlements?.enabledModules,
+    features,
   });
 
   // What quick create and the palette may offer, decided here with the same role and
@@ -133,40 +138,52 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
           />
           <SidebarInset
             className={cn(
-              "overflow-hidden",
+              // ⚠️ `clip`, not `hidden`, under a page that marks `data-sticky-sections`
+              // (see the wrapper below): `hidden` makes this a scroll container that
+              // never scrolls, and a sticky header inside it then never sticks.
+              // `min-w-0` because `hidden` also let this flex item shrink below its
+              // content, and `clip` does not: without it a tablet's page grew wider
+              // than the screen and was cut off at the right.
+              "overflow-hidden has-[[data-sticky-sections]]:min-w-0 has-[[data-sticky-sections]]:overflow-clip",
               "[html[data-content-layout=centered]_&]:mx-auto! [html[data-content-layout=centered]_&]:max-w-screen-2xl!",
               "max-[113rem]:peer-data-[variant=inset]:mr-2! min-[101rem]:peer-data-[variant=inset]:peer-data-[state=collapsed]:mr-auto!",
             )}
           >
             <header
               className={cn(
-                "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
+                "flex h-(--app-header-height) shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear",
                 "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
               )}
             >
-              <div className="flex w-full items-center justify-between px-4 lg:px-6">
-                <div className="flex min-w-0 items-center gap-1 lg:gap-2">
-                  {/* Below md the bottom bar opens the menu, and the trigger would
-                    be a second control for the same thing in the hardest corner
-                    of the screen to reach one-handed. */}
-                  {/*
-                  ⚠️ First on the left, at every width, because that is the edge
-                  the panel comes out of. It lived here, moved to the last slot
-                  of the bottom bar for a while, and that was wrong twice over: a
-                  control on the right that opens a panel on the left, and a
-                  fifth of the bar spent on a menu instead of a destination.
+              {/*
+                One row that rearranges itself, rather than two layouts:
+
+                - Phone: [‹ back] [page title ········] [search] [bell]. The menu
+                  is the Menu slot of the bottom bar, so the trigger is not here;
+                  the preferences that sat on the right live in that hub too.
+                - md and up: [menu trigger | search ········] [recents] [bell]
+                  [currency] [language] [layout] [theme], as it always was.
+              */}
+              <div className="flex w-full min-w-0 items-center gap-1 px-3 md:gap-2 md:px-4 lg:px-6">
+                {/*
+                  ⚠️ First on the left from md up, because that is the edge the
+                  sidebar comes out of. Below md there is no sidebar to open: the
+                  bottom bar's Menu opens the navigation hub from the bottom edge,
+                  where the thumb already is.
                 */}
+                <div className="hidden shrink-0 items-center md:flex">
                   <MenuTrigger />
                   <Separator
                     orientation="vertical"
-                    className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"
+                    className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
                   />
-                  {/* Installed, there is no address bar and no tab title, so the
-                    app has to say what it is somewhere. */}
-                  <span className="truncate font-semibold text-sm md:hidden">{APP_CONFIG.name}</span>
-                  {/* The palette offers verbs now, so it needs to know which are allowed. */}
-                  <SearchDialog tenantRole={tenantRole} enabledModules={enabledModules} />
                 </div>
+                {/* Installed, there is no address bar and no tab title, so the
+                  app has to say where you are somewhere. */}
+                <MobilePageTitle className="flex-1 md:hidden" />
+                {/* The palette offers verbs now, so it needs to know which are allowed. */}
+                <SearchDialog tenantRole={tenantRole} enabledModules={enabledModules} navAccess={navAccess} />
+                <div className="hidden md:block md:flex-1" />
                 <div className="flex shrink-0 items-center gap-1 md:gap-2">
                   {/* Desktop conveniences. Recently-visited duplicates the browser
                     history a phone already has, and the layout controls configure
@@ -181,8 +198,8 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                     <CurrencySwitcher />
                     <LocaleSwitcher />
                     <LayoutControls />
+                    <ThemeSwitcher />
                   </div>
-                  <ThemeSwitcher />
                 </div>
               </div>
             </header>
@@ -194,15 +211,23 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
             below no longer set their own; a new one should not either.
 
             The bottom padding is the tab bar, which is fixed and would otherwise
-            cover the last row of every scrollable page.
+            cover the last row of every scrollable page. The 1rem is also what the
+            create button rises above the bar, and full-height screens (chat, a
+            ticket) are sized to this exact sum — change one, change them.
+
+            ⚠️ Nothing above this is bounded in height (the sidebar wrapper is
+            `min-h-svh`), so it is the *document* that scrolls, and this box only
+            grows. A page whose section headers stick while it scrolls (the pipeline
+            list) marks itself `data-sticky-sections`: a box that is a scroll
+            container but never scrolls is where a sticky header sticks — i.e. nowhere.
           */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] md:p-6 md:pb-6">
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] has-[[data-sticky-sections]]:overflow-visible md:p-6 md:pb-6">
               {children}
             </div>
           </SidebarInset>
-          <MobileTabBar navAccess={navAccess} />
+          <MobileTabBar navAccess={navAccess} creatable={creatable} user={user} />
           <InstallPrompt />
-          {session?.user?.id && <ChatWidget userId={session.user.id} />}
+          {session?.user?.id && features.chat && <ChatWidget userId={session.user.id} />}
         </SidebarProvider>
       </CurrencyProvider>
     </WorkspaceScopeProvider>

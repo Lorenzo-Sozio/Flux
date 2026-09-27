@@ -1,21 +1,20 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { ilike } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { companies } from "@/db/schema";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { buildCompanyPayload, parseOnDuplicate, validateCompanyInput } from "@/lib/api-import-validators";
+import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/** Marks the event as written by a machine, so an integrator does not
- *  receive its own import back and react to it. */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the idempotency ledger and the write log both
@@ -23,11 +22,27 @@ const API_ORIGIN = { via: "api" as const, actor: null };
  */
 const ENDPOINT = "/api/crm/companies";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "companies", access: "write" } as const;
+const READ_SCOPE = { entity: "companies", access: "read" } as const;
+
+/**
+ * A page of companies, oldest change first; `updatedSince` and `cursor` to reconcile
+ * (src/lib/api-read.ts). Nothing is written, so nothing is logged.
+ */
+export async function GET(req: NextRequest) {
+  const gate = await gateApiRequest(req, READ_SCOPE);
+  if (gate.response) return gate.response;
+  return listResponse(req, gate.auth, "companies");
+}
+
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -75,7 +90,10 @@ export async function POST(req: NextRequest) {
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -97,7 +115,16 @@ export async function POST(req: NextRequest) {
   let response: Response;
   try {
     response = await (async () => {
-      const [existing] = await db.select({ id: companies.id }).from(companies).where(ilike(companies.name, data.name));
+      // ⚠️⚠️ An exact comparison, ignoring case — the one the bulk route makes. This was
+      // `ilike(name, data.name)`, and the caller's name is a *pattern* there: `%` and `_`
+      // are wildcards. With `onDuplicate: "update"` the same condition chose the rows to
+      // overwrite, so a company named "%" rewrote every company in the workspace with one
+      // record's data. The update below targets the row found, by id, and nothing else.
+      const [existing] = await db
+        .select()
+        .from(companies)
+        .where(sql`lower(${companies.name}) = lower(${data.name})`)
+        .limit(1);
 
       if (existing) {
         if (onDuplicate === "error") {
@@ -111,9 +138,16 @@ export async function POST(req: NextRequest) {
           const [updated] = await db
             .update(companies)
             .set(buildCompanyPayload(data, authResult.userId))
-            .where(ilike(companies.name, data.name))
+            .where(eq(companies.id, existing.id))
             .returning();
           dispatchWebhook("company.updated", { company: updated }, API_ORIGIN, db);
+          runRulesAfterApiWrite(tenant.id, {
+            entityType: "company",
+            entityId: updated.id,
+            event: "onUpdate",
+            oldData: existing as Record<string, unknown>,
+            newData: updated as Record<string, unknown>,
+          });
           await logApiWrite(db, authResult, { entity: "company", endpoint: ENDPOINT, recordId: updated.id });
           return NextResponse.json({ status: "updated", id: updated.id, data: updated });
         }
@@ -123,6 +157,15 @@ export async function POST(req: NextRequest) {
 
       const [created] = await db.insert(companies).values(buildCompanyPayload(data, authResult.userId)).returning();
       dispatchWebhook("company.created", { company: created }, API_ORIGIN, db);
+      // The same rules a company typed into the dashboard runs. Only here and in the single
+      // routes: see runRulesAfterApiWrite for why an import in bulk runs none.
+      runRulesAfterApiWrite(tenant.id, {
+        entityType: "company",
+        entityId: created.id,
+        event: "onCreate",
+        oldData: {},
+        newData: created as Record<string, unknown>,
+      });
       await logApiWrite(db, authResult, { entity: "company", endpoint: ENDPOINT, recordId: created.id });
 
       return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
@@ -134,7 +177,7 @@ export async function POST(req: NextRequest) {
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/actions/support.ts",
+    "description": "⚠️⚠️ salvare gli orari di apertura riporta il fuso orario a quello predefinito",
+    "find": "    await db.update(businessCalendar).set({ week, updatedAt: new Date() }).where(eq(businessCalendar.id, existing.id));",
+    "replace": "    await db.update(businessCalendar).set({ week, timeZone: \"Europe/Rome\", updatedAt: new Date() }).where(eq(businessCalendar.id, existing.id));"
+  },
+  {
+    "file": "src/actions/workspace-settings.ts",
+    "description": "⚠️ un fuso orario inesistente viene salvato e rompe ogni data",
+    "find": "    new Intl.DateTimeFormat(\"en-US\", { timeZone: zone });",
+    "replace": "    void zone;"
+  },
+  {
+    "file": "src/actions/workspace-settings.ts",
+    "description": "⚠️⚠️ il fuso orario scelto in Generale non viene salvato",
+    "find": "      .set({ timeZone: zone, updatedAt: new Date() })",
+    "replace": "      .set({ updatedAt: new Date() })"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ un nuovo preventivo ignora la validità predefinita",
+    "find": "      : defaultExpiry(new Date(), defaults.validityDays);",
+    "replace": "      : null;"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ un nuovo preventivo ignora le condizioni standard",
+    "find": "    const notes = validated.notes?.trim() ? validated.notes : defaults.terms || validated.notes || null;",
+    "replace": "    const notes = validated.notes || null;"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️ le condizioni standard sovrascrivono le note scritte sul preventivo",
+    "find": "    const notes = validated.notes?.trim() ? validated.notes : defaults.terms || validated.notes || null;",
+    "replace": "    const notes = defaults.terms || validated.notes || null;"
+  },
+  {
+    "file": "src/lib/workspace-preferences.ts",
+    "description": "una validità negativa o enorme viene accettata",
+    "find": "    validityDays: Number.isFinite(days) ? Math.min(MAX_VALIDITY_DAYS, Math.max(0, days)) : 0,",
+    "replace": "    validityDays: Number.isFinite(days) ? days : 0,"
+  },
+  {
+    "file": "src/lib/workspace-preferences.ts",
+    "description": "⚠️ un file qualunque passa per un PNG",
+    "find": "  if (bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {",
+    "replace": "  if (bytes.length > 8) {"
+  },
+  {
+    "file": "src/lib/workspace-preferences.ts",
+    "description": "⚠️ togliere il logo scrive un null in una colonna che non lo accetta",
+    "find": "  if (ref) await writeKey(db, KEYS.logo, ref);\n  else await db.delete(workspaceSettings).where(eq(workspaceSettings.key, KEYS.logo));",
+    "replace": "  await writeKey(db, KEYS.logo, ref);"
+  },
+  {
+    "file": "src/actions/lists.ts",
+    "description": "⚠️ rinominare una voce col nome di un'altra crea un doppione",
+    "find": "    .where(sql`lower(${table.name}) = ${clean.toLowerCase()} and ${table.id} <> ${id}`)",
+    "replace": "    .where(sql`${table.name} = ${clean} and ${table.id} <> ${id}`)"
+  },
+  {
+    "file": "src/actions/lists.ts",
+    "description": "unire due voci lascia in piedi quella vecchia",
+    "find": "    db.delete(table).where(eq(table.id, fromId)),",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ «Prospect» e «prospect» tornano a essere due tipi",
+    "find": "    .where(sql`lower(${table.name}) = ${clean.toLowerCase()}`)",
+    "replace": "    .where(eq(table.name, clean))"
+  }
+]

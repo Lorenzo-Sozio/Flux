@@ -22,7 +22,7 @@ vi.mock("@/db", () => ({ platformDb: {} }));
 vi.mock("@/db/schema", () => ({}));
 vi.mock("@/lib/notify", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/document-counter", () => ({ nextInSequence: async () => 1 }));
-vi.mock("@/actions/webhooks", () => ({ dispatchWebhook: async () => undefined }));
+vi.mock("@/lib/webhook-dispatch", () => ({ dispatchWebhook: async () => undefined }));
 vi.mock("../../crm/automation/webhook-service", () => ({ sendWebhook: async () => ({}) }));
 vi.mock("../../crm/automation/email-service", () => ({ sendAutomationEmailWithContext: async () => ({}) }));
 vi.mock("../../crm/automation/rule-engine", () => ({ runAutomations: async () => undefined }));

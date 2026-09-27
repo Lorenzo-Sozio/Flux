@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "⚠️ una risposta da dare finisce tra le attività di oggi invece che tra i clienti in attesa",
+    "find": "    if (t.type === \"email\" && t.title.startsWith(REPLY_TASK_PREFIX)) d.repliesDue++;\n    else if",
+    "replace": "    if"
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "⚠️ le attività scadute vengono presentate come di oggi",
+    "find": "    else if (t.dueDate && new Date(t.dueDate) < start) d.overdue++;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "⚠️⚠️ chi ha disattivato il riepilogo lo riceve comunque",
+    "find": "(p: { wants: boolean | null; sentOn: string | null }) => p.wants !== false && p.sentOn !== day,",
+    "replace": "(p: { wants: boolean | null; sentOn: string | null }) => p.sentOn !== day,"
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "⚠️⚠️ il riepilogo parte due volte nella stessa mattina",
+    "find": "    if (claimed.length === 0) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "il riepilogo è sempre in italiano",
+    "find": "      locale: p.locale === \"en\" ? \"en\" : \"it\",",
+    "replace": "      locale: \"it\","
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "⚠️ un ex membro, ancora nella copia degli utenti, riceve il riepilogo",
+    "find": "    .where(and(inArray(users.id, opts.members), isNotNull(users.email)));",
+    "replace": "    .where(isNotNull(users.email));"
+  },
+  {
+    "file": "src/lib/morning-digest.ts",
+    "description": "una lingua che il prodotto non parla viene salvata",
+    "find": "  if (locale !== \"it\" && locale !== \"en\") return;",
+    "replace": ""
+  }
+]

@@ -1,0 +1,164 @@
+[
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️⚠️ si scrive ai clienti anche con la funzione spenta",
+    "find": "  return Boolean((row?.value as { enabled?: unknown } | undefined)?.enabled === true);",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️⚠️ un ticket risolto due volte in un secondo manda due email",
+    "find": "    .where(and(eq(tickets.id, ticket.id), isNull(tickets.csatRequestedAt)))",
+    "replace": "    .where(eq(tickets.id, ticket.id))"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ si chiede di nuovo a chi ha già risposto",
+    "find": "  if (ticket.ratedAt) return \"rated\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ senza indirizzo pubblico partono link che non portano da nessuna parte",
+    "find": "  if (!input.base || !input.subdomain) return \"noLink\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️⚠️ la pagina del cliente mostra le note interne dei colleghi",
+    "find": "    .where(and(eq(ticketMessages.ticketId, ticket.id), eq(ticketMessages.isPublic, true)))",
+    "replace": "    .where(eq(ticketMessages.ticketId, ticket.id))"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️⚠️ l'HTML di un'email arriva alla pagina pubblica senza essere ripulito",
+    "find": "    html: sanitizeEmailHtml(m.content ?? \"\"),",
+    "replace": "    html: m.content ?? \"\","
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ si può giudicare un ticket ancora aperto",
+    "find": "    .where(and(eq(tickets.publicToken, input.token), inArray(tickets.status, RATEABLE)))",
+    "replace": "    .where(eq(tickets.publicToken, input.token))"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ ogni ricarica della pagina è una risposta nuova",
+    "find": "    changed: before?.rating !== input.rating,",
+    "replace": "    changed: true,"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ cambiare idea cancella il commento già scritto",
+    "find": "      ...(comment !== null ? { csatComment: comment } : {}),",
+    "replace": "      csatComment: comment,"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️⚠️ l'oggetto scritto dal cliente entra nell'email come markup",
+    "find": "  <p>${escapeHtml(fill(t.resolvedBody, { number: input.number, subject: input.subject }))}</p>",
+    "replace": "  <p>${fill(t.resolvedBody, { number: input.number, subject: input.subject })}</p>"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ l'email di risoluzione non si aggancia alla conversazione",
+    "find": "      inReplyTo: last?.id ?? null,",
+    "replace": "      inReplyTo: null,"
+  },
+  {
+    "file": "src/lib/ticket-public.ts",
+    "description": "⚠️ un token di qualsiasi forma arriva alla query",
+    "find": "export const isPublicToken = (v: unknown): v is string => typeof v === \"string\" && /^[a-z2-7]{20}$/.test(v);",
+    "replace": "export const isPublicToken = (v: unknown): v is string => typeof v === \"string\";"
+  },
+  {
+    "file": "src/lib/ticket-public-page.ts",
+    "description": "⚠️ l'agente riceve la stessa cattiva notizia a ogni ricarica",
+    "find": "  if (result.rating === \"bad\" && result.changed && result.notifyUserId) {",
+    "replace": "  if (result.rating === \"bad\" && result.notifyUserId) {"
+  },
+  {
+    "file": "src/lib/ticket-public-page.ts",
+    "description": "anche un giudizio positivo interrompe l'agente",
+    "find": "  if (result.rating === \"bad\" && result.changed && result.notifyUserId) {",
+    "replace": "  if (result.changed && result.notifyUserId) {"
+  },
+  {
+    "file": "src/lib/ticket-state-machine.ts",
+    "description": "⚠️⚠️ un ticket riaperto resta contato come risolto",
+    "find": "  else if (ticket.status === \"resolved\" && next !== \"closed\") stamps.resolvedAt = null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-state-machine.ts",
+    "description": "⚠️ il tempo in attesa del cliente si perde",
+    "find": "    stamps.slaPauseMinutes = (ticket.slaPauseMinutes ?? 0) + Math.floor(pausedMs / 60000);",
+    "replace": "    stamps.slaPauseMinutes = ticket.slaPauseMinutes ?? 0;"
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️⚠️ un ticket riaperto conta come risolto nel report",
+    "find": "  if (!SOLVED.includes(t.status)) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️ la mediana diventa la media: un ticket dimenticato descrive tutti",
+    "find": "  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;",
+    "replace": "  return sorted.reduce((a, b) => a + b, 0) / sorted.length;"
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️⚠️ una prima risposta scaduta e mai data non conta come mancata",
+    "find": "  return t.firstResponseDueAt < now ? false : null;",
+    "replace": "  return null;"
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️ il tempo in pausa non viene restituito alla scadenza",
+    "find": "  const deadline = t.slaDeadlineAt.getTime() + (t.slaPauseMinutes ?? 0) * MINUTE;",
+    "replace": "  const deadline = t.slaDeadlineAt.getTime();"
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️ la violazione vista dal job non conta",
+    "find": "  if (t.slaBreachedAt) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/support-metrics.ts",
+    "description": "⚠️ nessuna risposta diventa soddisfazione al 100%",
+    "find": "  c.good + c.bad === 0 ? null : c.good / (c.good + c.bad);",
+    "replace": "  c.good + c.bad === 0 ? 1 : c.good / (c.good + c.bad);"
+  },
+  {
+    "file": "src/lib/web-forms.ts",
+    "description": "⚠️⚠️ una richiesta dal sito nasce senza SLA",
+    "find": "  const sla = await resolveSla(db, \"normal\");",
+    "replace": "  const sla = { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ una richiesta per email nasce senza SLA",
+    "find": "  const sla = await resolveSla(db, \"normal\");",
+    "replace": "  const sla = { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };"
+  },
+  {
+    "file": "src/app/api/cron/ticket-sla-check/route.ts",
+    "description": "⚠️⚠️ una prima risposta mai data non viene mai segnata come in ritardo",
+    "find": "      .set({ firstResponseBreachedAt: now })",
+    "replace": "      .set({ updatedAt: now })"
+  },
+  {
+    "file": "src/actions/support.ts",
+    "description": "⚠️ una prima risposta data in ritardo non viene segnata",
+    "find": "      ticketUpdates.firstResponseBreachedAt = answeredAt;",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/support.ts",
+    "description": "⚠️⚠️ il trascinamento sulla board salta il controllo del titolare e la richiesta di giudizio",
+    "find": "  return updateTicketAction(ticketId, { status: status as z.infer<typeof UpdateTicketSchema>[\"status\"] });",
+    "replace": "  return { success: true, ticket: await getTicketById(ticketId) };"
+  }
+]

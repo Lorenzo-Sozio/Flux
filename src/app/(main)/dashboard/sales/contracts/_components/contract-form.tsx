@@ -2,17 +2,26 @@
 
 import { useMemo, useState } from "react";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronLeft, Loader2, ScrollText } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Building2, CalendarRange, Coins, Loader2, NotebookPen, RefreshCw, User, UserRound } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { createContract, type getContractFormData, updateContract } from "@/actions/contracts";
 import { ContractFormSchema, type ContractFormValues } from "@/actions/contracts-validation";
+import {
+  MetaItem,
+  Metric,
+  MetricStrip,
+  RecordBackLink,
+  RecordHero,
+  StatusBadge,
+  type Tone,
+} from "@/components/crm/record/record-page";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +37,7 @@ import { useMessageText } from "@/hooks/use-message-text";
 import {
   addDays,
   BILLING_PERIODS,
+  type ContractPhase,
   contractPhase,
   currentTermEnd,
   monthlyValue,
@@ -35,6 +45,7 @@ import {
   REMINDER_LEAD_DAYS,
   today,
 } from "@/lib/contract-terms";
+import { cn } from "@/lib/utils";
 
 type FormData = Awaited<ReturnType<typeof getContractFormData>>;
 
@@ -42,25 +53,65 @@ export interface ContractInitial extends Partial<ContractFormValues> {
   id: string;
 }
 
+/** The kit's five tones, matched to the badges on the contracts list. */
+const PHASE_TONE: Record<ContractPhase, Tone> = {
+  active: "success",
+  renewal_due: "warning",
+  expired: "danger",
+  upcoming: "info",
+  draft: "neutral",
+  cancelled: "neutral",
+};
+
+const DAY = 86_400_000;
+
+/** Whole days from one calendar day to another; both are UTC `yyyy-mm-dd`, as contract-terms keeps them. */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / DAY);
+
 /**
- * Writing a contract.
+ * Writing a contract, and — once it exists — the contract's page.
  *
- * Built to the same plan as the quote form rather than as a dialog: a bar that
- * stays put with the recurring value in it, then who it is for, what it is worth,
- * and how long it runs, each in its own card with room for the explanation.
+ * There is no separate detail view: opening a contract opens this. So in edit mode
+ * it starts with the same hero every record has — the phase, the title, who it is
+ * with — and the figures that decide what happens next: what it brings in a month,
+ * when the term ends and by when notice must be given, each with how far away it
+ * is. Below, one card per subject: who, what it is worth, how long it runs, notes.
+ * Save and cancel stay at the bottom edge, where the thumb is.
  *
  * ⚠️ The term, the notice and the renewal are the part people get wrong, so the
  * page works out what it will mean — when it ends, when it will ask for a decision
  * — and says it under the fields, rather than leaving three dates to be held in
- * the head.
+ * the head. The hero's figures follow the fields for the same reason: a date
+ * changed is seen to move the deadline before it is saved.
+ *
+ * ⚠️ Shared with /contracts/new (`initial` null): the hero then has no status and
+ * no customer to show, and the submit creates instead of updating.
  */
+type FormSection = "customer" | "value" | "term" | "notes";
+
+/** Which phone tab holds each field, so a failed save can open the right one. */
+const FIELDS_OF: Record<FormSection, (keyof ContractFormValues)[]> = {
+  customer: ["title", "companyId", "contactId", "ownerId"],
+  value: ["amount", "billingPeriod", "currency", "status"],
+  term: ["startDate", "endDate", "noticeDays", "renewalTermMonths", "autoRenew"],
+  notes: ["notes"],
+};
+const SECTION_OF = Object.fromEntries(
+  Object.entries(FIELDS_OF).flatMap(([section, fields]) => fields.map((f) => [f, section])),
+) as Partial<Record<keyof ContractFormValues, FormSection>>;
+
 export function ContractForm({ initial, data }: { initial: ContractInitial | null; data: FormData | null }) {
   const t = useTranslations("contracts");
   const tf = useTranslations("contracts.form");
+  const tR = useTranslations("record");
+  const formatter = useFormatter();
   const say = useMessageText();
   const router = useRouter();
   const { formatMoney } = useCurrency();
   const [saving, setSaving] = useState(false);
+  // Which card a phone shows. The form is one form whatever is on screen: every
+  // field stays mounted and is submitted, only hidden.
+  const [section, setSection] = useState<FormSection>("customer");
 
   const form = useForm<ContractFormValues>({
     resolver: zodResolver(ContractFormSchema),
@@ -84,6 +135,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
 
   const values = form.watch();
   const companyId = values.companyId;
+  const currency = values.currency || "EUR";
 
   /** Contacts of the chosen company, or all of them while none is chosen. */
   const contactOptions = useMemo(() => {
@@ -107,6 +159,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
     const on = today();
     const termEnd = currentTermEnd(terms, on);
     return {
+      on,
       monthly: monthlyValue(terms),
       phase: contractPhase(terms, on),
       termEnd,
@@ -114,6 +167,35 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
       asksFrom: termEnd ? addDays(noticeDeadline(termEnd, terms.noticeDays), -REMINDER_LEAD_DAYS) : null,
     };
   }, [values]);
+
+  // The contract as it is saved, for the hero's identity: a title that changed
+  // with every keystroke would make the heading of the page flicker.
+  const saved = useMemo(() => {
+    if (!initial) return null;
+    const on = today();
+    const phase = contractPhase(
+      {
+        status: initial.status ?? "active",
+        amount: Number(initial.amount) || 0,
+        billingPeriod: initial.billingPeriod ?? "annual",
+        startDate: initial.startDate || on,
+        endDate: initial.endDate || null,
+        autoRenew: Boolean(initial.autoRenew),
+        renewalTermMonths: Number(initial.renewalTermMonths) || null,
+        noticeDays: Number(initial.noticeDays) || 0,
+      },
+      on,
+    );
+    const company = data?.companies.find((c) => c.id === initial.companyId);
+    const contact = data?.contacts.find((c) => c.id === initial.contactId);
+    const owner = data?.users.find((u) => u.id === initial.ownerId);
+    return {
+      phase,
+      company,
+      contactName: contact ? `${contact.firstName} ${contact.lastName}`.trim() : null,
+      ownerName: owner ? (owner.name ?? owner.email) : null,
+    };
+  }, [initial, data]);
 
   const submit = async (input: ContractFormValues) => {
     setSaving(true);
@@ -156,59 +238,135 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
     </FormLabel>
   );
 
+  const day = (d: string) =>
+    formatter.dateTime(new Date(`${d}T00:00:00Z`), {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+
+  /** "in 12 days", "today", or — once it has passed — how long ago, in red. */
+  const distance = (d: string, pastKey: "daysAgo" | "overdueBy") => {
+    const days = daysBetween(preview.on, d);
+    if (days === 0) return { hint: tR("today"), late: false };
+    if (days > 0) return { hint: tR("inDays", { days }), late: false };
+    return { hint: tR(pastKey, { days: -days }), late: true };
+  };
+  // Only a contract that is running has a deadline worth counting down to.
+  const counts = preview.phase !== "draft" && preview.phase !== "cancelled";
+  const termEndIn = preview.termEnd && counts ? distance(preview.termEnd, "daysAgo") : null;
+  const noticeIn = preview.noticeBy && counts ? distance(preview.noticeBy, "overdueBy") : null;
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
-        {/* ── The bar that stays put: where you are, what it is worth, what to do ── */}
-        <div className="-mx-4 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur before:pointer-events-none before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-background/95 md:-mx-6 md:px-6 md:before:-top-6 md:before:h-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Button asChild type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0">
-              <Link href="/dashboard/sales/contracts" aria-label={t("back")}>
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <ScrollText className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate font-bold text-lg tracking-tight">{initial ? t("edit") : t("newContract")}</h1>
-              <p className="hidden truncate text-muted-foreground text-xs sm:block">{tf("subtitle")}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="mr-2 hidden items-baseline gap-2 sm:flex">
-              <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("monthly")}</span>
-              <span className="font-bold text-base tabular-nums">
-                {formatMoney(preview.monthly, values.currency || "EUR")}
-              </span>
-            </div>
-            <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/contracts")}>
-              {t("cancel")}
-            </Button>
-            <Button type="submit" disabled={saving} className="gap-2">
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("save")}
-            </Button>
-          </div>
-        </div>
+      <form
+        onSubmit={form.handleSubmit(submit, (errors) => {
+          // ⚠️ On a phone the field that failed may be on a tab nobody is looking
+          // at, and a Save that does nothing visible reads as a broken button.
+          const first = Object.keys(errors)[0] as keyof ContractFormValues | undefined;
+          if (first) setSection(SECTION_OF[first] ?? "customer");
+        })}
+        className="flex min-w-0 flex-col gap-4 sm:gap-6"
+      >
+        <RecordBackLink href="/dashboard/sales/contracts">{t("back")}</RecordBackLink>
 
-        <div className="grid items-start gap-6 lg:grid-cols-12">
-          {/* What the contract is, and how long it runs: the part being filled in. */}
-          <div className="space-y-6 lg:col-span-8">
+        {/* ── Hero: which contract, where it stands, and the dates that decide the next step ── */}
+        <RecordHero
+          badges={
+            saved ? (
+              <>
+                <StatusBadge tone={PHASE_TONE[saved.phase]}>{t(`phases.${saved.phase}`)}</StatusBadge>
+                {initial?.autoRenew && (
+                  <StatusBadge>
+                    <RefreshCw aria-hidden />
+                    {t("autoRenews")}
+                  </StatusBadge>
+                )}
+              </>
+            ) : undefined
+          }
+          title={saved ? initial?.title || t("edit") : t("newContract")}
+          meta={
+            saved ? (
+              <>
+                {saved.company && (
+                  <MetaItem icon={<Building2 aria-hidden />} href={`/dashboard/companies/${saved.company.id}`}>
+                    {saved.company.name}
+                  </MetaItem>
+                )}
+                {saved.contactName && initial?.contactId && (
+                  <MetaItem icon={<User aria-hidden />} href={`/dashboard/contacts/${initial.contactId}`}>
+                    {saved.contactName}
+                  </MetaItem>
+                )}
+                <MetaItem icon={<UserRound aria-hidden />}>
+                  {saved.ownerName ? tR("assignedTo", { name: saved.ownerName }) : tR("unassigned")}
+                </MetaItem>
+              </>
+            ) : (
+              <span>{tf("subtitle")}</span>
+            )
+          }
+        >
+          <MetricStrip>
+            <Metric
+              label={t("monthly")}
+              hint={t("detail.perYearHint", { amount: formatMoney(preview.monthly * 12, currency) })}
+            >
+              {formatMoney(preview.monthly, currency)}
+            </Metric>
+            <Metric label={t("termEnd")} tone={termEndIn?.late ? "danger" : undefined} hint={termEndIn?.hint}>
+              {preview.termEnd ? day(preview.termEnd) : tf("noEnd")}
+            </Metric>
+            {preview.noticeBy && (
+              <Metric label={t("noticeBy")} tone={noticeIn?.late ? "danger" : undefined} hint={noticeIn?.hint}>
+                {day(preview.noticeBy)}
+              </Metric>
+            )}
+          </MetricStrip>
+        </RecordHero>
+
+        {/*
+          Two columns from lg: what is being filled in, and the value beside it,
+          kept in view while the dates are edited. Below lg both columns dissolve
+          (`contents`) so the cards can be ordered by what a phone needs first:
+          who, what it is worth, how long it runs, then the notes.
+        */}
+        {/*
+          ⚠️ On a phone the four cards are four tabs. Stacked, the form was some
+          2,300px — a scroll past the customer and the value to reach the dates,
+          which are what an edit is usually about.
+        */}
+        <RecordTabBar
+          tabs={[
+            { id: "customer", label: t("detail.tabCustomer"), icon: <Building2 aria-hidden /> },
+            { id: "value", label: t("detail.tabValue"), icon: <Coins aria-hidden /> },
+            { id: "term", label: t("detail.tabTerm"), icon: <CalendarRange aria-hidden /> },
+            { id: "notes", label: t("detail.tabNotes"), icon: <NotebookPen aria-hidden /> },
+          ]}
+          active={section}
+          onChange={(id) => setSection(id as FormSection)}
+          label={tR("sectionsLabel")}
+          invalid={[
+            ...new Set(Object.keys(form.formState.errors).map((k) => SECTION_OF[k as keyof ContractFormValues])),
+          ].filter((v): v is FormSection => !!v)}
+        />
+
+        <div className="-mt-3 grid grid-cols-1 items-start gap-4 sm:-mt-4 sm:gap-6 lg:mt-0 lg:grid-cols-12">
+          <div className="min-w-0 max-lg:contents lg:col-span-8 lg:flex lg:flex-col lg:gap-6">
             {/* ── Who it is with ── */}
-            <Card>
+            <Card className={cn("min-w-0 max-lg:order-1", section !== "customer" && "max-lg:hidden")}>
               <CardHeader>
-                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                  {tf("customerTitle")}
-                </CardTitle>
+                <CardTitle className="text-base">{tf("customerTitle")}</CardTitle>
                 <CardDescription>{tf("customerSubtitle")}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="title"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="sm:col-span-2">
                       {label("title", true)}
                       <FormControl>
                         <Input {...field} placeholder={tf("titlePlaceholder")} className="h-9" />
@@ -263,7 +421,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
                   control={form.control}
                   name="ownerId"
                   render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="sm:col-span-2">
                       {label("owner")}
                       <FormControl>
                         <SearchableSelect
@@ -283,11 +441,9 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
             </Card>
 
             {/* ── How long it runs ── */}
-            <Card>
+            <Card className={cn("min-w-0 max-lg:order-3", section !== "term" && "max-lg:hidden")}>
               <CardHeader>
-                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                  {tf("termTitle")}
-                </CardTitle>
+                <CardTitle className="text-base">{tf("termTitle")}</CardTitle>
                 <CardDescription>{tf("termSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -373,34 +529,47 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
                 {/* What those dates will mean, rather than three dates to hold in the head. */}
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md bg-muted/50 p-3 text-sm">
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("status")}</span>
+                    <span className="text-muted-foreground text-xs">{t("status")}</span>
                     <Badge variant="outline">{t(`phases.${preview.phase}`)}</Badge>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("termEnd")}</span>
-                    <span className="tabular-nums">{preview.termEnd ?? tf("noEnd")}</span>
+                    <span className="text-muted-foreground text-xs">{t("termEnd")}</span>
+                    <span className="tabular-nums">{preview.termEnd ? day(preview.termEnd) : tf("noEnd")}</span>
                   </div>
                   {preview.noticeBy && (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("noticeBy")}</span>
-                        <span className="tabular-nums">{preview.noticeBy}</span>
+                        <span className="text-muted-foreground text-xs">{t("noticeBy")}</span>
+                        <span className="tabular-nums">{day(preview.noticeBy)}</span>
                       </div>
                       <p className="text-muted-foreground text-xs">
-                        {tf("asksFrom", { date: preview.asksFrom ?? "" })}
+                        {tf("asksFrom", { date: preview.asksFrom ? day(preview.asksFrom) : "" })}
                       </p>
                     </>
                   )}
                 </div>
+              </CardContent>
+            </Card>
 
+            {/* ── Notes: its own card, so the dates above are not a scroll past a paragraph ── */}
+            <Card className={cn("min-w-0 max-lg:order-4", section !== "notes" && "max-lg:hidden")}>
+              <CardHeader>
+                <CardTitle className="text-base">{tf("notes")}</CardTitle>
+              </CardHeader>
+              <CardContent>
                 <FormField
                   control={form.control}
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
-                      {label("notes")}
                       <FormControl>
-                        <Textarea {...field} rows={3} placeholder={tf("notesPlaceholder")} />
+                        <Textarea
+                          {...field}
+                          rows={4}
+                          aria-label={tf("notes")}
+                          placeholder={tf("notesPlaceholder")}
+                          className="resize-y"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -410,114 +579,161 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
             </Card>
           </div>
 
-          {/* What it is worth, kept in view while the dates above are edited. */}
-          <div className="lg:col-span-4">
-            <div className="space-y-6 lg:sticky lg:top-24">
-              {/* ── What it is worth ── */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                    {tf("valueTitle")}
-                  </CardTitle>
-                  <CardDescription>{tf("valueSubtitle")}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          {label("amount", true)}
+          {/* What it is worth, kept in view while the dates are edited. */}
+          <div className="min-w-0 max-lg:contents lg:sticky lg:top-0 lg:col-span-4">
+            {/* ── What it is worth ── */}
+            <Card className={cn("min-w-0 max-lg:order-2", section !== "value" && "max-lg:hidden")}>
+              <CardHeader>
+                <CardTitle className="text-base">{tf("valueTitle")}</CardTitle>
+                <CardDescription>{tf("valueSubtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("amount", true)}
+                        <FormControl>
+                          <Input {...field} inputMode="decimal" className="h-9 text-right tabular-nums" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="billingPeriod"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("billingPeriod", true)}
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <Input {...field} inputMode="decimal" className="h-9 text-right tabular-nums" />
+                            <SelectTrigger className="h-9 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="billingPeriod"
-                      render={({ field }) => (
-                        <FormItem>
-                          {label("billingPeriod", true)}
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger className="h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {BILLING_PERIODS.map((p) => (
-                                <SelectItem key={p} value={p}>
-                                  {t(`periods.${p}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="currency"
-                      render={({ field }) => (
-                        <FormItem>
-                          {label("currency")}
+                          <SelectContent>
+                            {BILLING_PERIODS.map((p) => (
+                              <SelectItem key={p} value={p}>
+                                {t(`periods.${p}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("currency")}
+                        <FormControl>
+                          <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("status")}
+                        <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
+                            <SelectTrigger className="h-9 w-full">
+                              <SelectValue />
+                            </SelectTrigger>
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          {label("status")}
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <FormControl>
-                              <SelectTrigger className="h-9">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {(["draft", "active", "cancelled"] as const).map((s) => (
-                                <SelectItem key={s} value={s}>
-                                  {t(`statuses.${s}`)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                          <SelectContent>
+                            {(["draft", "active", "cancelled"] as const).map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {t(`statuses.${s}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="rounded-md bg-muted/50 p-3 text-sm">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-muted-foreground text-xs">{tf("perMonth")}</span>
+                    <span className="font-semibold tabular-nums">{formatMoney(preview.monthly, currency)}</span>
                   </div>
-                  <div className="rounded-md bg-muted/50 p-3 text-sm">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perMonth")}</span>
-                      <span className="font-semibold tabular-nums">
-                        {formatMoney(preview.monthly, values.currency || "EUR")}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-baseline justify-between">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perYear")}</span>
-                      <span className="tabular-nums">
-                        {formatMoney(preview.monthly * 12, values.currency || "EUR")}
-                      </span>
-                    </div>
+                  <div className="mt-1 flex items-baseline justify-between gap-3">
+                    <span className="text-muted-foreground text-xs">{tf("perYear")}</span>
+                    <span className="tabular-nums">{formatMoney(preview.monthly * 12, currency)}</span>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
+
+        {/* ── The bar that stays put, at the bottom where the thumb is ── */}
+        <EditorFooter
+          total={formatMoney(preview.monthly, currency)}
+          totalLabel={t("monthly")}
+          cancelLabel={t("cancel")}
+          saveLabel={t("save")}
+          saving={saving}
+          onCancel={() => router.push("/dashboard/sales/contracts")}
+        />
       </form>
     </Form>
+  );
+}
+
+/**
+ * Save and cancel, stuck to the bottom of the page on every width.
+ *
+ * ⚠️ `bottom-0` lands above the tab bar, not under it: a sticky box stops at the
+ * scroll container's padding, and the layout pads its bottom by exactly the tab
+ * bar plus 1rem. The `after:` strip fills that 1rem, which would otherwise show
+ * the form scrolling past underneath the buttons.
+ */
+function EditorFooter({
+  total,
+  totalLabel,
+  cancelLabel,
+  saveLabel,
+  saving,
+  onCancel,
+}: {
+  total: string;
+  totalLabel: string;
+  cancelLabel: string;
+  saveLabel: string;
+  saving: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      data-bottom-bar=""
+      className="-mx-4 md:-mx-6 sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t bg-background px-4 py-3 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-background md:px-6 md:after:h-6"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-muted-foreground text-xs">{totalLabel}</p>
+        <p className="truncate font-bold tabular-nums">{total}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+        <Button type="submit" disabled={saving} className="gap-2">
+          {saving && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+          {saveLabel}
+        </Button>
+      </div>
+    </div>
   );
 }

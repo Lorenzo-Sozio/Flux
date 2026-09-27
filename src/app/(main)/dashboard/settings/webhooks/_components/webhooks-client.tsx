@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createWebhook, deleteWebhook, getWebhookSecret, updateWebhook } from "@/actions/webhooks";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,30 +24,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ALL_EVENTS, eventLabelKey, WEBHOOK_EVENTS } from "@/lib/webhook-events";
 
-type WebhookEventKey =
-  | "contactCreated"
-  | "contactUpdated"
-  | "contactDeleted"
-  | "leadCreated"
-  | "leadConverted"
-  | "dealCreated"
-  | "dealStageChanged"
-  | "dealWon"
-  | "dealLost"
-  | "taskCompleted";
-
-const AVAILABLE_EVENTS: { value: string; key: WebhookEventKey }[] = [
-  { value: "contact.created", key: "contactCreated" },
-  { value: "contact.updated", key: "contactUpdated" },
-  { value: "contact.deleted", key: "contactDeleted" },
-  { value: "lead.created", key: "leadCreated" },
-  { value: "lead.converted", key: "leadConverted" },
-  { value: "deal.created", key: "dealCreated" },
-  { value: "deal.stage_changed", key: "dealStageChanged" },
-  { value: "deal.won", key: "dealWon" },
-  { value: "deal.lost", key: "dealLost" },
-  { value: "task.completed", key: "taskCompleted" },
+// What the screen offers is what the code sends: one list (src/lib/webhook-events.ts).
+const AVAILABLE_EVENTS = [
+  { value: ALL_EVENTS, key: "all" },
+  ...WEBHOOK_EVENTS.map((e) => ({ value: e.name as string, key: eventLabelKey(e.name) })),
 ];
 
 type WebhookType = {
@@ -175,26 +158,15 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
           {webhooks.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground text-sm">{t("noWebhooksYet")}</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("columns.name")}</TableHead>
-                  <TableHead>{t("columns.url")}</TableHead>
-                  <TableHead>{t("columns.events")}</TableHead>
-                  <TableHead>{t("columns.secret")}</TableHead>
-                  <TableHead>{t("columns.active")}</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {webhooks.map((wh) => (
-                  <TableRow key={wh.id}>
-                    <TableCell className="font-medium">{wh.name}</TableCell>
-                    <TableCell>
-                      <code className="block max-w-xs truncate text-muted-foreground text-xs">{wh.url}</code>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
+            <ResponsiveRecordList
+              cards={
+                <RecordCards
+                  items={webhooks.map((wh) => ({
+                    id: wh.id,
+                    title: wh.name,
+                    subtitle: <code className="text-muted-foreground text-xs">{wh.url}</code>,
+                    meta: (
+                      <>
                         {wh.events.slice(0, 3).map((ev) => (
                           <Badge key={ev} variant="outline" className="text-[10px]">
                             {ev}
@@ -205,45 +177,120 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                             {t("moreEvents", { count: wh.events.length - 3 })}
                           </Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {/* Always shown: the secret exists for every webhook — it is
-                          created with it — and hiding the button behind a field the
-                          listing deliberately strips meant hiding it always. */}
-                      {
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 gap-1 text-xs"
-                          onClick={() => copySecret(wh.id)}
-                        >
-                          {copiedId === wh.id ? (
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                          {t("copy")}
-                        </Button>
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <Switch checked={wh.isActive} onCheckedChange={() => handleToggleActive(wh)} />
-                    </TableCell>
-                    <TableCell>
+                      </>
+                    ),
+                    actions: (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        className="text-destructive hover:text-destructive"
                         onClick={() => handleDelete(wh.id)}
+                        aria-label={tc("delete")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    ),
+                    // The two things this list lets you do without opening
+                    // anything: take the secret, and switch delivery off.
+                    footer: (
+                      <>
+                        <span className="text-muted-foreground text-xs">{t("columns.secret")}</span>
+                        <Button variant="outline" size="sm" className="gap-1.5" onClick={() => copySecret(wh.id)}>
+                          {copiedId === wh.id ? (
+                            <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                          {t("copy")}
+                        </Button>
+                        <label
+                          htmlFor={`webhook-active-${wh.id}`}
+                          className="ml-auto flex cursor-pointer items-center gap-2 text-muted-foreground text-xs"
+                        >
+                          {t("columns.active")}
+                          <Switch
+                            id={`webhook-active-${wh.id}`}
+                            checked={wh.isActive}
+                            onCheckedChange={() => handleToggleActive(wh)}
+                          />
+                        </label>
+                      </>
+                    ),
+                  }))}
+                />
+              }
+              table={
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("columns.name")}</TableHead>
+                      <TableHead>{t("columns.url")}</TableHead>
+                      <TableHead>{t("columns.events")}</TableHead>
+                      <TableHead>{t("columns.secret")}</TableHead>
+                      <TableHead>{t("columns.active")}</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {webhooks.map((wh) => (
+                      <TableRow key={wh.id}>
+                        <TableCell className="font-medium">{wh.name}</TableCell>
+                        <TableCell>
+                          <code className="block max-w-xs truncate text-muted-foreground text-xs">{wh.url}</code>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {wh.events.slice(0, 3).map((ev) => (
+                              <Badge key={ev} variant="outline" className="text-[10px]">
+                                {ev}
+                              </Badge>
+                            ))}
+                            {wh.events.length > 3 && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {t("moreEvents", { count: wh.events.length - 3 })}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {/* Always shown: the secret exists for every webhook — it is
+                              created with it — and hiding the button behind a field the
+                              listing deliberately strips meant hiding it always. */}
+                          {
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 gap-1 text-xs"
+                              onClick={() => copySecret(wh.id)}
+                            >
+                              {copiedId === wh.id ? (
+                                <CheckCircle className="h-3 w-3 text-green-500" />
+                              ) : (
+                                <Copy className="h-3 w-3" />
+                              )}
+                              {t("copy")}
+                            </Button>
+                          }
+                        </TableCell>
+                        <TableCell>
+                          <Switch checked={wh.isActive} onCheckedChange={() => handleToggleActive(wh)} />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(wh.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              }
+            />
           )}
         </CardContent>
       </Card>
@@ -273,7 +320,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
             </div>
             <div className="space-y-2">
               <Label>{t("dialog.eventsLabel")}</Label>
-              <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
+              <div className="grid max-h-72 grid-cols-1 gap-2 overflow-y-auto rounded-lg border p-3 sm:grid-cols-2">
                 {AVAILABLE_EVENTS.map((ev) => (
                   // ⚠️ `htmlFor` and an id, not a nested control: `Checkbox` renders a
                   // button with a role, so a label wrapping it binds to nothing — the click

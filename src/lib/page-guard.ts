@@ -11,6 +11,8 @@ import { redirect } from "next/navigation";
 
 import { getActor } from "@/lib/auth-guard";
 import { type Actor, type Capability, can } from "@/lib/permissions";
+import { getDb } from "@/lib/tenant-context";
+import { readWorkspaceFeatures, type WorkspaceFeature } from "@/lib/workspace-features";
 
 /**
  * The single sign-in route.
@@ -56,4 +58,13 @@ export async function requirePageActor(returnTo?: string): Promise<Actor> {
     redirect(target);
   }
   return actor;
+}
+
+/**
+ * Sends a page of an optional part the workspace has switched off back to where the work
+ * is. The menu already hides it; this is for a bookmark or a typed address.
+ */
+export async function requirePageFeature(feature: WorkspaceFeature, fallback: string): Promise<void> {
+  const features = await readWorkspaceFeatures(await getDb());
+  if (!features[feature]) redirect(fallback);
 }

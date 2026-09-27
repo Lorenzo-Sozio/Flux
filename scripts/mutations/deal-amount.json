@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/deal-amount.ts",
+    "description": "⚠️⚠️ il modulo torna a proporre la cifra in EUR accanto alla valuta della trattativa: ogni salvataggio toglie il cambio",
+    "find": "    return { amount: String(deal.amountOriginal), currency };",
+    "replace": "    return { amount: String(deal.amount), currency };"
+  },
+  {
+    "file": "src/lib/deal-amount.ts",
+    "description": "⚠️⚠️ la cifra digitata non viene più conservata: la prossima modifica non ha da dove ripartire",
+    "find": "  return { amount: String(round2(eur)), amountOriginal: String(round2(value)), currency: code };",
+    "replace": "  return { amount: String(round2(eur)), amountOriginal: null, currency: code };"
+  },
+  {
+    "file": "src/lib/deal-amount.ts",
+    "description": "⚠️ una trattativa senza cifra originale torna a essere proposta nella sua valuta con la cifra in EUR",
+    "find": "  return { amount: deal.amount === null ? \"\" : String(deal.amount), currency: \"EUR\" };",
+    "replace": "  return { amount: deal.amount === null ? \"\" : String(deal.amount), currency };"
+  },
+  {
+    "file": "src/lib/deal-amount.ts",
+    "description": "⚠️ la board torna a stampare la cifra in EUR col simbolo della valuta della trattativa",
+    "find": "  return { value: Number(deal.amount ?? 0), currency: \"EUR\" };",
+    "replace": "  return { value: Number(deal.amount ?? 0), currency: (deal.currency || \"EUR\").toUpperCase() };"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ la modifica di una trattativa torna a salvare la cifra senza convertirla",
+    "find": "  const amounts = data.amount !== undefined ? await storedAmount(data.amount, data.currency ?? oldDeal?.currency) : {};",
+    "replace": "  const amounts = data.amount !== undefined ? { amount: String(data.amount) } : {};"
+  }
+]

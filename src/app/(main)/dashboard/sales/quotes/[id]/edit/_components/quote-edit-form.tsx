@@ -2,13 +2,24 @@
 
 import { useMemo, useState } from "react";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { ChevronLeft, FileEdit, Loader2, Package, Plus, Trash2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import {
+  Building2,
+  ChevronDown,
+  FileText,
+  Handshake,
+  ListOrdered,
+  Loader2,
+  Package,
+  Pencil,
+  Plus,
+  Receipt,
+  Trash2,
+} from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -16,6 +27,15 @@ import { z } from "zod";
 import { type getQuoteById, type getQuoteFormData, updateQuoteAction } from "@/actions/quotes";
 import { QuoteItemSchema } from "@/actions/quotes-validation";
 import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
+import {
+  MetaItem,
+  Metric,
+  MetricStrip,
+  RecordBackLink,
+  RecordHero,
+  StatusBadge,
+} from "@/components/crm/record/record-page";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
 import { computeDocument } from "@/lib/document-totals";
 import { priceFor } from "@/lib/price-list";
+import { quoteStatusConfig } from "@/lib/quote-status";
 import { cn } from "@/lib/utils";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
@@ -88,15 +109,25 @@ interface Props {
  * a quote and saving it therefore showed one total and stored another, which is
  * audit rilievo C-03 surviving in the preview. It calls the shared module now.
  */
+type EditSection = "customer" | "lines" | "terms" | "summary";
+
 export function QuoteEditForm({ quote, formData }: Props) {
   const router = useRouter();
   const t = useTranslations("quotes.form");
   const tc = useTranslations("common");
+  const tq = useTranslations("quotes");
+  const tD = useTranslations("quotes.detail");
+  const tR = useTranslations("record");
+  const formatter = useFormatter();
   const { formatMoney } = useCurrency();
   // Fixed when the quote was created, with its exchange rate: changing it here would
   // relabel the figures without converting them.
   const currency = quote.currency || "EUR";
   const [submitting, setSubmitting] = useState(false);
+  // What a phone shows: one card at a time, and one line open at a time. The
+  // form is one form whatever is on screen - every field stays mounted.
+  const [section, setSection] = useState<EditSection>("customer");
+  const [openLine, setOpenLine] = useState<number | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(EditQuoteSchema),
@@ -215,55 +246,107 @@ export function QuoteEditForm({ quote, formData }: Props) {
     }
   }
 
+  // How long the quote will stand, as it is being typed: the same "in N days" the
+  // quote page shows, so the date is checked here rather than discovered there.
+  const expiresValue = form.watch("expiresAt");
+  const expiresOn = expiresValue ? new Date(`${expiresValue}T00:00:00Z`) : null;
+  const daysLeft =
+    expiresOn && !Number.isNaN(expiresOn.getTime())
+      ? Math.round((expiresOn.getTime() - Date.UTC(...todayUtc())) / 86_400_000)
+      : null;
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
-        {/* ── The bar that stays put ─────────────────────────────────────── */}
-        <div className="-mx-4 md:-mx-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-md md:px-6">
-          <div className="flex min-w-0 items-center gap-2">
-            <Button
-              asChild
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 shrink-0 text-muted-foreground"
-              aria-label={t("backToQuote")}
+      <form
+        onSubmit={form.handleSubmit(onSubmit, (errors) => {
+          // ⚠️ On a phone the field that failed may be on another tab, or inside a
+          // folded line: open both, or Save looks like it did nothing.
+          if (errors.dealId || errors.companyId || errors.contactId) setSection("customer");
+          else if (errors.items) {
+            setSection("lines");
+            const bad = Array.isArray(errors.items) ? errors.items.findIndex(Boolean) : -1;
+            if (bad >= 0) setOpenLine(bad);
+          } else setSection("terms");
+        })}
+        className="flex min-w-0 flex-col gap-4 sm:gap-6"
+      >
+        <RecordBackLink href={`/dashboard/sales/quotes/${quote.id}`}>{t("backToQuote")}</RecordBackLink>
+
+        {/* ── A compact hero: which quote, in what state, and what it adds up to ──
+            No links out of it: leaving an editor from its heading loses what was
+            typed, and the way back is the Cancel at the bottom. */}
+        <RecordHero
+          badges={
+            <>
+              <StatusBadge>{tq(`statuses.${quoteStatusConfig(quote.status).labelKey}`)}</StatusBadge>
+              <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                <Pencil className="size-3" aria-hidden />
+                {t("editTitle")}
+              </span>
+            </>
+          }
+          title={<span className="font-mono tracking-tight">{quote.quoteNumber}</span>}
+          meta={
+            <>
+              {quote.company && <MetaItem icon={<Building2 aria-hidden />}>{quote.company.name}</MetaItem>}
+              {quote.deal && <MetaItem icon={<Handshake aria-hidden />}>{quote.deal.name}</MetaItem>}
+            </>
+          }
+        >
+          <MetricStrip>
+            <Metric label={t("total")}>{formatMoney(totals.total, currency)}</Metric>
+            <Metric
+              label={t("expiresAt")}
+              tone={daysLeft != null && daysLeft < 0 ? "danger" : undefined}
+              hint={
+                daysLeft == null
+                  ? undefined
+                  : daysLeft < 0
+                    ? tD("expiredAgo", { days: -daysLeft })
+                    : daysLeft === 0
+                      ? tR("today")
+                      : tR("inDays", { days: daysLeft })
+              }
             >
-              <Link href={`/dashboard/sales/quotes/${quote.id}`}>
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-            </Button>
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-              <FileEdit className="h-5 w-5 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate font-bold text-lg tracking-tight">{t("editTitle")}</h1>
-              <p className="truncate font-mono text-muted-foreground text-xs">{quote.quoteNumber}</p>
-            </div>
-          </div>
+              {expiresOn && daysLeft != null
+                ? formatter.dateTime(expiresOn, { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })
+                : tR("notSet")}
+            </Metric>
+            {totals.discountAmount > 0 && (
+              <Metric label={t("discountAmount")} hint={`${headerDiscount}%`}>
+                −{formatMoney(totals.discountAmount, currency)}
+              </Metric>
+            )}
+          </MetricStrip>
+        </RecordHero>
 
-          <div className="flex items-center gap-2">
-            <div className="mr-2 hidden items-baseline gap-2 sm:flex">
-              <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
-              <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
-            </div>
-            <Button type="button" variant="ghost" onClick={() => router.push(`/dashboard/sales/quotes/${quote.id}`)}>
-              {tc("cancel")}
-            </Button>
-            <Button type="submit" disabled={submitting} className="gap-2">
-              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("saveChanges")}
-            </Button>
-          </div>
-        </div>
+        {/*
+          ⚠️ On a phone the editor is four tabs. Stacked it was some 3,300px, with
+          every line's six fields open at once: the terms were a long scroll past
+          the lines, and the lines a long scroll past each other.
+        */}
+        <RecordTabBar
+          tabs={[
+            { id: "customer", label: t("customerTitle"), icon: <Building2 aria-hidden /> },
+            { id: "lines", label: t("linesTitle"), icon: <ListOrdered aria-hidden />, count: fields.length },
+            { id: "terms", label: tR("tabs.terms"), icon: <FileText aria-hidden /> },
+            { id: "summary", label: t("summaryTitle"), icon: <Receipt aria-hidden /> },
+          ]}
+          active={section}
+          onChange={(id) => setSection(id as EditSection)}
+          label={tR("sectionsLabel")}
+          invalid={[
+            ...(form.formState.errors.dealId || form.formState.errors.companyId ? ["customer"] : []),
+            ...(form.formState.errors.items ? ["lines"] : []),
+          ]}
+        />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <div className="-mt-3 grid grid-cols-1 gap-4 sm:-mt-4 sm:gap-6 lg:mt-0 xl:grid-cols-12">
           {/* ── Main column: who it is for, what is quoted, on what terms ── */}
-          <div className="min-w-0 space-y-6 xl:col-span-8">
-            <Card>
+          <div className="min-w-0 space-y-4 sm:space-y-6 xl:col-span-8">
+            <Card className={cn(section !== "customer" && "max-lg:hidden")}>
               <CardHeader>
-                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                  {t("customerTitle")}
-                </CardTitle>
+                <CardTitle className="text-base">{t("customerTitle")}</CardTitle>
                 <CardDescription>{t("customerSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -344,12 +427,10 @@ export function QuoteEditForm({ quote, formData }: Props) {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cn(section !== "lines" && "max-lg:hidden")}>
               <CardHeader className="flex flex-row items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                    {t("linesTitle")}
-                  </CardTitle>
+                  <CardTitle className="text-base">{t("linesTitle")}</CardTitle>
                   <CardDescription>{t("linesSubtitle")}</CardDescription>
                   <PriceListNote rules={priceRules} onApply={applyPriceList} className="mt-1.5" />
                 </div>
@@ -358,7 +439,10 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   variant="outline"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => append(emptyLine())}
+                  onClick={() => {
+                    append(emptyLine());
+                    setOpenLine(fields.length);
+                  }}
                 >
                   <Plus className="h-3.5 w-3.5" /> {t("addLine")}
                 </Button>
@@ -396,21 +480,47 @@ export function QuoteEditForm({ quote, formData }: Props) {
                         key={field.id}
                         className="rounded-lg border bg-muted/20 p-3 2xl:rounded-none 2xl:border-0 2xl:border-b 2xl:bg-transparent 2xl:px-0 2xl:py-2 2xl:hover:bg-muted/20 2xl:last:border-b-0"
                       >
-                        <div className="mb-3 flex items-center justify-between gap-2 2xl:hidden">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-muted-foreground text-xs">
-                              {t("line", { number: index + 1 })}
+                        {/* On a phone a line is a summary row that opens to edit: six
+                            fields a line, open for every line, was most of the page. */}
+                        <div
+                          className={cn(
+                            "mb-3 flex items-center justify-between gap-2 2xl:hidden",
+                            openLine !== index && "max-lg:mb-0",
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setOpenLine(openLine === index ? null : index)}
+                            aria-expanded={openLine === index}
+                            className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 text-left lg:pointer-events-none lg:min-h-0"
+                          >
+                            <span className="flex min-w-0 flex-wrap items-center gap-2">
+                              <span className="font-medium text-muted-foreground text-xs">
+                                {t("line", { number: index + 1 })}
+                              </span>
+                              {isCustom && (
+                                <Badge
+                                  variant="outline"
+                                  className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                                >
+                                  {t("offCatalogue")}
+                                </Badge>
+                              )}
+                              <ChevronDown
+                                className={cn(
+                                  "size-3.5 text-muted-foreground transition-transform lg:hidden",
+                                  openLine === index && "rotate-180",
+                                )}
+                                aria-hidden
+                              />
                             </span>
-                            {isCustom && (
-                              <Badge
-                                variant="outline"
-                                className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                              >
-                                {t("offCatalogue")}
-                              </Badge>
+                            {openLine !== index && (
+                              <span className="max-w-full truncate font-medium text-sm lg:hidden">
+                                {line?.description || t("descriptionPlaceholder")}
+                              </span>
                             )}
-                          </div>
-                          <div className="flex items-center gap-1">
+                          </button>
+                          <div className="flex shrink-0 items-center gap-1">
                             <span className="mr-1 font-semibold text-sm tabular-nums">
                               {formatMoney(lineTotal, currency)}
                             </span>
@@ -418,7 +528,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              className="h-9 w-9 text-muted-foreground hover:text-destructive"
                               onClick={() => remove(index)}
                               disabled={fields.length === 1}
                               aria-label={t("removeLine")}
@@ -428,7 +538,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
                           </div>
                         </div>
 
-                        <div className={LINE_GRID}>
+                        <div className={cn(LINE_GRID, openLine !== index && "max-lg:hidden")}>
                           <span className="hidden text-muted-foreground text-xs tabular-nums 2xl:block">
                             {index + 1}
                           </span>
@@ -589,18 +699,19 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   type="button"
                   variant="ghost"
                   className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
-                  onClick={() => append(emptyLine())}
+                  onClick={() => {
+                    append(emptyLine());
+                    setOpenLine(fields.length);
+                  }}
                 >
                   <Plus className="h-4 w-4" /> {t("addAnotherLine")}
                 </Button>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className={cn(section !== "terms" && "max-lg:hidden")}>
               <CardHeader>
-                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                  {t("termsTitle")}
-                </CardTitle>
+                <CardTitle className="text-base">{t("termsTitle")}</CardTitle>
                 <CardDescription>{t("termsSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -689,13 +800,11 @@ export function QuoteEditForm({ quote, formData }: Props) {
           </div>
 
           {/* ── Side column: the money, kept in view while the lines are written ── */}
-          <div className="min-w-0 xl:col-span-4">
+          <div className={cn("min-w-0 xl:col-span-4", section !== "summary" && "max-lg:hidden")}>
             <div className="space-y-6 xl:sticky xl:top-20">
               <Card>
                 <CardHeader>
-                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                    {t("summaryTitle")}
-                  </CardTitle>
+                  <CardTitle className="text-base">{t("summaryTitle")}</CardTitle>
                   <CardDescription>{t("summarySubtitle")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2.5 text-sm">
@@ -735,7 +844,71 @@ export function QuoteEditForm({ quote, formData }: Props) {
             </div>
           </div>
         </div>
+
+        {/* ── The bar that stays put, at the bottom where the thumb is ──
+            It used to be a bar across the top; on a phone that is the far end of
+            the screen from the hand, and it held the one control people reach for
+            last. The running total rides with it, so a line changed far down the
+            page shows its effect without scrolling back. */}
+        <EditorFooter
+          total={formatMoney(totals.total, currency)}
+          totalLabel={t("total")}
+          cancelLabel={tc("cancel")}
+          saveLabel={t("saveChanges")}
+          saving={submitting}
+          onCancel={() => router.push(`/dashboard/sales/quotes/${quote.id}`)}
+        />
       </form>
     </Form>
   );
 }
+
+/**
+ * Save and cancel, stuck to the bottom of the page on every width.
+ *
+ * ⚠️ `bottom-0` lands above the tab bar, not under it: a sticky box stops at the
+ * scroll container's padding, and the layout pads its bottom by exactly the tab
+ * bar plus 1rem. The `after:` strip fills that 1rem, which would otherwise show
+ * the form scrolling past underneath the buttons.
+ */
+function EditorFooter({
+  total,
+  totalLabel,
+  cancelLabel,
+  saveLabel,
+  saving,
+  onCancel,
+}: {
+  total: string;
+  totalLabel: string;
+  cancelLabel: string;
+  saveLabel: string;
+  saving: boolean;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      data-bottom-bar=""
+      className="-mx-4 md:-mx-6 sticky bottom-0 z-20 flex items-center justify-between gap-3 border-t bg-background px-4 py-3 after:pointer-events-none after:absolute after:inset-x-0 after:top-full after:h-4 after:bg-background md:px-6 md:after:h-6"
+    >
+      <div className="min-w-0">
+        <p className="truncate text-muted-foreground text-xs">{totalLabel}</p>
+        <p className="truncate font-bold tabular-nums">{total}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+        <Button type="submit" disabled={saving} className="gap-2">
+          {saving && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+          {saveLabel}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+const todayUtc = (): [number, number, number] => {
+  const d = new Date();
+  return [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()];
+};

@@ -48,13 +48,13 @@ export function DuplicateHint({
                 <Link
                   href={m.href}
                   target="_blank"
-                  className="truncate text-amber-800 underline underline-offset-2 hover:text-amber-950 dark:text-amber-300"
+                  className="min-w-0 truncate text-amber-800 underline underline-offset-2 hover:text-amber-950 dark:text-amber-300"
                 >
                   {m.label}
                 </Link>
                 <ExternalLink className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-500" />
                 {m.detail && (
-                  <span className="truncate text-amber-700/70 text-xs dark:text-amber-400/70">{m.detail}</span>
+                  <span className="min-w-0 truncate text-amber-700/70 text-xs dark:text-amber-400/70">{m.detail}</span>
                 )}
               </li>
             ))}
@@ -64,7 +64,7 @@ export function DuplicateHint({
           type="button"
           size="icon"
           variant="ghost"
-          className="h-6 w-6 shrink-0 text-amber-700 hover:bg-amber-100 dark:text-amber-400"
+          className="h-6 w-6 shrink-0 text-amber-700 max-sm:size-9 hover:bg-amber-100 dark:text-amber-400"
           onClick={onDismiss}
           aria-label={t("dismiss")}
         >

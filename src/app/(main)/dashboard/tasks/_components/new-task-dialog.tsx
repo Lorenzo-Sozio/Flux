@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { createTask } from "@/actions/tasks";
+import { TaskTypePicker } from "@/components/crm/task-type-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -47,11 +48,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useOpenOnNew } from "@/hooks/use-open-on-new";
+import { TASK_TYPES } from "@/lib/task-kinds";
 import { cn } from "@/lib/utils";
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
 
 const schema = z.object({
+  type: z.enum(TASK_TYPES).default("todo"),
   title: z.string().min(1),
   description: z.string().optional(),
   status: z.enum(["todo", "in_progress", "done"]).default("todo"),
@@ -379,6 +382,7 @@ export function NewTaskDialog({
   openOnNew = false,
 }: Props) {
   const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   useOpenOnNew(openOnNew, setOpen);
   const [allDay, setAllDay] = useState(true);
@@ -401,6 +405,7 @@ export function NewTaskDialog({
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      type: "todo",
       title: "",
       description: "",
       status: "todo",
@@ -475,6 +480,7 @@ export function NewTaskDialog({
   const onSubmit = async (data: FormValues) => {
     try {
       const parent = await createTask({
+        type: data.type,
         title: data.title,
         description: data.description || undefined,
         status: data.status,
@@ -560,11 +566,12 @@ export function NewTaskDialog({
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[680px]">
         {/* Header */}
         <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3">
+          {/* Clear of the close button, which on a phone sits over this row's right end. */}
+          <div className="flex items-center gap-3 max-sm:pr-8">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <CheckSquare className="h-4 w-4 text-primary" />
             </div>
-            <div>
+            <div className="min-w-0">
               <DialogTitle className="font-semibold text-base">{t("dialog.newTitle")}</DialogTitle>
               <p className="mt-0.5 text-muted-foreground text-xs">{t("dialog.subtitle")}</p>
             </div>
@@ -575,24 +582,26 @@ export function NewTaskDialog({
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-y-auto px-4 md:px-6 py-5">
             <Tabs defaultValue="details">
+              {/* Four labels on a phone wrap to a second row (see TabsList); without
+                  their icons they mostly do not have to. */}
               <TabsList className="mb-5 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5 text-xs">
-                  <CheckSquare className="h-3.5 w-3.5" />
+                  <CheckSquare className="h-3.5 w-3.5 max-sm:hidden" />
                   {t("dialog.tabs.details")}
                   <TabDot has={tabErrors.details} />
                 </TabsTrigger>
                 <TabsTrigger value="assignment" className="relative flex-1 gap-1.5 text-xs">
-                  <User className="h-3.5 w-3.5" />
+                  <User className="h-3.5 w-3.5 max-sm:hidden" />
                   {t("dialog.tabs.assignment")}
                   <TabDot has={tabErrors.assignment} />
                 </TabsTrigger>
                 <TabsTrigger value="links" className="relative flex-1 gap-1.5 text-xs">
-                  <Link2 className="h-3.5 w-3.5" />
+                  <Link2 className="h-3.5 w-3.5 max-sm:hidden" />
                   {t("dialog.tabs.links")}
                   <TabDot has={tabErrors.links} />
                 </TabsTrigger>
                 <TabsTrigger value="subtasks" className="relative flex-1 gap-1.5 text-xs">
-                  <ListChecks className="h-3.5 w-3.5" />
+                  <ListChecks className="h-3.5 w-3.5 max-sm:hidden" />
                   {t("dialog.tabs.subtasks")}
                   {subtasks.length > 0 && (
                     <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-medium text-[10px] text-primary-foreground">
@@ -604,6 +613,11 @@ export function NewTaskDialog({
 
               {/* ── Tab 1: Dettagli ──────────────────────────────────────────── */}
               <TabsContent value="details" className="mt-0 space-y-4">
+                <Controller
+                  control={control}
+                  name="type"
+                  render={({ field }) => <TaskTypePicker value={field.value} onChange={field.onChange} />}
+                />
                 <F label={t("dialog.titleLabel")} required error={e.title ? t("modal.titleRequired") : undefined}>
                   <Input
                     {...register("title")}
@@ -858,7 +872,7 @@ export function NewTaskDialog({
                               type="button"
                               onClick={() => toggleExpanded(sub._id)}
                               className={cn(
-                                "shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                "shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground max-md:p-2.5",
                               )}
                               title={expanded ? t("dialog.subtasks.collapse") : t("dialog.subtasks.expand")}
                             >
@@ -876,7 +890,8 @@ export function NewTaskDialog({
                                   return next;
                                 });
                               }}
-                              className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                              aria-label={tc("delete")}
+                              className="shrink-0 rounded-sm p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive max-md:p-2.5"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -1023,11 +1038,12 @@ export function NewTaskDialog({
           </div>
 
           {/* Footer */}
-          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          {/* Side by side on a phone too: stacked, the two buttons took a sixth of the screen from the form. */}
+          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4 max-sm:flex-row">
+            <Button type="button" variant="outline" className="max-sm:flex-1" onClick={() => setOpen(false)}>
               {t("dialog.cancel")}
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-[130px] gap-2">
+            <Button type="submit" disabled={isSubmitting} className="min-w-[130px] gap-2 max-sm:flex-1">
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />

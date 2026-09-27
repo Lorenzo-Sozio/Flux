@@ -71,6 +71,15 @@ describe("can", () => {
     expect(can(admin, "billing:manage")).toBe(false);
   });
 
+  it("lets an admin and the owner act on a colleague's record, and nobody below", () => {
+    // Eleven call sites wrote this as `tenantRole !== "admin"`, four of them leaving the
+    // owner out: the person who owns the workspace could not send their salesperson's quote.
+    expect(can(owner, "record:manageAny")).toBe(true);
+    expect(can(admin, "record:manageAny")).toBe(true);
+    expect(can(editor, "record:manageAny")).toBe(false);
+    expect(can(viewer, "record:manageAny")).toBe(false);
+  });
+
   it("gives the owner everything", () => {
     for (const capability of Object.keys(CAPABILITIES) as (keyof typeof CAPABILITIES)[]) {
       expect(can(owner, capability)).toBe(true);

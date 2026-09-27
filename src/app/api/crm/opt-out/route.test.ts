@@ -31,7 +31,22 @@ vi.mock("next/server", async () => {
   return { ...vero, after: (fn: () => unknown) => fn() };
 });
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: {
+      via: "apikey",
+      userId: null,
+      role: "editor",
+      tenantId: "t1",
+      scopes: null,
+      key: { id: "k-assistente", name: "Assistente" },
+    },
+  }),
+}));
+const annunci: { optOut: Record<string, unknown>; origin: Record<string, unknown> }[] = [];
+vi.mock("@/lib/consent-events", () => ({
+  announceOptOut: async (_db: unknown, optOut: Record<string, unknown>, origin: Record<string, unknown>) => {
+    annunci.push({ optOut, origin });
+  },
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -74,6 +89,7 @@ function richiesta(body: unknown) {
 }
 
 beforeEach(() => {
+  annunci.length = 0;
   regole.length = 0;
   scritti.length = 0;
   righeLead = [{ id: "l1", marketingConsent: true }];
@@ -96,6 +112,25 @@ describe("a refusal said to the assistant reaches the CRM", () => {
 
     expect(regole.map((r) => r.entityType).sort()).toEqual(["contact", "lead"]);
     expect(regole.map((r) => r.entityId).sort()).toEqual(["c1", "l1"]);
+  });
+
+  it("⚠️⚠️ tells every other integration, naming the key that asked so it can ignore its own", async () => {
+    await POST(richiesta({ contactPoint: "mario@example.it" }));
+
+    expect(annunci).toHaveLength(1);
+    expect(annunci[0].origin).toEqual({ via: "api", actor: null, key: { id: "k-assistente", name: "Assistente" } });
+    expect(annunci[0].optOut).toMatchObject({ email: "mario@example.it", source: "api", channel: "all" });
+    expect((annunci[0].optOut.records as { id: string }[]).map((r) => r.id).sort()).toEqual(["c1", "l1"]);
+  });
+
+  it("⚠️ announces the act even when nothing here changed: the others have their own consent", async () => {
+    righeLead = [{ id: "l1", marketingConsent: false }];
+    righeContatti = [{ id: "c1", marketingConsent: false }];
+
+    await POST(richiesta({ contactPoint: "mario@example.it" }));
+
+    expect(scritti).toHaveLength(0);
+    expect(annunci).toHaveLength(1);
   });
 
   it("⚠️ writes nothing on somebody already unsubscribed, and still answers 200", async () => {

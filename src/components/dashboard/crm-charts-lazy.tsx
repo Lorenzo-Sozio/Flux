@@ -30,7 +30,7 @@ const CRMCharts = dynamic(() => import("./CRMCharts.client"), {
             <Skeleton className="h-5 w-40" />
             <Skeleton className="h-4 w-56 max-w-full" />
           </CardHeader>
-          <CardContent className="h-[300px]">
+          <CardContent className="h-[240px] sm:h-[300px]">
             <Skeleton className="h-full w-full" />
           </CardContent>
         </Card>

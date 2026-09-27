@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import bcrypt from "bcryptjs";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
@@ -13,6 +14,7 @@ import { requireActor, requireCapability } from "@/lib/auth-guard";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { serverT } from "@/lib/i18n-server";
 import { assignableRoles, normalizeTenantRole, outranks } from "@/lib/permissions";
+import { announceAccountWithoutWorkspace } from "@/lib/platform-staff";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -115,12 +117,17 @@ export async function registerAction(data: { name?: string; email: string; passw
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
+  const displayName = name ?? email.split("@")[0];
   await platformDb.insert(users).values({
-    name: name ?? email.split("@")[0],
+    name: displayName,
     email,
     password: hashedPassword,
     role: "user",
   });
+
+  // A new account belongs to no workspace, and only Flux's staff can create one: they are
+  // told, after the response. See src/lib/platform-staff.ts.
+  after(() => announceAccountWithoutWorkspace({ name: displayName, email }));
 
   // Auto sign-in after registration
   try {

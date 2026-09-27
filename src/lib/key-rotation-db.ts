@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { emailSettings, tenants } from "@/db/schema";
+import { emailSettings, mailConnections, tenants } from "@/db/schema";
 
 /**
  * The statements a key rotation writes with, built but not run.
@@ -12,10 +12,10 @@ import { emailSettings, tenants } from "@/db/schema";
  * with an encrypted copy of the old ones.
  */
 
-export type RotatedColumn = "db_url" | "resend_api_key" | "smtp_password";
+export type RotatedColumn = "db_url" | "resend_api_key" | "smtp_password" | "access_token" | "refresh_token";
 
 export interface RotatedLocation {
-  table: "tenants" | "email_settings";
+  table: "tenants" | "email_settings" | "mail_connection";
   column: RotatedColumn;
   id: string;
 }
@@ -31,6 +31,17 @@ export function conditionalWrite(db: AnyDb, where: RotatedLocation, from: string
       .set({ dbUrl: to })
       .where(and(eq(tenants.id, where.id), eq(tenants.dbUrl, from)))
       .returning({ id: tenants.id });
+  }
+  // A person's mailbox tokens (V3.2). ⚠️ A refresh racing the rotation rewrites the token;
+  // the condition below is what makes the rotation skip that row rather than undo it.
+  if (where.table === "mail_connection") {
+    const col = where.column === "access_token" ? mailConnections.accessToken : mailConnections.refreshToken;
+    const set = where.column === "access_token" ? { accessToken: to } : { refreshToken: to };
+    return db
+      .update(mailConnections)
+      .set(set)
+      .where(and(eq(mailConnections.id, where.id), eq(col, from)))
+      .returning({ id: mailConnections.id });
   }
   const column = where.column === "resend_api_key" ? emailSettings.resendApiKey : emailSettings.smtpPassword;
   const set = where.column === "resend_api_key" ? { resendApiKey: to } : { smtpPassword: to };

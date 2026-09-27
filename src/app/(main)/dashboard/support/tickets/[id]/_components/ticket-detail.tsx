@@ -1,67 +1,58 @@
 "use client";
 
-import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
-  Activity,
   AlertTriangle,
-  ArrowLeft,
   Building2,
   CheckCircle2,
-  ChevronDown,
-  Circle,
   Clock,
-  ExternalLink,
-  FileText,
-  Loader2,
-  Lock,
-  Mail,
-  MessageCircle,
+  Flag,
+  Hash,
+  Info,
+  ListChecks,
   MessageSquare,
   MoreHorizontal,
-  Paperclip,
-  Phone,
-  Plus,
-  Send,
-  Shield,
+  Pause,
+  Reply,
+  RotateCcw,
   Trash2,
   TrendingUp,
   User,
   UserCheck,
-  Users,
-  Zap,
+  UserRound,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useFormatter, useTranslations } from "next-intl";
-import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import {
   addTicketMessageAction,
   deleteTicketAction,
   escalateTicketAction,
-  getCustomerTicketHistory,
   getMacros,
-  getOrdersForTicket,
   getTicketById,
   getTicketTimelineBefore,
-  linkTicketToOrderAction,
   reassignTicketAction,
   updateTicketAction,
 } from "@/actions/support";
-import { createTask, getAllUsers, getTasksByTicketId } from "@/actions/tasks";
+import { getAllUsers, getTasksByTicketId } from "@/actions/tasks";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
-import { RichTextEditor } from "@/components/crm/rich-text-editor";
-import { TaskModal } from "@/components/crm/task-modal";
-import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
-import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
-import { Badge } from "@/components/ui/badge";
+import {
+  MetaItem,
+  Metric,
+  MetricStrip,
+  RecordBackLink,
+  RecordHero,
+  RecordPage,
+  StatusBadge,
+} from "@/components/crm/record/record-page";
+import { RecordSections } from "@/components/crm/record/record-sections";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -77,949 +68,116 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { ticketMacros } from "@/db/schema";
-import { useCurrency } from "@/hooks/use-currency";
-import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+import { canTransition } from "@/lib/ticket-state-machine";
 import { mergeThread, oldestOf } from "@/lib/ticket-thread";
 
 import { HandoverCard } from "../../_components/handover-card";
 import { TriageCard } from "../../_components/triage-card";
+import {
+  AttachmentsCard,
+  CustomerHistoryCard,
+  OrderCard,
+  PropertiesCard,
+  RequesterCard,
+  SlaCard,
+  TasksCard,
+} from "./ticket-cards";
+import { COMPOSER_ID, TicketComposer } from "./ticket-composer";
+import {
+  CHANNEL_ICONS,
+  formatDuration,
+  type LinkedTask,
+  labelOf,
+  messageOf,
+  PRIORITY_TONE,
+  type PresenceEntry,
+  SEVERITY_TONE,
+  SLA_TONE,
+  type SlaState,
+  STATUS_TONE,
+  slaDeadlines,
+  slaStateOf,
+  type TicketAuditEntry,
+  type TicketDocument,
+  type TicketMacro,
+  type TicketMessage,
+  type TicketPriority,
+  type TicketRow,
+  type TicketStatus,
+} from "./ticket-shared";
+import { TicketThread } from "./ticket-thread";
 
-// ─── Row shapes ───────────────────────────────────────────────────────────────
-//
-// Derived from what the loaders actually return, rather than `any`. Every prop on
-// this page was untyped, so a renamed column compiled fine and rendered blank.
-
-type TicketRow = NonNullable<Awaited<ReturnType<typeof getTicketById>>>;
-type TicketMessage = TicketRow["messages"][number];
-type TicketAuditEntry = TicketRow["auditLogs"][number];
-type TicketDocument = { id: string; name: string; url: string; mimeType?: string | null; size?: number | null };
-type TicketMacro = typeof ticketMacros.$inferSelect;
-type PresenceEntry = { userId?: string; userName?: string; typing?: boolean; action?: string };
-type TicketStatus = NonNullable<Parameters<typeof updateTicketAction>[1]["status"]>;
-type TicketPriority = NonNullable<Parameters<typeof updateTicketAction>[1]["priority"]>;
-
-/** The message from a caught value, which is `unknown` and not an Error. */
-function messageOf(err: unknown, fallback: string): string {
-  return err instanceof Error && err.message ? err.message : fallback;
-}
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const CHANNEL_ICONS: Record<string, React.ReactNode> = {
-  email: <Mail className="h-3.5 w-3.5" />,
-  chat: <MessageCircle className="h-3.5 w-3.5" />,
-  phone: <Phone className="h-3.5 w-3.5" />,
-  social: <Users className="h-3.5 w-3.5" />,
+const SLA_ICON: Record<SlaState, ReactNode> = {
+  breached: <AlertTriangle aria-hidden />,
+  atRisk: <Clock aria-hidden />,
+  paused: <Pause aria-hidden />,
+  met: <CheckCircle2 aria-hidden />,
+  onTrack: <Clock aria-hidden />,
 };
 
-const STATUS_OPTIONS = [
-  { value: "new", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  { value: "open", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  {
-    value: "in_progress",
-    color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
-  },
-  {
-    value: "waiting",
-    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  },
-  {
-    value: "on_hold",
-    color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
-  },
-  {
-    value: "resolved",
-    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  },
-  { value: "closed", color: "bg-muted text-muted-foreground" },
-];
+const STAMP = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } as const;
 
-const PRIORITY_OPTIONS = [
-  { value: "urgent", color: "text-red-600 dark:text-red-400" },
-  { value: "high", color: "text-orange-600 dark:text-orange-400" },
-  { value: "normal", color: "text-blue-600 dark:text-blue-400" },
-  { value: "low", color: "text-slate-500" },
-];
-
-const PRIORITY_DOT: Record<string, string> = {
-  blocker: "bg-red-600",
-  critical: "bg-orange-500",
-  high: "bg-red-400",
-  normal: "bg-blue-500",
-  low: "bg-slate-400",
-};
-
-// Values only: the words come from the message files, like every other list here.
-const TASK_PRIORITY_OPTIONS = ["normal", "high", "critical", "blocker", "low"] as const;
-
-const AVATAR_PALETTE = [
-  "from-violet-500 to-violet-700",
-  "from-blue-500 to-blue-700",
-  "from-emerald-500 to-emerald-700",
-  "from-rose-500 to-rose-700",
-  "from-indigo-500 to-indigo-700",
-  "from-cyan-500 to-cyan-700",
-  "from-amber-500 to-amber-700",
-];
-
-type LinkedTask = Awaited<ReturnType<typeof getTasksByTicketId>>[number];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function avatarColor(name: string) {
-  const h = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
-}
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
-
-function formatBytes(b: number) {
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-  return `${(b / 1048576).toFixed(1)} MB`;
-}
-
-type Translate = ReturnType<typeof useTranslations>;
-type Formatter = ReturnType<typeof useFormatter>;
-
-/** A stored value shown through a message map when the map knows it, and as itself when not. */
-function labelOf(t: Translate, prefix: string, value: string): string {
-  return t.has(`${prefix}.${value}`) ? t(`${prefix}.${value}`) : value;
-}
-
-function formatStamp(date: Date, format: Formatter, t: Translate) {
-  const now = Date.now();
-  const diff = now - date.getTime();
-  if (diff < 60_000) return t("detail.justNow");
-  if (diff < 3_600_000) return t("detail.minutesAgo", { count: Math.floor(diff / 60_000) });
-  if (diff < 86_400_000) return format.dateTime(date, { hour: "2-digit", minute: "2-digit" });
-  return format.dateTime(date, {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-// ─── LinkedTasksCard ──────────────────────────────────────────────────────────
-
-function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; currentUserId?: string }) {
-  const t = useTranslations("support.tickets");
-  const format = useFormatter();
-  const [tasks, setTasks] = useState<LinkedTask[]>([]);
-  const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const { register, handleSubmit, reset } = useForm<{ title: string; priority: string; dueDate: string }>({
-    defaultValues: { priority: "normal", dueDate: "", title: "" },
-  });
-
-  const load = () => getTasksByTicketId(ticketId).then(setTasks).catch(console.error);
-
+/**
+ * The time, once the page is in the browser, and again every minute.
+ *
+ * Null on the server and on the first client render: the two disagree about what
+ * time it is, and a countdown that differed between them would be a hydration
+ * mismatch. Everything that counts down shows "—" for that first instant.
+ */
+function useNow(interval = 60_000): number | null {
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    getTasksByTicketId(ticketId).then(setTasks).catch(console.error);
-    getAllUsers().then(setUsers).catch(console.error);
-  }, [ticketId]);
-
-  const onSubmit = async (data: { title: string; priority: string; dueDate: string }) => {
-    if (!data.title.trim()) return;
-    setSaving(true);
-    try {
-      await createTask({
-        title: data.title.trim(),
-        priority: data.priority,
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
-        ticketId,
-      });
-      reset();
-      setAdding(false);
-      load();
-    } catch {
-      toast.error(t("taskCreateFailed"));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="flex items-center justify-between font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          <span className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {t("detail.tasks")}
-            {tasks.length > 0 && (
-              <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] normal-case tracking-normal">
-                {tasks.length}
-              </span>
-            )}
-          </span>
-          <button
-            type="button"
-            onClick={() => setAdding((v) => !v)}
-            className="flex items-center gap-0.5 font-medium text-xs normal-case tracking-normal transition-colors hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5" /> {t("newLabel")}
-          </button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 px-3 pb-3">
-        {adding && (
-          <form onSubmit={handleSubmit(onSubmit)} className="mb-2 space-y-2 rounded-lg border bg-muted/30 p-2.5">
-            <Input
-              {...register("title")}
-              placeholder={t("detail.taskTitlePlaceholder")}
-              className="h-8 text-sm"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <select
-                {...register("priority")}
-                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              >
-                {TASK_PRIORITY_OPTIONS.map((o) => (
-                  <option key={o} value={o}>
-                    {t(`taskPriority.${o}`)}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="date"
-                {...register("dueDate")}
-                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-              />
-            </div>
-            <div className="flex justify-end gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setAdding(false);
-                  reset();
-                }}
-                className="rounded px-2 py-1 text-muted-foreground text-xs hover:text-foreground"
-              >
-                {t("cancel")}
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="rounded bg-primary px-3 py-1 font-semibold text-primary-foreground text-xs hover:bg-primary/90 disabled:opacity-50"
-              >
-                {saving ? "…" : t("detail.create")}
-              </button>
-            </div>
-          </form>
-        )}
-        {tasks.length === 0 && !adding && <p className="py-1 text-muted-foreground text-sm italic">{t("noTasks")}</p>}
-        {tasks.map((task) => {
-          const done = task.status === "done";
-          return (
-            <div
-              key={task.id}
-              className="group flex items-start gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
-            >
-              {done ? (
-                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              ) : (
-                <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              )}
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`truncate font-medium text-sm leading-snug ${done ? "text-muted-foreground line-through" : ""}`}
-                >
-                  {task.title}
-                </p>
-                <div className="mt-0.5 flex items-center gap-1.5">
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.normal}`}
-                  />
-                  {task.dueDate && (
-                    <span className="text-muted-foreground text-xs tabular-nums">
-                      {format.dateTime(new Date(task.dueDate), { day: "2-digit", month: "short" })}
-                    </span>
-                  )}
-                  {task.assigneeName && (
-                    <span className="truncate text-muted-foreground text-xs">{task.assigneeName}</span>
-                  )}
-                </div>
-              </div>
-              <TaskModal
-                task={task}
-                users={users}
-                currentUserId={currentUserId}
-                revalidatePathStr={`/dashboard/support/tickets/${ticketId}`}
-                onUpdated={(updated) =>
-                  setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)))
-                }
-              />
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
-// ─── SLATimer ─────────────────────────────────────────────────────────────────
-
-function SLATimer({ targetDate }: { targetDate: Date | null }) {
-  const t = useTranslations("support.tickets");
-  const [remaining, setRemaining] = useState<string | null>(null);
-  const [isOverdue, setIsOverdue] = useState(false);
-
-  useEffect(() => {
-    if (!targetDate) return;
-    const update = () => {
-      const diff = new Date(targetDate).getTime() - Date.now();
-      if (diff <= 0) {
-        setIsOverdue(true);
-        const ms = Math.abs(diff);
-        setRemaining(
-          t("detail.slaOverdue", { hours: Math.floor(ms / 3_600_000), minutes: Math.floor((ms % 3_600_000) / 60_000) }),
-        );
-      } else {
-        setIsOverdue(false);
-        setRemaining(
-          t("detail.slaRemaining", {
-            hours: Math.floor(diff / 3_600_000),
-            minutes: Math.floor((diff % 3_600_000) / 60_000),
-          }),
-        );
-      }
-    };
-    update();
-    const timer = setInterval(update, 60_000);
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), interval);
     return () => clearInterval(timer);
-  }, [targetDate, t]);
-
-  if (!targetDate || !remaining) return <span className="text-muted-foreground text-sm">—</span>;
-  return (
-    <span
-      className={`font-mono font-semibold text-sm tabular-nums ${isOverdue ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}
-    >
-      {isOverdue && <AlertTriangle className="mr-1 inline h-3 w-3" />}
-      {remaining}
-    </span>
-  );
-}
-
-// ─── Timeline sub-components ──────────────────────────────────────────────────
-
-function AuditEvent({ entry }: { entry: TicketAuditEntry }) {
-  const t = useTranslations("support.tickets");
-  const format = useFormatter();
-  const actor = entry.actor?.name ?? entry.actorName ?? t("detail.system");
-  const label = labelOf(t, "detail.audit", entry.action);
-  // The values a status or priority change records are the stored words, which read as
-  // English code; the ones this screen already knows are shown in the interface language.
-  const valuePrefix =
-    entry.action === "status_changed" ? "statuses" : entry.action === "priority_changed" ? "priorities" : null;
-  const shown = (value: string) => (valuePrefix ? labelOf(t, valuePrefix, value) : value);
-  return (
-    <div className="flex items-center gap-3 py-1">
-      <div className="h-px flex-1 bg-border" />
-      <div className="flex items-center gap-1.5 whitespace-nowrap text-muted-foreground text-xs">
-        <Activity className="h-2.5 w-2.5 shrink-0" />
-        <span className="font-medium">{actor}</span>
-        <span>·</span>
-        <span>{label}</span>
-        {entry.oldValue && entry.newValue && (
-          <span className="flex items-center gap-1">
-            <span className="line-through opacity-60">{shown(entry.oldValue)}</span>
-            <span>→</span>
-            <span className="font-medium">{shown(entry.newValue)}</span>
-          </span>
-        )}
-        <span>·</span>
-        <span>{formatStamp(new Date(entry.createdAt), format, t)}</span>
-      </div>
-      <div className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-function AttachmentChips({ docs }: { docs: TicketDocument[] }) {
-  if (!docs.length) return null;
-  return (
-    <div className="mt-2.5 flex flex-wrap gap-1.5">
-      {docs.map((doc) => {
-        const isPdf = doc.mimeType === "application/pdf";
-        return (
-          <a
-            key={doc.id}
-            href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
-            target={isPdf ? "_blank" : undefined}
-            download={!isPdf ? doc.name : undefined}
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border bg-background/80 px-2 py-1 text-xs transition-colors hover:bg-muted"
-          >
-            <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
-            <span className="max-w-[140px] truncate font-medium">{doc.name}</span>
-            {doc.size != null && <span className="text-muted-foreground">({formatBytes(doc.size)})</span>}
-          </a>
-        );
-      })}
-    </div>
-  );
-}
-
-function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: TicketDocument[]; isAgent: boolean }) {
-  const t = useTranslations("support.tickets");
-  const format = useFormatter();
-  const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? t("detail.unknownSender");
-  const isInternal = !msg.isPublic;
-  const stamp = formatStamp(new Date(msg.createdAt), format, t);
-
-  if (isInternal) {
-    return (
-      <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 dark:border-amber-800/30 dark:bg-amber-950/20">
-        <div className="mb-1.5 flex items-center gap-2">
-          <div
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
-          >
-            {initials(senderName)}
-          </div>
-          <span className="font-semibold text-amber-800 text-sm dark:text-amber-300">{senderName}</span>
-          <Badge
-            variant="secondary"
-            className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-          >
-            <Lock className="h-2.5 w-2.5" /> {t("internalNote")}
-          </Badge>
-          <span className="ml-auto text-amber-600/70 text-xs dark:text-amber-500/60">{stamp}</span>
-        </div>
-        {msg.content?.startsWith("<") ? (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none prose-p:text-amber-900 text-sm leading-relaxed dark:prose-p:text-amber-100"
-            // Message bodies arrive from inbound customer email: this is markup written by a
-            // stranger, rendered inside an authenticated agent's session.
-            //
-            // Two independent things stop that being stored XSS, and it needs to stay two.
-            // `sanitizeEmailHtml` removes what executes without needing an HTML parser, which
-            // matters because jsdom does not run on Workers and the bundle is already near the
-            // 10 MB limit. Behind it the Content-Security-Policy in src/proxy.ts still holds the
-            // line: no `unsafe-inline` in script-src, `frame-src 'none'`, `form-action 'self'`,
-            // `img-src 'self' data: blob:`.
-            //
-            // WARN The sanitiser is a denylist, so it is only ever as good as its list. Do not
-            // weaken the CSP on the strength of it.
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
-            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
-          />
-        ) : (
-          <p className="whitespace-pre-wrap text-amber-900 text-sm leading-relaxed dark:text-amber-100">
-            {msg.content}
-          </p>
-        )}
-        <AttachmentChips docs={docs ?? []} />
-      </div>
-    );
-  }
-
-  if (isAgent) {
-    return (
-      <div className="flex justify-end gap-3">
-        <div className="min-w-0 max-w-[85%]">
-          <div className="mb-1 flex items-center justify-end gap-2">
-            {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
-            <span className="text-muted-foreground/70 text-xs">{stamp}</span>
-            <span className="font-semibold text-sm">{senderName}</span>
-          </div>
-          <div className="rounded-2xl rounded-tr-sm border border-primary/12 bg-primary/8 px-4 py-3 dark:bg-primary/12">
-            {msg.content?.startsWith("<") ? (
-              <div
-                className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
-                dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
-              />
-            ) : (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-            )}
-            <AttachmentChips docs={docs ?? []} />
-          </div>
-        </div>
-        <div
-          className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
-        >
-          {initials(senderName)}
-        </div>
-      </div>
-    );
-  }
-
-  // Customer message
-  return (
-    <div className="flex gap-3">
-      <div
-        className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
-      >
-        {initials(senderName)}
-      </div>
-      <div className="min-w-0 max-w-[85%]">
-        <div className="mb-1 flex items-center gap-2">
-          <span className="font-semibold text-sm">{senderName}</span>
-          {msg.senderEmail && <span className="text-muted-foreground/70 text-xs">&lt;{msg.senderEmail}&gt;</span>}
-          {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
-          <span className="text-muted-foreground/70 text-xs">{stamp}</span>
-        </div>
-        <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-muted/60 px-4 py-3">
-          {msg.content?.startsWith("<") ? (
-            <div
-              className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
-              dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
-            />
-          ) : (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
-          )}
-          <AttachmentChips docs={docs ?? []} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Sidebar cards ────────────────────────────────────────────────────────────
-
-/**
- * Which order this conversation is about.
- *
- * Support and sales did not touch anywhere. An agent reading "my order has not
- * arrived" had nowhere to record which one, so the answer stayed in the prose of
- * the message where no query can reach it, and the order never learned that
- * somebody had complained about it.
- *
- * The list is the customer's own orders, not the workspace's: "which of their
- * orders" is the question, and offering all of them invites the wrong answer.
- */
-/**
- * Whether this customer has been here before.
- *
- * A first ticket and a fourth in a month are different conversations, and
- * answering the second as though it were the first is how somebody decides
- * nobody is listening. The sidebar said who they are and never whether they had
- * written before.
- */
-function HistoryCard({ ticket }: { ticket: TicketRow }) {
-  const t = useTranslations("support.tickets");
-  const [history, setHistory] = useState<Awaited<ReturnType<typeof getCustomerTicketHistory>> | null>(null);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the ticket is the trigger
-  useEffect(() => {
-    let current = true;
-    getCustomerTicketHistory(ticket.id)
-      .then((h) => current && setHistory(h))
-      .catch(() => current && setHistory(null));
-    return () => {
-      current = false;
-    };
-  }, [ticket.id]);
-
-  // Nothing to say is said by saying nothing: a card reading "0 previous" on a
-  // first-time customer is noise on every new ticket.
-  if (!history || history.total === 0) return null;
-
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
-          {t("customerHistory")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 px-3 pb-3">
-        <p className="text-muted-foreground text-xs">
-          {history.open > 0
-            ? t("historySummaryOpen", { total: history.total, open: history.open })
-            : t("historySummary", { total: history.total })}
-        </p>
-        <div className="space-y-1">
-          {history.recent.map((h) => (
-            <Link
-              key={h.id}
-              href={`/dashboard/support/tickets/${h.id}`}
-              className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
-            >
-              <span className="truncate text-xs">{h.subject}</span>
-              <span className="shrink-0 text-[10px] text-muted-foreground capitalize">
-                {t.has(`statuses.${h.status}`) ? t(`statuses.${h.status}`) : h.status.replace(/_/g, " ")}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => void }) {
-  const t = useTranslations("support.tickets");
-  const tOrderStatus = useTranslations("orders.statuses");
-  const { formatMoney } = useCurrency();
-  const [orders, setOrders] = useState<Awaited<ReturnType<typeof getOrdersForTicket>>>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // Asked for when the card is opened to, not on every ticket that is read.
-  function load() {
-    if (orders.length > 0 || loading) return;
-    setLoading(true);
-    getOrdersForTicket(ticket.id)
-      .then(setOrders)
-      .catch(() => setOrders([]))
-      .finally(() => setLoading(false));
-  }
-
-  async function choose(value: string) {
-    setSaving(true);
-    try {
-      await linkTicketToOrderAction(ticket.id, value === "__none__" ? null : value);
-      onLinked();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("orderLinkFailed"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (!ticket.companyId && !ticket.contactId) return null;
-
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
-          {t("aboutOrder")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 px-3 pb-3">
-        {ticket.order && (
-          <Link
-            href={`/dashboard/sales/orders/${ticket.order.id}`}
-            className="flex items-center justify-between rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
-          >
-            <span className="truncate font-medium text-xs">{ticket.order.orderNumber}</span>
-            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-              {formatMoney(ticket.order.totalAmount, ticket.order.currency)}
-            </span>
-          </Link>
-        )}
-
-        <Select
-          value={ticket.orderId ?? "__none__"}
-          onValueChange={choose}
-          disabled={saving}
-          onOpenChange={(open) => open && load()}
-        >
-          <SelectTrigger className="h-8 text-xs">
-            <SelectValue placeholder={t("chooseOrder")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">{t("noOrder")}</SelectItem>
-            {orders.map((o) => (
-              <SelectItem key={o.id} value={o.id}>
-                {o.orderNumber} · {tOrderStatus.has(o.status) ? tOrderStatus(o.status) : o.status}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {loading && <p className="text-[11px] text-muted-foreground">{t("loadingOrders")}</p>}
-        {!loading && orders.length === 0 && ticket.orderId === null && (
-          <p className="text-[11px] text-muted-foreground">{t("noOrdersForCustomer")}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ContactCard({ ticket }: { ticket: TicketRow }) {
-  const t = useTranslations("support.tickets");
-  const contact = ticket.contact;
-  if (!contact) {
-    return (
-      <Card>
-        <CardContent className="px-3 py-3">
-          <p className="text-muted-foreground text-xs italic">{t("noContactLinked")}</p>
-        </CardContent>
-      </Card>
-    );
-  }
-  const name = `${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—";
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          <User className="h-3.5 w-3.5" /> {t("customer")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2.5 px-3 pb-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white text-xs ${avatarColor(name)}`}
-          >
-            {initials(name)}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate font-semibold text-sm">{name}</p>
-            {contact.email && <p className="truncate text-muted-foreground text-sm">{contact.email}</p>}
-          </div>
-        </div>
-        {contact.phone && (
-          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-            <Phone className="h-3.5 w-3.5 shrink-0" />
-            {contact.phone}
-          </div>
-        )}
-        {ticket.company && (
-          <div className="flex items-center gap-1.5 border-t pt-2 text-muted-foreground text-sm">
-            <Building2 className="h-3.5 w-3.5 shrink-0" />
-            <span className="font-medium text-foreground">{ticket.company.name}</span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function PropertiesCard({
-  ticket,
-  onStatusChange,
-  onPriorityChange,
-  onReassign,
-}: {
-  ticket: TicketRow;
-  onStatusChange: (s: TicketStatus) => void;
-  onPriorityChange: (p: TicketPriority) => void;
-  onReassign: () => void;
-}) {
-  const t = useTranslations("support.tickets");
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          {t("properties")}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 px-3 pb-3">
-        {/* Status pills */}
-        <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("statusLabel")}</p>
-          <div className="flex flex-wrap gap-1">
-            {STATUS_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onStatusChange(opt.value as TicketStatus)}
-                className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
-                  ticket.status === opt.value
-                    ? `${opt.color} ring-1 ring-current/30 ring-inset`
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {t(
-                  `statuses.${opt.value as "new" | "open" | "in_progress" | "waiting" | "on_hold" | "resolved" | "closed"}`,
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Priority */}
-        <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-            {t("priorityLabel")}
-          </p>
-          <div className="flex gap-1">
-            {PRIORITY_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => onPriorityChange(opt.value as TicketPriority)}
-                className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
-                  (ticket.priority ?? "normal") === opt.value
-                    ? `bg-muted ${opt.color} ring-1 ring-current/20 ring-inset`
-                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}
-              >
-                {t(`priorities.${opt.value as "low" | "normal" | "high" | "urgent"}`)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Assignee */}
-        <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("assignedTo")}</p>
-          <button
-            type="button"
-            onClick={onReassign}
-            className="group flex w-full items-center gap-2 rounded-lg border border-border/60 border-dashed px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
-          >
-            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
-              <User className="h-3.5 w-3.5 text-muted-foreground" />
-            </div>
-            <span className="truncate font-medium text-sm">{ticket.assignee?.name ?? t("detail.unassigned")}</span>
-            <MoreHorizontal className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </button>
-        </div>
-
-        {/* SLA tier + severity */}
-        {(ticket.sla || ticket.severity) && (
-          <div className="flex flex-wrap gap-1.5 border-t pt-2.5">
-            {ticket.sla && (
-              <Badge variant="outline" className="text-xs">
-                {ticket.sla.name}
-              </Badge>
-            )}
-            {ticket.severity && ticket.severity !== "normal" && (
-              <Badge variant="outline" className="text-xs capitalize">
-                {t("detail.severityBadge", { severity: labelOf(t, "detail.severities", ticket.severity) })}
-              </Badge>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function SLACard({
-  ticket,
-  slaFirstTarget,
-  slaResTarget,
-}: {
-  ticket: TicketRow;
-  slaFirstTarget: Date | null;
-  slaResTarget: Date | null;
-}) {
-  const t = useTranslations("support.tickets");
-  const format = useFormatter();
-  if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          <Clock className="h-3.5 w-3.5" /> SLA
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 px-3 pb-3">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-sm">{t("firstResponse")}</span>
-          {ticket.firstResponseAt ? (
-            <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
-              ✓ {format.dateTime(new Date(ticket.firstResponseAt), { hour: "2-digit", minute: "2-digit" })}
-            </span>
-          ) : (
-            <SLATimer targetDate={slaFirstTarget} />
-          )}
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-sm">{t("resolution")}</span>
-          {ticket.resolvedAt ? (
-            <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
-              ✓ {format.dateTime(new Date(ticket.resolvedAt), { day: "numeric", month: "short" })}
-            </span>
-          ) : (
-            <SLATimer targetDate={slaResTarget} />
-          )}
-        </div>
-        {ticket.closedAt && (
-          <div className="flex items-center justify-between border-t pt-2">
-            <span className="text-muted-foreground text-sm">{t("closedLabel")}</span>
-            <span className="font-mono text-sm">
-              {format.dateTime(new Date(ticket.closedAt), {
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
-  const t = useTranslations("support.tickets");
-  return (
-    <Card>
-      <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          <Paperclip className="h-3.5 w-3.5" />
-          {t("detail.attachments")}
-          {docs.length > 0 && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] text-muted-foreground normal-case tracking-normal">
-              {docs.length}
-            </span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1 px-3 pb-3">
-        {docs.length === 0 ? (
-          <p className="py-0.5 text-muted-foreground text-sm italic">{t("noAttachments")}</p>
-        ) : (
-          docs.map((doc) => {
-            const isPdf = doc.mimeType === "application/pdf";
-            return (
-              <a
-                key={doc.id}
-                href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
-                target={isPdf ? "_blank" : undefined}
-                download={!isPdf ? doc.name : undefined}
-                rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
-              >
-                <FileText className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-sm leading-snug group-hover:text-primary">{doc.name}</p>
-                  {doc.size != null && <p className="text-muted-foreground text-xs">{formatBytes(doc.size)}</p>}
-                </div>
-                <ExternalLink className="h-3 w-3 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
-              </a>
-            );
-          })
-        )}
-      </CardContent>
-    </Card>
-  );
+  }, [interval]);
+  return now;
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 /**
- * ⚠️ This was the page itself, a client component that asked for its ticket in a
- * `useEffect`. So the most-used screen in support drew a skeleton, downloaded and
- * ran fifteen hundred lines of JavaScript, and only then requested the ticket it
- * was opened to show. The server page now loads the ticket and the macros and
- * hands them in; `loadTicket` stays, for the refreshes that follow a reply.
+ * One ticket, laid out for the agent answering it — the same record layout as
+ * every other page in the CRM, bent where a conversation needs it to bend.
  *
- * When the server could not load the ticket the props are empty and the screen
- * loads it itself, exactly as before, so a failure degrades to the old behaviour
- * rather than to a broken page.
+ * ⚠️ This used to be a screen of its own: a fixed-height frame with the thread
+ * scrolling inside it, a reply box pinned under it and a 300px column of cards
+ * beside it, and on a phone a Details button that swapped the conversation for
+ * the cards. It now has the hero, the figures and the sections every record has,
+ * so an agent who has learnt the deal page has learnt this one. What it keeps
+ * from the old frame is what made it a support screen: the thread scrolls in its
+ * own box, anchored at the latest message, with the reply box directly under it,
+ * so answering never means scrolling past the whole conversation first — and the
+ * hero's Reply button goes straight there from anywhere on the page.
+ *
+ * ⚠️ It was also the page itself, a client component that asked for its ticket in
+ * a `useEffect`. The server page now loads the ticket and the macros and hands
+ * them in; `loadTicket` stays, for the refreshes that follow a reply. When the
+ * server could not load the ticket the props are empty and the screen loads it
+ * itself, so a failure degrades to the old behaviour rather than to a broken page.
  */
 export function TicketDetail({
   id,
   initialTicket,
   initialMacros,
+  canWrite,
+  canDelete,
 }: {
   id: string;
   initialTicket: TicketRow | null;
   initialMacros: TicketMacro[];
+  /** `ticket:write` — replying, changing status/priority/assignee, tasks, linking an order. */
+  canWrite: boolean;
+  /** `ticket:delete`, which is an admin's. */
+  canDelete: boolean;
 }) {
   const t = useTranslations("support.tickets");
+  const tR = useTranslations("record");
+  const tH = useTranslations("handover");
   const format = useFormatter();
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const now = useNow();
 
   const [ticket, setTicket] = useState<TicketRow | null>(initialTicket);
   const [messages, setMessages] = useState<TicketMessage[]>(() => mergeThread(initialTicket?.messages ?? [], []));
@@ -1031,6 +189,10 @@ export function TicketDetail({
   const [ticketDocs, setTicketDocs] = useState<Record<string, TicketDocument>>({});
   /** Whether an older page is on its way, so the button cannot fire twice. */
   const [loadingEarlier, setLoadingEarlier] = useState(false);
+  // Held here rather than in the tasks card, so the phone's Tasks tab can show
+  // how many are open before it is opened.
+  const [tasks, setTasks] = useState<LinkedTask[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
 
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -1070,6 +232,8 @@ export function TicketDetail({
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
+      // The thread is `flex-col-reverse`, where the bottom is scrollTop 0 and a
+      // positive target clamps to it; scrollHeight works in either direction.
       scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     });
   }, []);
@@ -1104,11 +268,15 @@ export function TicketDetail({
     }
   }, [id, loadDocuments]);
 
+  const loadTasks = useCallback(() => getTasksByTicketId(id).then(setTasks).catch(console.error), [id]);
+
   // The ticket and the macros arrive with the page. The attachments still load
   // here: they are secondary, and the links in the thread fill in a moment later.
   // Without a ticket from the server, load everything as the page always did.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on mount
   useEffect(() => {
+    void loadTasks();
+    getAllUsers().then(setUsers).catch(console.error);
     if (initialTicket) {
       void loadDocuments();
       return;
@@ -1116,9 +284,6 @@ export function TicketDetail({
     loadTicket();
     getMacros().then(setMacros).catch(console.error);
   }, []);
-  useEffect(() => {
-    if (!loading) scrollToBottom();
-  }, [loading, scrollToBottom]);
   useEffect(() => {
     const announce = (action: "viewing" | "typing") =>
       fetch(`/api/tickets/${id}/presence`, {
@@ -1166,17 +331,24 @@ export function TicketDetail({
     }
   }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel, t]);
 
+  // ⚠️ A status or priority change reloads the ticket as well as patching it. The
+  // server moves more than the field that was chosen — resolving stamps
+  // `resolvedAt`, "waiting" pauses the SLA, a new priority re-computes both
+  // deadlines — and the change itself lands in the thread as an audit line. Patched
+  // alone, the figures above kept counting down to a deadline that no longer
+  // existed until somebody refreshed.
   const handleStatusChange = useCallback(
     async (status: TicketStatus) => {
       try {
         await updateTicketAction(id, { status });
         setTicket((p) => (p ? { ...p, status } : p));
         toast.success(t("statusUpdated"));
+        void loadTicket();
       } catch (err) {
         toast.error(messageOf(err, t("detail.error")));
       }
     },
-    [id, t],
+    [id, loadTicket, t],
   );
 
   const handlePriorityChange = useCallback(
@@ -1185,11 +357,12 @@ export function TicketDetail({
         await updateTicketAction(id, { priority });
         setTicket((p) => (p ? { ...p, priority } : p));
         toast.success(t("priorityUpdated"));
+        void loadTicket();
       } catch (err) {
         toast.error(messageOf(err, t("detail.error")));
       }
     },
-    [id, t],
+    [id, loadTicket, t],
   );
 
   const handleEscalate = useCallback(async () => {
@@ -1203,10 +376,11 @@ export function TicketDetail({
       toast.success(
         t("detail.escalated", { priority: result.newPriority ? labelOf(t, "priorities", result.newPriority) : "" }),
       );
+      void loadTicket();
     } catch (err) {
       toast.error(messageOf(err, t("detail.error")));
     }
-  }, [id, t]);
+  }, [id, loadTicket, t]);
 
   const handleReassign = useCallback(async () => {
     setReassigning(true);
@@ -1236,14 +410,25 @@ export function TicketDetail({
     }
   }, [id, router, t]);
 
-  const slaFirstTarget =
-    ticket?.sla && !ticket.firstResponseAt
-      ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60_000)
-      : null;
-  const slaResTarget =
-    ticket?.sla && !ticket.resolvedAt
-      ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000)
-      : null;
+  /**
+   * The hero's Reply: bring the composer into view and put the caret in it.
+   *
+   * ⚠️ On a phone the composer lives in the Conversation tab, and an element in a
+   * hidden tab can be neither scrolled to nor focused. `RecordSections` owns the
+   * chosen tab and offers no way to set it, so this presses the tab's own button —
+   * the one path that also keeps the URL fragment right. Only when that button is
+   * on screen: from lg up the bar is `display: none`, every section is visible,
+   * and a click there would only make the sections scroll the page to their top.
+   */
+  const focusComposer = useCallback(() => {
+    const tab = document.getElementById("record-tab-conversation");
+    if (tab && tab.offsetParent !== null && tab.getAttribute("aria-selected") !== "true") tab.click();
+    requestAnimationFrame(() => {
+      const composer = document.getElementById(COMPOSER_ID);
+      composer?.scrollIntoView({ behavior: "smooth", block: "center" });
+      composer?.querySelector<HTMLElement>("[contenteditable='true']")?.focus({ preventScroll: true });
+    });
+  }, []);
 
   /** More of the thread exists than the screen holds. Counted, not inferred from a page length. */
   const hasEarlier = ticket
@@ -1266,28 +451,18 @@ export function TicketDetail({
     }
   };
 
-  // Build chronological timeline merging messages + audit events
-  const timeline = [
-    ...messages.map((m) => ({ type: "message" as const, ts: new Date(m.createdAt).getTime(), data: m })),
-    ...auditLogs.map((a) => ({ type: "audit" as const, ts: new Date(a.createdAt).getTime(), data: a })),
-  ].sort((a, b) => a.ts - b.ts);
-
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex animate-pulse flex-col gap-0 p-6">
-        <div className="mb-6 h-4 w-28 rounded bg-muted" />
-        <div className="mb-3 h-7 w-full max-w-96 rounded bg-muted" />
-        <div className="mb-6 h-4 w-full max-w-64 rounded bg-muted" />
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="space-y-3 lg:col-span-2">
-            <div className="h-80 rounded-xl bg-muted" />
-            <div className="h-40 rounded-xl bg-muted" />
+      <div className="flex animate-pulse flex-col gap-4 sm:gap-6">
+        <div className="h-44 rounded-xl bg-muted" />
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
+          <div className="space-y-4 lg:order-2 lg:col-span-2">
+            <div className="h-96 rounded-xl bg-muted" />
           </div>
-          <div className="space-y-3">
-            <div className="h-28 rounded-xl bg-muted" />
+          <div className="space-y-4 max-lg:hidden">
             <div className="h-48 rounded-xl bg-muted" />
-            <div className="h-24 rounded-xl bg-muted" />
+            <div className="h-28 rounded-xl bg-muted" />
           </div>
         </div>
       </div>
@@ -1306,304 +481,381 @@ export function TicketDetail({
     );
   }
 
+  // ── Derived ──────────────────────────────────────────────────────────────────
   const typingUsers = presence.filter((p) => p.action === "typing");
+  const priority = ticket.priority ?? "normal";
+  const created = new Date(ticket.createdAt).getTime();
+  const { firstDue, resolutionDue } = slaDeadlines(ticket);
+  const slaState = slaStateOf(ticket, now);
+  const paused = !!ticket.slaPausedAt;
+  // When the ticket stopped being work: resolved, or closed without ever being
+  // resolved (straight from "new", say). Past that, nothing counts down.
+  const doneAt = ticket.resolvedAt
+    ? new Date(ticket.resolvedAt).getTime()
+    : ticket.closedAt
+      ? new Date(ticket.closedAt).getTime()
+      : null;
+  const endedAt = ticket.closedAt ? new Date(ticket.closedAt).getTime() : doneAt;
+  const contactName = ticket.contact
+    ? `${ticket.contact.firstName ?? ""} ${ticket.contact.lastName ?? ""}`.trim() || null
+    : null;
+  const openTasks = tasks.filter((tk) => tk.status !== "done").length;
+  const waiting = ticket.handoverSummary?.waiting;
+
+  /** Time left to a deadline, or how far past it — "3h 20m" or "3h 20m overdue". */
+  const countdown = (due: Date) => {
+    if (now === null) return "—";
+    const left = due.getTime() - now;
+    return left >= 0 ? formatDuration(left, t) : t("detail.metrics.overdue", { duration: formatDuration(left, t) });
+  };
+  const isPast = (due: Date | null) => due !== null && now !== null && due.getTime() < now;
+
+  // ── Metrics ──────────────────────────────────────────────────────────────────
+  // The figures an agent triages by: how long is left, whether anybody has
+  // answered, how long it has been going on, and how much has been said.
+  const resolutionMetric =
+    doneAt !== null ? (
+      <Metric
+        label={labelOf(t, "statuses", ticket.resolvedAt ? "resolved" : "closed")}
+        tone={slaState === "breached" ? "danger" : resolutionDue ? "success" : undefined}
+        hint={t("detail.metrics.after", { duration: formatDuration(doneAt - created, t) })}
+      >
+        {format.dateTime(new Date(doneAt), { day: "numeric", month: "short" })}
+      </Metric>
+    ) : resolutionDue ? (
+      <Metric
+        label={t("detail.metrics.resolutionDue")}
+        tone={isPast(resolutionDue) && !paused ? "danger" : undefined}
+        hint={paused ? t("detail.sla.paused") : format.dateTime(resolutionDue, STAMP)}
+      >
+        {countdown(resolutionDue)}
+      </Metric>
+    ) : null;
+
+  const firstResponseMetric = ticket.firstResponseAt ? (
+    <Metric
+      label={t("firstResponse")}
+      tone={ticket.firstResponseBreachedAt ? "danger" : firstDue ? "success" : undefined}
+      hint={format.dateTime(new Date(ticket.firstResponseAt), STAMP)}
+    >
+      {formatDuration(new Date(ticket.firstResponseAt).getTime() - created, t)}
+    </Metric>
+  ) : doneAt === null && firstDue ? (
+    <Metric
+      label={t("firstResponse")}
+      tone={isPast(firstDue) && !paused ? "danger" : undefined}
+      hint={t("detail.sla.dueAt", { date: format.dateTime(firstDue, STAMP) })}
+    >
+      {countdown(firstDue)}
+    </Metric>
+  ) : (
+    <Metric label={t("firstResponse")}>{doneAt === null ? t("detail.metrics.notYet") : "—"}</Metric>
+  );
+
+  const ageMetric = (
+    <Metric
+      label={t("detail.metrics.age")}
+      hint={
+        endedAt !== null
+          ? t("detail.metrics.closedOn", {
+              date: format.dateTime(new Date(endedAt), { day: "numeric", month: "short" }),
+            })
+          : t("detail.metrics.since", { date: format.dateTime(new Date(created), { day: "numeric", month: "short" }) })
+      }
+    >
+      {endedAt !== null ? formatDuration(endedAt - created, t) : now === null ? "—" : formatDuration(now - created, t)}
+    </Metric>
+  );
+
+  const messagesMetric = (
+    <Metric
+      label={t("detail.metrics.messages")}
+      hint={doneAt === null && waiting && waiting !== "nobody" ? tH(`waiting.${waiting}`) : undefined}
+    >
+      {ticket.messageCount ?? messages.length}
+    </Metric>
+  );
+
+  // What the customer said when asked (src/lib/ticket-public.ts): shown once they were asked.
+  const csatMetric = ticket.csatRating ? (
+    <Metric
+      label={t("detail.csat.label")}
+      tone={ticket.csatRating === "good" ? "success" : "danger"}
+      hint={ticket.csatComment ? `“${ticket.csatComment.slice(0, 140)}”` : t("detail.csat.noComment")}
+    >
+      {t(ticket.csatRating === "good" ? "detail.csat.good" : "detail.csat.bad")}
+    </Metric>
+  ) : ticket.csatRequestedAt ? (
+    <Metric
+      label={t("detail.csat.label")}
+      hint={t("detail.csat.askedOn", {
+        date: format.dateTime(new Date(ticket.csatRequestedAt), { day: "numeric", month: "short" }),
+      })}
+    >
+      {t("detail.csat.waiting")}
+    </Metric>
+  ) : null;
+
+  // ── Sections ─────────────────────────────────────────────────────────────────
+  const conversation = (
+    <Card className="gap-0 py-0 sm:gap-0 sm:py-0">
+      <div className="flex items-center justify-between gap-2 border-b px-3 py-3 sm:px-4 lg:px-6">
+        <h2 className="font-semibold text-base">{tR("tabs.conversation")}</h2>
+        <span className="text-muted-foreground text-xs tabular-nums">
+          {t("detail.messagesCount", { count: ticket.messageCount ?? messages.length })}
+        </span>
+      </div>
+      {typingUsers.length > 0 && (
+        <div className="flex items-center gap-2 border-b bg-amber-50/80 px-3 py-2 text-amber-700 text-xs sm:px-4 lg:px-6 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
+          <span className="flex gap-0.5">
+            {[0, 150, 300].map((d) => (
+              <span
+                key={d}
+                className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500"
+                style={{ animationDelay: `${d}ms` }}
+              />
+            ))}
+          </span>
+          {t("detail.typing", {
+            count: typingUsers.length,
+            names: typingUsers.map((p) => p.userName).join(", "),
+          })}
+        </div>
+      )}
+      <TicketThread
+        messages={messages}
+        auditLogs={auditLogs}
+        docsById={ticketDocs}
+        hasEarlier={hasEarlier}
+        loadingEarlier={loadingEarlier}
+        onLoadEarlier={loadEarlier}
+        scrollRef={scrollRef}
+        emptyHint={canWrite ? t("sendFirstReply") : undefined}
+      />
+      {canWrite ? (
+        <TicketComposer
+          ticketId={id}
+          value={replyContent}
+          onChange={setReplyContent}
+          isInternal={isInternal}
+          onInternalChange={setIsInternal}
+          macros={macros}
+          onApplyMacro={applyMacro}
+          onSend={handleSendReply}
+          sending={sending}
+        />
+      ) : (
+        <p className="border-t px-3 py-3 text-muted-foreground text-sm sm:px-4 lg:px-6">{t("detail.readOnly")}</p>
+      )}
+    </Card>
+  );
 
   return (
-    <>
-      {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
-      {/*
-        ⚠️ The height has to leave room for the bottom bar as well as the
-        header. `100dvh - 3rem` is the whole screen minus the header only, so
-        below md the reply box sat behind the tab bar — the one control the
-        page exists for.
-      */}
-      <div className="-my-4 md:-my-6 flex h-[calc(100dvh-3rem-var(--mobile-nav-height)-var(--safe-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-3rem)]">
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="shrink-0 border-b bg-background px-4 pt-4 pb-3 md:px-6 md:pt-5 md:pb-4">
-          {/* Breadcrumb + actions */}
-          <div className="mb-3 flex items-center justify-between gap-4">
-            <Link
-              href="/dashboard/support/tickets"
-              className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" /> {t("allTickets")}
-            </Link>
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-semibold text-muted-foreground text-xs">{ticket.ticketNumber}</span>
+    <RecordPage>
+      <RecordBackLink href="/dashboard/support/tickets">{t("allTickets")}</RecordBackLink>
+
+      {/* ── Hero: what it is, where it stands against its promise, who asked ── */}
+      <RecordHero
+        badges={
+          <>
+            <StatusBadge tone={STATUS_TONE[ticket.status] ?? "neutral"}>
+              {labelOf(t, "statuses", ticket.status)}
+            </StatusBadge>
+            <StatusBadge tone={PRIORITY_TONE[priority] ?? "neutral"}>
+              <Flag aria-hidden />
+              {labelOf(t, "priorities", priority)}
+            </StatusBadge>
+            {slaState && (
+              <StatusBadge tone={SLA_TONE[slaState]}>
+                {SLA_ICON[slaState]}
+                {t(`detail.sla.state.${slaState}`)}
+              </StatusBadge>
+            )}
+            {ticket.severity && SEVERITY_TONE[ticket.severity] && (
+              <StatusBadge tone={SEVERITY_TONE[ticket.severity]}>
+                {t("detail.severityBadge", { severity: labelOf(t, "detail.severities", ticket.severity) })}
+              </StatusBadge>
+            )}
+          </>
+        }
+        title={ticket.subject}
+        meta={
+          <>
+            <MetaItem icon={<Hash aria-hidden />}>
+              <span className="font-mono">{ticket.ticketNumber}</span>
+            </MetaItem>
+            {contactName && ticket.contact && (
+              <MetaItem icon={<User aria-hidden />} href={`/dashboard/contacts/${ticket.contact.id}`}>
+                {contactName}
+              </MetaItem>
+            )}
+            {ticket.company && (
+              <MetaItem icon={<Building2 aria-hidden />} href={`/dashboard/companies/${ticket.company.id}`}>
+                {ticket.company.name}
+              </MetaItem>
+            )}
+            <MetaItem icon={<UserRound aria-hidden />}>
+              {ticket.assignee?.name ? tR("assignedTo", { name: ticket.assignee.name }) : tR("unassigned")}
+            </MetaItem>
+            <MetaItem icon={CHANNEL_ICONS[ticket.channel]}>{labelOf(t, "channels", ticket.channel)}</MetaItem>
+          </>
+        }
+        actions={
+          (canWrite || canDelete) && (
+            <>
+              {canWrite && (
+                <Button size="sm" onClick={focusComposer}>
+                  <Reply className="size-3.5" aria-hidden />
+                  {t("detail.reply")}
+                </Button>
+              )}
+              {canWrite && canTransition(ticket.status, "resolved") && (
+                <Button size="sm" variant="outline" onClick={() => handleStatusChange("resolved")}>
+                  <CheckCircle2 className="size-3.5" aria-hidden />
+                  {t("detail.resolve")}
+                </Button>
+              )}
+              {canWrite && ticket.status === "resolved" && (
+                <Button size="sm" variant="outline" onClick={() => handleStatusChange("open")}>
+                  <RotateCcw className="size-3.5" aria-hidden />
+                  {t("detail.reopen")}
+                </Button>
+              )}
+              {/* The rarer moves. Reassign and delete open their dialogs from
+                  state outside the menu, never from inside it. */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-8 gap-1">
-                    {t("actions")} <ChevronDown className="h-3.5 w-3.5" />
+                  <Button size="sm" variant="outline">
+                    <MoreHorizontal className="size-3.5" aria-hidden />
+                    {tR("more")}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44">
-                  <DropdownMenuItem onClick={handleEscalate} className="gap-2">
-                    <TrendingUp className="h-4 w-4 text-orange-500" /> {t("escalatePriority")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setReassignOpen(true)} className="gap-2">
-                    <UserCheck className="h-4 w-4 text-blue-500" /> {t("reassign")}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setDeleteOpen(true)}
-                    className="gap-2 text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" /> {t("deleteTicket")}
-                  </DropdownMenuItem>
+                <DropdownMenuContent align="end" className="w-48">
+                  {canWrite && (
+                    <>
+                      <DropdownMenuItem onClick={() => setReassignOpen(true)} className="gap-2">
+                        <UserCheck className="h-4 w-4 text-blue-500" /> {t("reassign")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleEscalate} className="gap-2">
+                        <TrendingUp className="h-4 w-4 text-orange-500" /> {t("escalatePriority")}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {canWrite && canDelete && <DropdownMenuSeparator />}
+                  {canDelete && (
+                    <DropdownMenuItem
+                      onClick={() => setDeleteOpen(true)}
+                      className="gap-2 text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" /> {t("deleteTicket")}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
-          </div>
+            </>
+          )
+        }
+      >
+        <MetricStrip>
+          {resolutionMetric}
+          {firstResponseMetric}
+          {ageMetric}
+          {messagesMetric}
+          {csatMetric}
+        </MetricStrip>
+      </RecordHero>
 
-          {/* Title */}
-          <h1 className="mb-2 font-bold text-2xl leading-tight tracking-tight">{ticket.subject}</h1>
-
-          {/* Meta row */}
-          <div className="flex flex-wrap items-center gap-2">
-            <TicketStatusBadge status={ticket.status} />
-            <TicketPriorityBadge priority={ticket.priority} />
-            <Badge variant="outline" className="h-5 gap-1 text-xs">
-              {CHANNEL_ICONS[ticket.channel]}
-              <span className="capitalize">{labelOf(t, "channels", ticket.channel)}</span>
-            </Badge>
-            {ticket.severity && ticket.severity !== "normal" && (
-              <Badge variant="outline" className="h-5 text-xs capitalize">
-                {t("detail.severityBadge", { severity: labelOf(t, "detail.severities", ticket.severity) })}
-              </Badge>
-            )}
-            {ticket.tags?.map((tag: string) => (
-              <Badge key={tag} variant="secondary" className="h-5 text-xs">
-                {tag}
-              </Badge>
-            ))}
-            <span className="ml-1 flex items-center gap-1 text-muted-foreground text-xs">
-              <Clock className="h-3.5 w-3.5" />
-              {format.dateTime(new Date(ticket.createdAt), {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </span>
-          </div>
-        </div>
-
-        {/* ── Body grid ───────────────────────────────────────────────────── */}
-        {/*
-          ⚠️ Below lg this stops being a grid and becomes one column that
-          scrolls. As a grid it split a fixed-height page into two rows, each
-          with its own scrollbar — a conversation about 200px tall above a
-          panel about 200px tall, on a screen that had room for one of them
-          done properly. The thread takes the screen; the panel follows it.
-        */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-[1fr_300px] lg:overflow-hidden">
-          {/* ── Left: Conversation ──────────────────────────────────────── */}
-          <div className="flex min-h-0 flex-col lg:border-r">
-            {/* Typing presence banner */}
-            {typingUsers.length > 0 && (
-              <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-amber-700 text-xs dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
-                <span className="flex gap-0.5">
-                  {[0, 150, 300].map((d) => (
-                    <span
-                      key={d}
-                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500"
-                      style={{ animationDelay: `${d}ms` }}
-                    />
-                  ))}
-                </span>
-                {t("detail.typing", {
-                  count: typingUsers.length,
-                  names: typingUsers.map((p) => p.userName).join(", "),
-                })}
-              </div>
-            )}
-
-            {/* Timeline */}
-            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 px-4 py-4 lg:overflow-y-auto lg:px-6 lg:py-5">
-              {hasEarlier && (
-                <div className="flex justify-center">
-                  <Button type="button" variant="outline" size="sm" onClick={loadEarlier} disabled={loadingEarlier}>
-                    {loadingEarlier && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                    {t("loadEarlier")}
-                  </Button>
-                </div>
-              )}
-              {timeline.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
-                  <p className="text-muted-foreground text-sm">{t("noMessages")}</p>
-                  <p className="mt-1 text-muted-foreground/60 text-xs">{t("sendFirstReply")}</p>
-                </div>
-              ) : (
-                timeline.map((item, i) => {
-                  if (item.type === "audit") {
-                    return <AuditEvent key={`audit-${item.data.id}-${i}`} entry={item.data} />;
-                  }
-                  const msg = item.data;
-                  const isAgent = !!msg.sender;
-                  const msgDocs = (msg.attachmentIds ?? []).map((docId: string) => ticketDocs[docId]).filter(Boolean);
-                  return <MessageBubble key={msg.id ?? i} msg={msg} docs={msgDocs} isAgent={isAgent} />;
-                })
-              )}
-            </div>
-
-            {/* ── Reply area ──────────────────────────────────────────── */}
-            <div
-              className={`shrink-0 space-y-3 border-t p-4 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}
-            >
-              {/* Public / Internal toggle */}
-              <div className="flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
-                {[
-                  { val: false, icon: Send, label: t("detail.publicReply") },
-                  { val: true, icon: Lock, label: t("internalNote") },
-                ].map(({ val, icon: Icon, label }) => (
-                  <button
-                    key={String(val)}
-                    type="button"
-                    onClick={() => setIsInternal(val)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium text-sm transition-all ${
-                      isInternal === val
-                        ? val
-                          ? "bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900/40 dark:text-amber-300"
-                          : "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3 w-3" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Editor.
-                  The wrapper carries the Ctrl+Enter shortcut for the editor inside it;
-                  it is not itself a control, and giving it a role or a tab stop would
-                  put an extra, meaningless stop in the tab order. */}
-              {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcut for the focusable editor within */}
-              <div
-                onKeyDown={(e) => {
-                  if (e.ctrlKey && e.key === "Enter") {
-                    e.preventDefault();
-                    handleSendReply();
-                  }
-                }}
-              >
-                <RichTextEditor
-                  value={replyContent}
-                  onChange={(html) => {
-                    setReplyContent(html);
-                    fetch(`/api/tickets/${id}/presence`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ action: "typing" }),
-                      // A failed presence ping must not interrupt the agent's reply.
-                      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-                    }).catch(() => {});
-                  }}
-                  placeholder={isInternal ? t("detail.internalNotePlaceholder") : t("detail.replyPlaceholder")}
-                  className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
-                  macroVariables
-                />
-              </div>
-
-              {/* Footer */}
-              <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1 text-muted-foreground text-xs">
-                  {isInternal ? (
-                    <>
-                      <Shield className="h-3 w-3" /> {t("agentsOnly")}
-                    </>
-                  ) : (
-                    t("detail.ctrlEnterHint")
-                  )}
-                </p>
-                <div className="flex items-center gap-2">
-                  {macros.length > 0 && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                          <Zap className="h-3.5 w-3.5" /> {t("macro")}
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="max-h-60 w-52 overflow-y-auto">
-                        {macros.map((macro) => (
-                          <DropdownMenuItem
-                            key={macro.id}
-                            className="flex flex-col items-start gap-0.5 py-2"
-                            onClick={() => applyMacro(macro)}
-                          >
-                            <span className="font-medium text-sm">{macro.name}</span>
-                            {macro.description && (
-                              <span className="w-full truncate text-muted-foreground text-xs">{macro.description}</span>
-                            )}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => setReplyContent("<p></p>")}
-                    disabled={isReplyEmpty}
-                  >
-                    {t("clear")}
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="h-8 gap-1.5"
-                    onClick={handleSendReply}
-                    disabled={isReplyEmpty || sending}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    {sending ? t("detail.sending") : isInternal ? t("detail.addNote") : t("detail.sendReply")}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Right: Sidebar ──────────────────────────────────────────── */}
-          <div className="space-y-3 border-t p-4 lg:overflow-y-auto lg:border-t-0">
-            <ContactCard ticket={ticket} />
-            {/*
-              Where the ticket stands, for whoever is picking it up (audit rilievo
-              S-05, its fourth part). First in the column because "whose move is
-              it" decides whether this ticket gets opened at all, and it is read
-              before anything else on the page.
-            */}
-            {ticket.handoverSummary && <HandoverCard summary={ticket.handoverSummary} />}
-            {/*
-              What this ticket resembles, from what the workspace has already
-              answered (audit rilievo S-05). Above the history because it is the
-              thing somebody picking the ticket up wants first, and it renders
-              nothing at all when there is nothing to say.
-            */}
-            <TriageCard
-              subject={ticket.subject}
-              description={ticket.description}
-              excludeId={ticket.id}
-              onUseMacro={(macroId) => {
-                const macro = macros.find((m) => m.id === macroId);
-                if (macro) applyMacro(macro);
-              }}
-            />
-            <OrderCard ticket={ticket} onLinked={() => void loadTicket()} />
-            <HistoryCard ticket={ticket} />
-            <PropertiesCard
-              ticket={ticket}
-              onStatusChange={handleStatusChange}
-              onPriorityChange={handlePriorityChange}
-              onReassign={() => setReassignOpen(true)}
-            />
-            <SLACard ticket={ticket} slaFirstTarget={slaFirstTarget} slaResTarget={slaResTarget} />
-            <LinkedTasksCard ticketId={id} currentUserId={ticket?.ownerId ?? undefined} />
-            <AttachmentsCard docs={Object.values(ticketDocs)} />
-          </div>
-        </div>
-      </div>
+      <RecordSections
+        label={tR("sectionsLabel")}
+        tabs={[
+          {
+            id: "conversation",
+            label: tR("tabs.conversation"),
+            icon: <MessageSquare aria-hidden />,
+            count: ticket.messageCount ?? messages.length,
+          },
+          { id: "details", label: tR("tabs.details"), icon: <Info aria-hidden /> },
+          { id: "tasks", label: tR("tabs.tasks"), icon: <ListChecks aria-hidden />, count: openTasks },
+        ]}
+        sections={[
+          { tab: "conversation", column: "main", node: conversation },
+          /*
+            Where the ticket stands, for whoever is picking it up (audit rilievo
+            S-05, its fourth part). First in the reference column because "whose
+            move is it" decides whether this ticket gets opened at all. Renders
+            nothing on a ticket nobody has written on.
+          */
+          ...(ticket.handoverSummary
+            ? [{ tab: "details", column: "side" as const, node: <HandoverCard summary={ticket.handoverSummary} /> }]
+            : []),
+          {
+            tab: "details",
+            column: "side",
+            node: (
+              <PropertiesCard
+                ticket={ticket}
+                canWrite={canWrite}
+                onStatusChange={handleStatusChange}
+                onPriorityChange={handlePriorityChange}
+                onReassign={() => setReassignOpen(true)}
+              />
+            ),
+          },
+          { tab: "details", column: "side", node: <SlaCard ticket={ticket} /> },
+          { tab: "details", column: "side", node: <RequesterCard ticket={ticket} /> },
+          { tab: "details", column: "side", node: <CustomerHistoryCard ticket={ticket} /> },
+          {
+            tab: "details",
+            column: "side",
+            node: <OrderCard ticket={ticket} canWrite={canWrite} onLinked={() => void loadTicket()} />,
+          },
+          {
+            tab: "tasks",
+            column: "side",
+            node: (
+              <TasksCard
+                ticketId={id}
+                tasks={tasks}
+                users={users}
+                canWrite={canWrite}
+                currentUserId={ticket.ownerId ?? undefined}
+                onCreated={() => void loadTasks()}
+                onUpdated={(updated) =>
+                  setTasks((prev) => prev.map((tk) => (tk.id === updated.id ? { ...tk, ...updated } : tk)))
+                }
+              />
+            ),
+          },
+          /*
+            What this ticket resembles, from what the workspace has already
+            answered (audit rilievo S-05). In the Conversation tab on a phone —
+            under the reply box, which is where a suggested macro lands — and in
+            the reference column on a desktop. Renders nothing when there is
+            nothing to say.
+          */
+          {
+            tab: "conversation",
+            column: "side",
+            node: (
+              <TriageCard
+                subject={ticket.subject}
+                description={ticket.description}
+                excludeId={ticket.id}
+                onUseMacro={
+                  canWrite
+                    ? (macroId) => {
+                        const macro = macros.find((m) => m.id === macroId);
+                        if (macro) applyMacro(macro);
+                      }
+                    : undefined
+                }
+              />
+            ),
+          },
+          // The files the thread carries, beside it.
+          { tab: "conversation", column: "side", node: <AttachmentsCard docs={Object.values(ticketDocs)} /> },
+        ]}
+      />
 
       {/* ── Reassign dialog ─────────────────────────────────────────────── */}
       <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
@@ -1650,6 +902,6 @@ export function TicketDetail({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </>
+    </RecordPage>
   );
 }

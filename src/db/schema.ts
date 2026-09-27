@@ -202,7 +202,12 @@ export const companies = pgTable("company", {
   // What this customer pays; the product picker on their quotes and orders starts here.
   priceListId: text("price_list_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
 export const leads = pgTable("lead", {
@@ -232,6 +237,14 @@ export const leads = pgTable("lead", {
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
+  // Where the latest consent decision came from (src/lib/consent.ts). Migration 0040.
+  consentSource: text("consent_source"),
+  /** Being worked by an AI assistant since then (set through /api/crm/assistant); null = not. */
+  assistantSince: timestamp("assistant_since", { mode: "date" }),
+  /** The assistant, by the name of the key that marked the person. */
+  assistantName: text("assistant_name"),
+  // The API key that set the mark: only that key clears it (migration 0055).
+  assistantKeyId: text("assistant_key_id"),
   tags: text("tags").array(),
   leadTypeId: text("lead_type_id").references(() => companyTypes.id, { onDelete: "set null" }),
   leadCategoryId: text("lead_category_id").references(() => companyCategories.id, { onDelete: "set null" }),
@@ -241,7 +254,12 @@ export const leads = pgTable("lead", {
   convertedToCompanyId: text("converted_to_company_id"), // FK set via migration → company.id (set null)
   convertedToDealId: text("converted_to_deal_id"), // FK set via migration → deal.id (set null)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
 export const contacts = pgTable("contact", {
@@ -270,10 +288,23 @@ export const contacts = pgTable("contact", {
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
+  // Where the latest consent decision came from (src/lib/consent.ts). Migration 0040.
+  consentSource: text("consent_source"),
+  /** Being worked by an AI assistant since then (set through /api/crm/assistant); null = not. */
+  assistantSince: timestamp("assistant_since", { mode: "date" }),
+  /** The assistant, by the name of the key that marked the person. */
+  assistantName: text("assistant_name"),
+  // The API key that set the mark: only that key clears it (migration 0055).
+  assistantKeyId: text("assistant_key_id"),
   tags: text("tags").array(),
   sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
 export const products = pgTable("product", {
@@ -387,7 +418,12 @@ export const orders = pgTable("order", {
   deliveredAt: timestamp("delivered_at", { mode: "date" }),
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
 /**
@@ -406,9 +442,12 @@ export const orderPayments = pgTable("order_payment", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  orderId: text("order_id")
-    .notNull()
-    .references(() => orders.id, { onDelete: "cascade" }),
+  // Optional since I9: an invoice written without an order can be paid too (migration 0053).
+  orderId: text("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  // The invoice this money settles. A payment on an invoice also names its order, so the
+  // order's balance keeps counting it; one recorded on the order alone names no invoice.
+  // FK in migration 0053 (the invoice table is declared further down).
+  invoiceId: text("invoice_id"),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   paidAt: timestamp("paid_at", { mode: "date" }).defaultNow().notNull(),
   // Free text rather than an enum: bank transfer, card, cash, "the usual", and
@@ -447,6 +486,21 @@ export const orderItems = pgTable("order_item", {
 
 import { relations, sql } from "drizzle-orm";
 
+/**
+ * A way of selling, with its own stages (V3.8). "default" always exists — the migration
+ * creates it and the actions refuse to delete it — so a stage with no say is never orphaned.
+ * Migration 0044.
+ */
+export const pipelines = pgTable("pipeline", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  order: integer("order").default(0).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const pipelineStages = pgTable("pipeline_stage", {
   id: text("id")
     .primaryKey()
@@ -460,6 +514,11 @@ export const pipelineStages = pgTable("pipeline_stage", {
   // on the forecast (audit rilievo C-06).
   isWon: boolean("is_won").default(false).notNull(),
   isLost: boolean("is_lost").default(false).notNull(),
+  // Days in this stage after which an open deal is flagged as stuck; null for no limit.
+  // Migration 0043.
+  staleAfterDays: integer("stale_after_days"),
+  // The pipeline it belongs to (src/lib/pipelines.ts); a deal is in its stage's. Migration 0044.
+  pipelineId: text("pipeline_id").default("default").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -469,7 +528,15 @@ export const deals = pgTable("deal", {
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
+  /** Always EUR: every total, the forecast and every report sum this column. */
   amount: numeric("amount", { precision: 12, scale: 2 }),
+  /**
+   * The figure as typed, in `currency`. `amount` is that figure converted to EUR at the
+   * rate of the day; editing the deal edits this one and converts again, instead of
+   * re-converting the EUR figure — which shrank a USD deal by the rate on every save.
+   * Null on deals written before it existed. See src/lib/deal-amount.ts.
+   */
+  amountOriginal: numeric("amount_original", { precision: 12, scale: 2 }),
   currency: text("currency").default("EUR").notNull(),
   probability: integer("probability").default(0),
   expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
@@ -493,10 +560,19 @@ export const deals = pgTable("deal", {
   // The stage where the conversation actually stopped. Not derivable from
   // `stageId`: moving the card into the "Lost" column overwrites it.
   lostAtStageId: text("lost_at_stage_id"),
+  // ⚠️ Nothing writes or reads this any more. It was recomputed only right after an
+  // edit, so its inactivity penalties never applied; idle days and next step are worked
+  // out on every read instead (src/lib/deal-signals.ts). The column stays because tenant
+  // migrations are additive.
   healthScore: integer("health_score").default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" })
+    .defaultNow()
+    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+    .$onUpdate(() => new Date())
+    .notNull(),
 });
 
 /**
@@ -550,11 +626,18 @@ export const activities = pgTable("activity", {
   durationMinutes: integer("duration_minutes"), // call/meeting duration
   reminderMinutes: integer("reminder_minutes"), // minutes before date to remind (null = off)
   participants: text("participants"), // comma-separated names/emails for meetings
+  // What happened, when the activity was recorded by completing a task (reached, no
+  // answer, voicemail, held, no show, done), and which task it was. Migration 0034.
+  outcome: text("outcome"),
+  taskId: text("task_id"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
   dealId: text("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  // The email's Message-ID, for an email filed from the Bcc archive address: a redelivered
+  // webhook files it once per record (unique index in migration 0039).
+  messageId: text("message_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -564,6 +647,9 @@ export const tasks = pgTable("task", {
     .$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   description: text("description"),
+  // call, email, meeting, todo — what kind of contact it is, and so what completing it
+  // records (src/lib/task-kinds.ts). Migration 0034.
+  type: text("type").default("todo").notNull(),
   dueDate: timestamp("due_date", { mode: "date" }),
   startDate: timestamp("start_date", { mode: "date" }),
   allDay: boolean("all_day").default(true).notNull(),
@@ -718,10 +804,17 @@ export const emailJobs = pgTable("email_job", {
   // The follow-up sequence enrollment this email belongs to, so stopping the
   // enrollment can cancel an email already queued for it. FK added in migration 0021.
   sequenceEnrollmentId: text("sequence_enrollment_id"),
+  // Comma-separated copies, for an automation email that copies the owner. Migration 0038.
+  cc: text("cc"),
+  bcc: text("bcc"),
   // The provider's id for the sent message. Campaign logs carried it and nothing
   // else did, so a bounce on any other email named a message no workspace
   // recognised, and the dead address was mailed again.
   messageId: text("message_id"),
+  // Threading headers we set ourselves: the Message-ID this email carries, and the one it
+  // answers. Migration 0045.
+  messageHeaderId: text("message_header_id"),
+  inReplyTo: text("in_reply_to"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -898,8 +991,16 @@ export const notifications = pgTable("notification", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // task_due, deal_won, lead_assigned, email_sent, system
+  /** Composed in the default locale when written: what a push carries, and the fallback. */
   title: text("title").notNull(),
   message: text("message"),
+  /**
+   * The `notificationTexts` key the text was composed from, and its values. The bell
+   * composes it again in the reader's own language; null for text a person typed (an
+   * automation's own notification) and for rows written before this existed.
+   */
+  titleKey: text("title_key"),
+  params: jsonb("params").$type<Record<string, string | number>>(),
   link: text("link"), // /dashboard/tasks/123
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -1077,6 +1178,11 @@ export const emailSequences = pgTable("email_sequence", {
   isActive: boolean("is_active").default(true).notNull(),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdBy: text("created_by"),
+  // Waits counted in working days, and sends kept to a window of hours ("09:00"–"18:00") on
+  // the workspace's clock; no window when null. Migration 0045.
+  businessDays: boolean("business_days").default(false).notNull(),
+  sendFrom: text("send_from"),
+  sendUntil: text("send_until"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -1099,6 +1205,11 @@ export const emailSequenceSteps = pgTable(
     delayDays: integer("delay_days").default(0).notNull(),
     subject: text("subject").notNull(),
     body: text("body").notNull(),
+    // "email", or "task": a task for the salesperson instead of a send (src/lib/sequence-plan.ts).
+    kind: text("kind").default("email").notNull(),
+    taskType: text("task_type"),
+    // Sent as a reply in the first email's thread. Migration 0045.
+    replyInThread: boolean("reply_in_thread").default(false).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [unique("email_sequence_step_position_uniq").on(t.sequenceId, t.position)],
@@ -1137,6 +1248,10 @@ export const emailSequenceEnrollments = pgTable(
     enrolledAt: timestamp("enrolled_at", { mode: "date" }).defaultNow().notNull(),
     stoppedAt: timestamp("stopped_at", { mode: "date" }),
     completedAt: timestamp("completed_at", { mode: "date" }),
+    // The Message-ID and subject of its first email: what a step sent "in the thread" replies
+    // to. Migration 0045.
+    threadMessageId: text("thread_message_id"),
+    threadSubject: text("thread_subject"),
   },
   (t) => [
     uniqueIndex("email_sequence_enrollment_active_uniq").on(t.sequenceId, t.email).where(sql`status = 'active'`),
@@ -1340,6 +1455,11 @@ export const notificationPreferences = pgTable("notification_preference", {
   pushEnabled: boolean("push_enabled").default(true).notNull(),
   overrides: text("overrides").default("{}").notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  // The morning digest (src/lib/morning-digest.ts), migration 0037: whether it is wanted,
+  // the language the person last used the product in, and the day it was last sent.
+  digestEmail: boolean("digest_email").default(true).notNull(),
+  locale: text("locale"),
+  digestSentOn: text("digest_sent_on"),
 });
 
 // --- CUSTOM FIELD DEFINITIONS ---
@@ -1428,6 +1548,16 @@ export const quotes = pgTable("quote", {
   acceptedAt: timestamp("accepted_at", { mode: "date" }),
   declinedAt: timestamp("declined_at", { mode: "date" }),
   declineReason: text("decline_reason"),
+  // A simple electronic signature (src/lib/quote-signature.ts, migration 0049): the typed name,
+  // the consent text as shown, when, from where, and the fingerprint of the PDF signed.
+  signedName: text("signed_name"),
+  signedAt: timestamp("signed_at", { mode: "date" }),
+  signedIp: text("signed_ip"),
+  signedUserAgent: text("signed_user_agent"),
+  signedConsent: text("signed_consent"),
+  signedPdfSha256: text("signed_pdf_sha256"),
+  /** The bytes signed, in object storage; null when storage was unavailable (the hash stands). */
+  signedPdfKey: text("signed_pdf_key"),
   version: integer("version").default(1).notNull(),
   notes: text("notes"),
   publicToken: text("public_token")
@@ -1471,49 +1601,61 @@ export const quoteActivities = pgTable("quote_activity", {
 });
 
 // --- SUPPORT TICKETS & CASES (Omnichannel) ---
-export const tickets = pgTable("ticket", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  ticketNumber: text("ticket_number").notNull().unique(),
-  subject: text("subject").notNull(),
-  description: text("description"),
-  channel: text("channel").notNull(), // email, chat, phone, social
-  priority: text("priority").default("normal").notNull(), // low, normal, high, urgent
-  severity: text("severity").default("normal").notNull(), // low, normal, high, critical
-  status: text("status").default("new").notNull(), // new, open, in_progress, waiting, on_hold, resolved, closed
-  type: text("type").default("support"), // support, bug, complaint, info_request, internal_task
-  component: text("component"),
-  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
-  parentTicketId: text("parent_ticket_id"),
-  slaDeadlineAt: timestamp("sla_deadline_at", { mode: "date" }),
-  // An SLA defines two promises and the ticket only ever tracked one of them, so
-  // first-response compliance was unmeasurable (audit rilievo D-01).
-  firstResponseDueAt: timestamp("first_response_due_at", { mode: "date" }),
-  firstResponseBreachedAt: timestamp("first_response_breached_at", { mode: "date" }),
-  slaPausedAt: timestamp("sla_paused_at", { mode: "date" }),
-  slaPauseMinutes: integer("sla_pause_minutes").default(0).notNull(),
-  slaBreachedAt: timestamp("sla_breached_at", { mode: "date" }),
-  // How far into the window the team has already been warned: 0, then 50, then
-  // 80. Without it the job would say the same thing every fifteen minutes.
-  slaWarnLevel: integer("sla_warn_level").default(0).notNull(),
-  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
-  // Which order this is about, when it is about one. Support and sales did not
-  // touch anywhere: an agent reading "my order has not arrived" had no way to say
-  // which order, and the order had no way to know somebody had complained.
-  orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
-  assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
-  slaId: text("sla_id").references(() => slas.id, { onDelete: "set null" }),
-  firstResponseAt: timestamp("first_response_at", { mode: "date" }),
-  resolvedAt: timestamp("resolved_at", { mode: "date" }),
-  closedAt: timestamp("closed_at", { mode: "date" }),
-  tags: text("tags").array().default([]),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+export const tickets = pgTable(
+  "ticket",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    ticketNumber: text("ticket_number").notNull().unique(),
+    subject: text("subject").notNull(),
+    description: text("description"),
+    channel: text("channel").notNull(), // email, chat, phone, social
+    priority: text("priority").default("normal").notNull(), // low, normal, high, urgent
+    severity: text("severity").default("normal").notNull(), // low, normal, high, critical
+    status: text("status").default("new").notNull(), // new, open, in_progress, waiting, on_hold, resolved, closed
+    type: text("type").default("support"), // support, bug, complaint, info_request, internal_task
+    component: text("component"),
+    groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
+    parentTicketId: text("parent_ticket_id"),
+    slaDeadlineAt: timestamp("sla_deadline_at", { mode: "date" }),
+    // An SLA defines two promises and the ticket only ever tracked one of them, so
+    // first-response compliance was unmeasurable (audit rilievo D-01).
+    firstResponseDueAt: timestamp("first_response_due_at", { mode: "date" }),
+    firstResponseBreachedAt: timestamp("first_response_breached_at", { mode: "date" }),
+    slaPausedAt: timestamp("sla_paused_at", { mode: "date" }),
+    slaPauseMinutes: integer("sla_pause_minutes").default(0).notNull(),
+    slaBreachedAt: timestamp("sla_breached_at", { mode: "date" }),
+    // How far into the window the team has already been warned: 0, then 50, then
+    // 80. Without it the job would say the same thing every fifteen minutes.
+    slaWarnLevel: integer("sla_warn_level").default(0).notNull(),
+    contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    // Which order this is about, when it is about one. Support and sales did not
+    // touch anywhere: an agent reading "my order has not arrived" had no way to say
+    // which order, and the order had no way to know somebody had complained.
+    orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+    assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+    ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+    slaId: text("sla_id").references(() => slas.id, { onDelete: "set null" }),
+    firstResponseAt: timestamp("first_response_at", { mode: "date" }),
+    resolvedAt: timestamp("resolved_at", { mode: "date" }),
+    closedAt: timestamp("closed_at", { mode: "date" }),
+    tags: text("tags").array().default([]),
+    /** The customer’s way in: the status page and the rating links carry it (src/lib/ticket-public.ts). */
+    publicToken: text("public_token"),
+    /** "good" | "bad", from the customer, once asked (migration 0046). */
+    csatRating: text("csat_rating"),
+    csatComment: text("csat_comment"),
+    csatRatedAt: timestamp("csat_rated_at", { mode: "date" }),
+    /** When the rating was asked for: it is asked once per ticket, and this is the claim. */
+    csatRequestedAt: timestamp("csat_requested_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("ticket_public_token_idx").on(t.publicToken)],
+);
 
 export const ticketMessages = pgTable("ticket_message", {
   id: text("id")
@@ -1573,6 +1715,94 @@ export const businessCalendar = pgTable("business_calendar", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/**
+ * One workspace's own settings, a value per key.
+ *
+ * In the workspace's database, not in `tenants.settings` on the platform: that column is a
+ * JSON string the platform panel writes whole, so a key it does not know would be dropped
+ * the first time somebody changed the workspace's emoji. See src/lib/workspace-features.ts.
+ */
+/**
+ * Who changed which field of a deal, contact or company, from what to what — one row per
+ * field per save, read by the record's timeline (src/lib/field-history.ts). Values are text:
+ * an id stays an id and is named when read. Migration 0035.
+ */
+export const fieldChanges = pgTable(
+  "field_change",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    field: text("field").notNull(),
+    oldValue: text("old_value"),
+    newValue: text("new_value"),
+    changedBy: text("changed_by"),
+    changedAt: timestamp("changed_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [index("field_change_entity_idx").on(t.entityType, t.entityId, t.changedAt)],
+);
+
+/**
+ * A row of the work list somebody put aside until a date (src/actions/next-actions.ts).
+ * Personal: one person's "not today" hides nothing from anybody else. Migration 0036.
+ */
+export const nextActionSnoozes = pgTable(
+  "next_action_snooze",
+  {
+    userId: text("user_id").notNull(),
+    kind: text("kind").notNull(),
+    entityId: text("entity_id").notNull(),
+    until: timestamp("until", { mode: "date" }).notNull(),
+  },
+  (t) => [primaryKey({ name: "next_action_snooze_pk", columns: [t.userId, t.kind, t.entityId] })],
+);
+
+/**
+ * The Bcc address that files a person's own email on the records it was sent to
+ * (src/lib/mail-archive.ts). The token is the credential: rotating it retires the old
+ * address at once. Migration 0039.
+ */
+export const mailArchiveAddresses = pgTable(
+  "mail_archive_address",
+  {
+    userId: text("user_id").primaryKey(),
+    token: text("token").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("mail_archive_address_token_idx").on(t.token)],
+);
+
+/**
+ * A machine-to-machine key of this workspace, with what it may do (src/lib/api-keys.ts,
+ * src/lib/api-scopes.ts). Only the SHA-256 of the key is kept; `hint` is its last four
+ * characters, so a person can tell two keys apart without either being readable.
+ */
+export const apiKeys = pgTable(
+  "api_key",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    hash: text("hash").notNull(),
+    hint: text("hint").notNull(),
+    scopes: text("scopes").array().default([]).notNull(),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at", { mode: "date" }),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+  },
+  (t) => [uniqueIndex("api_key_hash_idx").on(t.hash)],
+);
+
+export const workspaceSettings = pgTable("workspace_setting", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const businessHolidays = pgTable("business_holiday", {
   id: text("id")
     .primaryKey()
@@ -1623,6 +1853,8 @@ export const webhooks = pgTable("webhook", {
   secret: text("secret"), // for HMAC signature verification
   isActive: boolean("is_active").default(true).notNull(),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  // The API key that subscribed it through /api/crm/webhooks; revoking the key switches it off.
+  apiKeyId: text("api_key_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -1837,6 +2069,33 @@ export const dmMessages = pgTable("dm_message", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/**
+ * A file sent in a chat message. Its bytes are in object storage under `storageKey`
+ * (src/lib/storage.ts); the row is what makes them reachable, and only to members of
+ * the conversation (`conversationId` is kept here so that check is one join, not two).
+ * Migration `0050_a_file_in_the_chat`.
+ */
+export const dmAttachments = pgTable(
+  "dm_attachment",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    messageId: text("message_id")
+      .notNull()
+      .references(() => dmMessages.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => dmConversations.id, { onDelete: "cascade" }),
+    storageKey: text("storage_key").notNull(),
+    name: text("name").notNull(),
+    mimeType: text("mime_type").notNull(),
+    size: integer("size").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [index("dm_attachment_message_idx").on(t.messageId)],
+);
+
 // ─── DM relations ─────────────────────────────────────────────────────────────
 
 export const dmConversationsRelations = relations(dmConversations, ({ many }) => ({
@@ -1852,9 +2111,14 @@ export const dmConversationMembersRelations = relations(dmConversationMembers, (
   user: one(users, { fields: [dmConversationMembers.userId], references: [users.id] }),
 }));
 
-export const dmMessagesRelations = relations(dmMessages, ({ one }) => ({
+export const dmMessagesRelations = relations(dmMessages, ({ one, many }) => ({
   conversation: one(dmConversations, { fields: [dmMessages.conversationId], references: [dmConversations.id] }),
   sender: one(users, { fields: [dmMessages.senderId], references: [users.id] }),
+  attachments: many(dmAttachments),
+}));
+
+export const dmAttachmentsRelations = relations(dmAttachments, ({ one }) => ({
+  message: one(dmMessages, { fields: [dmAttachments.messageId], references: [dmMessages.id] }),
 }));
 
 // ─── Appointments ─────────────────────────────────────────────────────────────
@@ -1881,9 +2145,67 @@ export const appointments = pgTable("appointment", {
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
   reminderMinutes: integer("reminder_minutes"),
+  // The start of the occurrence the in-app reminder last went out for. A moved
+  // appointment, or the next occurrence of a series, no longer matches it and so
+  // reminds again (src/lib/appointment-reminders.ts).
+  reminderSentFor: timestamp("reminder_sent_for", { mode: "date" }),
+  // All day: start is midnight of the first day and end midnight after the last,
+  // both in `timezone`, as iCalendar's DATE values mean.
+  allDay: boolean("all_day").default(false).notNull(),
+  // An RFC 5545 RRULE without its "RRULE:" prefix; null for a single occurrence.
+  // Parsed and expanded by src/lib/recurrence.ts, which is the subset it supports.
+  recurrenceRule: text("recurrence_rule"),
+  // Starts of occurrences removed from the series (EXDATE), as ISO instants.
+  recurrenceExceptions: text("recurrence_exceptions").array(),
+  // The series an occurrence was detached from when it alone was edited.
+  recurrenceParentId: text("recurrence_parent_id"),
+  // "link" when a visitor booked it through a booking link (src/lib/booking.ts): one such per
+  // organiser and start, by a unique index in migration 0041.
+  bookedVia: text("booked_via"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/**
+ * A person's public booking page: when they can be booked, for how long, and the token in
+ * its address (src/lib/booking.ts). Migration 0041.
+ */
+export const bookingLinks = pgTable(
+  "booking_link",
+  {
+    userId: text("user_id").primaryKey(),
+    token: text("token").notNull(),
+    enabled: boolean("enabled").default(false).notNull(),
+    title: text("title"),
+    durationMinutes: integer("duration_minutes").default(30).notNull(),
+    daysAhead: integer("days_ahead").default(14).notNull(),
+    dayStart: text("day_start").default("09:00").notNull(),
+    dayEnd: text("day_end").default("18:00").notNull(),
+    weekdays: text("weekdays").default("12345").notNull(),
+    bufferMinutes: integer("buffer_minutes").default(0).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("booking_link_token_idx").on(t.token)],
+);
+
+/**
+ * The workspace's public forms (src/lib/web-forms.ts): `kind` "lead" files a lead, "ticket"
+ * opens a ticket. One of each; the id is the token in the address. Migration 0042.
+ */
+export const webForms = pgTable(
+  "web_form",
+  {
+    id: text("id").primaryKey(),
+    kind: text("kind").notNull(),
+    enabled: boolean("enabled").default(false).notNull(),
+    // Who the leads are given to, or who is told of a ticket; nobody when null.
+    ownerId: text("owner_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("web_form_kind_idx").on(t.kind)],
+);
 
 export const appointmentAttendees = pgTable("appointment_attendee", {
   id: text("id")
@@ -1946,6 +2268,135 @@ export const salesTargets = pgTable(
 export const salesTargetsRelations = relations(salesTargets, ({ one }) => ({
   user: one(users, { fields: [salesTargets.userId], references: [users.id] }),
 }));
+
+// ── A person's own mailbox (V3.2) ─────────────────────────────────────────────
+// Google or Microsoft, behind src/lib/mail-providers/. Migration 0052.
+
+export const mailConnections = pgTable(
+  "mail_connection",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // google | microsoft
+    /** The address the mailbox sends as. */
+    email: text("email").notNull(),
+    /** Encrypted with the platform key (src/lib/tenant-db.ts), like every credential. */
+    accessToken: text("access_token").notNull(),
+    refreshToken: text("refresh_token"),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    scopes: text("scopes").default("").notNull(),
+    status: text("status").default("active").notNull(), // active | revoked
+    lastError: text("last_error"),
+    lastErrorAt: timestamp("last_error_at", { mode: "date" }),
+    /** Where reading the mailbox resumes; the provider's own format. */
+    mailCursor: text("mail_cursor"),
+    mailSyncedAt: timestamp("mail_synced_at", { mode: "date" }),
+    busySyncedAt: timestamp("busy_synced_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("mail_connection_user").on(t.userId)],
+);
+
+/** Busy time at the provider: bare intervals, replaced whole at each read. */
+export const mailBusy = pgTable(
+  "mail_busy",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => mailConnections.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    startAt: timestamp("start_at", { mode: "date" }).notNull(),
+    endAt: timestamp("end_at", { mode: "date" }).notNull(),
+  },
+  (t) => [index("mail_busy_user_start").on(t.userId, t.startAt)],
+);
+
+/** Which provider event stands for which appointment. No foreign key to the appointment on purpose. */
+export const appointmentMirrors = pgTable(
+  "appointment_mirror",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    appointmentId: text("appointment_id").notNull(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => mailConnections.id, { onDelete: "cascade" }),
+    externalId: text("external_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("appointment_mirror_unique").on(t.appointmentId, t.connectionId)],
+);
+
+// ── Commissions (L8) ──────────────────────────────────────────────────────────
+// Accrued on the won deal (D6). See src/lib/commissions.ts; migration 0051.
+
+/** A rate from a day, for one person (or everyone) in one pipeline (or all). */
+export const commissionRules = pgTable(
+  "commission_rule",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+    pipelineId: text("pipeline_id").references(() => pipelines.id, { onDelete: "cascade" }),
+    ratePercent: numeric("rate_percent", { precision: 5, scale: 2 }).notNull(),
+    /** YYYY-MM-DD on the workspace's clock. */
+    validFrom: text("valid_from").notNull(),
+    createdBy: text("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("commission_rule_scope_from").on(
+      sql`coalesce(${t.userId}, '')`,
+      sql`coalesce(${t.pipelineId}, '')`,
+      t.validFrom,
+    ),
+  ],
+);
+
+/** An approved month: its lines are what was paid. */
+export const commissionStatements = pgTable(
+  "commission_statement",
+  {
+    id: text("id").primaryKey(),
+    /** A month key, "2026-09". */
+    period: text("period").notNull(),
+    approvedBy: text("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex("commission_statement_period").on(t.period)],
+);
+
+/** One won deal in an approved month, as it stood when the month was approved. */
+export const commissionLines = pgTable(
+  "commission_line",
+  {
+    id: text("id").primaryKey(),
+    statementId: text("statement_id")
+      .notNull()
+      .references(() => commissionStatements.id, { onDelete: "cascade" }),
+    dealId: text("deal_id").references(() => deals.id, { onDelete: "set null" }),
+    dealName: text("deal_name").notNull(),
+    userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+    ruleId: text("rule_id"),
+    wonAt: timestamp("won_at", { mode: "date" }).notNull(),
+    base: numeric("base", { precision: 12, scale: 2 }).notNull(),
+    /** Null when no rule applied, or nobody owned the deal: won, and nobody is paid for it. */
+    ratePercent: numeric("rate_percent", { precision: 5, scale: 2 }),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  },
+  (t) => [uniqueIndex("commission_line_deal").on(t.dealId), index("commission_line_statement").on(t.statementId)],
+);
 
 // ── Deal Comments ─────────────────────────────────────────────────────────────
 

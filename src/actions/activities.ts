@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, gte, isNotNull, lte, or } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
-import { activities, contacts, leads, users } from "@/db/schema";
+import { activities, tasks, users } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
-import { sendCallInviteEmail } from "@/lib/email";
+import { activityTypeFor, outcomeFor, taskTypeOf } from "@/lib/task-kinds";
 import { getDb } from "@/lib/tenant-context";
 
 export async function createActivity(data: {
@@ -27,34 +27,12 @@ export async function createActivity(data: {
   if (data.companyId) revalidatePath(`/dashboard/companies/${data.companyId}`);
   if (data.dealId) revalidatePath(`/dashboard/pipeline`);
 
-  // For call activities with a linked contact or lead, send them an email invite
-  if (data.type === "call" && data.date && data.content) {
-    if (data.contactId) {
-      const [contact] = await db
-        .select({ email: contacts.email, firstName: contacts.firstName, lastName: contacts.lastName })
-        .from(contacts)
-        .where(eq(contacts.id, data.contactId));
-      if (contact?.email) {
-        const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "there";
-        sendCallInviteEmail(contact.email, name, data.content, data.date).catch(() => {
-          // The activity is recorded either way; a failed courtesy email is not
-          // a reason to fail the thing the user asked for.
-        });
-      }
-    } else if (data.leadId) {
-      const [lead] = await db
-        .select({ email: leads.email, firstName: leads.firstName, lastName: leads.lastName })
-        .from(leads)
-        .where(eq(leads.id, data.leadId));
-      if (lead?.email) {
-        const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there";
-        sendCallInviteEmail(lead.email, name, data.content, data.date).catch(() => {
-          // See above: the invitation is a courtesy, the record is the point.
-        });
-      }
-    }
-  }
-
+  // ⚠️⚠️ Logging an activity never writes to the customer. A call used to send the
+  // contact an email whose topic was the activity's content — and the timeline form
+  // stamps every entry with "now", so every call logged with a note mailed that note,
+  // internal remarks included, to the person it was about. What a salesperson writes
+  // here is for colleagues. Inviting a customer is an appointment, which says so on
+  // the screen and carries an iCalendar invitation (see src/actions/appointments.ts).
   return result[0];
 }
 
@@ -66,6 +44,7 @@ export async function getActivitiesByLead(leadId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      outcome: activities.outcome,
       date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
@@ -84,6 +63,7 @@ export async function getActivitiesByContact(contactId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      outcome: activities.outcome,
       date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
@@ -102,6 +82,7 @@ export async function getActivitiesByDeal(dealId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      outcome: activities.outcome,
       date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
@@ -124,6 +105,7 @@ export async function getActivitiesByCompany(companyId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      outcome: activities.outcome,
       date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
@@ -153,66 +135,48 @@ export async function deleteActivity(id: string, revalidatePathStr?: string) {
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
 }
 
-// Returns call/meeting activities scheduled for today (for cron day-of reminders)
-export async function getActivitiesDueToday() {
-  const db = await getDb();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-
-  return await db
-    .select({
-      id: activities.id,
-      type: activities.type,
-      content: activities.content,
-      date: activities.date,
-      ownerId: activities.ownerId,
-      contactId: activities.contactId,
-      leadId: activities.leadId,
-      companyId: activities.companyId,
-    })
-    .from(activities)
-    .where(
-      and(
-        isNotNull(activities.date),
-        gte(activities.date, start),
-        lte(activities.date, end),
-        or(eq(activities.type, "call"), eq(activities.type, "meeting")),
-      ),
-    );
-}
+const CONTACT_TARGETS = { deal: "dealId", lead: "leadId", company: "companyId", contact: "contactId" } as const;
 
 /**
- * Returns activities whose reminder should fire within the next `windowMinutes`.
- * Called by the cron worker every minute: finds activities where
- *   (date - reminderMinutes) is between now and now+windowMinutes.
+ * A contact logged from the work queue: what kind, how it went, what was said, and the next
+ * step if there is one — the same answer "How did it go?" gives for a task, for a contact
+ * that had no task behind it.
  */
-export async function getActivitiesWithPendingReminder(windowMinutes = 2) {
+export async function logContactAction(input: {
+  target: { entity: keyof typeof CONTACT_TARGETS; id: string };
+  type: string;
+  outcome?: string | null;
+  note?: string | null;
+  next?: { type?: string; title: string; dueDate?: Date | null; allDay?: boolean } | null;
+}): Promise<void> {
+  const actor = await requireWriteAccess();
+  const column = CONTACT_TARGETS[input.target.entity];
+  if (!column || !input.target.id) throw new Error("Invalid record.");
   const db = await getDb();
-  const now = new Date();
-  const ahead = new Date(now.getTime() + windowMinutes * 60_000);
-
-  return await db
-    .select({
-      id: activities.id,
-      type: activities.type,
-      content: activities.content,
-      date: activities.date,
-      reminderMinutes: activities.reminderMinutes,
-      ownerId: activities.ownerId,
-      contactId: activities.contactId,
-      leadId: activities.leadId,
-      companyId: activities.companyId,
-    })
-    .from(activities)
-    .where(and(isNotNull(activities.date), isNotNull(activities.reminderMinutes)))
-    // Filter in JS: date - reminderMinutes is in [now, ahead]
-    .then((rows) =>
-      rows.filter((r) => {
-        if (!r.date || r.reminderMinutes == null) return false;
-        const fireAt = new Date(r.date.getTime() - r.reminderMinutes * 60_000);
-        return fireAt >= now && fireAt <= ahead;
-      }),
-    );
+  const kind = taskTypeOf(input.type);
+  const link = { [column]: input.target.id };
+  const note = input.note?.trim();
+  await db.insert(activities).values({
+    type: activityTypeFor(kind),
+    content: note || null,
+    outcome: outcomeFor(kind, input.outcome),
+    date: new Date(),
+    ownerId: actor.user.id,
+    ...link,
+  });
+  const title = input.next?.title?.trim();
+  if (title) {
+    await db.insert(tasks).values({
+      title,
+      type: taskTypeOf(input.next?.type),
+      dueDate: input.next?.dueDate ?? null,
+      allDay: input.next?.allDay ?? true,
+      ownerId: actor.user.id,
+      assigneeId: actor.user.id,
+      ...link,
+    });
+  }
+  const base = { deal: "pipeline", lead: "leads", company: "companies", contact: "contacts" }[input.target.entity];
+  revalidatePath(`/dashboard/${base}/${input.target.id}`);
+  revalidatePath("/dashboard/crm");
 }

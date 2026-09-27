@@ -23,12 +23,13 @@ export function MetricCard({
   const t = useTranslations("metricCard");
   return (
     <Card className={className}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-400">{label}</CardTitle>
-        <Icon className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+      {/* Tighter below `sm`, where these sit two to a row with ~120px of content each. */}
+      <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 px-4 pb-2 sm:px-6">
+        <CardTitle className="min-w-0 text-sm font-medium text-gray-600 dark:text-gray-400">{label}</CardTitle>
+        <Icon className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+      <CardContent className="px-4 sm:px-6">
+        <div className="break-words text-xl font-bold tabular-nums sm:text-2xl">{value}</div>
         {description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>}
         {trend !== "neutral" && (
           <div className={`text-xs font-medium mt-2 ${trend === "up" ? "text-green-600" : "text-red-600"}`}>

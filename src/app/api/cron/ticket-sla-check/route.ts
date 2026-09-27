@@ -140,8 +140,8 @@ export async function GET(req: Request) {
         return [...recipients].map((userId) => ({
           userId,
           type: "sla_breach",
-          title: `SLA missed — ${t.ticketNumber}`,
-          message: t.subject,
+          key: "slaBreach" as const,
+          params: { ticket: t.ticketNumber, subject: t.subject },
           link: `/dashboard/support/tickets/${t.id}`,
         }));
       });
@@ -229,8 +229,8 @@ export async function GET(req: Request) {
         return recipients.map((userId) => ({
           userId,
           type: "sla_warning",
-          title: `${w.label} of the SLA used — ${w.ticket.ticketNumber}`,
-          message: w.ticket.subject,
+          key: "slaWarning" as const,
+          params: { percent: w.label, ticket: w.ticket.ticketNumber, subject: w.ticket.subject },
           link: `/dashboard/support/tickets/${w.ticket.id}`,
         }));
       });
@@ -238,6 +238,26 @@ export async function GET(req: Request) {
       if (rows.length > 0) await notifyMany(rows).catch(() => undefined);
     }
 
-    return { breached: active.length, warned: warnings.length };
+    // ── A first answer that is late ───────────────────────────────────────────
+    // ⚠️ Nothing wrote this column before, so the overview's first-response gauge read
+    // 100% for ever and no report could say who kept customers waiting for a reply. An
+    // answer given late is stamped when it is sent (addTicketMessageAction); this is the
+    // other half, the answer still not given. One statement, whatever the count.
+    const firstLate = await db
+      .update(tickets)
+      .set({ firstResponseBreachedAt: now })
+      .where(
+        and(
+          isNotNull(tickets.firstResponseDueAt),
+          lt(tickets.firstResponseDueAt, now),
+          isNull(tickets.firstResponseAt),
+          isNull(tickets.firstResponseBreachedAt),
+          isNull(tickets.slaPausedAt),
+          inArray(tickets.status, OPEN_STATUSES),
+        ),
+      )
+      .returning({ id: tickets.id });
+
+    return { breached: active.length, warned: warnings.length, firstResponseLate: firstLate.length };
   });
 }

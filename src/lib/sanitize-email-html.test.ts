@@ -15,6 +15,12 @@ const EXECUTES = [
   "<script>alert(1)</script>",
   "<SCRIPT >alert(1)</SCRIPT>",
   "<img src=x onerror=alert(1)>",
+  // A slash separates attributes as well as a space does.
+  '<img src="/x"/onerror="alert(1)">',
+  // A space inside the quoted value: only the rule for quoted handlers takes it whole.
+  '<img src=x/onerror="window.x=1 ;alert(1)">',
+  '<svg><a/href="javascript:alert(1)">x</a></svg>',
+  '<div/style="background:url(javascript:alert(1))">x</div>',
   '<img src="x" onerror="alert(1)">',
   // A space inside the value, with the payload after it. The rule for unquoted
   // attributes stops at the first space, so only the quoted rule removes the

@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { ChevronLeft } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getQuoteById } from "@/actions/quotes";
 import { auth } from "@/auth";
 import { QuoteDetail } from "@/components/crm/quote-detail";
+import { RecordBackLink, RecordPage } from "@/components/crm/record/record-page";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { documentLanguage } from "@/lib/document-language";
 
@@ -15,6 +14,12 @@ interface Props {
   searchParams: Promise<{ send?: string }>;
 }
 
+/**
+ * One quote, on the plan every record page follows (see the deal page): the hero
+ * and its figures, then the lines as the work and the customer, the tracking and
+ * the history beside them. The layout is in `QuoteDetail`, a client component
+ * because its actions open dialogs; this page loads the data and the drafts.
+ */
 export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { send } = await searchParams;
@@ -46,17 +51,9 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <RecordPage>
       <RecordVisit type="quote" id={quote.id} label={quote.quoteNumber} sub={quote.company?.name ?? null} />
-      <div>
-        <Link
-          href="/dashboard/sales/quotes"
-          className="inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          {t("backToQuotes")}
-        </Link>
-      </div>
+      <RecordBackLink href="/dashboard/sales/quotes">{t("backToQuotes")}</RecordBackLink>
       <QuoteDetail
         quote={quote}
         autoOpenSend={send === "1"}
@@ -64,6 +61,6 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
         customerLanguage={customerLanguage}
         customerDrafts={customerDrafts}
       />
-    </div>
+    </RecordPage>
   );
 }

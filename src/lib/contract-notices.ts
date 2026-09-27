@@ -91,15 +91,19 @@ export async function sendContractNotices(db: AnyDb, on = today()) {
     if (claimed.length === 0) continue; // another run got there first
 
     const deadline = noticeDeadline(end, terms.noticeDays);
-    const message = terms.autoRenew
-      ? `It renews itself on ${addDays(end, 1)} unless notice is given by ${deadline}.`
-      : `It ends on ${end}. Notice to renew or cancel is due by ${deadline}.`;
+    const params = {
+      title: row.title,
+      autoRenew: terms.autoRenew ? "yes" : "no",
+      renewsOn: addDays(end, 1),
+      end,
+      deadline,
+    };
     try {
       await notify({
         userId: recipient,
         type: "contract_renewal",
-        title: `Contract "${row.title}" is due for a decision`,
-        message,
+        key: "contractRenewal",
+        params,
         link: "/dashboard/sales/contracts?view=renewal_due",
       });
       notified++;

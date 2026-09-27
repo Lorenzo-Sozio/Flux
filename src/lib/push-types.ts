@@ -22,11 +22,30 @@ export const PUSH_TYPES = {
   sla_warning: { defaultOn: true },
   contract_renewal: { defaultOn: true },
   sequence_reply: { defaultOn: true },
+  // A customer a person owns has written to them: the answer is theirs to give.
+  email_reply: { defaultOn: true },
+  // The customer acted on a quote from its own page: the moment to call is now (§7.1).
+  quote_viewed: { defaultOn: true },
+  quote_accepted: { defaultOn: true },
+  quote_declined: { defaultOn: true },
+  appointment_reminder: { defaultOn: true },
+  // A visitor booked time in this person's calendar from their booking page (V3.5): it is
+  // their day that changed, and somebody is expecting them.
+  booking_received: { defaultOn: true },
   deal_won: { defaultOn: false },
+  // A customer said a resolved ticket did not go well (V3.10). Off: the bell has it, and it
+  // is something to read in the morning, not to be woken for.
+  ticket_rated_bad: { defaultOn: false },
+  // Off: a colleague finishing something is news, not an alarm.
+  task_completed: { defaultOn: false },
   quote_approval_requested: { defaultOn: false },
   quote_approved: { defaultOn: false },
   quote_rejected: { defaultOn: false },
   chat_message: { defaultOn: false },
+  // A colleague naming this person in a chat (@Nome). On: it is addressed to them by name,
+  // which is the one kind of chat message that is theirs to answer, and it reaches them
+  // even through a muted conversation.
+  chat_mention: { defaultOn: true },
   direct: { defaultOn: false },
   group: { defaultOn: false },
   note: { defaultOn: false },

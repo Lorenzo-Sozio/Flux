@@ -56,6 +56,14 @@ export function validateWebhookUrl(raw: string): string | null {
     return "Webhook URL must not point to a private or reserved network address.";
   }
 
+  // ⚠️⚠️ `localhost` is the machine itself. It was exempted from the no-dot check below so
+  // development could post to a local receiver, and nothing else refused it — so it passed
+  // in production too, for settings webhooks and rule webhooks alike.
+  const host = u.hostname.toLowerCase();
+  if (!isDev && (host === "localhost" || host.endsWith(".localhost"))) {
+    return "Webhook URL must not point to a private or reserved network address.";
+  }
+
   // Reject bare hostnames without a dot (e.g. "http://internal/")
   if (!u.hostname.includes(".") && u.hostname !== "localhost") {
     return "Webhook URL must include a fully-qualified domain name.";

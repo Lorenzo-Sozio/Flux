@@ -60,13 +60,14 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
     .from(leads)
     .where(and(eq(leads.isConverted, true), isNotNull(leads.convertedAt), gte(leads.createdAt, since), byLead));
 
-  // Avg days from deal creation → won (updated_at is refreshed on every stage change)
+  // Avg days from deal creation to the day it was won. `closedAt`, not `updatedAt`: the
+  // latter moves on every edit, so any note added to an old won deal lengthened its cycle.
   const [dealCycleRow] = await db
     .select({
-      avgDays: sql<number>`AVG(EXTRACT(EPOCH FROM (${deals.updatedAt} - ${deals.createdAt})) / 86400)`.as("avg_days"),
+      avgDays: sql<number>`AVG(EXTRACT(EPOCH FROM (${deals.closedAt} - ${deals.createdAt})) / 86400)`.as("avg_days"),
     })
     .from(deals)
-    .where(and(eq(deals.status, "won"), gte(deals.createdAt, since), byDeal));
+    .where(and(eq(deals.status, "won"), isNotNull(deals.closedAt), gte(deals.createdAt, since), byDeal));
 
   // Lead source breakdown
   const sourceRows = await db

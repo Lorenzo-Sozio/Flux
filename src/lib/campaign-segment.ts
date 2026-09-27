@@ -1,6 +1,7 @@
 import { and, eq, inArray, or } from "drizzle-orm";
 
 import { contacts, customFieldDefinitions, customFilters, leads } from "@/db/schema";
+import { notWithAssistant } from "@/lib/assistant-handling";
 import { buildWhereClause, CONTACT_FIELDS, customFieldsToRegistry, LEAD_FIELDS } from "@/lib/filter-engine";
 import type { FilterTree } from "@/lib/filter-types";
 import { getDb } from "@/lib/tenant-context";
@@ -87,14 +88,14 @@ export async function resolveSegmentIds(
     const rows = await db
       .select({ id: contacts.id })
       .from(contacts)
-      .where(and(eq(contacts.marketingConsent, true), clause));
+      .where(and(eq(contacts.marketingConsent, true), notWithAssistant.contacts, clause));
     return rows.map((r) => r.id);
   }
 
   const rows = await db
     .select({ id: leads.id })
     .from(leads)
-    .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), clause));
+    .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), notWithAssistant.leads, clause));
   return rows.map((r) => r.id);
 }
 

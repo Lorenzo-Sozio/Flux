@@ -10,7 +10,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const regole: { entityType: string; entityId: string; event: string }[] = [];
-let aperti: { id: string; status: string; name: string }[] = [];
+let aperti: { id: string; status: string; name: string; stageId?: string }[] = [];
 const scritti: Record<string, unknown>[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: ["c1"] };
 
@@ -35,7 +35,9 @@ vi.mock("next/server", async () => {
   return { ...vero, after: (fn: () => unknown) => fn() };
 });
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: { via: "apikey", userId: null, role: "editor", tenantId: "t1", scopes: null },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -45,7 +47,13 @@ vi.mock("@/lib/contact-point", async () => {
 });
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
-    select: () => ({ from: () => ({ where: async () => aperti }) }),
+    // The deals are awaited from where(); the losing stage is asked for with limit(1).
+    select: () => ({
+      from: () => ({
+        where: () => Object.assign(Promise.resolve(aperti), { limit: async () => [{ id: "lost-stage" }] }),
+      }),
+    }),
+    insert: () => ({ values: async () => undefined }),
     update: () => ({
       set: (valori: Record<string, unknown>) => {
         scritti.push(valori);
@@ -69,7 +77,7 @@ function richiesta(body: unknown) {
 beforeEach(() => {
   regole.length = 0;
   scritti.length = 0;
-  aperti = [{ id: "d1", status: "open", name: "Bagno" }];
+  aperti = [{ id: "d1", status: "open", name: "Bagno", stageId: "proposta" }];
   person = { leadIds: [], contactIds: ["c1"] };
 });
 
@@ -83,6 +91,8 @@ describe("closing what the assistant stopped following", () => {
     expect(scritti[0].status).toBe("lost");
     expect(String(scritti[0].lostReason)).toContain("nessuna risposta");
     expect(scritti[0].closedAt).toBeInstanceOf(Date);
+    // Into the losing column, remembering where it was lost — as the dashboard does.
+    expect(scritti[0]).toMatchObject({ stageId: "lost-stage", lostAtStageId: "proposta" });
   });
 
   it("⚠️⚠️ a process that reached its destination leaves the deal alone", async () => {

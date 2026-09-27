@@ -13,6 +13,8 @@ const aggiornamenti: { id: string; valori: Record<string, unknown> }[] = [];
 /** The lines saying who called the route. */
 const scritture: Record<string, unknown>[] = [];
 const emessi: { evento: string; carico: unknown }[] = [];
+/** The rules the route asked for, and in which workspace. */
+const regole: { tenantId: string; ctx: Record<string, unknown> }[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: ["l1"], contactIds: [] };
 
 vi.mock("@/lib/billing/usage", () => ({
@@ -20,7 +22,9 @@ vi.mock("@/lib/billing/usage", () => ({
   EntitlementError: class extends Error {},
 }));
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: { via: "apikey", userId: null, role: "editor", tenantId: "t1", scopes: null },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -28,9 +32,14 @@ vi.mock("@/lib/contact-point", async () => {
   const vero = await vi.importActual<typeof import("@/lib/contact-point")>("@/lib/contact-point");
   return { ...vero, findByContactPoint: async () => ({ ...person, email: null, digits: null }) };
 });
-vi.mock("@/actions/webhooks", () => ({
+vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: (evento: string, carico: unknown) => {
     emessi.push({ evento, carico });
+  },
+}));
+vi.mock("@/lib/api-automations", () => ({
+  runRulesAfterApiWrite: (tenantId: string, ctx: Record<string, unknown>) => {
+    regole.push({ tenantId, ctx });
   },
 }));
 vi.mock("@/lib/api-write-log", () => ({
@@ -42,6 +51,8 @@ vi.mock("@/lib/api-write-log", () => ({
 /** Un doppio che **dichiara** che cosa restituisce, e registra che cosa gli si scrive. */
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
+    // The row as it was, read before the update so a rule can compare the two.
+    select: () => ({ from: () => ({ where: async () => [{ id: "l1", status: "new", email: "mario@example.it" }] }) }),
     update: () => ({
       set: (valori: Record<string, unknown>) => ({
         where: () => ({
@@ -69,6 +80,7 @@ beforeEach(() => {
   aggiornamenti.length = 0;
   scritture.length = 0;
   emessi.length = 0;
+  regole.length = 0;
   person = { leadIds: ["l1"], contactIds: [] };
 });
 
@@ -127,5 +139,21 @@ describe("lo stadio del lead", () => {
 
     expect(emessi.map((e) => e.evento)).toEqual(["lead.updated"]);
     expect(scritture[0]).toMatchObject({ entity: "lead", endpoint: "/api/crm/leads/stage" });
+  });
+
+  it("⚠️⚠️ fa scattare le regole del workspace, con lo stadio di prima e quello di dopo", async () => {
+    // Uno stadio mosso dalla dashboard fa partire le regole («quando un lead diventa
+    // qualificato, assegnalo»); mosso da un'integrazione non faceva partire niente.
+    await POST(richiesta({ contactPoint: "+39 333 111 2223", status: "qualified" }));
+
+    expect(regole).toHaveLength(1);
+    expect(regole[0].tenantId).toBe("t1");
+    expect(regole[0].ctx).toMatchObject({
+      entityType: "lead",
+      entityId: "l1",
+      event: "onUpdate",
+      oldData: { status: "new" },
+      newData: { status: "qualified" },
+    });
   });
 });

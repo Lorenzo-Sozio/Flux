@@ -3,9 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { desc, eq, isNull } from "drizzle-orm";
+import { z } from "zod";
 
 import { ConditionEvaluator } from "@/components/crm/automation/condition-evaluator";
-import { type AutomationRuleFormData, AutomationRuleFormSchema } from "@/components/crm/automation/types";
+import { explainConditions, ruleConditionsHold } from "@/components/crm/automation/rule-engine";
+import {
+  type AutomationRuleFormData,
+  AutomationRuleFormSchema,
+  type Condition,
+  ConditionSchema,
+} from "@/components/crm/automation/types";
 import {
   automationLogs,
   automationRules,
@@ -17,8 +24,9 @@ import {
   orders,
   tickets,
 } from "@/db/schema";
-import { requireAdminAccess, requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { AUTOMATION_RECIPES, findRecipe, isPreviewable } from "@/lib/automation-recipes";
+import { dealSignals, lastActivityByDeal } from "@/lib/deal-signals";
 import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
 
@@ -32,7 +40,7 @@ export async function getAutomationRules() {
 }
 
 export async function getAutomationRuleById(id: string) {
-  await requireWriteAccess();
+  await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
   const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, id));
@@ -101,7 +109,7 @@ export async function getAutomationEmailLogs(limit = 100) {
 // ─── Create ───────────────────────────────────────────────────────────────────
 
 export async function createAutomationRule(data: AutomationRuleFormData) {
-  const session = await requireWriteAccess();
+  const actor = await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
 
@@ -122,7 +130,7 @@ export async function createAutomationRule(data: AutomationRuleFormData) {
     conditionLogic,
     conditions: JSON.stringify(conditions),
     actions: JSON.stringify(actions),
-    ownerId: session.user.id,
+    ownerId: actor.userId,
   });
 
   revalidatePath("/dashboard/automation");
@@ -132,7 +140,7 @@ export async function createAutomationRule(data: AutomationRuleFormData) {
 // ─── Update ───────────────────────────────────────────────────────────────────
 
 export async function updateAutomationRule(id: string, data: AutomationRuleFormData) {
-  await requireWriteAccess();
+  await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
 
@@ -165,7 +173,7 @@ export async function updateAutomationRule(id: string, data: AutomationRuleFormD
 // ─── Toggle active ────────────────────────────────────────────────────────────
 
 export async function toggleAutomationRuleActive(id: string, isActive: boolean) {
-  await requireWriteAccess();
+  await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
   await db.update(automationRules).set({ isActive, updatedAt: new Date() }).where(eq(automationRules.id, id));
@@ -176,7 +184,7 @@ export async function toggleAutomationRuleActive(id: string, isActive: boolean) 
 // ─── Delete ───────────────────────────────────────────────────────────────────
 
 export async function deleteAutomationRule(id: string) {
-  await requireAdminAccess();
+  await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
   await db.delete(automationRules).where(eq(automationRules.id, id));
@@ -209,7 +217,7 @@ export async function getRecipeMatchCounts(): Promise<{
   installed: string[];
 }> {
   // The same bar as installing one: whoever is shown the dialog can ask it.
-  await requireWriteAccess();
+  await requireCapability("automation:manage");
   await requirePlanModule("automation");
   const db = await getDb();
 
@@ -268,7 +276,7 @@ export async function installAutomationRecipe(recipeId: string) {
   const recipe = findRecipe(recipeId);
   if (!recipe) return { success: false, error: (await serverT())("automation.noSuchRecipe") };
 
-  await requireWriteAccess();
+  await requireCapability("automation:manage");
   const db = await getDb();
   const [already] = await db
     .select({ id: automationRules.id })
@@ -278,4 +286,86 @@ export async function installAutomationRecipe(recipeId: string) {
   if (already) return { success: false, error: "already-installed" };
 
   return createAutomationRule(recipe.rule);
+}
+
+// ── Test a rule on a record (§8.2) ────────────────────────────────────────────
+
+const TESTABLE: Record<
+  string,
+  {
+    table: typeof deals | typeof leads | typeof contacts | typeof companies | typeof tickets | typeof orders;
+    label: (r: Record<string, unknown>) => string;
+  }
+> = {
+  deal: { table: deals, label: (r) => String(r.name ?? r.id) },
+  lead: { table: leads, label: (r) => `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || String(r.id) },
+  contact: { table: contacts, label: (r) => `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || String(r.id) },
+  company: { table: companies, label: (r) => String(r.name ?? r.id) },
+  ticket: { table: tickets, label: (r) => `${r.ticketNumber ?? ""} ${r.subject ?? ""}`.trim() },
+  order: { table: orders, label: (r) => String(r.orderNumber ?? r.id) },
+};
+
+/** The newest records of a kind, for picking one to test a rule on. */
+export async function recordsForRuleTest(entity: string): Promise<{ id: string; label: string }[]> {
+  await requireCapability("automation:manage");
+  const spec = TESTABLE[entity];
+  if (!spec) return [];
+  const db = await getDb();
+  const rows = (await db.select().from(spec.table).orderBy(desc(spec.table.createdAt)).limit(25)) as Record<
+    string,
+    unknown
+  >[];
+  return rows.map((r) => ({ id: String(r.id), label: spec.label(r) }));
+}
+
+/**
+ * Condition by condition, whether a rule would run on this record — without running it.
+ *
+ * ⚠️ "Why did my rule not fire?" had no answer: a rule that did not apply writes nothing
+ * (rightly), and there was no way to ask. The data is the record as the engine sees it,
+ * with the days without activity the daily run works out for a deal.
+ */
+export async function testRuleAction(input: {
+  entity: string;
+  recordId: string;
+  conditions: Condition[];
+  logic: "AND" | "OR";
+  expression?: string;
+}): Promise<{ holds: boolean; details: { condition: Condition; holds: boolean; actual: unknown }[] } | null> {
+  await requireCapability("automation:manage");
+  const spec = TESTABLE[input.entity];
+  if (!spec) return null;
+  const db = await getDb();
+  const [row] = (await db.select().from(spec.table).where(eq(spec.table.id, input.recordId))) as Record<
+    string,
+    unknown
+  >[];
+  if (!row) return null;
+  let data: Record<string, unknown> = row;
+  if (input.entity === "deal") {
+    const last = lastActivityByDeal(db, new Date());
+    const [a] = await db.select({ at: last.at }).from(last).where(eq(last.dealId, input.recordId));
+    data = {
+      ...row,
+      idleDays: dealSignals({
+        createdAt: row.createdAt as Date,
+        lastActivityAt: a?.at ?? null,
+        hasNextStep: false,
+        nextStepAt: null,
+      }).idleDays,
+    };
+  }
+  const conditions = z.array(ConditionSchema).parse(input.conditions);
+  return {
+    holds: ruleConditionsHold(
+      {
+        conditions: JSON.stringify(conditions),
+        conditionLogic: input.logic,
+        conditionExpression: input.expression ?? "",
+      },
+      data,
+      data,
+    ),
+    details: explainConditions(conditions, data, data),
+  };
 }

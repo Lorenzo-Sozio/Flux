@@ -48,6 +48,7 @@ const STORAGE_KEY = (id: string) => `task_timer_${id}`;
 
 export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHoursChanged }: Props) {
   const t = useTranslations("tasks.timer");
+  const tc = useTranslations("common");
   const locale = useLocale();
   const [logs, setLogs] = useState<TimeLog[]>([]);
   const [running, setRunning] = useState(false);
@@ -155,7 +156,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
   return (
     <div className="space-y-3">
       {/* Hours summary */}
-      <div className="flex items-center gap-4 text-xs">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <div className="flex items-center gap-1">
           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-muted-foreground">{t("estimated")}</span>
@@ -206,8 +207,9 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       </div>
 
       {/* Manual log form */}
+      {/* Wraps on a phone: hours, a note and two buttons left the note ~80px. */}
       {showManual && (
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <Input
             type="number"
             step="0.25"
@@ -221,12 +223,19 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
             value={manualNote}
             onChange={(e) => setManualNote(e.target.value)}
             placeholder={t("notePlaceholder")}
-            className="h-7 text-xs flex-1"
+            className="h-7 text-xs min-w-[8rem] flex-1"
           />
           <Button type="button" size="sm" className="h-7 text-xs" onClick={handleManualLog}>
             {t("log")}
           </Button>
-          <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowManual(false)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs"
+            onClick={() => setShowManual(false)}
+            aria-label={tc("cancel")}
+          >
             ✕
           </Button>
         </div>
@@ -249,7 +258,8 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
               <button
                 type="button"
                 onClick={() => handleDeleteLog(log.id)}
-                className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-all"
+                aria-label={tc("delete")}
+                className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground/40 hover:text-destructive transition-all max-md:-m-3 max-md:p-3"
               >
                 <Trash2 className="h-3 w-3" />
               </button>

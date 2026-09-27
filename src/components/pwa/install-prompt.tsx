@@ -109,7 +109,8 @@ export function InstallPrompt() {
     dismiss();
   }
 
-  // ⚠️ Only on the dashboard. It is a fixed strip above the tab bar, so
+  // ⚠️ Only on the dashboard. It is a fixed strip above the tab bar (its bottom
+  // padding leaves room for the create button raised out of the bar), so
   // anywhere else it covers whatever is under it — and it was covering the
   // status field of an order somebody was in the middle of writing. An offer
   // belongs on the screen you arrive at, not on the one you are working in.
@@ -118,7 +119,7 @@ export function InstallPrompt() {
 
   return (
     <section
-      className="fixed inset-x-0 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom))] z-30 border-t bg-background/95 p-3 backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom))] z-30 border-t bg-background/95 p-3 pb-6 backdrop-blur-md md:hidden"
       aria-label={t("installTitle")}
     >
       <div className="flex items-start gap-3">

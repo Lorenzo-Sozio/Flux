@@ -3,8 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import crypto from "node:crypto";
-
 import { and, asc, count, desc, eq, inArray, isNotNull, lt, ne, notInArray, or, type SQL, sql } from "drizzle-orm";
 import type { z } from "zod";
 
@@ -28,111 +26,25 @@ import {
   tickets,
   users,
 } from "@/db/schema";
+import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { FALLBACK_CALENDAR, loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
-import { addBusinessMinutes } from "@/lib/business-hours";
+import { FALLBACK_CALENDAR, parseWeek } from "@/lib/business-calendar";
 import { sendEmail } from "@/lib/email-provider";
+import { getTenantById } from "@/lib/get-tenant";
+import { can } from "@/lib/permissions";
 import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
-import { tolerateUnmigrated } from "@/lib/schema-ready";
-import { getDb } from "@/lib/tenant-context";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
+import { ticketEventPayload } from "@/lib/ticket-events";
 import { handover } from "@/lib/ticket-handover";
-import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
+import { generateTicketNumber } from "@/lib/ticket-number";
+import { ensurePublicToken, replyFooterHtml, requestRating, statusPageUrl, ticketLanguage } from "@/lib/ticket-public";
+import { resolveSla } from "@/lib/ticket-sla";
+import { becameResolved, statusStamps } from "@/lib/ticket-state-machine";
 import { HANDOVER_CONTENT_CAP, TICKET_THREAD_PAGE } from "@/lib/ticket-thread";
 import { suggestMacros, triage } from "@/lib/ticket-triage";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
-
-// --- HELPERS ---
-
-function generateTicketNumber(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
-  return `TKT-${year}${month}-${random}`;
-}
-
-/**
- * Picks the SLA policy that applies to a ticket, and works out both deadlines.
- *
- * Ticket creation called `calculateSLADeadline(null)` — the argument was hardcoded
- * — so `slaDeadlineAt` was always empty and no ticket ever carried an SLA at all.
- * The policy page, the compliance gauge, the "SLA due" badge and the breach job
- * were therefore all reading a column nothing wrote (audit rilievo D-01).
- *
- * The policy is matched on priority, which is what the `sla.priority` column is
- * for. A ticket whose priority has no policy simply has no deadline, rather than
- * silently inheriting someone else's.
- */
-async function resolveSla(priority: string, from: Date = new Date()) {
-  const db = await getDb();
-
-  // ⚠️⚠️ **Only the columns this needs, named.** `findFirst` selects every column
-  // the schema declares, including ones a migration has not created yet — and a
-  // tenant database is migrated by hand, after the deploy. Reading the whole row
-  // meant that creating a ticket failed outright on a workspace that had not been
-  // migrated, which is the most ordinary thing anyone does here.
-  //
-  // The working-hours switch arrived with migration 0007, so it is asked for
-  // first and dropped on the one workspace-shaped error that means "not yet".
-  // Asking for it separately would have cost a second query on every ticket
-  // created, for ever, to survive a window that closes the first time the
-  // workspace is used.
-  const where = and(eq(slas.priority, priority), eq(slas.isActive, true));
-
-  const row = await tolerateUnmigrated(
-    "SLA working hours",
-    async () => {
-      const [full] = await db
-        .select({
-          id: slas.id,
-          firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
-          resolutionTimeMinutes: slas.resolutionTimeMinutes,
-          useBusinessHours: slas.useBusinessHours,
-        })
-        .from(slas)
-        .where(where)
-        .limit(1);
-      return full ?? null;
-    },
-    null,
-  );
-
-  const sla =
-    row ??
-    (await (async () => {
-      const [base] = await db
-        .select({
-          id: slas.id,
-          firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
-          resolutionTimeMinutes: slas.resolutionTimeMinutes,
-        })
-        .from(slas)
-        .where(where)
-        .limit(1);
-      return base ? { ...base, useBusinessHours: false } : null;
-    })());
-
-  if (!sla) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
-
-  // A policy measured in working minutes needs the workspace's own week. Wall
-  // clock stays the default on existing policies, so nothing already promised
-  // changes meaning without somebody choosing it (audit rilievo S-07).
-  const advance = sla.useBusinessHours
-    ? await (async () => {
-        const calendar = await loadBusinessCalendar(db);
-        return (minutes: number) => addBusinessMinutes(from, minutes, calendar);
-      })()
-    : (minutes: number) => new Date(from.getTime() + minutes * 60_000);
-
-  return {
-    slaId: sla.id,
-    // Two promises, tracked separately. The ticket only ever had one field, so
-    // first-response compliance could not be measured even in principle.
-    firstResponseDueAt: advance(sla.firstResponseTimeMinutes),
-    slaDeadlineAt: advance(sla.resolutionTimeMinutes),
-  };
-}
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
 
 // --- MAIN ACTIONS ---
 
@@ -143,7 +55,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 
   const validated = CreateTicketSchema.parse(data);
   const ticketNumber = generateTicketNumber();
-  const sla = await resolveSla(validated.priority);
+  const sla = await resolveSla(db, validated.priority);
 
   const [ticket] = await db
     .insert(tickets)
@@ -180,6 +92,10 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 
   revalidatePath("/dashboard/support/tickets");
   revalidatePath("/dashboard/support");
+
+  dispatchWebhook("ticket.created", ticketEventPayload(ticket), { via: "user", actor: actor.userId }).catch((err) =>
+    console.error("[support] ticket.created not dispatched", err),
+  );
 
   after(() =>
     runAutomations({
@@ -426,12 +342,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    actor.userId !== ticket.ownerId &&
-    actor.userId !== ticket.assigneeId &&
-    actor.tenantRole !== "admin" &&
-    actor.tenantRole !== "owner"
-  ) {
+  if (actor.userId !== ticket.ownerId && actor.userId !== ticket.assigneeId && !can(actor, "record:manageAny")) {
     throw new Error("Unauthorized");
   }
 
@@ -445,29 +356,17 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
   if (validated.component !== undefined) updateData.component = validated.component;
   if (validated.groupId !== undefined) updateData.groupId = validated.groupId;
 
-  if (validated.status) {
-    if (!canTransition(ticket.status, validated.status)) {
-      throw new Error(`Invalid transition: ${ticket.status} → ${validated.status}`);
-    }
-    updateData.status = validated.status;
-    if (validated.status === "resolved") updateData.resolvedAt = now;
-    if (validated.status === "closed") updateData.closedAt = now;
-
-    // SLA pause/resume
-    if (isSLAPauseStatus(validated.status) && !ticket.slaPausedAt) {
-      updateData.slaPausedAt = now;
-    } else if (!isSLAPauseStatus(validated.status) && ticket.slaPausedAt) {
-      const pausedMs = now.getTime() - ticket.slaPausedAt.getTime();
-      updateData.slaPauseMinutes = (ticket.slaPauseMinutes ?? 0) + Math.floor(pausedMs / 60000);
-      updateData.slaPausedAt = null;
-    }
+  if (validated.status && validated.status !== ticket.status) {
+    const stamps = statusStamps(ticket, validated.status, now);
+    if (!stamps) throw new Error(`Invalid transition: ${ticket.status} → ${validated.status}`);
+    Object.assign(updateData, stamps);
   }
 
   if (validated.priority && validated.priority !== ticket.priority) {
     updateData.priority = validated.priority;
     // Raising a ticket to urgent has to shorten its deadlines, or the policy is
     // whatever it happened to be when the ticket was opened.
-    const sla = await resolveSla(validated.priority, ticket.createdAt);
+    const sla = await resolveSla(db, validated.priority, ticket.createdAt);
     updateData.slaId = sla.slaId;
     updateData.firstResponseDueAt = sla.firstResponseDueAt;
     updateData.slaDeadlineAt = sla.slaDeadlineAt;
@@ -544,6 +443,20 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
     }),
   );
 
+  // Resolved: the customer hears so, and is asked once how it went (src/lib/ticket-public.ts).
+  if (validated.status && becameResolved(ticket.status, validated.status)) {
+    dispatchWebhook("ticket.resolved", ticketEventPayload(updated), { via: "user", actor: actor.userId }).catch((err) =>
+      console.error("[support] ticket.resolved not dispatched", err),
+    );
+    after(async () => {
+      const tenantId = await getCurrentTenantId();
+      const tenant = tenantId ? await getTenantById(tenantId) : null;
+      await requestRating(db, { ticketId, subdomain: tenant?.subdomain ?? null, base: getAppUrlOrNull() }).catch(
+        (err) => console.error("[support] rating not requested:", err),
+      );
+    });
+  }
+
   return { success: true, ticket: updated };
 }
 
@@ -559,18 +472,14 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    actor.userId !== ticket.ownerId &&
-    actor.userId !== ticket.assigneeId &&
-    actor.tenantRole !== "admin" &&
-    actor.tenantRole !== "owner"
-  ) {
+  if (actor.userId !== ticket.ownerId && actor.userId !== ticket.assigneeId && !can(actor, "record:manageAny")) {
     throw new Error("Unauthorized");
   }
 
   // Reply to closed ticket → open new linked ticket instead
   if (ticket.status === "closed") {
     const newNumber = generateTicketNumber();
+    const sla = await resolveSla(db, ticket.priority);
     const [newTicket] = await db
       .insert(tickets)
       .values({
@@ -587,6 +496,9 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
         assigneeId: ticket.assigneeId,
         ownerId: actor.userId,
         parentTicketId: ticket.id,
+        slaId: sla.slaId,
+        firstResponseDueAt: sla.firstResponseDueAt,
+        slaDeadlineAt: sla.slaDeadlineAt,
       })
       .returning();
 
@@ -638,7 +550,13 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
   // Internal notes used to stop the clock too, so the SLA was met by talking to
   // colleagues (audit rilievo D-01).
   if (!ticket.firstResponseAt && validated.isPublic !== false) {
-    ticketUpdates.firstResponseAt = new Date();
+    const answeredAt = new Date();
+    ticketUpdates.firstResponseAt = answeredAt;
+    // ⚠️ Nothing used to write this: the breach job looks only at resolution, so a late
+    // first answer was invisible to the overview and to every report built on it.
+    if (ticket.firstResponseDueAt && answeredAt > ticket.firstResponseDueAt && !ticket.firstResponseBreachedAt) {
+      ticketUpdates.firstResponseBreachedAt = answeredAt;
+    }
   }
   // Auto-move from 'new' to 'open' on first agent reply
   if (ticket.status === "new") ticketUpdates.status = "open";
@@ -664,6 +582,18 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
       const customerEmail = contact?.email ?? null;
       if (!customerEmail) return;
 
+      const tenantId = await getCurrentTenantId();
+      const tenant = tenantId ? await getTenantById(tenantId) : null;
+      const base = getAppUrlOrNull();
+      const token = base && tenant?.subdomain ? await ensurePublicToken(db, ticketId).catch(() => null) : null;
+      const follow =
+        token && base && tenant?.subdomain
+          ? replyFooterHtml(await ticketLanguage(db, contactId), statusPageUrl(base, tenant.subdomain, token))
+          : "";
+      // ⚠️ Ours, not the provider's: Resend returns its own id, which is not a Message-ID,
+      // and a reply threaded to it threads to nothing.
+      const headerId = `<tkt-${message.id}@${new URL(base ?? "https://fluxcrm.app").hostname}>`;
+
       const result = await sendEmail({
         to: customerEmail,
         subject: `[${ticket.ticketNumber}] Re: ${ticket.subject}`,
@@ -677,8 +607,10 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
             <p style="color:#9ca3af;font-size:11px">
               To reply, simply reply to this email and include the ticket number in the subject.
             </p>
+            ${follow}
           </div>
         `,
+        messageId: headerId,
         inReplyTo: threadMsgIds.at(-1),
         references: threadMsgIds.length > 0 ? threadMsgIds.join(" ") : undefined,
       }).catch((err) => {
@@ -687,10 +619,10 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
       });
 
       // Store the provider's Message-ID for future replies to thread against
-      if (result?.success && result.messageId) {
+      if (result?.success) {
         await db
           .update(ticketMessages)
-          .set({ emailMessageId: result.messageId })
+          .set({ emailMessageId: headerId })
           .where(eq(ticketMessages.id, message.id))
           .catch(console.error);
       }
@@ -777,12 +709,7 @@ export async function reassignTicketAction(ticketId: string, assigneeId: string 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    actor.userId !== ticket.ownerId &&
-    actor.userId !== ticket.assigneeId &&
-    actor.tenantRole !== "admin" &&
-    actor.tenantRole !== "owner"
-  ) {
+  if (actor.userId !== ticket.ownerId && actor.userId !== ticket.assigneeId && !can(actor, "record:manageAny")) {
     throw new Error("Unauthorized");
   }
 
@@ -821,12 +748,7 @@ export async function escalateTicketAction(ticketId: string) {
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    actor.userId !== ticket.ownerId &&
-    actor.userId !== ticket.assigneeId &&
-    actor.tenantRole !== "admin" &&
-    actor.tenantRole !== "owner"
-  ) {
+  if (actor.userId !== ticket.ownerId && actor.userId !== ticket.assigneeId && !can(actor, "record:manageAny")) {
     throw new Error("Unauthorized");
   }
 
@@ -857,48 +779,12 @@ export async function escalateTicketAction(ticketId: string) {
   return { success: true, ticket: updated, previousPriority: currentPriority, newPriority };
 }
 
+/**
+ * Moving a card on the board. ⚠️⚠️ The same change as the detail page's, not a copy of it:
+ * the copy skipped the owner check, the rules, and everything a resolution sets off.
+ */
 export async function updateTicketStatusAction(ticketId: string, status: string) {
-  const db = await getDb();
-  const actor = await requireCapability("ticket:write");
-  await requirePlanModule("support");
-
-  const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
-  if (!ticket) throw new Error("Ticket not found");
-
-  if (!canTransition(ticket.status, status)) {
-    throw new Error(`Invalid transition: ${ticket.status} → ${status}`);
-  }
-
-  const now = new Date();
-  const updateData: Record<string, unknown> = { status, updatedAt: now };
-
-  if (status === "resolved") updateData.resolvedAt = now;
-  if (status === "closed") updateData.closedAt = now;
-
-  // SLA pause/resume
-  if (isSLAPauseStatus(status) && !ticket.slaPausedAt) {
-    updateData.slaPausedAt = now;
-  } else if (!isSLAPauseStatus(status) && ticket.slaPausedAt) {
-    const pausedMs = now.getTime() - ticket.slaPausedAt.getTime();
-    updateData.slaPauseMinutes = (ticket.slaPauseMinutes ?? 0) + Math.floor(pausedMs / 60000);
-    updateData.slaPausedAt = null;
-  }
-
-  const [updated] = await db.update(tickets).set(updateData).where(eq(tickets.id, ticketId)).returning();
-
-  await logTicketChange({
-    ticketId,
-    actorId: actor.userId,
-    actorName: actor.name ?? actor.email ?? undefined,
-    action: "status_changed",
-    field: "status",
-    oldValue: ticket.status,
-    newValue: status,
-  });
-
-  revalidatePath("/dashboard/support/tickets");
-  revalidatePath(`/dashboard/support/tickets/${ticketId}`);
-  return { success: true, ticket: updated };
+  return updateTicketAction(ticketId, { status: status as z.infer<typeof UpdateTicketSchema>["status"] });
 }
 
 // --- MACROS ---
@@ -1026,7 +912,7 @@ export async function getBusinessCalendar() {
  *
  * One row per workspace, so this creates it the first time and updates it after.
  */
-export async function saveBusinessCalendarAction(data: { timeZone: string; week: unknown }) {
+export async function saveBusinessCalendarAction(data: { week: unknown }) {
   await requireCapability("sla:manage");
   await requirePlanModule("support");
   const db = await getDb();
@@ -1034,23 +920,16 @@ export async function saveBusinessCalendarAction(data: { timeZone: string; week:
   // Validated on the way in as well as on the way out: the column is `jsonb` and
   // will take whatever it is given.
   const week = parseWeek(data.week);
-  const timeZone = data.timeZone.trim() || "Europe/Rome";
-  try {
-    // Rejects a name no runtime recognises, before it reaches every deadline.
-    new Intl.DateTimeFormat("en-US", { timeZone });
-  } catch {
-    throw new Error(`"${timeZone}" is not a time zone this system knows.`);
-  }
 
+  // ⚠️ The week only. The time zone shares this row but belongs to the whole workspace,
+  // and is set in Settings → General (saveWorkspaceTimeZoneAction) — by an administrator,
+  // with or without the support module. A first save here keeps the default zone.
   const [existing] = await db.select({ id: businessCalendar.id }).from(businessCalendar).limit(1);
 
   if (existing) {
-    await db
-      .update(businessCalendar)
-      .set({ timeZone, week, updatedAt: new Date() })
-      .where(eq(businessCalendar.id, existing.id));
+    await db.update(businessCalendar).set({ week, updatedAt: new Date() }).where(eq(businessCalendar.id, existing.id));
   } else {
-    await db.insert(businessCalendar).values({ timeZone, week });
+    await db.insert(businessCalendar).values({ week });
   }
 
   revalidatePath("/dashboard/support/sla");

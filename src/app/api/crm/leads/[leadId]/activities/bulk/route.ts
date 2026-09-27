@@ -1,20 +1,17 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { chunk, INSERT_CHUNK } from "@/lib/api-import-batch";
 import { buildActivityPayload, type ValidationError, validateActivityInput } from "@/lib/api-import-validators";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/** Marks the event as written by a machine, so an integrator does not
- *  receive its own import back and react to it. */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook, hasActiveWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 const MAX_BATCH = 500;
 
@@ -28,11 +25,16 @@ type BulkResult =
  */
 const ENDPOINT = "/api/crm/leads/{leadId}/activities/bulk";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "activities", access: "write" } as const;
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -92,7 +94,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
   // makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(

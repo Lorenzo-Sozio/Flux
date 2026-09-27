@@ -113,6 +113,12 @@ type CreateProps = {
   ownerId?: string;
   revalidatePathStr: string;
   onCreated?: () => void;
+  /**
+   * Opened from somewhere else (a card's menu) instead of from its own button: when given,
+   * the dialog is controlled and draws no trigger.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 type EditProps = {
@@ -129,10 +135,16 @@ export function ActivityModal(props: Props) {
   const t = useTranslations("activityModal");
   const tf = useTranslations("appointment.fields");
   const tc = useTranslations("common");
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEdit = props.mode === "edit";
+  const controlled = props.mode === "create" && props.open !== undefined;
+  const open = controlled && props.mode === "create" ? Boolean(props.open) : ownOpen;
+  const setOpen = (v: boolean) => {
+    if (controlled && props.mode === "create") props.onOpenChange?.(v);
+    else setOwnOpen(v);
+  };
 
   const form = useForm<ActivityFormValues>({
     resolver: zodResolver(activitySchema),
@@ -231,18 +243,20 @@ export function ActivityModal(props: Props) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {isEdit ? (
-          <Button variant="ghost" size="icon" className="h-6 w-6">
-            <PencilIcon className="h-3.5 w-3.5" />
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <PlusIcon className="h-3.5 w-3.5" />
-            {t("logActivity")}
-          </Button>
-        )}
-      </DialogTrigger>
+      {!controlled && (
+        <DialogTrigger asChild>
+          {isEdit ? (
+            <Button variant="ghost" size="icon" className="h-6 w-6 max-sm:size-9" aria-label={t("editActivity")}>
+              <PencilIcon className="h-3.5 w-3.5" />
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <PlusIcon className="h-3.5 w-3.5" />
+              {t("logActivity")}
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
 
       <DialogContent className="gap-0 p-0 sm:max-w-[560px]">
         <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
@@ -250,11 +264,13 @@ export function ActivityModal(props: Props) {
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
-          <div className="space-y-5 px-6 py-5">
+          <div className="space-y-5 px-4 py-5 md:px-6">
             {/* ── Activity type selector ───────────────────────────── */}
             <div className="space-y-2">
               <Label>{tc("type")}</Label>
-              <div className="grid grid-cols-4 gap-2">
+              {/* Two by two on a phone, icon beside the label: four columns of 68px
+                  left "Meeting" and "Chiamata" touching both edges of their box. */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(
                   Object.entries(TYPE_CONFIG) as [
                     keyof typeof TYPE_CONFIG,
@@ -269,7 +285,7 @@ export function ActivityModal(props: Props) {
                       type="button"
                       onClick={() => form.setValue("type", type)}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 font-medium text-xs transition-all",
+                        "flex items-center justify-center gap-1.5 rounded-lg border-2 p-3 font-medium text-xs transition-all sm:flex-col",
                         // Two arguments rather than one concatenation: the class
                         // sorter trims the string it sorts, and a trailing space
                         // holding two class names apart does not survive that.
@@ -286,7 +302,7 @@ export function ActivityModal(props: Props) {
             </div>
 
             {/* ── Date + Duration (conditional) ──────────────────── */}
-            <div className={cn("grid gap-4", showDuration ? "grid-cols-2" : "grid-cols-1")}>
+            <div className={cn("grid grid-cols-1 gap-4", showDuration && "sm:grid-cols-2")}>
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <ClockIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -447,7 +463,9 @@ export function ActivityModal(props: Props) {
             </div>
           </div>
 
-          <DialogFooter className="border-t bg-muted/10 px-4 md:px-6 py-4">
+          {/* Sticky on a phone: the dialog is the whole screen and this form is
+              longer than it, so the save button was below the fold. */}
+          <DialogFooter className="border-t bg-muted/10 px-4 py-4 max-sm:sticky max-sm:bottom-0 max-sm:bg-background md:px-6">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               {tc("cancel")}
             </Button>

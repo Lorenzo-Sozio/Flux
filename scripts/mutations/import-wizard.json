@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️ aggiornando da un file si sovrascrive la fonte del cliente",
+    "find": "const NEVER_PATCHED = new Set([\"source\"]);",
+    "replace": "const NEVER_PATCHED = new Set<string>([]);"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️⚠️ la scelta «aggiorna» salta comunque i doppioni",
+    "find": "    if (onDuplicate === \"skip\") {",
+    "replace": "    if (onDuplicate !== \"create\") {"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️ due righe sullo stesso record: vince la prima invece dell'ultima",
+    "find": "    const merged = Object.assign({}, ...list.map((r) => patchOf(table, withCompany(r)))) as Record<string, unknown>;",
+    "replace": "    const merged = Object.assign({}, ...list.map((r) => patchOf(table, withCompany(r))).reverse()) as Record<string, unknown>;"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️⚠️ l'aggiornamento perde l'azienda indicata nella riga",
+    "find": "    const merged = Object.assign({}, ...list.map((r) => patchOf(table, withCompany(r)))) as Record<string, unknown>;",
+    "replace": "    const merged = Object.assign({}, ...list.map((r) => patchOf(table, r))) as Record<string, unknown>;"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️⚠️ senza parentesi l'aggiornamento in blocco non aggiorna niente",
+    "find": "to_jsonb(cur) || (e.x -> 'patch')",
+    "replace": "to_jsonb(cur) || e.x -> 'patch'"
+  },
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️⚠️ l'anteprima scrive davvero",
+    "find": "  if (!dryRun) await plan.write();",
+    "replace": "  await plan.write();"
+  },
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️ l'anteprima di un file oltre il limite del piano risponde con un errore invece di dirlo",
+    "find": "      if (!dryRun) return NextResponse.json({ error: err.message }, { status: 403 });",
+    "replace": "      return NextResponse.json({ error: err.message }, { status: 403 });"
+  },
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️⚠️ la mappatura scelta nella procedura viene ignorata",
+    "find": "  const rows = mapping ? data.map((row) => applyMapping(row, mapping)) : data;",
+    "replace": "  const rows = data;"
+  },
+  {
+    "file": "src/lib/csv-import-fields.ts",
+    "description": "due colonne propongono lo stesso campo",
+    "find": "    out[h] = field && !used.has(field) ? field : \"\";",
+    "replace": "    out[h] = field;"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️ una persona nuova ripetuta nel file perde le celle della seconda riga",
+    "find": "      for (const k of Object.keys(row.input)) known.data[k] = row.data[k];",
+    "replace": ""
+  }
+]

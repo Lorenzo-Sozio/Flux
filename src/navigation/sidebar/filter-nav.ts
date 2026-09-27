@@ -26,6 +26,7 @@
  * imported directly by the client component, and only the verdict travels.
  */
 import { type Actor, type Capability, can } from "@/lib/permissions";
+import type { WorkspaceFeature, WorkspaceFeatures } from "@/lib/workspace-feature-list";
 
 import type { NavGroup, NavModule, NavSubItem } from "./sidebar-items";
 
@@ -33,6 +34,8 @@ export interface NavVisibilityContext {
   actor: Actor;
   /** Modules included in the tenant's plan. Undefined means "do not gate". */
   enabledModules?: readonly string[];
+  /** The workspace's optional parts. Undefined means all on. */
+  features?: WorkspaceFeatures;
 }
 
 /**
@@ -46,6 +49,12 @@ export interface NavAccess {
   hidden: string[];
   /** Url → the plan module missing for it: shown, but locked. */
   locked: Record<string, NavModule>;
+  /**
+   * Urls this person may open but rarely needs — the catalogue, contracts, campaigns, the
+   * analysis views that are tabs inside Pipeline anyway: left out of their menu until they
+   * ask for all of it, and always found by the palette (§4.1).
+   */
+  secondary: string[];
 }
 
 function allowedByRole(need: Capability | undefined, actor: Actor): boolean {
@@ -59,11 +68,25 @@ function lockedByPlan(module: NavModule | undefined, enabled: readonly string[] 
 
 /** Runs on the server, where the role and the plan are known. */
 export function computeNavAccess(groups: readonly NavGroup[], ctx: NavVisibilityContext): NavAccess {
-  const { actor, enabledModules } = ctx;
+  const { actor, enabledModules, features } = ctx;
   const hidden: string[] = [];
   const locked: Record<string, NavModule> = {};
+  const secondary: string[] = [];
+  // Managers get the whole menu; everybody else the day's work first.
+  const manager = can(actor, "record:manageAny");
 
-  const consider = (entry: { url: string; need?: Capability; module?: NavModule }) => {
+  const consider = (entry: {
+    url: string;
+    need?: Capability;
+    module?: NavModule;
+    feature?: WorkspaceFeature;
+    audience?: "manager";
+  }) => {
+    // Switched off by the workspace: gone, not locked — nothing is for sale here.
+    if (entry.feature && features && !features[entry.feature]) {
+      hidden.push(entry.url);
+      return;
+    }
     if (!allowedByRole(entry.need, actor)) {
       hidden.push(entry.url);
       return;
@@ -71,6 +94,7 @@ export function computeNavAccess(groups: readonly NavGroup[], ctx: NavVisibility
     if (entry.module && lockedByPlan(entry.module, enabledModules)) {
       locked[entry.url] = entry.module;
     }
+    if (entry.audience === "manager" && !manager) secondary.push(entry.url);
   };
 
   for (const group of groups) {
@@ -80,7 +104,7 @@ export function computeNavAccess(groups: readonly NavGroup[], ctx: NavVisibility
     }
   }
 
-  return { hidden, locked };
+  return { hidden, locked, secondary };
 }
 
 /**
@@ -88,8 +112,13 @@ export function computeNavAccess(groups: readonly NavGroup[], ctx: NavVisibility
  *
  * A group with nothing left in it disappears, so no empty headings are rendered.
  */
-export function applyNavAccess(groups: readonly NavGroup[], access: NavAccess): NavGroup[] {
-  const hidden = new Set(access.hidden);
+export function applyNavAccess(
+  groups: readonly NavGroup[],
+  access: NavAccess,
+  /** Leave out what is secondary for this person: the menu, unless they asked for all of it. */
+  options: { focused?: boolean } = {},
+): NavGroup[] {
+  const hidden = new Set([...access.hidden, ...(options.focused ? (access.secondary ?? []) : [])]);
   const result: NavGroup[] = [];
 
   for (const group of groups) {

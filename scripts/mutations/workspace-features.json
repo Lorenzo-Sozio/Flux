@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/workspace-features.ts",
+    "description": "⚠️⚠️ un workspace esistente, senza righe, perde chat e progetti che usava",
+    "find": "      if (row && row.value === false) out[f] = false;",
+    "replace": "      if (!row || row.value === false) out[f] = false;"
+  },
+  {
+    "file": "src/db/seed-workspace.ts",
+    "description": "⚠️⚠️ premere Migrate spegne chat e progetti in ogni workspace esistente",
+    "find": "      .onConflictDoNothing();\n  }\n",
+    "replace": "      .onConflictDoNothing();\n  }\n  await db.insert(workspaceSettings).values([{ key: \"feature.chat\", value: false }, { key: \"feature.projects\", value: false }]).onConflictDoUpdate({ target: workspaceSettings.key, set: { value: false } });\n"
+  },
+  {
+    "file": "src/navigation/sidebar/filter-nav.ts",
+    "description": "⚠️ una funzione spenta resta nel menu",
+    "find": "    if (entry.feature && features && !features[entry.feature]) {",
+    "replace": "    if (entry.feature && features && features[entry.feature] === undefined) {"
+  },
+  {
+    "file": "src/actions/workspace-settings.ts",
+    "description": "⚠️⚠️ un editor torna a poter cambiare il menu di tutto il workspace",
+    "find": "export async function setWorkspaceFeatureAction(feature: WorkspaceFeature, on: boolean): Promise<void> {\n  await requireCapability(\"settings:manage\");",
+    "replace": "export async function setWorkspaceFeatureAction(feature: WorkspaceFeature, on: boolean): Promise<void> {\n  await requireCapability(\"record:write\");"
+  }
+]

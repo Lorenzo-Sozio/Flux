@@ -87,7 +87,9 @@ export function WinLossFigures({ analysis }: { analysis: WinLossAnalysis }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      {/* One column on a phone: these are amounts with cents, and half of 360px
+          clips them. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground text-sm">

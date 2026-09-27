@@ -31,9 +31,18 @@ import { join, relative } from "node:path";
 
 import ts from "typescript";
 
-const ROOTS = ["src/app/(main)/dashboard", "src/app/(main)/auth", "src/app/q", "src/components"];
+const ROOTS = [
+  "src/app/(main)/dashboard",
+  "src/app/(main)/auth",
+  "src/app/(main)/select-tenant",
+  "src/app/q",
+  "src/components",
+];
 const SKIP_DIRS = new Set(["node_modules", ".next"]);
-const SKIP_FILES = [/\.test\.tsx?$/, /\.d\.ts$/, /components\/ui\//];
+// The API reference is written in one language, entries and frame alike
+// (src/lib/api-docs/public-api.ts): a translated frame around untranslated entries would
+// be a page in two languages at once.
+const SKIP_FILES = [/\.test\.tsx?$/, /\.d\.ts$/, /components\/ui\//, /components\/api-docs\//];
 
 const READ_ATTRIBUTES = new Set([
   "placeholder",

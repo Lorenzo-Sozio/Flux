@@ -128,10 +128,10 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
         <div className="space-y-3">
           {macros.map((macro) => (
             <Card key={macro.id}>
-              <CardContent className="flex items-start gap-4 p-4">
+              <CardContent className="flex items-start gap-2 p-4 sm:gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-sm">{macro.name}</span>
+                    <span className="min-w-0 break-words font-semibold text-sm">{macro.name}</span>
                     <Badge variant="outline" className="h-4 gap-1 px-1.5 text-[10px]">
                       {macro.isPublic ? (
                         <>
@@ -145,17 +145,26 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
                     </Badge>
                   </div>
                   {macro.description && <p className="mb-2 text-muted-foreground text-xs">{macro.description}</p>}
-                  <p className="rounded bg-muted/50 p-2 text-muted-foreground text-xs">{plainPreview(macro.body)}</p>
+                  <p className="rounded bg-muted/50 p-2 text-muted-foreground text-xs [overflow-wrap:anywhere]">
+                    {plainPreview(macro.body)}
+                  </p>
                 </div>
                 <div className="flex flex-shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(macro)}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-9 sm:size-8"
+                    onClick={() => openEdit(macro)}
+                    aria-label={t("editMacro")}
+                  >
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
+                    className="size-9 text-destructive hover:text-destructive sm:size-8"
                     onClick={() => setDeleteId(macro.id)}
+                    aria-label={t("delete")}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

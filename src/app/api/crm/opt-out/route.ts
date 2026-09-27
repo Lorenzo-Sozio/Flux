@@ -1,21 +1,28 @@
-import { after, type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { eq, inArray } from "drizzle-orm";
 
-import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { contacts, leads } from "@/db/schema";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { logApiWrite } from "@/lib/api-write-log";
+import { consentWithdrawn } from "@/lib/consent";
+import { announceOptOut } from "@/lib/consent-events";
 import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
+import { recordFieldChanges } from "@/lib/field-history";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the idempotency ledger and the write log both
  * record it, and two literals that have to agree are one literal too many.
  */
 const ENDPOINT = "/api/crm/opt-out";
+
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "privacy", access: "write" } as const;
 
 /**
  * Record that a person told an integration they do not want to be contacted any more.
@@ -52,10 +59,9 @@ const ENDPOINT = "/api/crm/opt-out";
  * never becomes a failure it retries for ever.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
   if (!authResult.tenantId) {
     return NextResponse.json(
       { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
@@ -136,24 +142,54 @@ export async function POST(req: NextRequest) {
   const now = new Date();
   const zittiti: string[] = [];
   for (const riga of daZittire) {
+    // Dated today and sourced "api", beside the switch in the record's history.
     if (riga.entityType === "lead") {
-      await db.update(leads).set({ marketingConsent: false, updatedAt: now }).where(eq(leads.id, riga.id));
+      await db
+        .update(leads)
+        .set({ ...consentWithdrawn("api", now), updatedAt: now })
+        .where(eq(leads.id, riga.id));
     } else {
-      await db.update(contacts).set({ marketingConsent: false, updatedAt: now }).where(eq(contacts.id, riga.id));
+      await db
+        .update(contacts)
+        .set({ ...consentWithdrawn("api", now), updatedAt: now })
+        .where(eq(contacts.id, riga.id));
     }
+    await recordFieldChanges(
+      db,
+      riga.entityType,
+      riga.id,
+      { marketingConsent: true },
+      { marketingConsent: false },
+      null,
+    );
     zittiti.push(riga.id);
     // After the response, like every other write that runs rules: withdrawing consent is a
     // change the owner may well want to watch.
-    after(() =>
-      runAutomations({
-        entityType: riga.entityType,
-        entityId: riga.id,
-        event: "onUpdate",
-        oldData: { id: riga.id, marketingConsent: true },
-        newData: { id: riga.id, marketingConsent: false },
-      }),
-    );
+    runRulesAfterApiWrite(tenant.id, {
+      entityType: riga.entityType,
+      entityId: riga.id,
+      event: "onUpdate",
+      oldData: { id: riga.id, marketingConsent: true },
+      newData: { id: riga.id, marketingConsent: false },
+    });
   }
+
+  // Every system that writes to this person hears it — including when nothing here changed,
+  // because the act is what the others must honour. The key is named in the origin, so the
+  // integration that asked recognises its own request and ignores it.
+  await announceOptOut(
+    db,
+    {
+      records: [
+        ...suoiLead.map((r) => ({ entity: "lead" as const, id: r.id })),
+        ...suoiContatti.map((r) => ({ entity: "contact" as const, id: r.id })),
+      ],
+      email: parsed.email,
+      source: "api",
+      channel: "all",
+    },
+    apiOrigin(authResult),
+  );
 
   // ⚠️ Nothing silenced, nothing logged — and that is the same decision as the `200` below,
   // read from the other side: the answer is «already so», and a line here would report a

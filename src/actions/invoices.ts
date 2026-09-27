@@ -5,7 +5,16 @@ import { after } from "next/server";
 
 import { and, asc, count, desc, eq, gte, ilike, or, type SQL, sql } from "drizzle-orm";
 
-import { companies, invoiceIssuers, invoiceItems, invoices, orderItems, orders, products } from "@/db/schema";
+import {
+  companies,
+  invoiceIssuers,
+  invoiceItems,
+  invoices,
+  orderItems,
+  orderPayments,
+  orders,
+  products,
+} from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { documentLanguage, formatDocumentMoney } from "@/lib/document-language";
 import { sendInvoiceCopyEmail } from "@/lib/email";
@@ -16,10 +25,22 @@ import { archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
 import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
+import { paymentDay } from "@/lib/order-payment";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
+import {
+  balanceOf,
+  invoiceBalance,
+  invoicePayments,
+  linkOrderPayments,
+  receivables,
+  recordInvoicePayment,
+} from "@/lib/receivables";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { assessStampDuty, quarterlyStampDuty, quarterOf, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 import { getDb } from "@/lib/tenant-context";
+import { toWallDate } from "@/lib/wall-clock";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 const LIST = "/dashboard/sales/invoices";
 type Db = Awaited<ReturnType<typeof getDb>>;
@@ -646,6 +667,46 @@ export async function issueInvoiceAction(
   }
   if (room) revalidatePath(`${LIST}/${room.id}`);
 
+  // Money already on the order — a deposit — reaches its only invoice now (I9). And an invoice
+  // settled by this issue, by those payments or by a credit note bringing what is due down to
+  // what was paid, says so: settlement is not only a payment arriving.
+  const settledNow = async (invoiceId: string, creditedNow: number) => {
+    const balance = await tolerateUnmigrated("invoice payments", () => balanceOf(db, invoiceId), null);
+    if (!balance || balance.outstanding > 0 || balance.paid <= 0) return;
+    if (balance.outstanding + creditedNow <= 0 && creditedNow > 0) return; // already settled before
+    dispatchWebhook(
+      "invoice.paid",
+      { id: invoiceId, paid: balance.paid, due: balance.due },
+      { via: "user", actor: actor.userId },
+    ).catch((err) => console.error("[invoices] invoice.paid not dispatched", err));
+  };
+  if (!isCredit && invoice.orderId) {
+    const linked = await tolerateUnmigrated(
+      "invoice payments",
+      () => linkOrderPayments(db, invoice.orderId as string),
+      0,
+    );
+    if (linked > 0) await settledNow(id, 0);
+  }
+  if (isCredit && room) await settledNow(room.id, totals.total);
+
+  // An accounting system waits for this more than for anything else a CRM does (§13.11).
+  dispatchWebhook(
+    "invoice.issued",
+    {
+      id,
+      number: result.documentNumber,
+      documentType: invoice.documentType,
+      issueDate,
+      total: totals.total,
+      currency: invoice.currency,
+      companyId: invoice.companyId,
+      orderId: invoice.orderId,
+      originalInvoiceId: isCredit ? invoice.originalInvoiceId : null,
+    },
+    { via: "user", actor: actor.userId },
+  ).catch((err) => console.error("[invoices] invoice.issued not dispatched", err));
+
   // The files are kept after the response: the number is already assigned, and a
   // failure here is retried by the next download rather than failing the issue.
   after(() =>
@@ -759,4 +820,78 @@ export async function getStampDutySummary(year: number) {
 /** The value the upsert tried to insert, for the columns it updates on conflict. */
 function sqlExcluded(column: string) {
   return sql.raw(`excluded.${column}`);
+}
+
+// ─── Payments and receivables (I9) ────────────────────────────────────────────
+
+/** The payments recorded against an invoice, with its balance. */
+export async function getInvoicePayments(invoiceId: string) {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [invoice] = await db
+    .select({ total: invoices.total, credited: invoices.creditedAmount })
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId));
+  if (!invoice) return null;
+  const payments = await tolerateUnmigrated("invoice payments", () => invoicePayments(db, invoiceId), []);
+  return { payments, balance: invoiceBalance(invoice.total, invoice.credited, payments) };
+}
+
+/**
+ * Money arrived against an issued invoice (src/lib/receivables.ts). Settling it in full
+ * sends `invoice.paid`: the accounting system waits for that one as much as for the issue.
+ */
+export async function recordInvoicePaymentAction(
+  invoiceId: string,
+  data: { amount: number | string; paidAt?: string; method?: string; note?: string },
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  const paidAt = paymentDay(data.paidAt, timeZone);
+  if (!paidAt) return { ok: false, error: (await serverT("serverErrors.invoices"))("payment.invalid_date") };
+  const result = await recordInvoicePayment(db, {
+    invoiceId,
+    amount: data.amount,
+    paidAt,
+    method: data.method,
+    note: data.note,
+    by: actor.userId,
+  });
+  if (!result.ok) return { ok: false, error: (await serverT("serverErrors.invoices"))(`payment.${result.reason}`) };
+
+  if (result.becamePaid) {
+    dispatchWebhook(
+      "invoice.paid",
+      { id: invoiceId, paid: result.balance.paid, due: result.balance.due },
+      { via: "user", actor: actor.userId },
+    ).catch((err) => console.error("[invoices] invoice.paid not dispatched", err));
+  }
+  revalidatePath(`${LIST}/${invoiceId}`);
+  revalidatePath("/dashboard/sales/finance");
+  return { ok: true };
+}
+
+/** A payment recorded by mistake, taken back. Whoever may write the invoice may do it. */
+export async function deleteInvoicePaymentAction(paymentId: string): Promise<{ ok: boolean }> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [row] = await db
+    .delete(orderPayments)
+    .where(and(eq(orderPayments.id, paymentId), sql`${orderPayments.invoiceId} is not null`))
+    .returning({ invoiceId: orderPayments.invoiceId, orderId: orderPayments.orderId });
+  if (row?.invoiceId) revalidatePath(`${LIST}/${row.invoiceId}`);
+  if (row?.orderId) revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
+  revalidatePath("/dashboard/sales/finance");
+  return { ok: Boolean(row) };
+}
+
+/** The receivables schedule: every issued invoice still owed something, by age. */
+export async function getReceivables() {
+  await requireCapability("settings:manage");
+  await requirePlanModule("sales");
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  return tolerateUnmigrated("receivables", () => receivables(db, { today: toWallDate(new Date(), timeZone) }), null);
 }

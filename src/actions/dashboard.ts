@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
 
 import {
   activities,
@@ -15,7 +15,10 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { quoteEur, ticketIsOpen } from "@/lib/metrics";
 import { getDb } from "@/lib/tenant-context";
+import { dayBounds } from "@/lib/workspace-day";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 /**
  * The figures on the first screen after login.
@@ -34,18 +37,18 @@ import { getDb } from "@/lib/tenant-context";
  * ⚠️ The return shape is unchanged, field for field. Two details are kept on
  * purpose because the dashboard cards depend on them: a stage with no deals still
  * appears with a zero, which is why that query starts from the stages and joins
- * the deals rather than the other way round; and it counts deals in every status,
- * as it always did.
+ * the deals rather than the other way round.
+ *
+ * ⚠️ The distribution is of the **open** deals, over the stages a deal can be open in. It
+ * counted every status, so every deal ever won stood in the "Won" column and every loss in
+ * "Lost": the largest bars on the chart said nothing about the pipeline (§11.1).
  */
 export async function getDashboardStats() {
   await requireCapability("record:read");
   const db = await getDb();
 
-  // Local midnight to local midnight, as before.
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
+  // The workspace's midnight to midnight — not the server's, which is UTC on Workers.
+  const { start: today, end: tomorrow } = dayBounds(new Date(), await getWorkspaceTimeZone());
 
   const [[leadCounts], [dealValue], [taskCounts], [quoteFigures], [ticketCounts], distribution, sources] =
     await Promise.all([
@@ -71,19 +74,26 @@ export async function getDashboardStats() {
           dueToday: sql<number>`count(*) filter (where ${and(gte(tasks.dueDate, today), lt(tasks.dueDate, tomorrow))})`,
         })
         .from(tasks)
-        .where(eq(tasks.status, "todo")),
+        // Everything not done: a task somebody has started is still pending, and counting
+        // only `todo` left it out of both figures the moment work began.
+        .where(ne(tasks.status, "done")),
 
       db
         .select({
-          pipelineValue: sql<number>`coalesce(sum(cast(${quotes.totalAmount} as numeric)) filter (where ${quotes.status} in ('sent', 'viewed')), 0)`,
-          openCount: sql<number>`count(*) filter (where ${quotes.status} in ('draft', 'sent', 'viewed'))`,
+          // In EUR at each quote's own rate: quotes in different currencies used to be added
+          // together as they stood.
+          pipelineValue: sql<number>`coalesce(sum(${quoteEur}) filter (where ${quotes.status} in ('sent', 'viewed')), 0)`,
+          // The same quotes the value adds up: those with the customer. Drafts were counted and
+          // not summed, so the number and the amount on one card described different lists.
+          openCount: sql<number>`count(*) filter (where ${quotes.status} in ('sent', 'viewed'))`,
         })
         .from(quotes),
 
       db
         .select({
-          open: sql<number>`count(*) filter (where ${tickets.status} in ('open', 'in_progress', 'waiting'))`,
-          urgent: sql<number>`count(*) filter (where ${tickets.status} in ('open', 'in_progress', 'waiting') and ${tickets.priority} = 'urgent')`,
+          // Every ticket not finished — `new` included, which is how every ticket arrives.
+          open: sql<number>`count(*) filter (where ${ticketIsOpen()})`,
+          urgent: sql<number>`count(*) filter (where ${ticketIsOpen()} and ${tickets.priority} = 'urgent')`,
         })
         .from(tickets),
 
@@ -95,7 +105,8 @@ export async function getDashboardStats() {
           value: sql<number>`count(${deals.id})`,
         })
         .from(pipelineStages)
-        .leftJoin(deals, eq(deals.stageId, pipelineStages.id))
+        .leftJoin(deals, and(eq(deals.stageId, pipelineStages.id), eq(deals.status, "open")))
+        .where(and(eq(pipelineStages.isWon, false), eq(pipelineStages.isLost, false)))
         .groupBy(pipelineStages.id, pipelineStages.name, pipelineStages.color, pipelineStages.order)
         .orderBy(pipelineStages.order),
 

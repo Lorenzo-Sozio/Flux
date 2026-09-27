@@ -23,6 +23,22 @@ export function generateUnsubscribeToken(email: string, logId: string): string {
   return Buffer.from(JSON.stringify({ e: email, l: logId, s: sig })).toString("base64url");
 }
 
+/**
+ * The unsubscribe address for a queued email, rebuilt from what the job knows: a campaign
+ * (or rule) email is signed against its campaign log, a sequence step against its enrollment.
+ * Null for an email that is not marketing, or when the public address is not configured.
+ */
+export function unsubscribeUrlFor(
+  job: { toEmail: string; campaignLogId: string | null; sequenceEnrollmentId: string | null },
+  appUrl: string | null,
+  sequencePrefix: string,
+): string | null {
+  if (!appUrl) return null;
+  const logId = job.campaignLogId ?? (job.sequenceEnrollmentId ? `${sequencePrefix}${job.sequenceEnrollmentId}` : null);
+  if (!logId) return null;
+  return `${appUrl}/api/unsubscribe?token=${generateUnsubscribeToken(job.toEmail, logId)}`;
+}
+
 /** Verify an unsubscribe token. Returns payload or null. */
 export function verifyUnsubscribeToken(token: string): { email: string; logId: string } | null {
   try {

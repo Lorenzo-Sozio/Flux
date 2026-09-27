@@ -1,6 +1,8 @@
+import { getDigestPreference } from "@/actions/digest";
 import { getPushSettings } from "@/actions/push";
 import { requirePageCapability } from "@/lib/page-guard";
 
+import { DigestSetting } from "./_components/digest-setting";
 import { PushSettingsClient } from "./_components/push-settings-client";
 
 /**
@@ -15,7 +17,12 @@ import { PushSettingsClient } from "./_components/push-settings-client";
 export default async function NotificationSettingsPage() {
   await requirePageCapability("record:read", "/dashboard/settings/notifications");
 
-  const settings = await getPushSettings();
+  const [settings, digest] = await Promise.all([getPushSettings(), getDigestPreference()]);
 
-  return <PushSettingsClient settings={settings} />;
+  return (
+    <div className="space-y-6">
+      <PushSettingsClient settings={settings} />
+      <DigestSetting initial={digest} />
+    </div>
+  );
 }

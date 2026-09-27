@@ -4,11 +4,12 @@ import { getTranslations } from "next-intl/server";
 
 import { getAllUsers, getCompanyCategories, getCompanyTypes, listCompanies } from "@/actions/crm";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
-import { getCustomFilters } from "@/actions/filters";
+import { getSavedViews } from "@/actions/filters";
 import { getPriceListsForSelect } from "@/actions/price-lists";
 import { FilterBuilder } from "@/components/crm/filter-builder";
 import { ImportExportButtons } from "@/components/crm/import-export-buttons";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { PinnedViews } from "@/components/crm/pinned-views";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { hasCapability } from "@/lib/auth-guard";
@@ -29,11 +30,11 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   // The workspace role, not the platform staff field: the latter is "user" for
   // every customer, so this was always true and a viewer saw buttons that could
   // only fail (audit rilievo U-02).
-  const canEdit = await hasCapability("record:write");
+  const [canEdit, canImport] = await Promise.all([hasCapability("record:write"), hasCapability("record:import")]);
 
   const [pageResult, savedFilters, customDefs, users, categories, companyTypes, priceLists] = await Promise.all([
     listCompanies(listParams),
-    getCustomFilters("companies").catch(() => []),
+    getSavedViews("companies").catch(() => []),
     getCustomFieldDefinitions("company").catch(() => []),
     getAllUsers(),
     getCompanyCategories().catch(() => []),
@@ -48,6 +49,13 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(COMPANY_FIELDS), ...customFieldsToMetaMap(customDefs) };
+  // "Mine" is the first thing a list is narrowed by: the owner, by name.
+  if (fields.ownerId) {
+    fields.ownerId = {
+      ...fields.ownerId,
+      lookupOptions: users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })),
+    };
+  }
 
   if (fields.companyCategoryId) {
     fields.companyCategoryId = {
@@ -65,7 +73,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="font-bold text-2xl">{t("title")}</h1>
           <Badge variant="secondary">{pageResult.total}</Badge>
           {activeCount > 0 && (
@@ -88,7 +96,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
             }))}
             basePath="/dashboard/companies"
           />
-          <ImportExportButtons entityType="companies" />
+          <ImportExportButtons entityType="companies" canImport={canImport} />
           {canEdit && (
             <CompanyModal categories={categories} companyTypes={companyTypes} priceLists={priceLists}>
               <Button>{t("newCompany")}</Button>
@@ -97,6 +105,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
+      <PinnedViews views={savedFilters} basePath="/dashboard/companies" />
       <div className="mb-4">
         <ListToolbar
           total={pageResult.total}

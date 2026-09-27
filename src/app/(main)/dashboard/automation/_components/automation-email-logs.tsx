@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { AlertCircle, CheckCircle2, Eye, Mail, MousePointerClick } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -68,7 +69,7 @@ export function AutomationEmailLogs({ logs }: Props) {
           <Card key={label} className="border shadow-none">
             <CardContent className="flex items-center gap-3 pt-4 pb-3">
               <Icon className={`h-5 w-5 shrink-0 ${color}`} />
-              <div>
+              <div className="min-w-0">
                 <p className="font-bold text-lg tabular-nums leading-none">{value}</p>
                 <p className="mt-0.5 text-muted-foreground text-xs">{label}</p>
               </div>
@@ -94,67 +95,117 @@ export function AutomationEmailLogs({ logs }: Props) {
             <p className="mt-1 text-muted-foreground text-xs">{t("noEmailsDesc")}</p>
           </CardContent>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="font-semibold text-xs">{t("colRecipient")}</TableHead>
-                <TableHead className="font-semibold text-xs">{t("colType")}</TableHead>
-                <TableHead className="font-semibold text-xs">{t("colStatus")}</TableHead>
-                <TableHead className="font-semibold text-xs">{t("colSentAt")}</TableHead>
-                <TableHead className="font-semibold text-xs">{t("colOpened")}</TableHead>
-                <TableHead className="font-semibold text-xs">{t("colClicked")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => {
-                const statusClass = STATUS_CLASS[log.status] ?? STATUS_CLASS.sent;
-                const statusLabel = statusLabels[log.status] ?? log.status;
-                return (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-sm">
-                      <p className="font-medium leading-none">{log.recipientName}</p>
-                      <p className="mt-0.5 text-muted-foreground text-xs">{log.recipientEmail}</p>
-                    </TableCell>
-                    <TableCell>
-                      {log.recipientType ? (
-                        <Badge variant="outline" className="h-4 px-1.5 py-0 text-[10px] capitalize">
-                          {log.recipientType}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
+          // Below `md` the rows are cards: recipient, type, status and three
+          // timestamps are six columns a phone cannot show side by side.
+          <ResponsiveRecordList
+            cards={
+              <RecordCards
+                className="px-3 pb-3"
+                items={logs.map((log) => {
+                  const statusClass = STATUS_CLASS[log.status] ?? STATUS_CLASS.sent;
+                  const statusLabel = statusLabels[log.status] ?? log.status;
+                  return {
+                    id: log.id,
+                    title: log.recipientName,
+                    subtitle: log.recipientEmail,
+                    badge: (
                       <Badge variant="outline" className={`text-xs ${statusClass}`}>
                         {statusLabel}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {format(new Date(log.sentAt), "MMM d, HH:mm")}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {log.openedAt ? (
-                        <span className="font-medium text-violet-600">
-                          {format(new Date(log.openedAt), "MMM d, HH:mm")}
+                    ),
+                    meta: (
+                      <>
+                        {log.recipientType && (
+                          <Badge variant="outline" className="h-4 px-1.5 py-0 text-[10px] capitalize">
+                            {log.recipientType}
+                          </Badge>
+                        )}
+                        <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                          <Mail className="h-3 w-3" />
+                          {format(new Date(log.sentAt), "MMM d, HH:mm")}
                         </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {log.clickedAt ? (
-                        <span className="font-medium text-green-600">
-                          {format(new Date(log.clickedAt), "MMM d, HH:mm")}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
+                        {log.openedAt && (
+                          <span className="flex items-center gap-1 font-medium text-violet-600 text-xs">
+                            <Eye className="h-3 w-3" />
+                            {format(new Date(log.openedAt), "MMM d, HH:mm")}
+                          </span>
+                        )}
+                        {log.clickedAt && (
+                          <span className="flex items-center gap-1 font-medium text-green-600 text-xs">
+                            <MousePointerClick className="h-3 w-3" />
+                            {format(new Date(log.clickedAt), "MMM d, HH:mm")}
+                          </span>
+                        )}
+                      </>
+                    ),
+                  };
+                })}
+              />
+            }
+            table={
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="font-semibold text-xs">{t("colRecipient")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("colType")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("colStatus")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("colSentAt")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("colOpened")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("colClicked")}</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => {
+                    const statusClass = STATUS_CLASS[log.status] ?? STATUS_CLASS.sent;
+                    const statusLabel = statusLabels[log.status] ?? log.status;
+                    return (
+                      <TableRow key={log.id}>
+                        <TableCell className="text-sm">
+                          <p className="font-medium leading-none">{log.recipientName}</p>
+                          <p className="mt-0.5 text-muted-foreground text-xs">{log.recipientEmail}</p>
+                        </TableCell>
+                        <TableCell>
+                          {log.recipientType ? (
+                            <Badge variant="outline" className="h-4 px-1.5 py-0 text-[10px] capitalize">
+                              {log.recipientType}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={`text-xs ${statusClass}`}>
+                            {statusLabel}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {format(new Date(log.sentAt), "MMM d, HH:mm")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {log.openedAt ? (
+                            <span className="font-medium text-violet-600">
+                              {format(new Date(log.openedAt), "MMM d, HH:mm")}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {log.clickedAt ? (
+                            <span className="font-medium text-green-600">
+                              {format(new Date(log.clickedAt), "MMM d, HH:mm")}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            }
+          />
         )}
       </Card>
     </div>

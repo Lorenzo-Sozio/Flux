@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -49,6 +49,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DATE_BUCKETS } from "@/lib/report-builder-config";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -207,6 +208,18 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
   const [saved, setSaved] = useState<SavedReport[]>(initialSaved);
   const [reportName, setReportName] = useState("");
   const [isRunning, setIsRunning] = useState(false);
+  // Pie geometry is a number, not a class: labels drawn outside the pie are clipped on a phone.
+  const isMobile = useIsMobile();
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  // ⚠️ Below lg the result sits under a configuration panel that is taller
+  // than the screen, so "Run" at the bottom of the panel produced a result
+  // nobody saw: the page did not move. Bring it into view where it is stacked;
+  // side by side (lg up) it is already in view and nothing scrolls.
+  useEffect(() => {
+    if (!result || !window.matchMedia("(max-width: 1023px)").matches) return;
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [result]);
 
   const entityConfig = entityConfigs[config.entity];
   const fields = entityConfig?.fields ?? [];
@@ -385,14 +398,15 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               nameKey="name"
               cx="50%"
               cy="50%"
-              outerRadius={100}
-              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+              outerRadius={isMobile ? 80 : 100}
+              label={isMobile ? false : ({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
             >
               {data.map((_, i) => (
                 <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
               ))}
             </Pie>
             <Tooltip />
+            {isMobile && <Legend wrapperStyle={{ fontSize: 11 }} />}
           </PieChart>
         </ResponsiveContainer>
       );
@@ -441,11 +455,13 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
   return (
     <div className="flex flex-col gap-0 h-full">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-6">
+      {/* No side padding below sm here or in the two panes: the page around
+          them already has 16px, and doubling it cost every control 32px. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b py-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <BarChart2 className="h-5 w-5 shrink-0 text-primary" />
           <h1 className="truncate font-bold text-xl tracking-tight">{t("title")}</h1>
-          <Badge variant="secondary" className="text-xs">
+          <Badge variant="secondary" className="shrink-0 text-xs">
             {t("adminBadge")}
           </Badge>
         </div>
@@ -473,8 +489,9 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     </button>
                     <button
                       type="button"
-                      className="shrink-0 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                      className="shrink-0 p-1 rounded hover:bg-destructive/10 hover:text-destructive text-muted-foreground max-md:p-2.5"
                       onClick={() => handleDelete(r.id)}
+                      aria-label={tCommon("delete")}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -492,7 +509,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
           the result under it, which is the order they are used in. */}
       <div className="flex flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* ── Config panel ── */}
-        <div className="w-full shrink-0 space-y-5 border-b p-4 lg:w-72 lg:overflow-y-auto lg:border-r lg:border-b-0">
+        <div className="w-full shrink-0 space-y-5 border-b py-4 sm:px-4 lg:w-72 lg:overflow-y-auto lg:border-r lg:border-b-0 lg:p-4">
           {/* Entity */}
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("dataSource")}</p>
@@ -570,7 +587,8 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     <button
                       type="button"
                       onClick={() => removeFilter(i)}
-                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      aria-label={tCommon("remove")}
+                      className="text-muted-foreground hover:text-destructive shrink-0 max-md:p-2"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -765,7 +783,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
         </div>
 
         {/* ── Results panel ── */}
-        <div className="flex-1 overflow-auto p-6 space-y-5">
+        <div ref={resultsRef} className="flex-1 scroll-mt-4 space-y-5 overflow-auto py-4 sm:p-6">
           {!result ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
               <BarChart2 className="h-14 w-14 text-muted-foreground/20" />
@@ -784,12 +802,13 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   </Badge>
                 )}
                 <div className="flex-1" />
-                <div className="flex items-center gap-1.5">
+                {/* The name field takes the row on a phone rather than 160px of it. */}
+                <div className="flex w-full items-center gap-1.5 sm:w-auto">
                   <Input
                     value={reportName}
                     onChange={(e) => setReportName(e.target.value)}
                     placeholder={t("reportName")}
-                    className="h-8 text-sm w-40"
+                    className="h-8 min-w-0 flex-1 text-sm sm:w-40 sm:flex-none"
                   />
                   <Button size="sm" variant="outline" onClick={handleSave} disabled={isPending || !reportName.trim()}>
                     <Save className="h-3.5 w-3.5 mr-1.5" />

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ la risposta di un cliente con un titolare torna ad aprire un ticket di supporto",
+    "find": "  if (!ticketRef && senderEmail) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️ la risposta a un ticket viene dirottata al commerciale",
+    "find": "  if (!ticketRef && senderEmail) {",
+    "replace": "  if (senderEmail) {"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️ il titolare riceve due avvisi per la stessa risposta a una sequenza",
+    "find": "      if (sequencesStopped === 0) {",
+    "replace": "      if (true) {"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "un contatto senza titolare non passa al titolare della sua azienda",
+    "find": "    const ownerId = contact.ownerId ?? contact.companyOwnerId;",
+    "replace": "    const ownerId = contact.ownerId;"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "⚠️ un indirizzo scritto con le maiuscole non viene riconosciuto",
+    "find": "    .where(sql`lower(${contacts.email}) = ${email}`)",
+    "replace": "    .where(eq(contacts.email, senderEmail))"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "⚠️ un lead già convertito viene ancora trattato come lead",
+    "find": "    .where(and(sql`lower(${leads.email}) = ${email}`, eq(leads.isConverted, false)))",
+    "replace": "    .where(sql`lower(${leads.email}) = ${email}`)"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "l'email ricevuta risulta scritta da uno dei nostri",
+    "find": "    ownerId: null,",
+    "replace": "    ownerId: target.ownerId,"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "⚠️ il task per rispondere non è assegnato al titolare",
+    "find": "    assigneeId: target.ownerId,",
+    "replace": "    assigneeId: null,"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "⚠️ con la posta in entrata configurata, le risposte vanno fuori da Flux e non si tracciano",
+    "find": "  return inbound ? undefined : senderEmail?.trim() || undefined;",
+    "replace": "  return senderEmail?.trim() || undefined;"
+  },
+  {
+    "file": "src/lib/inbound-sales-reply.ts",
+    "description": "un oggetto lunghissimo produce un titolo di task senza limite",
+    "find": "  return `${REPLY_TASK_PREFIX}${name}: ${subject}`.slice(0, 200);",
+    "replace": "  return `${REPLY_TASK_PREFIX}${name}: ${subject}`;"
+  }
+]

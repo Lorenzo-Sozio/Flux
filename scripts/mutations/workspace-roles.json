@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/lib/workspace-members.ts",
+    "description": "⚠️⚠️ i destinatari tornano a essere tutti i membri: un viewer riceve la richiesta di approvare un preventivo che non può approvare",
+    "find": "  return members.filter((m) => can(m.role, capability)).map((m) => m.userId);",
+    "replace": "  return members.map((m) => m.userId);"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️ la campanella dell'ordine chiede la capacità sbagliata: suona anche per chi non manda avanti l'attività",
+    "find": "          const destinatari = await membersWith(tenant.id, \"settings:manage\");",
+    "replace": "          const destinatari = await membersWith(tenant.id, \"record:read\");"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ agire sul record di un collega torna possibile a un editor",
+    "find": "  \"record:manageAny\": \"admin\",",
+    "replace": "  \"record:manageAny\": \"editor\","
+  }
+]

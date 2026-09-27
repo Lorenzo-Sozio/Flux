@@ -3,42 +3,40 @@
  * Translates FilterTree → Drizzle WHERE clause.
  */
 
-import {
-  and,
-  between,
-  eq,
-  gt,
-  gte,
-  ilike,
-  inArray,
-  lt,
-  lte,
-  ne,
-  not,
-  notInArray,
-  or,
-  type SQL,
-  sql,
-} from "drizzle-orm";
+import { and, between, eq, gt, gte, inArray, lt, lte, ne, not, notInArray, or, type SQL, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
-import { companies, contacts, deals, leads } from "@/db/schema";
+import { activities, companies, contacts, leads } from "@/db/schema";
 import type {
   FieldMeta,
   FieldMetaMap,
   FieldType,
   FilterCondition,
-  FilterGroup,
   FilterNode,
   FilterOperator,
   FilterTree,
   FilterValue,
 } from "@/lib/filter-types";
 import { NO_VALUE_OPERATORS } from "@/lib/filter-types";
+import { matchesText } from "@/lib/text-match";
 
 // ─── Field registry (server-only, includes Drizzle cols) ─────────────────────
 
 export type FieldDef = FieldMeta & { col: any };
 export type FieldRegistry = Record<string, FieldDef>;
+
+// ─── Fields that are not a column of the record (V2.5, §4.5) ─────────────────
+//
+// ⚠️ The filter had no owner, no tags, no "last activity" and no contact's company — the
+// four things a salesperson narrows a list by first ("my leads nobody has touched in a
+// month"). Each is an SQL expression rather than a column, which every operator accepts.
+
+/** When anything was last done with the record, as its own column would say it. */
+const lastActivityOf = (fk: AnyPgColumn, id: AnyPgColumn) =>
+  sql`(select max(coalesce(${activities.date}, ${activities.createdAt})) from ${activities} where ${fk} = ${id})`;
+
+/** A tag list as text, so "contains" and "is empty" read it like any other text field. */
+const tagsOf = (col: AnyPgColumn) => sql`array_to_string(${col}, ', ')`;
 
 export const LEAD_FIELDS: FieldRegistry = {
   firstName: { label: "First Name", type: "text", col: leads.firstName },
@@ -70,6 +68,9 @@ export const LEAD_FIELDS: FieldRegistry = {
   leadTypeId: { label: "Lead Type", type: "enum", col: leads.leadTypeId, options: [] }, // lookupOptions injected dynamically in page.tsx
   leadCategoryId: { label: "Lead Category", type: "enum", col: leads.leadCategoryId, options: [] }, // lookupOptions injected dynamically in page.tsx
   createdAt: { label: "Created Date", type: "date", col: leads.createdAt },
+  ownerId: { label: "Owner", type: "enum", col: leads.ownerId, options: [] }, // users injected in page.tsx
+  tags: { label: "Tags", type: "text", col: tagsOf(leads.tags) },
+  lastActivity: { label: "Last activity", type: "date", col: lastActivityOf(activities.leadId, leads.id) },
 };
 
 export const CONTACT_FIELDS: FieldRegistry = {
@@ -97,6 +98,14 @@ export const CONTACT_FIELDS: FieldRegistry = {
   leadScore: { label: "Lead Score", type: "number", col: contacts.leadScore },
   marketingConsent: { label: "Marketing Consent", type: "boolean", col: contacts.marketingConsent },
   createdAt: { label: "Created Date", type: "date", col: contacts.createdAt },
+  ownerId: { label: "Owner", type: "enum", col: contacts.ownerId, options: [] }, // users injected in page.tsx
+  tags: { label: "Tags", type: "text", col: tagsOf(contacts.tags) },
+  lastActivity: { label: "Last activity", type: "date", col: lastActivityOf(activities.contactId, contacts.id) },
+  companyName: {
+    label: "Company",
+    type: "text",
+    col: sql`(select ${companies.name} from ${companies} where ${companies.id} = ${contacts.companyId})`,
+  },
 };
 
 export const COMPANY_FIELDS: FieldRegistry = {
@@ -133,6 +142,9 @@ export const COMPANY_FIELDS: FieldRegistry = {
   companyCategoryId: { label: "Category", type: "enum", col: companies.companyCategoryId, options: [] }, // lookupOptions injected dynamically in page.tsx
   companyTypeId: { label: "Activity Type", type: "enum", col: companies.companyTypeId, options: [] }, // lookupOptions injected dynamically in page.tsx
   createdAt: { label: "Created Date", type: "date", col: companies.createdAt },
+  ownerId: { label: "Owner", type: "enum", col: companies.ownerId, options: [] }, // users injected in page.tsx
+  tags: { label: "Tags", type: "text", col: tagsOf(companies.tags) },
+  lastActivity: { label: "Last activity", type: "date", col: lastActivityOf(activities.companyId, companies.id) },
 };
 
 /** Extract client-safe FieldMetaMap from a FieldRegistry */
@@ -434,18 +446,19 @@ function buildCustomDateCond(op: FilterOperator, val?: string | [string, string]
 function buildText(col: any, op: FilterOperator, val: string): SQL | undefined {
   if (!val && !NO_VALUE_OPERATORS.includes(op)) return undefined;
   switch (op) {
+    // Accents folded, as the search box does (src/lib/text-match.ts): "Nicolo" finds "Nicolò".
     case "contains":
-      return ilike(col, `%${val}%`);
+      return matchesText(col, `%${val}%`);
     case "not_contains":
-      return not(ilike(col, `%${val}%`));
+      return not(matchesText(col, `%${val}%`));
     case "eq":
       return eq(col, val);
     case "neq":
       return ne(col, val);
     case "starts_with":
-      return ilike(col, `${val}%`);
+      return matchesText(col, `${val}%`);
     case "ends_with":
-      return ilike(col, `%${val}`);
+      return matchesText(col, `%${val}`);
     case "is_empty":
       return sql`(${col} IS NULL OR ${col} = '')`;
     case "is_not_empty":

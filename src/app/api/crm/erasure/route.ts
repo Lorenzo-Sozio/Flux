@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { createTenantDb } from "@/db";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { logApiWrite } from "@/lib/api-write-log";
 import { countByContactPoint, eraseByContactPoint } from "@/lib/erasure";
 import { getTenantById } from "@/lib/get-tenant";
@@ -12,6 +12,9 @@ import { decryptDbUrl } from "@/lib/tenant-db";
  * record it, and two literals that have to agree are one literal too many.
  */
 const ENDPOINT = "/api/crm/erasure";
+
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "privacy", access: "write" } as const;
 
 /**
  * GDPR art. 17 — erase the person reachable at a contact point.
@@ -24,10 +27,9 @@ const ENDPOINT = "/api/crm/erasure";
  * answers the person reads it, and «done» is not an answer they can give from a 200 alone.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
   if (!authResult.tenantId) {
     return NextResponse.json(
       { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },

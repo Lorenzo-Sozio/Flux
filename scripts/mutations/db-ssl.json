@@ -24,9 +24,9 @@
     "replace": "  if (!host || isLoopback(host)) return undefined;"
   },
   {
-    "file": "src/lib/db-ssl.ts",
+    "file": "src/lib/db-url.ts",
     "description": "la porta resta attaccata al nome host, quindi «localhost:5432» non viene riconosciuto e ogni sviluppo locale pretende un certificato",
-    "find": "  return authority.split(\":\")[0];",
-    "replace": "  return authority;"
+    "find": "  const host = bracketed ? bracketed[1] : authority.split(\":\")[0];",
+    "replace": "  const host = bracketed ? bracketed[1] : authority;"
   }
 ]

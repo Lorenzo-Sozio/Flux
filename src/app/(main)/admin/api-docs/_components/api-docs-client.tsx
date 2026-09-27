@@ -1,242 +1,24 @@
 "use client";
 
-import type React from "react";
-import { useEffect, useRef, useState } from "react";
-
 import {
-  AlertCircle,
   Bell,
   Building2,
-  Check,
-  ChevronDown,
-  ChevronRight,
   Clock,
-  Code2,
-  Copy,
-  Download,
-  ExternalLink,
   FileText,
   Globe,
-  Info,
   Lock,
   Mail,
   Receipt,
   Search,
   Server,
-  Shield,
-  Terminal,
   UserPlus,
   Users,
   Webhook,
   Zap,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-
-// ─── Types ─────────────────────────────────────────────────────────────────────
-
-type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
-type AuthLevel = "public" | "session" | "admin" | "cron";
-
-interface Param {
-  name: string;
-  in: "query" | "path" | "body" | "form" | "header";
-  required: boolean;
-  type: string;
-  description: string;
-  example?: string;
-  enum?: string[];
-}
-
-interface ApiEndpoint {
-  id: string;
-  method: Method;
-  path: string;
-  summary: string;
-  description: string;
-  auth: AuthLevel;
-  parameters?: Param[];
-  requestBody?: { contentType: string; example: string };
-  responses: Array<{ status: number; description: string; example: string }>;
-}
-
-interface ApiGroup {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  color: string;
-  bg: string;
-  border: string;
-  description: string;
-  isInfoOnly?: boolean;
-  endpoints: ApiEndpoint[];
-}
-
-// ─── Errori comuni ─────────────────────────────────────────────────────────────
-
-/**
- * The responses **every** route under /api/crm can return.
- *
- * ⚠️ Merged at render time rather than copied into each of the eighteen entries,
- * because copying is exactly how drift starts: one entry's text is updated and the others
- * are not, and whoever reads the wrong one discovers the real behaviour at runtime. None
- * of these was documented anywhere, so a 429 halfway through an import arrived with no
- * preavviso.
- */
-const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
-  {
-    status: 400,
-    description: "Manca il contesto del workspace, oppure il corpo non è JSON valido",
-    example: JSON.stringify(
-      { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
-      null,
-      2,
-    ),
-  },
-  {
-    status: 401,
-    description: "Credenziale assente o non valida, o X-Tenant-ID in disaccordo con la chiave usata",
-    example: JSON.stringify({ error: "Unauthorized" }, null, 2),
-  },
-  {
-    status: 404,
-    description: "Il workspace indicato non esiste nel registro",
-    example: JSON.stringify({ error: "Tenant not found" }, null, 2),
-  },
-  {
-    status: 422,
-    description: "JSON valido ma dati rifiutati: `errors` elenca ogni campo che non va",
-    example: JSON.stringify(
-      { error: "Validation failed", errors: [{ field: "email", message: "Invalid email address" }] },
-      null,
-      2,
-    ),
-  },
-  {
-    status: 429,
-    description: "Superato il limite di chiamate del piano per questo mese",
-    example: JSON.stringify({ error: "Monthly API call limit reached for your plan." }, null, 2),
-  },
-];
-
-/**
- * Every route that accepts `Idempotency-Key`.
- *
- * ⚠️ Generated from the routes that actually call `claim`, and checked against
- * them by `src/lib/docs-alignment.test.ts`. A list like this kept by hand is a
- * list that quietly stops matching the code, and the failure is a status an
- * integrator meets for the first time halfway through an import.
- *
- * The ones deliberately absent are the ones a repeat cannot hurt: closing a deal
- * that is already closed, an opt-out, an erasure.
- */
-const IDEMPOTENT_PATHS = [
-  "/api/crm/activities/bulk",
-  "/api/crm/activities",
-  "/api/crm/companies/{companyId}/activities/bulk",
-  "/api/crm/companies/{companyId}/activities",
-  "/api/crm/companies/bulk",
-  "/api/crm/companies",
-  "/api/crm/contacts/{contactId}/activities/bulk",
-  "/api/crm/contacts/{contactId}/activities",
-  "/api/crm/contacts/bulk",
-  "/api/crm/contacts",
-  "/api/crm/deals/{dealId}/activities/bulk",
-  "/api/crm/deals/{dealId}/activities",
-  "/api/crm/leads/{leadId}/activities/bulk",
-  "/api/crm/leads/{leadId}/activities",
-  "/api/crm/leads/bulk",
-  "/api/crm/leads",
-  "/api/crm/notes",
-  "/api/crm/orders",
-] as const;
-
-/**
- * The two answers a route gives about `Idempotency-Key` itself.
- *
- * ⚠️ A bulk request reports a rejected row inside a 200, row by row — that is the
- * whole design, and it is why the ordinary validation 422 is kept off those
- * endpoints. But a key reused with a different body has to be refused, and the
- * status for that is 422 as well. Same code, entirely different meaning, so it
- * carries its own description here rather than inheriting the common one.
- */
-const IDEMPOTENCY_RESPONSES: ApiEndpoint["responses"] = [
-  {
-    status: 409,
-    description:
-      "Una richiesta con lo stesso `Idempotency-Key` è ancora in corso. Riprova fra poco: non è stato importato niente due volte.",
-    example: JSON.stringify(
-      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
-      null,
-      2,
-    ),
-  },
-  {
-    status: 422,
-    description:
-      "⚠️ Lo stesso `Idempotency-Key` era già stato usato con un corpo diverso. Non è un errore di validazione delle righe: quelle tornano dentro un 200. Usa una chiave nuova per una richiesta nuova.",
-    example: JSON.stringify({ error: "This Idempotency-Key was already used with a different request body." }, null, 2),
-  },
-];
-
-/**
- * The responses common to every route guarded by `CRON_SECRET`.
- *
- * ⚠️ The 500 is not theoretical: with `CRON_SECRET` unset on the server every job
- * answers 500 for ever and none of them run. Worth knowing in advance.
- */
-const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
-  {
-    status: 401,
-    description: "Header Authorization assente o segreto sbagliato",
-    example: JSON.stringify({ error: "Unauthorized" }, null, 2),
-  },
-  {
-    status: 500,
-    description: "⚠️ `CRON_SECRET` non è configurato sul server: nessun job può girare finché non lo è",
-    example: JSON.stringify({ error: "CRON_SECRET is not configured on this server." }, null, 2),
-  },
-];
-
-/**
- * An entry's declared responses, plus whichever common ones it does not already have.
- *
- * ⚠️ A bulk variant does not return the *validation* 422. A rejected row does not fail
- * the request: the answer is 200 and the reason sits inside `results`, row by row.
- * Documenting that 422 on them would send an integrator looking for a status code
- * that never arrives, instead of inside the body where it actually is.
- *
- * A route that accepts `Idempotency-Key` also answers 409, and 422 for a key
- * reused with a different body. Those come from `IDEMPOTENCY_RESPONSES` above,
- * with their own wording.
- */
-function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
-  const isCrm = endpoint.path.startsWith("/api/crm/");
-  const isCron = endpoint.path.startsWith("/api/cron/");
-  if (!isCrm && !isCron) return endpoint.responses;
-
-  // ⚠️ Opt-out and erasure are not metered against the plan and therefore never answer
-  // 429. That is a choice: refusing an opt-out because the plan is
-  // esaurito significa continuare a contattare chi ha chiesto di smettere, e
-  // refusing an erasure means missing a deadline that is not ours to move. Neither is a
-  // billing decision.
-  const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
-
-  const isBulk = endpoint.path.endsWith("/bulk");
-  const isIdempotent = (IDEMPOTENT_PATHS as readonly string[]).includes(endpoint.path);
-  const common = isCron
-    ? CRON_COMMON_RESPONSES
-    : [
-        ...CRM_COMMON_RESPONSES.filter(
-          (r) => !(isBulk && r.status === 422) && !(UNMETERED.includes(endpoint.path) && r.status === 429),
-        ),
-        ...(isIdempotent ? IDEMPOTENCY_RESPONSES : []),
-      ];
-
-  const declared = new Set(endpoint.responses.map((r) => r.status));
-  return [...endpoint.responses, ...common.filter((r) => !declared.has(r.status))].sort((a, b) => a.status - b.status);
-}
+import { ApiDocsView } from "@/components/api-docs/api-docs-view";
+import { type ApiGroup, PUBLIC_API_GROUPS } from "@/lib/api-docs/public-api";
 
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
@@ -309,7 +91,7 @@ const GROUPS: ApiGroup[] = [
         path: "/api/contacts/import",
         summary: "Importa contatti da CSV",
         description:
-          "Accetta un file CSV tramite `multipart/form-data` e importa i contatti in bulk. I duplicati (rilevati per email) vengono saltati. Restituisce un riepilogo delle righe importate, saltate ed errate.",
+          "Accetta un file CSV tramite `multipart/form-data` e importa i contatti. Obbligatori nome e cognome; i duplicati per email (senza distinzione di maiuscole, anche dentro lo stesso file) vengono saltati. La colonna `company` collega l'azienda con quel nome, o la crea una volta sola. Richiede la capacità `record:import` (editor in su). Intestazioni in camelCase (quelle dell'esportazione), snake_case o italiano (Nome, Cognome, Email, Telefono, Azienda, Città, CAP…); separatore `,` o `;` rilevato da solo; fino a 5.000 righe. Tutte le righe sono validate con le stesse regole dell'API d'importazione; una riga rifiutata non ferma le altre e torna in `errors` con il numero di riga del foglio. Se il file supererebbe il limite di record del piano viene rifiutato per intero, senza scrivere niente. Non fa partire regole né webhook: è un'importazione, non un evento.",
         auth: "session",
         parameters: [
           {
@@ -317,8 +99,35 @@ const GROUPS: ApiGroup[] = [
             in: "form",
             required: true,
             type: "File (text/csv)",
-            description: "File CSV con i dati dei contatti. Colonna `email` obbligatoria.",
+            description: "File CSV con i dati dei contatti. Colonne obbligatorie: `firstName` e `lastName`.",
             example: "contacts.csv",
+          },
+          {
+            name: "mapping",
+            in: "form",
+            required: false,
+            type: "string (JSON)",
+            description:
+              'Quale campo riempie ogni colonna, come la sceglie l\'importazione guidata: `{ "Intestazione": "campo" }`, `""` per ignorare una colonna. Senza, le intestazioni vengono riconosciute da sole.',
+            example: '{"Nome":"firstName","Cognome":"lastName","Codice cliente":""}',
+          },
+          {
+            name: "onDuplicate",
+            in: "form",
+            required: false,
+            type: '"skip" | "update" | "create"',
+            description:
+              "Cosa fare di una riga già presente: `skip` (predefinito) la salta; `update` riempie il record con le sole celle compilate — celle vuote, titolare e fonte non si toccano, l'ultima riga vince; `create` crea comunque. Gli aggiornamenti vanno a blocchi, un'istruzione per blocco.",
+            example: "update",
+          },
+          {
+            name: "dryRun",
+            in: "form",
+            required: false,
+            type: '"1"',
+            description:
+              "Anteprima: esegue lo stesso piano senza scrivere niente e risponde con gli stessi conteggi. Un file oltre il limite del piano risponde 200 con `limitError` invece di 403. Ha un limite di frequenza suo, più largo.",
+            example: "1",
           },
         ],
         requestBody: {
@@ -332,9 +141,15 @@ const GROUPS: ApiGroup[] = [
             example: '{\n  "error": "Too many imports. Try again in 10 minutes."\n}',
           },
           {
+            status: 403,
+            description: "Manca la capacità `record:import`, oppure il file supererebbe il limite di record del piano",
+            example: JSON.stringify({ error: "Limite del piano raggiunto" }, null, 2),
+          },
+          {
             status: 200,
             description: "Import completato",
-            example: JSON.stringify({ imported: 42, skipped: 3, errors: ["Row 7: formato email non valido"] }, null, 2),
+            example:
+              '{\n  "success": true,\n  "dryRun": false,\n  "created": 42,\n  "updated": 5,\n  "skipped": 3,\n  "duplicates": [\n    "anna@startup.io"\n  ],\n  "errors": [\n    {\n      "line": 7,\n      "errors": [\n        {\n          "field": "email",\n          "message": "email must be a valid email address"\n        }\n      ]\n    }\n  ],\n  "total": 45\n}',
           },
           {
             status: 400,
@@ -386,7 +201,7 @@ const GROUPS: ApiGroup[] = [
         path: "/api/companies/import",
         summary: "Importa aziende da CSV",
         description:
-          "Accetta un file CSV e importa le aziende in bulk. I duplicati vengono rilevati per nome aziendale.",
+          "Accetta un file CSV e importa le aziende. Obbligatorio il nome; i duplicati si riconoscono dal nome, senza distinzione di maiuscole. Richiede la capacità `record:import` (editor in su). Intestazioni in camelCase (quelle dell'esportazione), snake_case o italiano (Nome, Cognome, Email, Telefono, Azienda, Città, CAP…); separatore `,` o `;` rilevato da solo; fino a 5.000 righe. Tutte le righe sono validate con le stesse regole dell'API d'importazione; una riga rifiutata non ferma le altre e torna in `errors` con il numero di riga del foglio. Se il file supererebbe il limite di record del piano viene rifiutato per intero, senza scrivere niente. Non fa partire regole né webhook: è un'importazione, non un evento.",
         auth: "session",
         parameters: [
           {
@@ -396,6 +211,33 @@ const GROUPS: ApiGroup[] = [
             type: "File (text/csv)",
             description: "CSV con le colonne delle aziende.",
             example: "companies.csv",
+          },
+          {
+            name: "mapping",
+            in: "form",
+            required: false,
+            type: "string (JSON)",
+            description:
+              'Quale campo riempie ogni colonna, come la sceglie l\'importazione guidata: `{ "Intestazione": "campo" }`, `""` per ignorare una colonna. Senza, le intestazioni vengono riconosciute da sole.',
+            example: '{"Nome":"firstName","Cognome":"lastName","Codice cliente":""}',
+          },
+          {
+            name: "onDuplicate",
+            in: "form",
+            required: false,
+            type: '"skip" | "update" | "create"',
+            description:
+              "Cosa fare di una riga già presente: `skip` (predefinito) la salta; `update` riempie il record con le sole celle compilate — celle vuote, titolare e fonte non si toccano, l'ultima riga vince; `create` crea comunque. Gli aggiornamenti vanno a blocchi, un'istruzione per blocco.",
+            example: "update",
+          },
+          {
+            name: "dryRun",
+            in: "form",
+            required: false,
+            type: '"1"',
+            description:
+              "Anteprima: esegue lo stesso piano senza scrivere niente e risponde con gli stessi conteggi. Un file oltre il limite del piano risponde 200 con `limitError` invece di 403. Ha un limite di frequenza suo, più largo.",
+            example: "1",
           },
         ],
         requestBody: {
@@ -409,9 +251,15 @@ const GROUPS: ApiGroup[] = [
             example: '{\n  "error": "Too many imports. Try again later."\n}',
           },
           {
+            status: 403,
+            description: "Manca la capacità `record:import`, oppure il file supererebbe il limite di record del piano",
+            example: JSON.stringify({ error: "Limite del piano raggiunto" }, null, 2),
+          },
+          {
             status: 200,
             description: "Import completato",
-            example: JSON.stringify({ imported: 15, skipped: 2, errors: [] }, null, 2),
+            example:
+              '{\n  "success": true,\n  "dryRun": false,\n  "created": 42,\n  "updated": 5,\n  "skipped": 3,\n  "duplicates": [\n    "anna@startup.io"\n  ],\n  "errors": [\n    {\n      "line": 7,\n      "errors": [\n        {\n          "field": "email",\n          "message": "email must be a valid email address"\n        }\n      ]\n    }\n  ],\n  "total": 45\n}',
           },
           {
             status: 400,
@@ -434,8 +282,81 @@ const GROUPS: ApiGroup[] = [
     color: "text-green-600",
     bg: "bg-green-50",
     border: "border-green-200",
-    description: "Esportazione dei lead in formato CSV.",
+    description: "Importazione ed esportazione dei lead in formato CSV.",
     endpoints: [
+      {
+        id: "leads-import",
+        method: "POST",
+        path: "/api/leads/import",
+        summary: "Importa lead da CSV",
+        description:
+          "Accetta un file CSV e importa i lead. Serve almeno uno fra nome, cognome, email e telefono; i duplicati per email vengono saltati. Lo stato, se presente, è uno di new, contacting, engaged, qualified, unqualified. Richiede la capacità `record:import` (editor in su). Intestazioni in camelCase (quelle dell'esportazione), snake_case o italiano (Nome, Cognome, Email, Telefono, Azienda, Città, CAP…); separatore `,` o `;` rilevato da solo; fino a 5.000 righe. Tutte le righe sono validate con le stesse regole dell'API d'importazione; una riga rifiutata non ferma le altre e torna in `errors` con il numero di riga del foglio. Se il file supererebbe il limite di record del piano viene rifiutato per intero, senza scrivere niente. Non fa partire regole né webhook: è un'importazione, non un evento.",
+        auth: "session",
+        parameters: [
+          {
+            name: "file",
+            in: "form",
+            required: true,
+            type: "File (text/csv)",
+            description: "CSV con le colonne dei lead.",
+            example: "leads.csv",
+          },
+          {
+            name: "mapping",
+            in: "form",
+            required: false,
+            type: "string (JSON)",
+            description:
+              'Quale campo riempie ogni colonna, come la sceglie l\'importazione guidata: `{ "Intestazione": "campo" }`, `""` per ignorare una colonna. Senza, le intestazioni vengono riconosciute da sole.',
+            example: '{"Nome":"firstName","Cognome":"lastName","Codice cliente":""}',
+          },
+          {
+            name: "onDuplicate",
+            in: "form",
+            required: false,
+            type: '"skip" | "update" | "create"',
+            description:
+              "Cosa fare di una riga già presente: `skip` (predefinito) la salta; `update` riempie il record con le sole celle compilate — celle vuote, titolare e fonte non si toccano, l'ultima riga vince; `create` crea comunque. Gli aggiornamenti vanno a blocchi, un'istruzione per blocco.",
+            example: "update",
+          },
+          {
+            name: "dryRun",
+            in: "form",
+            required: false,
+            type: '"1"',
+            description:
+              "Anteprima: esegue lo stesso piano senza scrivere niente e risponde con gli stessi conteggi. Un file oltre il limite del piano risponde 200 con `limitError` invece di 403. Ha un limite di frequenza suo, più largo.",
+            example: "1",
+          },
+        ],
+        requestBody: {
+          contentType: "multipart/form-data",
+          example: `curl -X POST /api/leads/import \\\n  -H "Cookie: authjs.session-token=..." \\\n  -F "file=@leads.csv;type=text/csv"`,
+        },
+        responses: [
+          {
+            status: 403,
+            description: "Manca la capacità `record:import`, oppure il file supererebbe il limite di record del piano",
+            example: JSON.stringify({ error: "Limite del piano raggiunto" }, null, 2),
+          },
+          {
+            status: 200,
+            description: "Import completato",
+            example:
+              '{\n  "success": true,\n  "dryRun": false,\n  "created": 42,\n  "updated": 5,\n  "skipped": 3,\n  "duplicates": [\n    "anna@startup.io"\n  ],\n  "errors": [\n    {\n      "line": 7,\n      "errors": [\n        {\n          "field": "email",\n          "message": "email must be a valid email address"\n        }\n      ]\n    }\n  ],\n  "total": 45\n}',
+          },
+          {
+            status: 400,
+            description: "File mancante o non leggibile come CSV",
+            example: JSON.stringify({ error: "No file provided." }, null, 2),
+          },
+          {
+            status: 401,
+            description: "Non autenticato",
+            example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+          },
+        ],
+      },
       {
         id: "leads-export",
         method: "GET",
@@ -564,6 +485,20 @@ const GROUPS: ApiGroup[] = [
     description:
       "Gestione degli allegati associati alle entità CRM (contatti, lead, aziende, deal, ticket). I file sono memorizzati fuori dalla cartella pubblica e serviti tramite route autenticata.",
     endpoints: [
+      {
+        id: "workspace-logo",
+        method: "GET",
+        path: "/api/workspace/logo",
+        summary: "Logo del workspace",
+        description:
+          "Il logo impostato in Impostazioni → Generale, per l'anteprima. Solo per chi è entrato nel workspace: ai clienti il logo arriva dentro i PDF dei preventivi, non da qui. PNG o JPEG, `Cache-Control: private, no-store`.",
+        auth: "session",
+        responses: [
+          { status: 200, description: "L'immagine (`image/png` o `image/jpeg`)", example: "<bytes>" },
+          { status: 401, description: "Non autenticato", example: "Unauthorized" },
+          { status: 404, description: "Nessun logo impostato, o l'archivio non lo restituisce", example: "Not found" },
+        ],
+      },
       {
         id: "documents-list",
         method: "GET",
@@ -717,6 +652,161 @@ const GROUPS: ApiGroup[] = [
             status: 415,
             description: "MIME type non supportato o magic bytes mismatch",
             example: JSON.stringify({ error: 'File type "text/html" is not allowed.' }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "chat-message-attachment",
+        method: "POST",
+        path: "/api/chat/messages",
+        summary: "Invia un messaggio in chat con un allegato",
+        description:
+          "Invia in una conversazione della chat interna un messaggio con un file allegato (il testo è facoltativo). Stessi controlli dei documenti: tipo MIME in whitelist, estensione coerente, magic bytes, massimo 10 MB, spazio del piano. Solo i membri della conversazione possono inviare; le menzioni valgono solo per chi è nella conversazione.",
+        auth: "session",
+        parameters: [
+          {
+            name: "conversationId",
+            in: "form",
+            required: true,
+            type: "string",
+            description: "ID della conversazione.",
+            example: "conv_01",
+          },
+          {
+            name: "file",
+            in: "form",
+            required: true,
+            type: "File",
+            description: "Il file da inviare (max 10 MB, MIME type nella whitelist).",
+            example: "preventivo.pdf",
+          },
+          {
+            name: "content",
+            in: "form",
+            required: false,
+            type: "string",
+            description: "Il testo che accompagna il file.",
+            example: "Ecco il preventivo firmato",
+          },
+          {
+            name: "mentionIds",
+            in: "form",
+            required: false,
+            type: "string",
+            description: "Array JSON degli utenti menzionati; chi non è nella conversazione viene ignorato.",
+            example: '["usr_luca"]',
+          },
+        ],
+        requestBody: {
+          contentType: "multipart/form-data",
+          example: `curl -X POST /api/chat/messages \\\n  -H "Cookie: authjs.session-token=..." \\\n  -F "conversationId=conv_01" \\\n  -F "file=@preventivo.pdf;type=application/pdf"`,
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Messaggio inviato, con il suo allegato",
+            example: JSON.stringify(
+              {
+                message: {
+                  id: "msg_01",
+                  conversationId: "conv_01",
+                  content: "",
+                  attachments: [{ id: "att_01", name: "preventivo.pdf", mimeType: "application/pdf", size: 204800 }],
+                },
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 400,
+            description: "Richiesta non multipart, conversationId mancante o malformato, file assente",
+            example: JSON.stringify({ error: "Invalid request." }, null, 2),
+          },
+          {
+            status: 401,
+            description: "Sessione assente",
+            example: '{\n  "error": "Unauthorized"\n}',
+          },
+          {
+            status: 402,
+            description: "Spazio del piano esaurito: documenti e file della chat contano insieme",
+            example: '{\n  "error": "Storage limit reached for your plan."\n}',
+          },
+          {
+            status: 403,
+            description: "Chi invia non è membro della conversazione",
+            example: '{\n  "error": "Forbidden"\n}',
+          },
+          {
+            status: 413,
+            description: "File troppo grande (max 10 MB)",
+            example: JSON.stringify({ error: "File too large (max 10 MB)." }, null, 2),
+          },
+          {
+            status: 415,
+            description: "MIME type non supportato o magic bytes mismatch",
+            example: JSON.stringify({ error: 'File type "text/html" is not allowed.' }, null, 2),
+          },
+          {
+            status: 500,
+            description: "Salvataggio del file o del messaggio non riuscito; il file caricato viene rimosso",
+            example: JSON.stringify({ error: "Could not save the file." }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "chat-attachment-download",
+        method: "GET",
+        path: "/api/chat/attachments/{id}",
+        summary: "Scarica un allegato della chat",
+        description:
+          "Restituisce il file, solo a chi è membro della conversazione in cui è stato inviato: chi ha lasciato un gruppo non lo apre più. Con `view=1` le immagini sono mostrate inline (anteprima nel thread); ogni altro tipo è sempre un download. `nosniff` e una CSP che non consente nulla.",
+        auth: "session",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID dell'allegato.",
+            example: "att_01",
+          },
+          {
+            name: "view",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "`1` per mostrare un'immagine inline invece di scaricarla.",
+            example: "1",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il file, con il suo Content-Type",
+            example: "(contenuto binario)",
+          },
+          {
+            status: 401,
+            description: "Sessione assente",
+            example: "Unauthorized",
+          },
+          {
+            status: 403,
+            description: "Chiave di archiviazione non riconosciuta: il file non viene servito",
+            example: "Forbidden",
+          },
+          {
+            status: 404,
+            description:
+              "Allegato inesistente, oppure chi chiede non è nella conversazione (stessa risposta, per non confermare che esiste)",
+            example: "Not found",
+          },
+          {
+            status: 502,
+            description: "L'archivio dei file non ha risposto",
+            example: "Could not read the file.",
           },
         ],
       },
@@ -985,7 +1075,7 @@ const GROUPS: ApiGroup[] = [
         path: "/api/quotes/public",
         summary: "Accetta o rifiuta un preventivo",
         description:
-          "Permette al cliente di accettare o rifiutare un preventivo tramite token pubblico. L'azione viene registrata con timestamp e IP. Il preventivo deve essere in stato `sent` o `viewed`.",
+          "Permette al cliente di accettare o rifiutare un preventivo tramite token pubblico. Il preventivo deve essere in stato `sent` o `viewed`. ⚠️ **Accettare è firmare** (firma elettronica semplice): servono `signerName` e `consent: true`, altrimenti 422 `signature_required`. Si registrano il nome, il testo del consenso ricostruito dal server nella lingua del cliente, data e ora, l'IP visto dalla piattaforma, il browser e l'impronta SHA-256 del PDF accettato, i cui byte sono conservati. Il rifiuto non si firma.",
         auth: "public",
         parameters: [
           {
@@ -1013,10 +1103,31 @@ const GROUPS: ApiGroup[] = [
             description: "Motivazione del rifiuto (solo per `action: declined`).",
             example: "Budget non disponibile per il Q3.",
           },
+          {
+            name: "signerName",
+            in: "body",
+            required: false,
+            type: "string",
+            description:
+              "Nome e cognome di chi firma (obbligatorio per `action: accepted`, 3–120 caratteri, con lettere).",
+            example: "Mario Rossi",
+          },
+          {
+            name: "consent",
+            in: "body",
+            required: false,
+            type: "boolean",
+            description: "La casella di consenso spuntata (obbligatoria per `action: accepted`).",
+            example: "true",
+          },
         ],
         requestBody: {
           contentType: "application/json",
-          example: JSON.stringify({ token: "qt_pTkXz3mNR9aQv8", action: "accepted" }, null, 2),
+          example: JSON.stringify(
+            { token: "qt_pTkXz3mNR9aQv8", action: "accepted", signerName: "Mario Rossi", consent: true },
+            null,
+            2,
+          ),
         },
         responses: [
           {
@@ -1044,6 +1155,15 @@ const GROUPS: ApiGroup[] = [
             status: 400,
             description: "Token o azione non valida",
             example: JSON.stringify({ error: "Invalid request" }, null, 2),
+          },
+          {
+            status: 422,
+            description: "Accettazione senza nome o senza consenso: accettare è firmare",
+            example: JSON.stringify(
+              { error: "Type your name and tick the consent to sign.", code: "signature_required" },
+              null,
+              2,
+            ),
           },
           {
             status: 409,
@@ -1249,6 +1369,35 @@ const GROUPS: ApiGroup[] = [
     description: "Endpoint pubblici per la gestione delle risposte RSVP agli appuntamenti tramite link email.",
     endpoints: [
       {
+        id: "appointments-ics",
+        method: "GET",
+        path: "/api/appointments/{id}/ics",
+        summary: "Scarica un appuntamento in formato .ics",
+        description:
+          'Il file per "Aggiungi al mio calendario": `text/calendar` secondo RFC 5545 con `METHOD:PUBLISH`, così il calendario che lo apre lo archivia invece di chiedere una risposta all\'organizzatore.\n\n' +
+          "Un appuntamento ricorrente porta la regola (`RRULE`), le date escluse (`EXDATE`) e il fuso orario (`VTIMEZONE`): gli orari restano quelli locali anche al cambio dell'ora legale. Uno di tutto il giorno usa date senza ora.",
+        auth: "session",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID dell'appuntamento.",
+            example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il file .ics (attachment)",
+            example: `BEGIN:VCALENDAR\nVERSION:2.0\nMETHOD:PUBLISH\nBEGIN:VEVENT\nUID:…@fluxcrm.app\nDTSTART:20261005T080000Z\nDTEND:20261005T090000Z\nSUMMARY:Riunione con il cliente\nEND:VEVENT\nEND:VCALENDAR`,
+          },
+          { status: 401, description: "Nessuna sessione, o senza permesso di lettura", example: "Unauthorized" },
+          { status: 404, description: "Appuntamento inesistente", example: "Not found" },
+        ],
+      },
+      {
         id: "appointments-rsvp",
         method: "GET",
         path: "/api/appointments/rsvp",
@@ -1286,6 +1435,301 @@ const GROUPS: ApiGroup[] = [
             description: "Token non valido, scaduto o risposta non riconosciuta — HTML di errore",
             example: `<!-- Content-Type: text/html -->\n<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Errore</h1>\n    <p>Link non valido o scaduto.</p>\n  </body>\n</html>`,
           },
+        ],
+      },
+      {
+        id: "forms-public-post",
+        method: "POST",
+        path: "/api/forms",
+        summary: "Invia un modulo pubblico (contatto o assistenza)",
+        description:
+          "Il modulo di contatto crea un lead — oppure, per chi è già nel CRM, aggiunge il messaggio alla sua cronologia — e il modulo di assistenza apre un ticket. JSON o un normale invio di modulo HTML; aperto a qualunque origine (CORS), senza autenticazione, limitato a 5 invii al minuto per indirizzo. Con Cloudflare Turnstile configurato serve il campo `cf-turnstile-response`. Un campo `website` compilato viene trattato come un robot. `redirect` (http/https) porta il browser a una pagina dopo un invio riuscito.",
+        auth: "public",
+        parameters: [
+          {
+            name: "workspace",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Sottodominio del workspace.",
+            example: "acme",
+          },
+          {
+            name: "token",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Token del modulo (Impostazioni → Moduli).",
+            example: "q7m2x9k4b8n6t5r2wzv3",
+          },
+          {
+            name: "name",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Nome del mittente.",
+            example: "Mario Rossi",
+          },
+          {
+            name: "email",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Email del mittente.",
+            example: "mario@example.com",
+          },
+          {
+            name: "message",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Modulo di contatto: il messaggio.",
+            example: "Vorrei un preventivo.",
+          },
+          {
+            name: "consent",
+            in: "body",
+            required: false,
+            type: "boolean",
+            description: "Modulo di contatto: consenso marketing spuntato.",
+            example: "false",
+          },
+          {
+            name: "subject",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Modulo di assistenza: oggetto (obbligatorio).",
+            example: "Non riesco ad accedere",
+          },
+          {
+            name: "description",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Modulo di assistenza: descrizione (obbligatoria).",
+            example: "Dopo l'aggiornamento...",
+          },
+          {
+            name: "redirect",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Pagina a cui mandare il browser dopo l'invio.",
+            example: "https://www.example.com/grazie",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              workspace: "acme",
+              token: "q7m2x9k4b8n6t5r2wzv3",
+              name: "Mario Rossi",
+              email: "mario@example.com",
+              message: "Vorrei un preventivo.",
+              consent: false,
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Ricevuto",
+            example: '{\n  "ok": true,\n  "kind": "ticket",\n  "ticketNumber": "TKT-202609-A1B2C3"\n}',
+          },
+          { status: 303, description: "Ricevuto, con redirect", example: "Location: https://www.example.com/grazie" },
+          { status: 400, description: "Corpo illeggibile", example: '{\n  "ok": false,\n  "reason": "invalid"\n}' },
+          {
+            status: 403,
+            description: "Controllo Turnstile non superato",
+            example: '{\n  "ok": false,\n  "reason": "captcha"\n}',
+          },
+          {
+            status: 404,
+            description: "Modulo inesistente o chiuso",
+            example: '{\n  "ok": false,\n  "reason": "notFound"\n}',
+          },
+          {
+            status: 422,
+            description: "Campi mancanti o non validi",
+            example: '{\n  "ok": false,\n  "reason": "invalid"\n}',
+          },
+          { status: 429, description: "Troppi invii", example: '{\n  "ok": false,\n  "reason": "tooMany"\n}' },
+        ],
+      },
+      {
+        id: "booking-public-post",
+        method: "POST",
+        path: "/api/booking",
+        summary: "Prenota un orario da una pagina di prenotazione",
+        description:
+          "Il modulo della pagina pubblica `/b/{workspace}/{token}`. L'orario deve essere tra quelli offerti in quel momento (liberi nel calendario della persona, dentro le sue ore); l'appuntamento viene creato, chi prenota riceve l'invito e viene archiviato come contatto o lead esistente, oppure come nuovo lead. Senza autenticazione; limitato a 5 richieste al minuto per indirizzo. Un campo `website` compilato viene trattato come un robot: risposta di successo, nessuna scrittura.",
+        auth: "public",
+        parameters: [
+          {
+            name: "workspace",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Sottodominio del workspace.",
+            example: "acme",
+          },
+          {
+            name: "token",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Token della pagina di prenotazione.",
+            example: "k3v7q2m9x4b8n6t5r2wz",
+          },
+          {
+            name: "start",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Inizio scelto, ISO 8601, uno di quelli offerti.",
+            example: "2026-09-29T07:00:00.000Z",
+          },
+          {
+            name: "name",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Nome di chi prenota.",
+            example: "Mario Rossi",
+          },
+          {
+            name: "email",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Email di chi prenota.",
+            example: "mario@example.com",
+          },
+          {
+            name: "phone",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Telefono.",
+            example: "+39 333 1234567",
+          },
+          {
+            name: "note",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Nota per l'incontro.",
+            example: "Vorrei parlare del rinnovo.",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              workspace: "acme",
+              token: "k3v7q2m9x4b8n6t5r2wz",
+              start: "2026-09-29T07:00:00.000Z",
+              name: "Mario Rossi",
+              email: "mario@example.com",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Prenotato",
+            example:
+              '{\n  "ok": true,\n  "startAt": "2026-09-29T07:00:00.000Z",\n  "endAt": "2026-09-29T08:00:00.000Z"\n}',
+          },
+          { status: 400, description: "Corpo non JSON", example: '{\n  "ok": false,\n  "reason": "invalid"\n}' },
+          {
+            status: 404,
+            description: "Pagina inesistente o chiusa",
+            example: '{\n  "ok": false,\n  "reason": "notFound"\n}',
+          },
+          {
+            status: 409,
+            description: "Orario non più disponibile",
+            example: '{\n  "ok": false,\n  "reason": "taken"\n}',
+          },
+          {
+            status: 422,
+            description: "Nome, email o orario non validi",
+            example: '{\n  "ok": false,\n  "reason": "invalid"\n}',
+          },
+          { status: 429, description: "Troppi tentativi", example: '{\n  "ok": false,\n  "reason": "tooMany"\n}' },
+        ],
+      },
+      {
+        id: "ticket-rating-post",
+        method: "POST",
+        path: "/api/tickets/public",
+        summary: "Registra il giudizio del cliente su una richiesta risolta",
+        description:
+          "Il riquadro «Com'è andata?» della pagina di stato `/t/{workspace}/{token}`, a cui portano i pulsanti dell'email di risoluzione. Vale solo per un ticket risolto o chiuso; l'ultima risposta prevale e un commento dato in precedenza resta. Un giudizio negativo viene notificato a chi ha gestito il ticket, una volta. Senza autenticazione: il token è l'intero permesso. Limitato a 10 richieste al minuto per indirizzo.",
+        auth: "public",
+        parameters: [
+          {
+            name: "workspace",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Sottodominio del workspace.",
+            example: "acme",
+          },
+          {
+            name: "token",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Token del ticket, dal link dell'email.",
+            example: "k3v7q2m9x4b8n6t5r2wz",
+          },
+          {
+            name: "rating",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "`good` oppure `bad`.",
+            example: "bad",
+          },
+          {
+            name: "comment",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Facoltativo, fino a 2000 caratteri.",
+            example: "Ci è voluta una settimana.",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify({ workspace: "acme", token: "k3v7q2m9x4b8n6t5r2wz", rating: "good" }, null, 2),
+        },
+        responses: [
+          { status: 200, description: "Registrato", example: '{\n  "ok": true\n}' },
+          {
+            status: 400,
+            description: "Corpo non JSON, giudizio o token non validi",
+            example: '{\n  "ok": false,\n  "reason": "invalid"\n}',
+          },
+          {
+            status: 404,
+            description: "Workspace o ticket inesistente",
+            example: '{\n  "ok": false,\n  "reason": "notFound"\n}',
+          },
+          {
+            status: 409,
+            description: "Il ticket non è ancora risolto",
+            example: '{\n  "ok": false,\n  "reason": "notYet"\n}',
+          },
+          { status: 429, description: "Troppi tentativi", example: '{\n  "ok": false,\n  "reason": "tooMany"\n}' },
         ],
       },
     ],
@@ -1369,9 +1813,9 @@ const GROUPS: ApiGroup[] = [
         id: "unsubscribe",
         method: "GET",
         path: "/api/unsubscribe",
-        summary: "Disiscrizione da campagne marketing",
+        summary: "Pagina di disiscrizione: chiede, non agisce",
         description:
-          "Gestisce la disiscrizione di un contatto dalle comunicazioni marketing tramite token sicuro. Imposta `marketingConsent = false` e registra l'evento nel log campagna. Restituisce una pagina HTML di conferma.",
+          "Il link delle email. ⚠️ Aprirlo non disiscrive nessuno: mostra l'indirizzo e un pulsante che fa POST. Gli scanner della posta aziendale aprono ogni link, e un GET che agiva disiscriveva persone che non l'avevano chiesto (deciso il 27 settembre 2026).",
         auth: "public",
         parameters: [
           {
@@ -1394,6 +1838,33 @@ const GROUPS: ApiGroup[] = [
             description:
               "⚠️ Anche con un token non valido o già usato. Questa rotta la apre una persona da un client di posta, non un programma: la pagina cambia, il codice di stato no. Non c'è nessun 4xx da intercettare.",
             example: `<!-- Content-Type: text/html -->\n<html>\n  <body>\n    <h1>Link non valido</h1>\n  </body>\n</html>`,
+          },
+        ],
+      },
+      {
+        id: "unsubscribe-post",
+        method: "POST",
+        path: "/api/unsubscribe",
+        summary: "Disiscrizione: il pulsante della pagina, o il clic unico del client di posta",
+        description:
+          "Aggiunge l'indirizzo alle esclusioni, ferma le sequenze, ritira il consenso marketing con la sua data e annuncia `consent.withdrawn`. È anche il `List-Unsubscribe-Post` di RFC 8058: le email portano `List-Unsubscribe` e `List-Unsubscribe-Post: List-Unsubscribe=One-Click`, così il pulsante «Annulla iscrizione» di Gmail e Outlook arriva qui con il token nell'indirizzo.",
+        auth: "public",
+        parameters: [
+          {
+            name: "token",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "Il token firmato: nell'indirizzo (clic unico) o nel corpo del modulo (`token=…`).",
+            example: "eyJlIjoibWFyaW9AY2xpZW50ZS5pdCIs…",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description:
+              "Disiscrizione eseguita — pagina HTML. Anche con un token non valido la pagina cambia, lo stato no.",
+            example: `<!-- Content-Type: text/html -->\n<html>\n  <body>\n    <h1>Unsubscribed successfully</h1>\n  </body>\n</html>`,
           },
         ],
       },
@@ -1959,2106 +2430,8 @@ const GROUPS: ApiGroup[] = [
       },
     ],
   },
-  {
-    id: "crm-import",
-    label: "CRM Import API",
-    icon: Terminal,
-    color: "text-teal-600",
-    bg: "bg-teal-50",
-    border: "border-teal-200",
-    description:
-      "Endpoint REST per l'import programmatico di Lead, Company, Contact e Activity.\n\n" +
-      "⚠️ NON si usa un sottodominio per workspace. Il prodotto sta su un dominio solo e il workspace non viene mai dedotto dall'header Host: lo dice la credenziale. Con la chiave del workspace è la chiave stessa a dirlo; con la chiave di piattaforma serve l'header `X-Tenant-ID`; con la sessione viene dal JWT. Chiamare un sottodominio senza credenziale giusta risponde 400 `Tenant context required`, e non c'è nessun parametro nel corpo che possa rimediare.\n\n" +
-      "`ownerId` segue la credenziale: con la sessione il record nasce assegnato a chi ha chiamato, con una chiave API nasce senza proprietario, perché una chiave non è una persona.\n\n" +
-      "Ogni endpoint ha una variante bulk, fino a 500 record per richiesta, con `onDuplicate` a scelta fra `skip`, `update` ed `error`. Una richiesta bulk risponde sempre 200 e riporta l'esito riga per riga: le righe rifiutate stanno dentro il corpo, non nel codice di stato.\n\n⚠️ Manda anche un `Idempotency-Key`, una stringa tua che identifichi la singola importazione. Se la risposta non ti arriva — un timeout, una connessione caduta — non sai che cosa sia entrato, e rimandare lo stesso lotto duplica tutto ciò che quella rotta non sa deduplicare: contatti e lead si confrontano solo sull'email, che è facoltativa, e le attività su niente. Con la chiave puoi rimandare la richiesta identica quante volte vuoi: la prima importa, le successive ti restituiscono la stessa identica risposta, con gli stessi id, senza scrivere niente. La risposta rigiocata porta l'intestazione `Idempotent-Replay: true`. Se la stessa chiave arriva con un corpo diverso è un 422, perché rispondere con il risultato del primo corpo sembrerebbe riuscito. Senza chiave non cambia niente rispetto a prima.",
-    endpoints: [
-      {
-        id: "crm-leads-create",
-        method: "POST",
-        path: "/api/crm/leads",
-        summary: "Crea un lead",
-        description:
-          "Crea un singolo lead con validazione completa. La deduplicazione avviene per email (case-insensitive). Se `onDuplicate` è `skip` (default) e l'email è già presente, restituisce lo status `skipped`. Con `update` aggiorna il record esistente; con `error` risponde con HTTP 409.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "firstName",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Nome del lead",
-            example: "Anna",
-          },
-          {
-            name: "lastName",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Cognome del lead",
-            example: "Bianchi",
-          },
-          {
-            name: "email",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Indirizzo email — usato per la deduplicazione",
-            example: "anna@startup.io",
-          },
-          {
-            name: "phone",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Telefono fisso",
-            example: "+39 02 1234567",
-          },
-          {
-            name: "mobile",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Cellulare",
-            example: "+39 333 1234567",
-          },
-          {
-            name: "companyName",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Azienda di provenienza",
-            example: "StartupIO Srl",
-          },
-          {
-            name: "jobTitle",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Ruolo professionale",
-            example: "CEO",
-          },
-          { name: "industry", in: "body", required: false, type: "string", description: "Settore", example: "SaaS" },
-          {
-            name: "website",
-            in: "body",
-            required: false,
-            type: "string (URL)",
-            description: "Sito web aziendale",
-            example: "https://startup.io",
-          },
-          {
-            name: "status",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Stato del lead",
-            enum: ["new", "contacting", "engaged", "qualified", "unqualified"],
-            example: "new",
-          },
-          {
-            name: "rating",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Priorità del lead",
-            enum: ["hot", "warm", "cold"],
-            example: "warm",
-          },
-          {
-            name: "source",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Sorgente di acquisizione",
-            example: "linkedin",
-          },
-          {
-            name: "leadScore",
-            in: "body",
-            required: false,
-            type: "integer (0–100)",
-            description: "Score qualitativo",
-            example: "72",
-          },
-          {
-            name: "notes",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Note libere (max 5000 caratteri)",
-            example: "Ha partecipato al webinar Q1 2026",
-          },
-          {
-            name: "marketingConsent",
-            in: "body",
-            required: false,
-            type: "boolean",
-            description: "Consenso marketing ricevuto",
-            example: "true",
-          },
-          {
-            name: "tags",
-            in: "body",
-            required: false,
-            type: "string[]",
-            description: "Tag di classificazione",
-            example: '["inbound","q2-2026"]',
-          },
-          {
-            name: "street",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Via/indirizzo",
-            example: "Via Roma 1",
-          },
-          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Milano" },
-          {
-            name: "state",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Regione / Provincia",
-            example: "MI",
-          },
-          { name: "zipCode", in: "body", required: false, type: "string", description: "CAP", example: "20121" },
-          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Strategia deduplicazione",
-            enum: ["skip", "update", "error"],
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example:
-            `# Il workspace lo dice la credenziale, mai l'indirizzo: un dominio solo per tutti.\n#\n# Con la chiave del workspace — niente X-Tenant-ID, e uno diverso viene rifiutato:\n# curl -X POST https://app.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer flx_9f2c8ab1..." \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n#\n# Con la chiave di piattaforma — X-Tenant-ID e obbligatorio:\n# curl -X POST https://app.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer $IMPORT_API_KEY" \\\n#   -H "X-Tenant-ID: 0f3c1e5a-..." \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n\n` +
-            JSON.stringify(
-              {
-                firstName: "Anna",
-                lastName: "Bianchi",
-                email: "anna@startup.io",
-                companyName: "StartupIO Srl",
-                status: "new",
-                rating: "warm",
-                source: "linkedin",
-                leadScore: 72,
-                marketingConsent: true,
-                tags: ["inbound", "q2-2026"],
-                onDuplicate: "skip",
-              },
-              null,
-              2,
-            ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Lead creato",
-            example: JSON.stringify(
-              {
-                status: "created",
-                id: "lead_01JX",
-                data: {
-                  id: "lead_01JX",
-                  firstName: "Anna",
-                  lastName: "Bianchi",
-                  email: "anna@startup.io",
-                  status: "new",
-                },
-              },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 200,
-            description: "Lead saltato (duplicato) o aggiornato",
-            example: JSON.stringify({ status: "skipped", reason: "duplicate_email", existingId: "lead_99YZ" }, null, 2),
-          },
-          {
-            status: 409,
-            description: "Conflitto — onDuplicate=error e duplicato trovato",
-            example: JSON.stringify({ error: "Conflict", reason: "duplicate_email", existingId: "lead_99YZ" }, null, 2),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              {
-                error: "Validation failed",
-                errors: [{ field: "email", message: "email is not a valid email address" }],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-leads-bulk",
-        method: "POST",
-        path: "/api/crm/leads/bulk",
-        summary: "Import bulk lead",
-        description:
-          "Importa fino a 500 lead in una singola richiesta. Ogni record viene validato e processato individualmente. La risposta include un riepilogo (`summary`) e il dettaglio per ogni record (`results`) con status `created`, `updated`, `skipped` o `error`.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "LeadInput[]",
-            description: "Array di lead (max 500). Stessi campi dell'endpoint singolo.",
-            example: "[{ ... }, { ... }]",
-          },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Strategia deduplicazione applicata a tutti i record",
-            enum: ["skip", "update", "error"],
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { firstName: "Anna", lastName: "Bianchi", email: "anna@startup.io", status: "new" },
-                { firstName: "Marco", lastName: "Verdi", email: "marco@corp.com", status: "contacting", rating: "hot" },
-              ],
-              onDuplicate: "skip",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 1, updated: 0, skipped: 1, errors: 0, durationMs: 87 },
-                results: [
-                  { index: 0, status: "created", id: "lead_01JX" },
-                  { index: 1, status: "skipped", reason: "duplicate_email", existingId: "lead_99YZ" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 400,
-            description: "records mancante, vuoto o > 500 elementi",
-            example: JSON.stringify({ error: "Batch size exceeds maximum of 500" }, null, 2),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-companies-create",
-        method: "POST",
-        path: "/api/crm/companies",
-        summary: "Crea un'azienda",
-        description:
-          "Crea una singola azienda con validazione. La deduplicazione avviene per nome (case-insensitive, tramite ILIKE). Supporta `onDuplicate: skip | update | error`.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "name",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Ragione sociale — usata per la deduplicazione",
-            example: "Acme Srl",
-          },
-          {
-            name: "industry",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Settore",
-            example: "Manufacturing",
-          },
-          {
-            name: "website",
-            in: "body",
-            required: false,
-            type: "string (URL)",
-            description: "Sito web",
-            example: "https://acme.it",
-          },
-          {
-            name: "description",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Descrizione (max 2000 caratteri)",
-            example: "Produttore di componenti industriali",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Tipo azienda",
-            enum: ["prospect", "customer", "partner", "vendor"],
-            example: "prospect",
-          },
-          {
-            name: "employeeCount",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Numero dipendenti",
-            example: "250",
-          },
-          {
-            name: "annualRevenue",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Fatturato annuo (stringa numerica)",
-            example: "5000000.00",
-          },
-          {
-            name: "mainPhone",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Telefono principale",
-            example: "+39 02 9876543",
-          },
-          {
-            name: "mainEmail",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Email principale",
-            example: "info@acme.it",
-          },
-          {
-            name: "linkedinUrl",
-            in: "body",
-            required: false,
-            type: "string (URL)",
-            description: "URL profilo LinkedIn",
-            example: "https://linkedin.com/company/acme",
-          },
-          {
-            name: "vatNumber",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partita IVA",
-            example: "IT02345678901",
-          },
-          {
-            name: "sdiCode",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Codice SDI (fatturazione elettronica)",
-            example: "XXXXXXX",
-          },
-          {
-            name: "fiscalCode",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Codice fiscale (16 caratteri per una persona, 11 cifre per un'azienda)",
-            example: "02345678901",
-          },
-          {
-            name: "pec",
-            in: "body",
-            required: false,
-            type: "string (email)",
-            description: "PEC per la fatturazione elettronica, in alternativa al codice SDI",
-            example: "fatture@pec.acme.it",
-          },
-          {
-            name: "language",
-            in: "body",
-            required: false,
-            type: "string (it | en)",
-            description:
-              "Lingua dei documenti inviati al cliente: preventivo, stampa, pagina pubblica, email e copia di cortesia della fattura. Omesso o null: dedotta dal paese (italiano per l'Italia o senza paese, inglese altrimenti).",
-            example: "en",
-          },
-          {
-            name: "source",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Sorgente",
-            example: "trade_show",
-          },
-          {
-            name: "tags",
-            in: "body",
-            required: false,
-            type: "string[]",
-            description: "Tag",
-            example: '["nord-italia","enterprise"]',
-          },
-          {
-            name: "street",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Indirizzo",
-            example: "Via Industria 42",
-          },
-          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Bergamo" },
-          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Strategia deduplicazione",
-            enum: ["skip", "update", "error"],
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              name: "Acme Srl",
-              industry: "Manufacturing",
-              website: "https://acme.it",
-              type: "prospect",
-              employeeCount: 250,
-              mainEmail: "info@acme.it",
-              vatNumber: "IT02345678901",
-              onDuplicate: "update",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 409,
-            description: "Conflitto — `onDuplicate=error` e un azienda corrispondente esiste già",
-            example: JSON.stringify({ error: "Conflict", reason: "duplicate_name", existingId: "cmp_77AB" }, null, 2),
-          },
-          {
-            status: 201,
-            description: "Azienda creata",
-            example: JSON.stringify(
-              { status: "created", id: "cmp_01JX", data: { id: "cmp_01JX", name: "Acme Srl", type: "prospect" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 200,
-            description: "Azienda saltata o aggiornata",
-            example: JSON.stringify(
-              { status: "updated", id: "cmp_99YZ", data: { id: "cmp_99YZ", name: "Acme Srl" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "website", message: "website is not a valid URL" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-companies-bulk",
-        method: "POST",
-        path: "/api/crm/companies/bulk",
-        summary: "Import bulk aziende",
-        description: "Importa fino a 500 aziende in una singola richiesta. Deduplicazione per nome (ILIKE).",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "CompanyInput[]",
-            description: "Array di aziende (max 500)",
-            example: "[{ name: 'Acme', ... }]",
-          },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            enum: ["skip", "update", "error"],
-            description: "Strategia deduplicazione",
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { name: "Acme Srl", industry: "Manufacturing", type: "customer", vatNumber: "IT02345678901" },
-                { name: "Beta SpA", industry: "Technology", website: "https://beta.it", employeeCount: 80 },
-              ],
-              onDuplicate: "skip",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 112 },
-                results: [
-                  { index: 0, status: "created", id: "cmp_01JX" },
-                  { index: 1, status: "created", id: "cmp_02AB" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-contacts-create",
-        method: "POST",
-        path: "/api/crm/contacts",
-        summary: "Crea un contatto",
-        description:
-          "Crea un singolo contatto. Deduplicazione per email (case-insensitive). Supporta `onDuplicate`. Se si passa `companyId`, il contatto viene collegato all'azienda corrispondente.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          { name: "firstName", in: "body", required: true, type: "string", description: "Nome", example: "Mario" },
-          { name: "lastName", in: "body", required: true, type: "string", description: "Cognome", example: "Rossi" },
-          {
-            name: "email",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Email — usata per la deduplicazione",
-            example: "mario@acme.it",
-          },
-          {
-            name: "phone",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Telefono",
-            example: "+39 02 1234567",
-          },
-          {
-            name: "mobile",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Cellulare",
-            example: "+39 333 9876543",
-          },
-          {
-            name: "jobTitle",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Ruolo",
-            example: "Direttore Acquisti",
-          },
-          {
-            name: "department",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Reparto",
-            example: "Procurement",
-          },
-          {
-            name: "linkedinUrl",
-            in: "body",
-            required: false,
-            type: "string (URL)",
-            description: "Profilo LinkedIn",
-            example: "https://linkedin.com/in/mario-rossi",
-          },
-          {
-            name: "companyId",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "ID dell'azienda collegata (UUID)",
-            example: "cmp_01JX",
-          },
-          {
-            name: "source",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Sorgente",
-            example: "trade_show",
-          },
-          {
-            name: "leadScore",
-            in: "body",
-            required: false,
-            type: "integer (0–100)",
-            description: "Score",
-            example: "85",
-          },
-          {
-            name: "notes",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Note",
-            example: "Decisore finale per acquisti IT",
-          },
-          {
-            name: "marketingConsent",
-            in: "body",
-            required: false,
-            type: "boolean",
-            description: "Consenso marketing",
-            example: "true",
-          },
-          {
-            name: "tags",
-            in: "body",
-            required: false,
-            type: "string[]",
-            description: "Tag",
-            example: '["vip","decision-maker"]',
-          },
-          { name: "street", in: "body", required: false, type: "string", description: "Via", example: "Via Roma 1" },
-          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Milano" },
-          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            enum: ["skip", "update", "error"],
-            description: "Strategia deduplicazione",
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              firstName: "Mario",
-              lastName: "Rossi",
-              email: "mario@acme.it",
-              jobTitle: "Direttore Acquisti",
-              companyId: "cmp_01JX",
-              source: "trade_show",
-              leadScore: 85,
-              marketingConsent: true,
-              tags: ["vip", "decision-maker"],
-              onDuplicate: "skip",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 409,
-            description: "Conflitto — `onDuplicate=error` e un contatto corrispondente esiste già",
-            example: JSON.stringify({ error: "Conflict", reason: "duplicate_email", existingId: "cnt_31KJ" }, null, 2),
-          },
-          {
-            status: 201,
-            description: "Contatto creato",
-            example: JSON.stringify(
-              {
-                status: "created",
-                id: "cnt_01JX",
-                data: { id: "cnt_01JX", firstName: "Mario", lastName: "Rossi", email: "mario@acme.it" },
-              },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 200,
-            description: "Contatto saltato o aggiornato",
-            example: JSON.stringify({ status: "skipped", reason: "duplicate_email", existingId: "cnt_99YZ" }, null, 2),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "firstName", message: "firstName is required" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-contacts-bulk",
-        method: "POST",
-        path: "/api/crm/contacts/bulk",
-        summary: "Import bulk contatti",
-        description: "Importa fino a 500 contatti. Deduplicazione per email.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ContactInput[]",
-            description: "Array di contatti (max 500)",
-            example: "[{ firstName: 'Mario', ... }]",
-          },
-          {
-            name: "onDuplicate",
-            in: "body",
-            required: false,
-            type: "string",
-            enum: ["skip", "update", "error"],
-            description: "Strategia deduplicazione",
-            example: "skip",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { firstName: "Mario", lastName: "Rossi", email: "mario@acme.it", companyId: "cmp_01JX" },
-                { firstName: "Giulia", lastName: "Ferrari", email: "giulia@beta.it", jobTitle: "CTO" },
-              ],
-              onDuplicate: "skip",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 1, updated: 0, skipped: 1, errors: 0, durationMs: 95 },
-                results: [
-                  { index: 0, status: "skipped", reason: "duplicate_email", existingId: "cnt_99YZ" },
-                  { index: 1, status: "created", id: "cnt_02AB" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-activities-create",
-        method: "POST",
-        path: "/api/crm/activities",
-        summary: "Crea un'attività",
-        description:
-          "Crea una singola attività (nota, chiamata, meeting, email) collegata ad almeno un'entità CRM (lead, contact, company o deal). Le attività non sono deduplicate.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Tipo di attività",
-            enum: ["note", "call", "meeting", "email"],
-            example: "call",
-          },
-          {
-            name: "content",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Corpo/descrizione dell'attività (max 5000 caratteri)",
-            example: "Chiamata di presentazione prodotto",
-          },
-          {
-            name: "date",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Data/ora dell'attività",
-            example: "2026-05-15T14:30:00.000Z",
-          },
-          {
-            name: "durationMinutes",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Durata in minuti (per chiamate e meeting)",
-            example: "45",
-          },
-          {
-            name: "participants",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partecipanti (nomi o email separati da virgola)",
-            example: "mario@acme.it, giulia@beta.it",
-          },
-          {
-            name: "leadId",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "ID del lead collegato",
-            example: "lead_01JX",
-          },
-          {
-            name: "contactId",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "ID del contatto collegato",
-            example: "cnt_01JX",
-          },
-          {
-            name: "companyId",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "ID dell'azienda collegata",
-            example: "cmp_01JX",
-          },
-          {
-            name: "dealId",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "ID del deal collegato",
-            example: "deal_01JX",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              type: "call",
-              content: "Chiamata di presentazione prodotto — interesse confermato per Q3 2026",
-              date: "2026-05-15T14:30:00.000Z",
-              durationMinutes: 45,
-              participants: "mario@acme.it",
-              contactId: "cnt_01JX",
-              companyId: "cmp_01JX",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Attività creata",
-            example: JSON.stringify(
-              {
-                status: "created",
-                id: "act_01JX",
-                data: { id: "act_01JX", type: "call", content: "Chiamata di presentazione prodotto" },
-              },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione (es. entità mancante)",
-            example: JSON.stringify(
-              {
-                error: "Validation failed",
-                errors: [
-                  { field: "entity", message: "At least one of leadId, contactId, companyId, or dealId is required" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-activities-bulk",
-        method: "POST",
-        path: "/api/crm/activities/bulk",
-        summary: "Import bulk attività",
-        description:
-          "Importa fino a 500 attività in una singola richiesta. Le attività non sono soggette a deduplicazione — ogni record valido genera sempre un nuovo record in DB.",
-        auth: "session",
-        parameters: [
-          {
-            name: "Authorization",
-            in: "header",
-            required: false,
-            type: "string",
-            description:
-              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
-            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ActivityInput[]",
-            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo.",
-            example: "[{ type: 'note', ... }]",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                {
-                  type: "note",
-                  content: "Prima presa di contatto",
-                  contactId: "cnt_01JX",
-                  date: "2026-05-10T09:00:00.000Z",
-                },
-                {
-                  type: "call",
-                  content: "Demo prodotto",
-                  contactId: "cnt_01JX",
-                  durationMinutes: 30,
-                  date: "2026-05-15T14:30:00.000Z",
-                },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 54 },
-                results: [
-                  { index: 0, status: "created", id: "act_01JX" },
-                  { index: 1, status: "created", id: "act_02AB" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 400,
-            description: "records mancante o > 500 elementi",
-            example: JSON.stringify({ error: "Batch size exceeds maximum of 500" }, null, 2),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      // ─── Entity-scoped activity endpoints ─────────────────────────────
-      {
-        id: "crm-lead-activities-create",
-        method: "POST",
-        path: "/api/crm/leads/{leadId}/activities",
-        summary: "Aggiungi attività a un lead",
-        description:
-          "Crea una singola attività collegata al lead specificato nell'URL. Non è necessario includere leadId nel body — viene iniettato automaticamente dall'URL.",
-        auth: "session",
-        parameters: [
-          {
-            name: "leadId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del lead",
-            example: "lead_01JX",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Tipo di attività",
-            enum: ["note", "call", "meeting", "email"],
-            example: "note",
-          },
-          {
-            name: "content",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Corpo/descrizione (max 5000 caratteri)",
-            example: "Primo contatto via email",
-          },
-          {
-            name: "date",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Data/ora dell'attività",
-            example: "2026-05-15T10:00:00.000Z",
-          },
-          {
-            name: "durationMinutes",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Durata in minuti",
-            example: "30",
-          },
-          {
-            name: "participants",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partecipanti",
-            example: "anna@startup.io",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              type: "note",
-              content: "Primo contatto via email — interesse per piano Enterprise",
-              date: "2026-05-15T10:00:00.000Z",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Attività creata",
-            example: JSON.stringify(
-              { status: "created", id: "act_03CD", data: { id: "act_03CD", type: "note", leadId: "lead_01JX" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-lead-activities-bulk",
-        method: "POST",
-        path: "/api/crm/leads/{leadId}/activities/bulk",
-        summary: "Import bulk attività per un lead",
-        description:
-          "Importa fino a 500 attività tutte collegate al lead specificato. Il leadId viene iniettato automaticamente in ogni record dall'URL.",
-        auth: "session",
-        parameters: [
-          {
-            name: "leadId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del lead",
-            example: "lead_01JX",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ActivityBodyInput[]",
-            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto leadId.",
-            example: "[{ type: 'note', ... }]",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { type: "note", content: "Email di benvenuto inviata", date: "2026-05-10T09:00:00.000Z" },
-                { type: "call", content: "Demo prodotto", durationMinutes: 30, date: "2026-05-15T14:30:00.000Z" },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 38 },
-                results: [
-                  { index: 0, status: "created", id: "act_04EF" },
-                  { index: 1, status: "created", id: "act_05GH" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-contact-activities-create",
-        method: "POST",
-        path: "/api/crm/contacts/{contactId}/activities",
-        summary: "Aggiungi attività a un contatto",
-        description:
-          "Crea una singola attività collegata al contatto specificato nell'URL. Non è necessario includere contactId nel body.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del contatto",
-            example: "cnt_01JX",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Tipo di attività",
-            enum: ["note", "call", "meeting", "email"],
-            example: "call",
-          },
-          {
-            name: "content",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Corpo/descrizione (max 5000 caratteri)",
-            example: "Chiamata di follow-up",
-          },
-          {
-            name: "date",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Data/ora dell'attività",
-            example: "2026-05-15T14:30:00.000Z",
-          },
-          {
-            name: "durationMinutes",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Durata in minuti",
-            example: "45",
-          },
-          {
-            name: "participants",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partecipanti",
-            example: "mario@acme.it",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              type: "call",
-              content: "Chiamata di follow-up — conferma interesse per Q3",
-              durationMinutes: 45,
-              date: "2026-05-15T14:30:00.000Z",
-              participants: "mario@acme.it",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Attività creata",
-            example: JSON.stringify(
-              { status: "created", id: "act_06IJ", data: { id: "act_06IJ", type: "call", contactId: "cnt_01JX" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-contact-activities-bulk",
-        method: "POST",
-        path: "/api/crm/contacts/{contactId}/activities/bulk",
-        summary: "Import bulk attività per un contatto",
-        description:
-          "Importa fino a 500 attività tutte collegate al contatto specificato. Il contactId viene iniettato automaticamente in ogni record dall'URL.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del contatto",
-            example: "cnt_01JX",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ActivityBodyInput[]",
-            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto contactId.",
-            example: "[{ type: 'note', ... }]",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { type: "note", content: "Prima presa di contatto", date: "2026-05-10T09:00:00.000Z" },
-                {
-                  type: "meeting",
-                  content: "Riunione presentazione offerta",
-                  durationMinutes: 60,
-                  date: "2026-05-20T11:00:00.000Z",
-                },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 41 },
-                results: [
-                  { index: 0, status: "created", id: "act_07KL" },
-                  { index: 1, status: "created", id: "act_08MN" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-company-activities-create",
-        method: "POST",
-        path: "/api/crm/companies/{companyId}/activities",
-        summary: "Aggiungi attività a un'azienda",
-        description:
-          "Crea una singola attività collegata all'azienda specificata nell'URL. Non è necessario includere companyId nel body.",
-        auth: "session",
-        parameters: [
-          {
-            name: "companyId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID dell'azienda",
-            example: "cmp_01JX",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Tipo di attività",
-            enum: ["note", "call", "meeting", "email"],
-            example: "meeting",
-          },
-          {
-            name: "content",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Corpo/descrizione (max 5000 caratteri)",
-            example: "Riunione con il team acquisti",
-          },
-          {
-            name: "date",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Data/ora dell'attività",
-            example: "2026-05-20T09:00:00.000Z",
-          },
-          {
-            name: "durationMinutes",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Durata in minuti",
-            example: "60",
-          },
-          {
-            name: "participants",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partecipanti",
-            example: "info@acme.it",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              type: "meeting",
-              content: "Riunione con il team acquisti — discussione budget 2026",
-              durationMinutes: 60,
-              date: "2026-05-20T09:00:00.000Z",
-              participants: "info@acme.it",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Attività creata",
-            example: JSON.stringify(
-              { status: "created", id: "act_09OP", data: { id: "act_09OP", type: "meeting", companyId: "cmp_01JX" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-company-activities-bulk",
-        method: "POST",
-        path: "/api/crm/companies/{companyId}/activities/bulk",
-        summary: "Import bulk attività per un'azienda",
-        description:
-          "Importa fino a 500 attività tutte collegate all'azienda specificata. Il companyId viene iniettato automaticamente in ogni record dall'URL.",
-        auth: "session",
-        parameters: [
-          {
-            name: "companyId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID dell'azienda",
-            example: "cmp_01JX",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ActivityBodyInput[]",
-            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto companyId.",
-            example: "[{ type: 'note', ... }]",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                {
-                  type: "note",
-                  content: "Contatto iniziale con responsabile acquisti",
-                  date: "2026-05-05T10:00:00.000Z",
-                },
-                {
-                  type: "call",
-                  content: "Call di follow-up post-offerta",
-                  durationMinutes: 20,
-                  date: "2026-05-22T15:00:00.000Z",
-                },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 36 },
-                results: [
-                  { index: 0, status: "created", id: "act_10QR" },
-                  { index: 1, status: "created", id: "act_11ST" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-deal-activities-create",
-        method: "POST",
-        path: "/api/crm/deals/{dealId}/activities",
-        summary: "Aggiungi attività a un deal",
-        description:
-          "Crea una singola attività collegata al deal specificato nell'URL. Non è necessario includere dealId nel body.",
-        auth: "session",
-        parameters: [
-          {
-            name: "dealId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del deal",
-            example: "deal_01JX",
-          },
-          {
-            name: "type",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Tipo di attività",
-            enum: ["note", "call", "meeting", "email"],
-            example: "note",
-          },
-          {
-            name: "content",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Corpo/descrizione (max 5000 caratteri)",
-            example: "Proposta inviata, in attesa di feedback",
-          },
-          {
-            name: "date",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Data/ora dell'attività",
-            example: "2026-05-18T16:00:00.000Z",
-          },
-          {
-            name: "durationMinutes",
-            in: "body",
-            required: false,
-            type: "integer",
-            description: "Durata in minuti",
-            example: "20",
-          },
-          {
-            name: "participants",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Partecipanti",
-            example: "giulia@beta.it",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              type: "note",
-              content: "Proposta inviata, in attesa di feedback entro fine mese",
-              date: "2026-05-18T16:00:00.000Z",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Attività creata",
-            example: JSON.stringify(
-              { status: "created", id: "act_12UV", data: { id: "act_12UV", type: "note", dealId: "deal_01JX" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 422,
-            description: "Errore di validazione",
-            example: JSON.stringify(
-              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-      {
-        id: "crm-deal-activities-bulk",
-        method: "POST",
-        path: "/api/crm/deals/{dealId}/activities/bulk",
-        summary: "Import bulk attività per un deal",
-        description:
-          "Importa fino a 500 attività tutte collegate al deal specificato. Il dealId viene iniettato automaticamente in ogni record dall'URL.",
-        auth: "session",
-        parameters: [
-          {
-            name: "dealId",
-            in: "path",
-            required: true,
-            type: "string",
-            description: "ID del deal",
-            example: "deal_01JX",
-          },
-          {
-            name: "records",
-            in: "body",
-            required: true,
-            type: "ActivityBodyInput[]",
-            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto dealId.",
-            example: "[{ type: 'note', ... }]",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              records: [
-                { type: "note", content: "Proposta inviata", date: "2026-05-18T16:00:00.000Z" },
-                {
-                  type: "call",
-                  content: "Chiamata di chiarimento condizioni contrattuali",
-                  durationMinutes: 25,
-                  date: "2026-05-25T10:00:00.000Z",
-                },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Elaborazione completata",
-            example: JSON.stringify(
-              {
-                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 33 },
-                results: [
-                  { index: 0, status: "created", id: "act_13WX" },
-                  { index: 1, status: "created", id: "act_14YZ" },
-                ],
-              },
-              null,
-              2,
-            ),
-          },
-          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
-        ],
-      },
-    ],
-  },
-  {
-    id: "crm-contact-point",
-    label: "Integration API (recapito)",
-    icon: Terminal,
-    color: "text-rose-600",
-    bg: "bg-rose-50",
-    border: "border-rose-200",
-    description:
-      "Rotte pensate per un'integrazione che parla con una persona — un assistente telefonico, un bot, un centralino — e che di quella persona conosce solo il modo per raggiungerla.\n\n" +
-      "⚠️ Partono da un RECAPITO, non da un id. `contactPoint` accetta un numero di telefono o un indirizzo email e viene risolto contro lead e contatti insieme: il numero si confronta a cifre, ignorando spazi, punti, trattini e prefisso internazionale, così `+39 333 111 2223` e `333.111.2223` trovano la stessa persona. Un id del chiamante qui non significherebbe niente, ed è la ragione per cui queste rotte esistono accanto a quelle di /api/crm che invece gli id li prendono.\n\n" +
-      "Se il recapito non trova nessuno la risposta è 404: nessuna di queste rotte crea la persona per poi scriverci sopra.\n\n" +
-      "Autenticazione come il resto di /api/crm: chiave del workspace, oppure chiave di piattaforma con `X-Tenant-ID`, oppure sessione.",
-    endpoints: [
-      {
-        id: "crm-notes",
-        method: "POST",
-        path: "/api/crm/notes",
-        summary: "Annota sulla scheda della persona",
-        description:
-          "Scrive un'attività sulla cronologia della persona raggiungibile a quel recapito: quello che l'integrazione ha fatto o detto, con le sue parole.\n\n" +
-          "Se `occurredAt` manca vale adesso. L'attività nasce senza proprietario quando si usa una chiave API, perché una chiave non è una persona.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona. Il telefono si confronta a cifre",
-            example: "+39 333 111 2223",
-          },
-          {
-            name: "text",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Cosa annotare, come lo si vuole leggere sulla scheda",
-            example: "Chiamata: conferma l'appuntamento di giovedì alle 15",
-          },
-          {
-            name: "occurredAt",
-            in: "body",
-            required: false,
-            type: "string (ISO 8601)",
-            description: "Quando è successo. Assente vale adesso",
-            example: "2026-09-05T14:30:00Z",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              contactPoint: "+39 333 111 2223",
-              text: "Chiamata: conferma l'appuntamento di giovedì alle 15",
-              occurredAt: "2026-09-05T14:30:00Z",
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Annotazione scritta",
-            example: JSON.stringify({ status: "created", id: "act_7f21c9" }, null, 2),
-          },
-          {
-            status: 404,
-            description: "Nessuno è raggiungibile a quel recapito",
-            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-custom-fields",
-        method: "POST",
-        path: "/api/crm/custom-fields",
-        summary: "Registra i valori raccolti",
-        description:
-          "Scrive nei campi personalizzati che il workspace ha già definito, sulla scheda della persona.\n\n" +
-          "⚠️ Non è la rotta delle annotazioni con un altro nome. Un valore raccolto — un budget, una data di consegna, una taglia — deve finire nel campo che le schermate mostrano e su cui i filtri lavorano, non dentro il testo di una nota dove nessuna vista lo troverà. Le chiavi di `fields` sono gli slug delle definizioni esistenti.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "+39 333 111 2223",
-          },
-          {
-            name: "fields",
-            in: "body",
-            required: true,
-            type: "object",
-            description:
-              "Slug del campo → valore. Gli slug sono quelli definiti in Impostazioni → Campi personalizzati",
-            example: '{ "budget": "8000", "consegna": "2026-10-15" }',
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            { contactPoint: "+39 333 111 2223", fields: { budget: "8000", consegna: "2026-10-15" } },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Valori scritti. `entity` dice se la persona è un lead o un contatto",
-            example: JSON.stringify(
-              { status: "updated", entity: "lead", id: "led_31ka9", fields: { budget: "8000" } },
-              null,
-              2,
-            ),
-          },
-          {
-            status: 404,
-            description: "Nessuno è raggiungibile a quel recapito",
-            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-lead-stage",
-        method: "POST",
-        path: "/api/crm/leads/stage",
-        summary: "Sposta un lead allo stadio a cui l'assistente l'ha portato",
-        description:
-          "Cambia **solo** lo stadio del lead raggiungibile a quel recapito, senza toccare " +
-          "nient'altro della sua scheda.\n\n" +
-          '⚠️ Non è l\'importazione con `onDuplicate: "update"`: quella **sostituisce** il ' +
-          "lead con quello che le mandi, quindi un telefono e uno stadio azzererebbero " +
-          "email, azienda e note. Importare è sostituire; dire «questo si è mosso» è " +
-          "un'altra frase.\n\n" +
-          "⚠️ Serve a questo: un assistente che ha raccolto quello che serve al preventivo " +
-          "e passa la mano lo diceva **in prosa**, con una nota sulla cronologia. Una prosa " +
-          "non è una coda. Spostando il lead, la richiesta compare dove il commerciale " +
-          "guarda ogni mattina — l'elenco dei lead, filtrato per stadio.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "+39 333 111 2223",
-          },
-          {
-            name: "status",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Lo stadio: new, contacting, engaged, qualified, unqualified",
-            example: "qualified",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify({ contactPoint: "+39 333 111 2223", status: "qualified" }, null, 2),
-        },
-        responses: [
-          {
-            status: 200,
-            description:
-              "Spostato. `moved: false` con `already_a_contact` quando la persona è già " +
-              "stata convertita: non c'è più uno stadio da muovere, e non è un errore",
-            example: JSON.stringify({ status: "moved", moved: true, id: "led_31ka9" }, null, 2),
-          },
-          {
-            status: 404,
-            description: "Nessun lead è raggiungibile a quel recapito",
-            example: JSON.stringify({ error: "No lead reachable at that contact point" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-orders",
-        method: "POST",
-        path: "/api/crm/orders",
-        summary: "Registra un ordine raccolto",
-        description:
-          "Crea un ordine per la persona a quel recapito, dalle righe che l'integrazione ha raccolto.\n\n" +
-          "⚠️ I totali NON si accettano dal chiamante: vengono ricalcolati qui dalle righe ricevute. Due sistemi che si accordano sull'aritmetica costano poco; un ordine con il totale sbagliato costa molto, e non si vede finché non lo si legge in fattura.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "+39 333 111 2223",
-          },
-          {
-            name: "name",
-            in: "body",
-            required: false,
-            type: "string",
-            description: "Nome con cui la persona si è presentata, se non è già a sistema",
-            example: "Anna",
-          },
-          {
-            name: "lines",
-            in: "body",
-            required: true,
-            type: "array",
-            description: "Almeno una riga: `description`, `quantity`, `unitPrice`",
-            example: '[{ "description": "Margherita", "quantity": 2, "unitPrice": 6.5 }]',
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify(
-            {
-              contactPoint: "+39 333 111 2223",
-              name: "Anna",
-              lines: [
-                { description: "Margherita", quantity: 2, unitPrice: 6.5 },
-                { description: "Coperto", quantity: 2, unitPrice: 2 },
-              ],
-            },
-            null,
-            2,
-          ),
-        },
-        responses: [
-          {
-            status: 201,
-            description: "Ordine creato. I totali sono quelli ricalcolati qui",
-            example: JSON.stringify({ status: "created", id: "ord_9c14be", total: "17.00" }, null, 2),
-          },
-          {
-            status: 409,
-            description:
-              "⚠️ Hai mandato un totale e non corrisponde a quello calcolato dalle righe. La risposta riporta entrambi, così si vede dove sta la differenza senza rifare i conti a mano. L'ordine non viene creato.",
-            example: JSON.stringify({ error: "Total mismatch", declared: "16.00", computed: "17.00" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-close",
-        method: "POST",
-        path: "/api/crm/close",
-        summary: "Chiudi le trattative dopo il processo",
-        description:
-          "Chiude le trattative aperte della persona quando l'integrazione ha finito.\n\n" +
-          "⚠️ I tre esiti descrivono IL PROCESSO DELL'INTEGRAZIONE, non la vendita. `RAGGIUNTO` significa che la persona ha risposto: la trattativa resta APERTA, perché ci penserà un umano. `ABBANDONATO` e `NON_RAGGIUNTO` chiudono come persa, e il motivo resta scritto per esteso sulla trattativa — «persa» è quanto di più vicino la pipeline sappia dire quando in realtà non si sa come sia finita.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "+39 333 111 2223",
-          },
-          {
-            name: "outcome",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Esito del processo. Un valore diverso da questi tre viene rifiutato",
-            enum: ["RAGGIUNTO", "ABBANDONATO", "NON_RAGGIUNTO"],
-            example: "ABBANDONATO",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify({ contactPoint: "+39 333 111 2223", outcome: "ABBANDONATO" }, null, 2),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Trattative chiuse. Con `RAGGIUNTO` la lista è vuota perché non si chiude niente",
-            example: JSON.stringify({ status: "closed", ids: ["dea_18f2c0"] }, null, 2),
-          },
-          {
-            status: 404,
-            description: "Nessuna trattativa da chiudere per quel recapito",
-            example: JSON.stringify({ error: "No deal to close for that contact point" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-opt-out",
-        method: "POST",
-        path: "/api/crm/opt-out",
-        summary: "Registra che non vuole più essere contattata",
-        description:
-          "La persona ha detto all'integrazione di non essere più contattata.\n\n" +
-          "⚠️ Vale su ENTRAMBI i consensi. Marketing e trattative erano due elenchi che non si parlavano: chi si toglieva da uno restava nell'altro, e continuava a ricevere. Questa rotta li tocca insieme, che è ciò che la persona intendeva dicendolo una volta sola.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "+39 333 111 2223",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify({ contactPoint: "+39 333 111 2223" }, null, 2),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Registrato. `ids` elenca i record messi a tacere",
-            example: JSON.stringify({ status: "opted_out", ids: ["led_31ka9", "cnt_77bb1"] }, null, 2),
-          },
-          {
-            status: 404,
-            description: "Nessuno è raggiungibile a quel recapito",
-            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
-          },
-        ],
-      },
-      {
-        id: "crm-erasure",
-        method: "POST",
-        path: "/api/crm/erasure",
-        summary: "Cancellazione GDPR art. 17",
-        description:
-          "Cancella la persona raggiungibile a quel recapito.\n\n" +
-          "⚠️ La risposta è un REPORT, non una conferma: dice cosa è stato cancellato, cosa è stato conservato con la persona tolta da dentro, e cosa è stato deliberatamente lasciato stare. Chi risponde all'interessato deve poter dire quale delle tre cose è successa a ciascun dato, e una conferma generica non glielo permette.\n\n" +
-          "Con `preview: true` conta soltanto e non cancella niente: è come si guarda prima di premere.",
-        auth: "session",
-        parameters: [
-          {
-            name: "contactPoint",
-            in: "body",
-            required: true,
-            type: "string",
-            description: "Telefono o email della persona",
-            example: "mario@acme.it",
-          },
-          {
-            name: "preview",
-            in: "body",
-            required: false,
-            type: "boolean",
-            description: "Conta e non cancella. Assente vale `false`",
-            example: "true",
-          },
-        ],
-        requestBody: {
-          contentType: "application/json",
-          example: JSON.stringify({ contactPoint: "mario@acme.it", preview: true }, null, 2),
-        },
-        responses: [
-          {
-            status: 200,
-            description: "Conteggio, senza aver cancellato niente (`preview: true`)",
-            example: JSON.stringify({ status: "preview", found: { leads: 1, contacts: 0, activities: 12 } }, null, 2),
-          },
-          {
-            status: 200,
-            description: "Cancellazione eseguita, con il report di cosa è successo a ciascuna cosa",
-            example: JSON.stringify(
-              {
-                status: "erased",
-                report: {
-                  deleted: { lead: 1, activity: 12, task: 3 },
-                  anonymised: { ticket: 2 },
-                  kept: { order: "obbligo fiscale" },
-                },
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      },
-    ],
-  },
+  // The public API: written once, in src/lib/api-docs/public-api.ts.
+  ...PUBLIC_API_GROUPS,
   {
     id: "internal",
     label: "Rotte interne",
@@ -4109,6 +2482,79 @@ const GROUPS: ApiGroup[] = [
             description: "Troppe richieste per lo stesso token",
             example: "Too many requests",
           },
+        ],
+      },
+      {
+        id: "mail-connect",
+        method: "GET",
+        path: "/api/mail/connect/{provider}",
+        summary: "Collega la propria casella Google o Microsoft 365",
+        description:
+          "Porta la persona alla schermata di consenso del fornitore (V3.2). Lo stato inviato è firmato e nomina workspace, persona e fornitore, con dieci minuti di validità; un cookie httpOnly lega il ritorno allo stesso browser, e PKCE rende inutile il codice senza il verificatore.\n\n" +
+          "⚠️ Dormiente finché può funzionare: senza credenziali (`MAIL_GOOGLE_*` / `MAIL_MICROSOFT_*`) risponde rimandando al profilo con `?mail=unavailable`; con le credenziali ma senza la verifica del fornitore dichiarata (`MAIL_*_VERIFIED=1`) solo il personale di Flux può collegarsi.",
+        auth: "session",
+        parameters: [
+          {
+            name: "provider",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "`google` oppure `microsoft`",
+            example: "google",
+          },
+        ],
+        responses: [
+          {
+            status: 307,
+            description:
+              "Verso la schermata di consenso del fornitore, o di ritorno al profilo con `?mail=unavailable`",
+            example: "Location: https://accounts.google.com/o/oauth2/v2/auth?…",
+          },
+          { status: 404, description: "Fornitore sconosciuto", example: "Not found" },
+        ],
+      },
+      {
+        id: "mail-callback",
+        method: "GET",
+        path: "/api/mail/callback/{provider}",
+        summary: "Ritorno dal consenso: salva la casella collegata",
+        description:
+          "Dove il fornitore rimanda la persona. Prima di riscattare il codice controlla firma e scadenza dello stato, il cookie, che la persona collegata sia quella che ha iniziato e che il workspace aperto sia lo stesso. I token sono cifrati con la chiave di piattaforma; si legge la posta da quel momento in poi, mai l'arretrato.\n\n" +
+          "Risponde sempre rimandando al profilo con `?mail=connected`, `denied`, `error` o `unavailable`: il motivo di un rifiuto finisce nel log, non nell'indirizzo.",
+        auth: "session",
+        parameters: [
+          {
+            name: "provider",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "`google` oppure `microsoft`",
+            example: "microsoft",
+          },
+          {
+            name: "code",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "Il codice di autorizzazione del fornitore",
+            example: "4/0AbC…",
+          },
+          {
+            name: "state",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "Lo stato firmato inviato all'andata",
+            example: "eyJ0ZW5hbnRJZCI6…",
+          },
+        ],
+        responses: [
+          {
+            status: 307,
+            description: "Di ritorno al profilo, con l'esito in `?mail=`",
+            example: "Location: /dashboard/profile?mail=connected",
+          },
+          { status: 404, description: "Fornitore sconosciuto", example: "Not found" },
         ],
       },
       {
@@ -4187,12 +2633,39 @@ const GROUPS: ApiGroup[] = [
         ],
       },
       {
+        id: "quote-signed-pdf",
+        method: "GET",
+        path: "/api/quotes/{id}/signed-pdf",
+        summary: "Scarica il PDF esattamente come è stato firmato",
+        description:
+          "I byte conservati al momento della firma, per chi può vedere il preventivo. Servito solo se corrispondono ancora all'impronta SHA-256 registrata con la firma: un documento firmato che potrebbe essere stato sostituito non prova niente.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del preventivo" },
+        ],
+        responses: [
+          { status: 200, description: "Il PDF firmato (application/pdf)", example: "%PDF-1.7 …" },
+          { status: 401, description: "Nessuna sessione", example: "Unauthorized" },
+          { status: 403, description: "Preventivo non visibile a chi lo chiede", example: "Forbidden" },
+          {
+            status: 404,
+            description: "Preventivo inesistente, o nessun file firmato conservato",
+            example: JSON.stringify({ error: "No signed file kept." }, null, 2),
+          },
+          {
+            status: 409,
+            description: "Il file non corrisponde più all'impronta",
+            example: JSON.stringify({ error: "The signed file no longer matches its fingerprint." }, null, 2),
+          },
+        ],
+      },
+      {
         id: "reports-export",
         method: "GET",
         path: "/api/reports/export",
-        summary: "Esporta il registro attività",
+        summary: "Esporta le attività registrate",
         description:
-          "CSV del registro di chi ha fatto cosa. ⚠️ Richiede la capacità `report:manage`, cioè rango amministratore NEL WORKSPACE. Questa riga leggeva il ruolo di piattaforma, che vale «utente» per ogni cliente: l'esportazione era vietata a chiunque, proprietario compreso, e restava aperta solo al personale di Flux.",
+          "CSV delle chiamate, riunioni, email e note registrate nel periodo, con chi le ha registrate e il record a cui sono collegate (lead, contatto, azienda, trattativa). La data è quella dell'attività, o quella di registrazione se non ne ha una. Fino a 10.000 righe. Prima esportava un registro che il prodotto non scriveva mai: il file conteneva solo l'intestazione. ⚠️ Richiede la capacità `report:manage`, cioè rango amministratore NEL WORKSPACE. Questa riga leggeva il ruolo di piattaforma, che vale «utente» per ogni cliente: l'esportazione era vietata a chiunque, proprietario compreso, e restava aperta solo al personale di Flux.",
         auth: "session",
         parameters: [
           {
@@ -4216,14 +2689,15 @@ const GROUPS: ApiGroup[] = [
             in: "query",
             required: false,
             type: "string",
-            description: "Solo le azioni di questa persona",
+            description: "Solo le attività registrate da questa persona",
           },
         ],
         responses: [
           {
             status: 200,
             description: "Il CSV",
-            example: "data,utente,azione,entita\n2026-09-05,Anna Rossi,create_ticket,TKT-202609-1A2B",
+            example:
+              "Date,User,Email,Type,Lead,Contact,Company,Deal,Minutes,Content\n2026-09-05 10:30,Anna Rossi,anna@studio.it,call,,Mario Rossi,Rossi Impianti Srl,Impianto sede,15,Richiamare dopo il 20",
           },
           { status: 401, description: "Sessione assente", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
           {
@@ -4308,733 +2782,7 @@ const GROUPS: ApiGroup[] = [
   },
 ];
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-
-const METHOD_STYLES: Record<Method, string> = {
-  GET: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  POST: "bg-blue-100 text-blue-800 border-blue-200",
-  PUT: "bg-orange-100 text-orange-800 border-orange-200",
-  PATCH: "bg-yellow-100 text-yellow-800 border-yellow-200",
-  DELETE: "bg-red-100 text-red-800 border-red-200",
-};
-
-function MethodBadge({ method, small = false }: { method: Method; small?: boolean }) {
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded border font-bold font-mono uppercase",
-        small ? "px-1.5 py-0.5 text-[9px]" : "px-2.5 py-1 text-xs",
-        METHOD_STYLES[method],
-      )}
-    >
-      {method}
-    </span>
-  );
-}
-
-const AUTH_CONFIG: Record<AuthLevel, { label: string; icon: React.ElementType; className: string }> = {
-  public: {
-    label: "Pubblico",
-    icon: Globe,
-    className: "bg-gray-100 text-gray-700",
-  },
-  session: {
-    label: "Session Required",
-    icon: Lock,
-    className: "bg-amber-100 text-amber-800",
-  },
-  admin: {
-    label: "Admin / Owner",
-    icon: Shield,
-    className: "bg-red-100 text-red-700",
-  },
-  cron: {
-    label: "CRON_SECRET / Webhook",
-    icon: Zap,
-    className: "bg-purple-100 text-purple-800",
-  },
-};
-
-function AuthBadge({ level }: { level: AuthLevel }) {
-  const cfg = AUTH_CONFIG[level];
-  const Icon = cfg.icon;
-  return (
-    <span
-      className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium text-xs", cfg.className)}
-    >
-      <Icon className="h-3 w-3" />
-      {cfg.label}
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: number }) {
-  const cls =
-    status >= 500
-      ? "bg-red-100 text-red-700"
-      : status >= 400
-        ? "bg-orange-100 text-orange-700"
-        : status >= 300
-          ? "bg-blue-100 text-blue-700"
-          : "bg-emerald-100 text-emerald-700";
-  return <span className={cn("rounded px-2 py-0.5 font-bold font-mono text-xs", cls)}>{status}</span>;
-}
-
-function CodeBlock({ code, lang = "json", label }: { code: string; lang?: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-
-  function copy() {
-    navigator.clipboard.writeText(code).catch((_err) => {
-      // silently ignore clipboard errors
-    });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
-      <div className="flex items-center justify-between border-gray-200 border-b bg-white px-4 py-2">
-        <span className="font-mono text-[11px] text-gray-400">{label ?? lang}</span>
-        <button
-          type="button"
-          onClick={copy}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-        >
-          {copied ? (
-            <>
-              <Check className="h-3 w-3 text-emerald-600" />
-              <span className="text-emerald-600">Copiato</span>
-            </>
-          ) : (
-            <>
-              <Copy className="h-3 w-3" />
-              Copia
-            </>
-          )}
-        </button>
-      </div>
-      <pre className="max-h-80 overflow-auto p-4 text-[12px] text-gray-700 leading-relaxed">
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
-}
-
-function ParamTable({ params }: { params: Param[] }) {
-  const locationLabel: Record<string, string> = {
-    query: "query",
-    path: "path",
-    body: "body",
-    form: "form-data",
-    header: "header",
-  };
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-gray-200 border-b bg-gray-50">
-            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
-              Parametro
-            </th>
-            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">In</th>
-            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">Tipo</th>
-            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
-              Descrizione
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {params.map((p) => (
-            <tr key={p.name} className="hover:bg-gray-50">
-              <td className="px-3 py-3">
-                <div className="flex items-center gap-1.5">
-                  <code className="rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-[11px] text-gray-800">
-                    {p.name}
-                  </code>
-                  {p.required && <span className="font-bold text-[9px] text-red-500 uppercase tracking-wide">req</span>}
-                </div>
-              </td>
-              <td className="px-3 py-3">
-                <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
-                  {locationLabel[p.in]}
-                </span>
-              </td>
-              <td className="px-3 py-3 font-mono text-[11px] text-gray-500">{p.type}</td>
-              <td className="px-3 py-3 text-gray-500 text-sm">
-                <span>{p.description}</span>
-                {p.enum && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {p.enum.map((v) => (
-                      <code key={v} className="rounded bg-gray-100 px-1 py-0.5 text-[10px] text-gray-700">
-                        {v}
-                      </code>
-                    ))}
-                  </div>
-                )}
-                {p.example && (
-                  <div className="mt-1 font-mono text-[10px] text-gray-400">
-                    es: <code>{p.example}</code>
-                  </div>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function EndpointSection({
-  endpoint,
-  sectionRef,
-}: {
-  endpoint: ApiEndpoint;
-  sectionRef: (el: HTMLElement | null) => void;
-}) {
-  return (
-    <div id={endpoint.id} ref={sectionRef} className="scroll-mt-4 rounded-xl border border-gray-200 bg-white shadow-sm">
-      {/* Endpoint header */}
-      <div className="flex flex-wrap items-start gap-3 border-gray-200 border-b p-5">
-        <MethodBadge method={endpoint.method} />
-        <code className="flex-1 break-all font-mono font-semibold text-gray-900 text-sm">{endpoint.path}</code>
-        <AuthBadge level={endpoint.auth} />
-      </div>
-
-      {/* Body */}
-      <div className="p-5">
-        {/* Come per le sezioni: chi scrive paragrafi deve poterli avere. */}
-        <p className="mb-5 whitespace-pre-line text-gray-500 text-sm leading-relaxed">{endpoint.description}</p>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left: params + request body */}
-          <div className="space-y-5">
-            {endpoint.parameters && endpoint.parameters.length > 0 && (
-              <div>
-                <h4 className="mb-2 font-semibold text-gray-400 text-xs uppercase tracking-wide">Parametri</h4>
-                <ParamTable params={endpoint.parameters} />
-              </div>
-            )}
-
-            {endpoint.requestBody && (
-              <div>
-                <h4 className="mb-2 font-semibold text-gray-400 text-xs uppercase tracking-wide">Request Body</h4>
-                <CodeBlock
-                  code={endpoint.requestBody.example}
-                  lang={endpoint.requestBody.contentType}
-                  label={endpoint.requestBody.contentType}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Right: responses */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wide">Risposte</h4>
-            {responsesFor(endpoint).map((r) => (
-              <div key={`${r.status}-${r.description}`}>
-                <div className="mb-1.5 flex items-center gap-2">
-                  <StatusBadge status={r.status} />
-                  <span className="text-gray-500 text-xs">{r.description}</span>
-                </div>
-                <CodeBlock code={r.example} label={`${r.status} Response`} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GroupSection({
-  group,
-  groupRef,
-  endpointRef,
-}: {
-  group: ApiGroup;
-  groupRef: (el: HTMLElement | null) => void;
-  endpointRef: (id: string, el: HTMLElement | null) => void;
-}) {
-  const Icon = group.icon;
-
-  return (
-    <section id={group.id} ref={groupRef} className="scroll-mt-4 space-y-4">
-      {/* Group header */}
-      <div className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
-          <Icon className={cn("h-5 w-5", group.color)} />
-        </div>
-        <div>
-          <h2 className="font-bold text-gray-900 text-lg">{group.label}</h2>
-          {/*
-            `whitespace-pre-line` so a section that needs paragraphs can have
-            them. Descriptions written as one block are unaffected: they contain
-            no newlines to honour.
-          */}
-          <p className="mt-1 whitespace-pre-line text-gray-500 text-sm leading-relaxed">{group.description}</p>
-        </div>
-      </div>
-
-      {/* Endpoints */}
-      {group.endpoints.map((ep) => (
-        <EndpointSection key={ep.id} endpoint={ep} sectionRef={(el) => endpointRef(ep.id, el)} />
-      ))}
-    </section>
-  );
-}
-
-function ErrorCodesSection() {
-  const errors = [
-    {
-      status: 400,
-      name: "Bad Request",
-      description:
-        "La richiesta contiene parametri non validi, mancanti o in un formato errato. Controlla il body JSON o i query parameter.",
-    },
-    {
-      status: 401,
-      name: "Unauthorized",
-      description: "L'utente non è autenticato. La sessione è assente o scaduta. Effettua il login e riprova.",
-    },
-    {
-      status: 403,
-      name: "Forbidden",
-      description:
-        "L'utente è autenticato ma non ha i permessi necessari per questa operazione (es. tentativo di eliminare un documento altrui).",
-    },
-    {
-      status: 404,
-      name: "Not Found",
-      description: "La risorsa richiesta non esiste o non è stata trovata nel database.",
-    },
-    {
-      status: 409,
-      name: "Conflict",
-      description: "Lo stato attuale della risorsa non permette l'operazione richiesta (es. preventivo già accettato).",
-    },
-    {
-      status: 413,
-      name: "Payload Too Large",
-      description: "Il file caricato supera il limite consentito (10 MB per i documenti).",
-    },
-    {
-      status: 415,
-      name: "Unsupported Media Type",
-      description:
-        "Il tipo MIME del file non è nella whitelist, l'estensione non corrisponde al MIME dichiarato, o i magic bytes del file non corrispondono al tipo dichiarato.",
-    },
-    {
-      status: 500,
-      name: "Internal Server Error",
-      description:
-        "Errore imprevisto lato server, o database del workspace irraggiungibile. I webhook rispondono 500 apposta, per far ritentare il mittente. Controlla i log. ⚠️ Un workspace sbagliato NON arriva qui: una credenziale senza workspace risponde 400, uno inesistente 404.",
-    },
-    {
-      status: 503,
-      name: "Service Unavailable",
-      description: "Un servizio esterno (es. API tassi di cambio) non è disponibile. Riprova dopo qualche minuto.",
-    },
-  ];
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center gap-3 border-gray-200 border-b p-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50">
-          <AlertCircle className="h-5 w-5 text-red-600" />
-        </div>
-        <div>
-          <h2 className="font-bold text-lg">Codici di Errore</h2>
-          <p className="text-gray-500 text-sm">
-            Tutti gli errori restituiscono un body JSON con il campo{" "}
-            <code className="rounded bg-gray-100 px-1 text-xs">error</code>: stringa descrittiva.
-          </p>
-        </div>
-      </div>
-
-      <div className="p-5">
-        <div className="mb-4">
-          <CodeBlock
-            code={JSON.stringify({ error: "Descrizione leggibile dell'errore" }, null, 2)}
-            label="Formato errore standard"
-          />
-        </div>
-
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-gray-200 border-b bg-gray-50">
-                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
-                  Codice
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
-                  Nome
-                </th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
-                  Causa tipica
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {errors.map((e) => (
-                <tr key={e.status} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <StatusBadge status={e.status} />
-                  </td>
-                  <td className="px-4 py-3 font-medium text-gray-800">{e.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{e.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Postman Toolbar ───────────────────────────────────────────────────────────
-
-function PostmanToolbar() {
-  const [collectionUrl, setCollectionUrl] = useState<string>("/admin/api-docs/postman-collection.json");
-  const [nativeUrl, setNativeUrl] = useState<string>("");
-  const [webUrl, setWebUrl] = useState<string>("");
-  const [isLocalhost, setIsLocalhost] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    const base = window.location.origin;
-    const col = `${base}/admin/api-docs/postman-collection.json`;
-    setCollectionUrl(col);
-    // postman:// URI opens the desktop app and fetches the collection locally
-    // — works even on localhost, requires Postman desktop to be installed.
-    setNativeUrl(`postman://app/collections/import?url=${encodeURIComponent(col)}`);
-    // Web URL only works when the server is publicly accessible (not localhost).
-    setWebUrl(`https://app.getpostman.com/run-collection?url=${encodeURIComponent(col)}`);
-    setIsLocalhost(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
-  }, []);
-
-  function copyCollectionUrl() {
-    navigator.clipboard.writeText(collectionUrl).catch((_err) => {
-      // silently ignore clipboard permission errors
-    });
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  return (
-    <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
-      <div className="flex flex-wrap items-start gap-4">
-        {/* Left: title + description */}
-        <div className="min-w-48 flex-1">
-          <p className="font-semibold text-gray-900 text-sm">Testa in Postman</p>
-          <p className="mt-0.5 text-gray-500 text-xs leading-relaxed">
-            Importa la collezione pre-configurata con variabili{" "}
-            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{baseUrl}}"}</code>,{" "}
-            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{apiKey}}"}</code> e{" "}
-            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{cronSecret}}"}</code> già
-            impostate.
-          </p>
-        </div>
-
-        {/* Right: action buttons */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Primary: open Postman desktop via postman:// URI scheme — works on localhost */}
-          {nativeUrl && (
-            <a
-              href={nativeUrl}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FF6C37] px-4 py-2 font-semibold text-white text-xs shadow-sm transition-opacity hover:opacity-90"
-              title="Apre l'app desktop Postman e importa la collezione"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Import in Postman
-            </a>
-          )}
-
-          {/* Secondary: Postman web — only useful when server is publicly accessible */}
-          {webUrl && !isLocalhost && (
-            <a
-              href={webUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6C37]/40 bg-white px-3 py-2 font-medium text-[#FF6C37] text-xs shadow-sm transition-colors hover:bg-orange-50"
-              title="Apre Postman Web (richiede URL pubblico)"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Postman Web
-            </a>
-          )}
-
-          {/* Download Postman Collection */}
-          <a
-            href="/admin/api-docs/postman-collection.json"
-            download="flux-crm-postman-collection.json"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Download
-          </a>
-
-          {/* Download OpenAPI Spec */}
-          <a
-            href="/admin/api-docs/openapi.json"
-            download="flux-crm-openapi.json"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            OpenAPI
-          </a>
-
-          {/* Copy collection URL */}
-          <button
-            type="button"
-            onClick={copyCollectionUrl}
-            title="Copia URL della collezione"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
-          >
-            {copied ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="text-emerald-600">Copiato!</span>
-              </>
-            ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                URL
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Collection URL + localhost hint */}
-      <div className="mt-3 space-y-1.5">
-        <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white/60 px-3 py-2">
-          <Globe className="h-3.5 w-3.5 shrink-0 text-blue-400" />
-          <code className="flex-1 truncate font-mono text-[10px] text-blue-700">{collectionUrl}</code>
-          <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 font-semibold text-[9px] text-blue-600 uppercase tracking-wide">
-            Public
-          </span>
-        </div>
-        {isLocalhost && (
-          <p className="flex items-center gap-1.5 text-[10px] text-amber-600">
-            <Info className="h-3 w-3 shrink-0" />
-            <span>
-              Localhost rilevato — <strong>Import in Postman</strong> usa l'app desktop (che può raggiungere localhost).
-              Il pulsante <em>Postman Web</em> è nascosto perché richiede un URL pubblico.
-            </span>
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Main Component ────────────────────────────────────────────────────────────
-
+/** The staff reference: every route, internal ones included. */
 export function ApiDocsClient() {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
-    new Set(["authentication", "tenant", "contacts", "crm-import"]),
-  );
-  const [activeId, setActiveId] = useState<string>("authentication");
-  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
-
-  function scrollTo(id: string) {
-    const el = sectionRefs.current[id];
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-      setActiveId(id);
-    }
-  }
-
-  function toggleGroup(id: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  return (
-    <div className="flex min-h-full gap-6">
-      {/* ── Sidebar ────────────────────────────────────────────────────────── */}
-      <aside className="hidden w-60 shrink-0 xl:block">
-        <div className="sticky top-4 space-y-3">
-          {/* API badge */}
-          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-gray-700" />
-              <span className="font-bold font-mono text-gray-900 text-xs">API Reference</span>
-              <Badge className="ml-auto h-4 bg-blue-100 px-1.5 text-[10px] text-blue-700 hover:bg-blue-100">v1</Badge>
-            </div>
-            <p className="mt-2 font-mono text-[10px] text-gray-400">Base URL</p>
-            <p className="mt-0.5 break-all font-mono text-[11px] text-blue-600">{"{tenant}"}.domain.com/api</p>
-          </div>
-
-          {/* Nav */}
-          <nav className="space-y-0.5">
-            {GROUPS.map((group) => {
-              const Icon = group.icon;
-              const isExpanded = expandedGroups.has(group.id);
-              const count = group.endpoints.length;
-
-              return (
-                <div key={group.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      scrollTo(group.id);
-                      if (count > 0) toggleGroup(group.id);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left font-medium text-xs transition-colors",
-                      activeId === group.id
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-                    )}
-                  >
-                    <Icon className={cn("h-3.5 w-3.5 shrink-0", group.color)} />
-                    <span className="flex-1 truncate">{group.label}</span>
-                    {count > 0 && (
-                      <>
-                        <span className="rounded bg-gray-100 px-1 py-0.5 font-bold text-[9px] text-gray-500">
-                          {count}
-                        </span>
-                        {isExpanded ? (
-                          <ChevronDown className="h-3 w-3 shrink-0" />
-                        ) : (
-                          <ChevronRight className="h-3 w-3 shrink-0" />
-                        )}
-                      </>
-                    )}
-                  </button>
-
-                  {isExpanded && count > 0 && (
-                    <div className="mt-0.5 ml-5 space-y-0.5 border-gray-200 border-l pl-3">
-                      {group.endpoints.map((ep) => (
-                        <button
-                          key={ep.id}
-                          type="button"
-                          onClick={() => scrollTo(ep.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
-                            activeId === ep.id
-                              ? "bg-blue-50 text-blue-700"
-                              : "text-gray-500 hover:bg-gray-100 hover:text-gray-800",
-                          )}
-                        >
-                          <MethodBadge method={ep.method} small />
-                          <span className="min-w-0 truncate font-mono text-[10px]">{ep.path.replace("/api", "")}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            <button
-              type="button"
-              onClick={() => scrollTo("error-codes")}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left font-medium text-xs transition-colors",
-                activeId === "error-codes"
-                  ? "bg-blue-50 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
-              )}
-            >
-              <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
-              <span>Error Codes</span>
-            </button>
-          </nav>
-        </div>
-      </aside>
-
-      {/* ── Main Content ───────────────────────────────────────────────────── */}
-      <div className="min-w-0 flex-1 space-y-8 pb-20">
-        {/* Hero header */}
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-900">
-              <Terminal className="h-6 w-6 text-emerald-400" />
-            </div>
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="font-bold text-2xl text-gray-900 tracking-tight">Flux CRM API Reference</h1>
-                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">v1.0</Badge>
-              </div>
-              <p className="mt-1 text-gray-500 text-sm">
-                Documentazione completa degli endpoint HTTP. Base URL:{" "}
-                <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-blue-600">
-                  {"https://{tenant}.domain.com/api"}
-                </code>
-              </p>
-
-              <div className="mt-4 flex flex-wrap gap-4">
-                {[
-                  { dot: "bg-cyan-400", text: "Multi-tenant su un dominio solo: il workspace lo dice la credenziale" },
-                  {
-                    dot: "bg-amber-400",
-                    text: "Chiave del workspace, chiave di piattaforma con X-Tenant-ID, o sessione",
-                  },
-                  { dot: "bg-blue-400", text: "Risposte JSON (salvo CSV / HTML / GIF)" },
-                  { dot: "bg-purple-400", text: "Webhook firmati (Stripe HMAC, Resend)" },
-                  { dot: "bg-yellow-400", text: "Cron protetti da Authorization: Bearer $CRON_SECRET" },
-                ].map(({ dot, text }) => (
-                  <span key={text} className="flex items-center gap-1.5 text-gray-500 text-xs">
-                    <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
-                    {text}
-                  </span>
-                ))}
-              </div>
-
-              <PostmanToolbar />
-            </div>
-          </div>
-        </div>
-
-        {/* Group sections */}
-        {GROUPS.map((group) => (
-          <GroupSection
-            key={group.id}
-            group={group}
-            groupRef={(el) => {
-              sectionRefs.current[group.id] = el;
-            }}
-            endpointRef={(id, el) => {
-              sectionRefs.current[id] = el;
-            }}
-          />
-        ))}
-
-        {/* Error codes */}
-        <section
-          id="error-codes"
-          ref={(el) => {
-            sectionRefs.current["error-codes"] = el;
-          }}
-          className="scroll-mt-4"
-        >
-          <ErrorCodesSection />
-        </section>
-
-        {/* Footer note */}
-        <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
-          <div className="flex items-start gap-3">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
-            <div className="text-gray-600 text-sm">
-              <span className="font-medium text-gray-900">Nota:</span> Le mutazioni di dati CRM (creazione,
-              aggiornamento, eliminazione di contatti, deal, ticket, ecc.) avvengono tramite{" "}
-              <span className="font-medium text-gray-900">Next.js Server Actions</span>, non tramite endpoint REST. Le
-              Server Actions sono definite in{" "}
-              <code className="rounded bg-white px-1 text-blue-700 text-xs">src/actions/</code> e invocabili solo
-              dall'app stessa (non espongono URL pubblici).
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <ApiDocsView groups={GROUPS} variant="admin" />;
 }

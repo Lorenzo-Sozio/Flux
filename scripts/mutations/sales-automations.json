@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/lib/scheduled-rules.ts",
+    "description": "⚠️⚠️ una regola programmata riparte ogni mattina sullo stesso record",
+    "find": "        if (fired.has(`${rule.id}:${id}`)) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/scheduled-rules.ts",
+    "description": "⚠️ il ricordo della settimana conta anche le esecuzioni non programmate",
+    "find": "        eq(automationLogs.event, \"onSchedule\"),",
+    "replace": "        eq(automationLogs.event, \"onUpdate\"),"
+  },
+  {
+    "file": "src/components/crm/automation/rule-engine.ts",
+    "description": "⚠️⚠️ il giro del mattino fa partire anche le regole che non ha scelto",
+    "find": "      return !context.ruleIds || context.ruleIds.includes(r.id);",
+    "replace": "      return true;"
+  },
+  {
+    "file": "src/components/crm/automation/rule-engine.ts",
+    "description": "⚠️ a quota esaurita il registro si riempie di una riga per ogni record",
+    "find": "    const fresh = rules.filter((r) => !logged.has(r.id));",
+    "replace": "    const fresh = rules;"
+  },
+  {
+    "file": "src/components/crm/automation/rule-engine.ts",
+    "description": "⚠️ a quota esaurita gli admin vengono avvisati a ogni evento",
+    "find": "    if (logged.size === 0) {",
+    "replace": "    if (true) {"
+  },
+  {
+    "file": "src/components/crm/automation/email-service.ts",
+    "description": "⚠️⚠️ una regola scrive a chi si è disiscritto",
+    "find": "  if (suppressed) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/components/crm/automation/email-service.ts",
+    "description": "⚠️ l'email di un'automazione esce senza link di disiscrizione",
+    "find": "    htmlBody: ensureUnsubscribe(finalBody, unsubscribeUrl),",
+    "replace": "    htmlBody: finalBody,"
+  },
+  {
+    "file": "src/lib/rule-conditions.ts",
+    "description": "«è nel passato» vale anche per le date future",
+    "find": "      return d !== null && d.getTime() < now.getTime();",
+    "replace": "      return d !== null;"
+  },
+  {
+    "file": "src/lib/rule-conditions.ts",
+    "description": "«più di N giorni fa» ignora N",
+    "find": "      return d.getTime() <= now.getTime() - days * DAY_MS;",
+    "replace": "      return d.getTime() <= now.getTime();"
+  }
+]

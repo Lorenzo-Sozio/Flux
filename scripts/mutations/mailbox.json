@@ -1,0 +1,170 @@
+[
+  {
+    "file": "src/lib/mail-oauth.ts",
+    "description": "⚠️⚠️ uno stato OAuth modificato (altro workspace, altra persona) viene accettato",
+    "find": "  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return { ok: false, reason: \"signature\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-oauth.ts",
+    "description": "⚠️ uno stato scaduto viene accettato",
+    "find": "  if (typeof state.exp !== \"number\" || state.exp * 1000 < now) return { ok: false, reason: \"expired\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-oauth.ts",
+    "description": "un ritorno per Microsoft viene preso per Google",
+    "find": "  if (state.provider !== input.provider) return { ok: false, reason: \"provider\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-oauth.ts",
+    "description": "⚠️⚠️ il ritorno viene accettato in un browser diverso da quello che l'ha chiesto",
+    "find": "  if (a.length !== b.length || !timingSafeEqual(a, b)) return { ok: false, reason: \"cookie\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/mail/callback/[provider]/route.ts",
+    "description": "⚠️⚠️ la callback collega la casella di chi ha iniziato a un'altra persona o a un altro workspace",
+    "find": "  if (check.state.userId !== actor.userId || check.state.tenantId !== (await getCurrentTenantId())) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/mail-providers/registry.ts",
+    "description": "⚠️⚠️ un fornitore non verificato è offerto a tutti i clienti",
+    "find": "  return state === \"on\" || (state === \"testing\" && actor.isPlatformStaff);",
+    "replace": "  return state === \"on\" || state === \"testing\";"
+  },
+  {
+    "file": "src/lib/mail-providers/registry.ts",
+    "description": "⚠️ la verifica del fornitore si considera fatta senza che nessuno l'abbia dichiarata",
+    "find": "verified: env[`${prefix}_VERIFIED`] === \"1\"",
+    "replace": "verified: true"
+  },
+  {
+    "file": "src/lib/mail-providers/mime.ts",
+    "description": "⚠️⚠️ un a capo nell'oggetto o nel nome aggiunge intestazioni (un Ccn che nessuno ha scritto)",
+    "find": "  return value.replace(/[\\r\\n]+/g, \" \").trim();",
+    "replace": "  return value.trim();"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️ una casella prenota il budget e poi non legge niente, perdendo il suo posto in coda",
+    "find": "    if (budget.left < 3 + PER_MESSAGE + 1 || !budget.take(3)) {",
+    "replace": "    if (!budget.take(3)) {"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️ un cursore dimenticato dal fornitore blocca la casella per sempre",
+    "find": "    if (err instanceof ProviderError && err.cursorExpired) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "⚠️ la posta inviata dalla persona ferma le sue sequenze come se fosse una risposta",
+    "find": "    if (m.from !== own && done.matched > 0) {",
+    "replace": "    if (done.matched > 0) {"
+  },
+  {
+    "file": "src/lib/mail-sync.ts",
+    "description": "gli impegni si rileggono a ogni giro: una chiamata al fornitore ogni dieci minuti per casella",
+    "find": "  if (conn.busySyncedAt && now.getTime() - conn.busySyncedAt.getTime() < BUSY_REFRESH_MINUTES * 60_000) return 0;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️⚠️ il token viene salvato in chiaro",
+    "find": "    accessToken: encryptSecret(input.tokens.accessToken),",
+    "replace": "    accessToken: input.tokens.accessToken,"
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️ un rinnovo rifiutato non chiude la connessione: si riprova una concessione morta ogni dieci minuti",
+    "find": "    if (err instanceof ProviderError && isGrantRefused(err)) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️ un'interruzione passeggera del fornitore chiude la connessione",
+    "find": "    if (err instanceof ProviderError && isGrantRefused(err)) {",
+    "replace": "    if (err instanceof ProviderError) {"
+  },
+  {
+    "file": "src/lib/mail-connection.ts",
+    "description": "⚠️ il refresh token ruotato da Microsoft viene scartato",
+    "find": "      ...(fresh.refreshToken ? { refreshToken: encryptSecret(fresh.refreshToken) } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mailbox-send.ts",
+    "description": "⚠️⚠️ una casella che fallisce viene data per inviata",
+    "find": "    return { used: true, ok: false, error: err instanceof Error ? err.message : String(err) };",
+    "replace": "    return { used: true, ok: true, from: conn.email, messageId: null };"
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️ una serie ricorrente viene scritta nel calendario come un appuntamento singolo",
+    "find": "  if (!appt || appt.status === \"cancelled\" || appt.recurrenceRule) {",
+    "replace": "  if (!appt || appt.status === \"cancelled\") {"
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️⚠️ un appuntamento annullato resta nel calendario della persona",
+    "find": "  if (!appt || appt.status === \"cancelled\" || appt.recurrenceRule) {",
+    "replace": "  if (!appt || appt.recurrenceRule) {"
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️ un appuntamento eliminato lascia l'evento nel calendario",
+    "find": "    .where(or(isNull(appointments.id), inArray(appointments.recurrenceParentId, unique)));",
+    "replace": "    .where(inArray(appointments.recurrenceParentId, unique));"
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️ un appuntamento passato a un collega resta nel calendario del vecchio organizzatore",
+    "find": "  for (const m of mirrors.filter((x) => x.connectionId !== conn?.id)) await unmirror(db, m, options);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/appointment-mirror.ts",
+    "description": "⚠️ due salvataggi contemporanei lasciano due eventi nel calendario",
+    "find": "    if (claimed.length === 0) await live.provider.deleteEvent(live.token, externalId).catch(() => undefined);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/availability.ts",
+    "description": "⚠️ un appuntamento rispecchiato nel calendario conta due volte come occupato",
+    "find": "    if (!mine || mine.some((x) => x.startAt.getTime() === b.startAt.getTime())) continue;",
+    "replace": "    if (!mine) continue;"
+  },
+  {
+    "file": "src/lib/mail-providers/google.ts",
+    "description": "⚠️⚠️ la lettura oltre il limite sposta il cursore oltre messaggi mai letti: vanno persi",
+    "find": "        if (ids.length > 0 && ids.length + added.length > limit) {",
+    "replace": "        if (false) {"
+  },
+  {
+    "file": "src/lib/mail-providers/google.ts",
+    "description": "⚠️ una pagina letta per intero non porta il cursore alla storia della casella",
+    "find": "      if (!more) next = String(history.historyId);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/google.ts",
+    "description": "⚠️ bozze e spam vengono archiviati sulla cronologia di un cliente",
+    "find": "  if (labels.some((l) => l === \"DRAFT\" || l === \"SPAM\" || l === \"TRASH\")) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/mail-providers/microsoft.ts",
+    "description": "⚠️⚠️ la query OData scrive gli spazi come + e Graph non capisce il filtro",
+    "find": "    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)",
+    "replace": "    .map(([k, v]) => new URLSearchParams({ [k]: v }).toString())"
+  },
+  {
+    "file": "src/lib/key-rotation-db.ts",
+    "description": "⚠️⚠️ la rotazione della chiave sovrascrive un token che un rinnovo ha appena riscritto",
+    "find": "      .where(and(eq(mailConnections.id, where.id), eq(col, from)))",
+    "replace": "      .where(eq(mailConnections.id, where.id))"
+  }
+]

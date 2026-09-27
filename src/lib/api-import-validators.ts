@@ -1,3 +1,5 @@
+import type { ConsentSource } from "@/lib/consent";
+
 export type OnDuplicate = "skip" | "update" | "error";
 
 export interface ValidationError {
@@ -243,7 +245,16 @@ export function validateLeadInput(body: unknown): { errors: ValidationError[]; d
   };
 }
 
-export function buildLeadPayload(data: LeadInput, ownerId: string | null) {
+/**
+ * A consent that arrives as a yes is a decision taken now, through this channel
+ * (src/lib/consent.ts). A no is left as it is: the row it lands on may never have consented,
+ * and a withdrawal has its own dated route, `/api/crm/opt-out`.
+ */
+function consentStamp(consent: boolean | null | undefined, source: ConsentSource) {
+  return consent === true ? { consentDate: new Date(), consentSource: source } : {};
+}
+
+export function buildLeadPayload(data: LeadInput, ownerId: string | null, consentSource: ConsentSource = "api") {
   return {
     firstName: data.firstName,
     lastName: data.lastName,
@@ -265,6 +276,7 @@ export function buildLeadPayload(data: LeadInput, ownerId: string | null) {
     leadScore: data.leadScore,
     notes: data.notes,
     marketingConsent: data.marketingConsent,
+    ...consentStamp(data.marketingConsent, consentSource),
     tags: data.tags,
     ownerId: ownerId ?? undefined,
   };
@@ -489,7 +501,7 @@ export function validateContactInput(body: unknown): { errors: ValidationError[]
   };
 }
 
-export function buildContactPayload(data: ContactInput, ownerId: string | null) {
+export function buildContactPayload(data: ContactInput, ownerId: string | null, consentSource: ConsentSource = "api") {
   return {
     firstName: data.firstName,
     lastName: data.lastName,
@@ -510,6 +522,7 @@ export function buildContactPayload(data: ContactInput, ownerId: string | null) 
     notes: data.notes,
     companyId: data.companyId,
     marketingConsent: data.marketingConsent,
+    ...consentStamp(data.marketingConsent, consentSource),
     tags: data.tags,
     ownerId: ownerId ?? undefined,
   };

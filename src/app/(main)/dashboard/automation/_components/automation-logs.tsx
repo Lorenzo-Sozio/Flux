@@ -70,15 +70,17 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
         </CardTitle>
         <CardDescription>{t("logs.lastRuns", { count: displayLogs.length })}</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-3 sm:px-6">
         <Table>
           <TableHeader>
             <TableRow className="border-muted/50">
               <TableHead className="w-6" />
               <TableHead className="w-12">{t("logs.statusCol")}</TableHead>
               <TableHead>{t("logs.ruleCol")}</TableHead>
-              <TableHead>{t("logs.entityCol")}</TableHead>
-              <TableHead className="w-20 text-center">{t("logs.actionsCol")}</TableHead>
+              {/* Entity and action count fold under the rule name below `md`, so
+                  the row keeps its expand toggle and stays four columns wide. */}
+              <TableHead className="hidden md:table-cell">{t("logs.entityCol")}</TableHead>
+              <TableHead className="hidden w-20 text-center md:table-cell">{t("logs.actionsCol")}</TableHead>
               <TableHead className="text-right">{t("logs.timeCol")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -128,19 +130,29 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                     </TableCell>
 
                     {/* Rule Name */}
-                    <TableCell>
+                    <TableCell className="min-w-40 whitespace-normal md:min-w-0 md:whitespace-nowrap">
                       <span className="font-medium text-sm">{log.ruleName}</span>
+                      <div className="mt-1 flex flex-wrap gap-1 md:hidden">
+                        <Badge variant="outline" className="text-xs">
+                          {log.entityType} <span className="ml-1 opacity-60">#{log.entityId.slice(0, 8)}</span>
+                        </Badge>
+                        {log.success && (
+                          <Badge variant="secondary" className="text-xs">
+                            {t("logs.actionCount", { count: log.actionsExecuted })}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Entity */}
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <Badge variant="outline" className="text-xs">
                         {log.entityType} <span className="ml-1 opacity-60">#{log.entityId.slice(0, 8)}</span>
                       </Badge>
                     </TableCell>
 
                     {/* Actions Count */}
-                    <TableCell className="text-center">
+                    <TableCell className="hidden text-center md:table-cell">
                       {log.success ? (
                         <Badge variant="secondary" className="text-xs">
                           {t("logs.actionCount", { count: log.actionsExecuted })}

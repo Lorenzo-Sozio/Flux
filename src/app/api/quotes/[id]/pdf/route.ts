@@ -1,16 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
-import { quoteActivities, quotes } from "@/db/schema";
+import { quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
-import { documentLanguage, QUOTE_TEXT } from "@/lib/document-language";
-import { renderQuotePdf } from "@/lib/pdf/quote-pdf";
 import { can } from "@/lib/permissions";
-import { sellerIdentity } from "@/lib/seller-identity";
+import { buildQuotePdf, loadQuoteForPdf } from "@/lib/quote-pdf-load";
 import { getDb } from "@/lib/tenant-context";
 import { resolveTenantByProbe } from "@/lib/tenant-resolve";
-import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,20 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     db = await getDb();
   }
 
-  const q = await db.query.quotes.findFirst({
-    where: eq(quotes.id, id),
-    with: {
-      deal: true,
-      company: true,
-      contact: true,
-      owner: { columns: USER_SUMMARY_COLUMNS },
-      items: { with: { product: true } },
-      activities: {
-        with: { user: { columns: USER_SUMMARY_COLUMNS } },
-        orderBy: desc(quoteActivities.createdAt),
-      },
-    },
-  });
+  const q = await loadQuoteForPdf(db, id);
 
   if (!q) return new NextResponse("Not found", { status: 404 });
 
@@ -69,13 +53,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   // In the customer's language, whoever downloads it: this is the document they receive.
-  const lang = documentLanguage(q.company);
-  const seller = await sellerIdentity(db, workspaceName);
-  if (!seller.email && q.owner?.email) seller.email = q.owner.email;
-  const buffer = await renderQuotePdf({ quote: q, seller, lang });
-  const fileName = `${QUOTE_TEXT[lang].documentTitle}-${q.quoteNumber}`.replace(/[^A-Za-z0-9-]/g, "-");
+  const { bytes, fileName } = await buildQuotePdf(db, q, workspaceName);
 
-  return new NextResponse(new Uint8Array(buffer), {
+  return new NextResponse(new Uint8Array(bytes), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${fileName}.pdf"`,

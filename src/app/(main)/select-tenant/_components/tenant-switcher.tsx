@@ -5,9 +5,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { validateTenantSwitchAction } from "@/actions/auth";
+import { normalizeTenantRole } from "@/lib/permissions";
 
 type Membership = {
   tenantId: string;
@@ -25,6 +27,8 @@ export function TenantSwitcher({ memberships }: TenantSwitcherProps) {
   const { update } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
+  const t = useTranslations("auth.workspaces");
+  const tr = useTranslations("roles.roleLabel");
 
   async function handleSelect(tenantId: string) {
     setLoading(tenantId);
@@ -32,7 +36,7 @@ export function TenantSwitcher({ memberships }: TenantSwitcherProps) {
       // Server-side membership validation
       const result = await validateTenantSwitchAction(tenantId);
       if (!result.ok) {
-        toast.error(result.error ?? "Failed to switch workspace.");
+        toast.error(result.error ?? t("switchFailed"));
         return;
       }
 
@@ -42,21 +46,18 @@ export function TenantSwitcher({ memberships }: TenantSwitcherProps) {
       router.push("/dashboard/crm");
       router.refresh();
     } catch {
-      toast.error("An unexpected error occurred.");
+      toast.error(t("unexpected"));
     } finally {
       setLoading(null);
     }
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 px-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 py-8">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-3xl shadow-md ring-1 ring-slate-200">
-            🧩
-          </div>
-          <h1 className="font-bold text-2xl text-slate-900">Select workspace</h1>
-          <p className="mt-1 text-slate-500 text-sm">Choose the workspace you want to access.</p>
+          <h1 className="font-bold text-2xl">{t("title")}</h1>
+          <p className="mt-1 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -76,18 +77,18 @@ export function TenantSwitcher({ memberships }: TenantSwitcherProps) {
                 type="button"
                 disabled={isLoading || loading !== null}
                 onClick={() => handleSelect(tenantId)}
-                className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-left shadow-sm transition hover:border-slate-400 hover:shadow-md disabled:opacity-60"
+                className="flex items-center gap-4 rounded-2xl border bg-card px-5 py-4 text-left text-card-foreground shadow-sm transition hover:border-foreground/30 hover:shadow-md disabled:opacity-60"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-xl">
                   {settings.emoji ?? "🏢"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-slate-900 text-sm">{tenantName}</p>
-                  <p className="text-slate-500 text-xs capitalize">{role}</p>
+                  <p className="truncate font-semibold text-sm">{tenantName}</p>
+                  <p className="text-muted-foreground text-xs">{tr(normalizeTenantRole(role))}</p>
                 </div>
                 {isLoading && (
                   <svg
-                    className="h-4 w-4 animate-spin text-slate-400"
+                    className="h-4 w-4 animate-spin text-muted-foreground"
                     xmlns="http://www.w3.org/2000/svg"
                     fill="none"
                     viewBox="0 0 24 24"

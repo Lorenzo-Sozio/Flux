@@ -150,7 +150,7 @@ export function SendQuoteEmailDialog({
               )}
             />
 
-            <div className="flex justify-end gap-2">
+            <div className="sticky bottom-0 flex justify-end gap-2 bg-background py-3 sm:static sm:py-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 {t("cancel")}
               </Button>

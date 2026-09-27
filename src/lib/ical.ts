@@ -4,8 +4,155 @@
  * No external dependencies.
  */
 
+import { parseRRule } from "@/lib/recurrence";
+import { wallParts } from "@/lib/wall-clock";
+
 function formatUtcDate(d: Date): string {
   return `${d.toISOString().replace(/[-:]/g, "").split(".")[0]}Z`;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+function formatWallDate(d: Date, timeZone: string): string {
+  const p = wallParts(d, timeZone);
+  return `${p.year}${pad2(p.month)}${pad2(p.day)}`;
+}
+
+function formatWallDateTime(d: Date, timeZone: string): string {
+  const p = wallParts(d, timeZone);
+  return `${p.year}${pad2(p.month)}${pad2(p.day)}T${pad2(p.hour)}${pad2(p.minute)}00`;
+}
+
+/**
+ * How a repeating or all-day event is timed, beyond a plain start and end.
+ *
+ * ⚠️ A repeating event is written on its zone's clock (`TZID`), never in UTC. A
+ * client expands a UTC rule in UTC, so a weekly meeting at ten in Rome becomes a
+ * meeting at eleven for half the year — in every invitee's calendar, silently.
+ */
+export interface ICSTiming {
+  /** The zone the series keeps to; required for recurrence and all-day. */
+  timeZone?: string | null;
+  allDay?: boolean;
+  /** An RRULE without its prefix. */
+  recurrenceRule?: string | null;
+  /** Starts of removed occurrences. */
+  recurrenceExceptions?: readonly string[] | null;
+}
+
+function minutesOffset(instant: Date, timeZone: string): number {
+  const p = wallParts(instant, timeZone);
+  return Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - instant.getTime()) / 60_000);
+}
+
+function formatOffset(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "+";
+  const abs = Math.abs(minutes);
+  return `${sign}${pad2(Math.floor(abs / 60))}${pad2(abs % 60)}`;
+}
+
+const RULE_DAYS = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"];
+
+/**
+ * A VTIMEZONE for a named zone, derived from what `Intl` knows about one year.
+ *
+ * RFC 5545 requires one for every TZID used. The daylight-saving changes are
+ * found by walking the year a day at a time and then an hour at a time, and
+ * written as yearly rules ("last Sunday of October"), which is how every zone
+ * with summer time in use today is defined.
+ */
+export function vtimezone(timeZone: string, year: number): string[] {
+  const jan = minutesOffset(new Date(Date.UTC(year, 0, 1)), timeZone);
+  const jul = minutesOffset(new Date(Date.UTC(year, 6, 1)), timeZone);
+  const lines = ["BEGIN:VTIMEZONE", `TZID:${timeZone}`];
+  if (jan === jul) {
+    lines.push(
+      "BEGIN:STANDARD",
+      "DTSTART:19700101T000000",
+      `TZOFFSETFROM:${formatOffset(jan)}`,
+      `TZOFFSETTO:${formatOffset(jan)}`,
+      "END:STANDARD",
+      "END:VTIMEZONE",
+    );
+    return lines;
+  }
+
+  const HOUR = 3_600_000;
+  let t = Date.UTC(year, 0, 1);
+  let prev = minutesOffset(new Date(t), timeZone);
+  const end = Date.UTC(year + 1, 0, 1);
+  while (t < end) {
+    const next = t + 24 * HOUR;
+    const off = minutesOffset(new Date(next), timeZone);
+    if (off !== prev) {
+      let h = t;
+      while (minutesOffset(new Date(h + HOUR), timeZone) === prev) h += HOUR;
+      const change = new Date(h + HOUR);
+      // The wall-clock moment of the change, on the clock it changes from.
+      const local = new Date(change.getTime() + prev * 60_000);
+      const month = local.getUTCMonth() + 1;
+      const day = local.getUTCDate();
+      const lastOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      const nth = day + 7 > lastOfMonth ? -1 : Math.ceil(day / 7);
+      const weekday = RULE_DAYS[(local.getUTCDay() + 6) % 7];
+      const kind = off > prev ? "DAYLIGHT" : "STANDARD";
+      lines.push(
+        `BEGIN:${kind}`,
+        `DTSTART:${year}${pad2(month)}${pad2(day)}T${pad2(local.getUTCHours())}${pad2(local.getUTCMinutes())}00`,
+        `RRULE:FREQ=YEARLY;BYMONTH=${month};BYDAY=${nth}${weekday}`,
+        `TZOFFSETFROM:${formatOffset(prev)}`,
+        `TZOFFSETTO:${formatOffset(off)}`,
+        `END:${kind}`,
+      );
+      prev = off;
+    }
+    t = next;
+  }
+  lines.push("END:VTIMEZONE");
+  return lines;
+}
+
+/** DTSTART, DTEND, RRULE and EXDATE for an event, and the zone it needs declared. */
+function timingLines(
+  startAt: Date,
+  endAt: Date,
+  timing: ICSTiming,
+): { lines: string[]; zone: { id: string; year: number } | null } {
+  const tz = timing.timeZone ?? null;
+  const rule = timing.recurrenceRule && tz ? parseRRule(timing.recurrenceRule) : null;
+  const exceptions = rule ? (timing.recurrenceExceptions ?? []) : [];
+
+  if (timing.allDay && tz) {
+    const lines = [
+      `DTSTART;VALUE=DATE:${formatWallDate(startAt, tz)}`,
+      `DTEND;VALUE=DATE:${formatWallDate(endAt, tz)}`,
+    ];
+    if (rule) {
+      // With DATE values UNTIL has to be a DATE as well (RFC 5545 §3.3.10).
+      const raw = (timing.recurrenceRule ?? "").replace(/UNTIL=[^;]+/, () =>
+        rule.until ? `UNTIL=${formatWallDate(rule.until, tz)}` : "",
+      );
+      lines.push(`RRULE:${raw}`);
+      if (exceptions.length) {
+        lines.push(foldLine(`EXDATE;VALUE=DATE:${exceptions.map((e) => formatWallDate(new Date(e), tz)).join(",")}`));
+      }
+    }
+    return { lines, zone: null };
+  }
+
+  if (rule && tz) {
+    const lines = [
+      `DTSTART;TZID=${tz}:${formatWallDateTime(startAt, tz)}`,
+      `DTEND;TZID=${tz}:${formatWallDateTime(endAt, tz)}`,
+      `RRULE:${timing.recurrenceRule}`,
+    ];
+    if (exceptions.length) {
+      lines.push(foldLine(`EXDATE;TZID=${tz}:${exceptions.map((e) => formatWallDateTime(new Date(e), tz)).join(",")}`));
+    }
+    return { lines, zone: { id: tz, year: wallParts(startAt, tz).year } };
+  }
+
+  return { lines: [`DTSTART:${formatUtcDate(startAt)}`, `DTEND:${formatUtcDate(endAt)}`], zone: null };
 }
 
 function escapeText(str: string): string {
@@ -47,7 +194,7 @@ export interface ICSAttendee {
   status: AttendeeStatus;
 }
 
-export interface ICSEvent {
+export interface ICSEvent extends ICSTiming {
   uid: string;
   title: string;
   description?: string | null;
@@ -76,8 +223,7 @@ const ROLE_MAP: Record<AttendeeRole, string> = {
 
 export function generateICS(event: ICSEvent, method: "REQUEST" | "CANCEL" | "REPLY" = "REQUEST"): string {
   const now = formatUtcDate(new Date());
-  const dtstart = formatUtcDate(event.startAt);
-  const dtend = formatUtcDate(event.endAt);
+  const timing = timingLines(event.startAt, event.endAt, event);
   const status = method === "CANCEL" ? "CANCELLED" : "CONFIRMED";
 
   const lines: string[] = [
@@ -85,11 +231,11 @@ export function generateICS(event: ICSEvent, method: "REQUEST" | "CANCEL" | "REP
     "VERSION:2.0",
     "PRODID:-//FluxCRM//FluxCRM//EN",
     `METHOD:${method}`,
+    ...(timing.zone ? vtimezone(timing.zone.id, timing.zone.year) : []),
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
     `DTSTAMP:${now}`,
-    `DTSTART:${dtstart}`,
-    `DTEND:${dtend}`,
+    ...timing.lines,
     foldLine(`SUMMARY:${escapeText(event.title)}`),
     foldLine(`ORGANIZER;CN="${escapeText(event.organizer.name)}":mailto:${event.organizer.email}`),
     `SEQUENCE:${event.sequence}`,
@@ -160,7 +306,7 @@ export function generateICS(event: ICSEvent, method: "REQUEST" | "CANCEL" | "REP
 
 const CRLF = "\r\n";
 
-export interface FeedEvent {
+export interface FeedEvent extends ICSTiming {
   uid: string;
   title: string;
   description?: string | null;
@@ -188,13 +334,14 @@ function feedStatus(status: string | null | undefined): string {
   return status === "cancelled" ? "CANCELLED" : "CONFIRMED";
 }
 
-function feedEventLines(event: FeedEvent, stamp: string): string[] {
+function feedEventLines(event: FeedEvent, stamp: string, zones: Map<string, number>): string[] {
+  const timing = timingLines(event.startAt, event.endAt, event);
+  if (timing.zone && !zones.has(timing.zone.id)) zones.set(timing.zone.id, timing.zone.year);
   const lines = [
     "BEGIN:VEVENT",
     `UID:${event.uid}`,
     `DTSTAMP:${event.updatedAt ? formatUtcDate(event.updatedAt) : stamp}`,
-    `DTSTART:${formatUtcDate(event.startAt)}`,
-    `DTEND:${formatUtcDate(event.endAt)}`,
+    ...timing.lines,
     foldLine(`SUMMARY:${escapeText(event.title)}`),
     `SEQUENCE:${event.sequence ?? 0}`,
     `STATUS:${feedStatus(event.status)}`,
@@ -239,7 +386,11 @@ export function generateFeedICS(
     "X-PUBLISHED-TTL:PT15M",
   ];
 
-  for (const event of events) lines.push(...feedEventLines(event, stamp));
+  const zones = new Map<string, number>();
+  const body: string[] = [];
+  for (const event of events) body.push(...feedEventLines(event, stamp, zones));
+  for (const [id, year] of zones) lines.push(...vtimezone(id, year));
+  lines.push(...body);
 
   lines.push("END:VCALENDAR");
   // RFC 5545 §3.4: the last content line is terminated by CRLF like any other.

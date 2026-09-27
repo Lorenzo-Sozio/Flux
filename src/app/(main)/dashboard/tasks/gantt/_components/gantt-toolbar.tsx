@@ -67,7 +67,8 @@ export function GanttToolbar({
   const handleToday = () => setViewDate(new Date());
 
   return (
-    <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 md:px-6 md:py-4">
+    // No side padding below sm: the page around it already has 16px, and twice that left 296px for the controls.
+    <div className="flex shrink-0 flex-col gap-3 border-b py-3 sm:px-4 md:px-6 md:py-4">
       {/* Row 1: back + title | nav + view selector */}
       {/* Back arrow, title and a count on the left; a date walker and the view
           selector on the right. Six controls and a heading is more than a phone
@@ -75,8 +76,8 @@ export function GanttToolbar({
           supplementary — steps out below sm. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 md:gap-3">
-          <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-            <Link href="/dashboard/tasks">
+          <Button variant="ghost" size="icon" asChild className="h-8 w-8 max-md:size-9">
+            <Link href="/dashboard/tasks" aria-label={tTasks("title")}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
@@ -92,7 +93,7 @@ export function GanttToolbar({
         <div className="flex flex-wrap items-center gap-2">
           {/* Time navigation */}
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>
+            <Button variant="outline" size="icon" className="h-8 w-8 max-md:size-9" onClick={handlePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" className="h-8 px-3" onClick={handleToday} disabled={isToday}>
@@ -102,7 +103,13 @@ export function GanttToolbar({
               <PopoverTrigger asChild>
                 <Button variant="outline" className="h-8 gap-1.5 px-3 font-normal text-sm">
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  {viewDate.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
+                  {/* The year is the scale's top row already; on a phone the button does without it. */}
+                  <span className="sm:hidden">
+                    {viewDate.toLocaleDateString(locale, { day: "2-digit", month: "short" })}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {viewDate.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -118,14 +125,14 @@ export function GanttToolbar({
                 />
               </PopoverContent>
             </Popover>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNext}>
+            <Button variant="outline" size="icon" className="h-8 w-8 max-md:size-9" onClick={handleNext}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
           {/* View mode */}
           <Select value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}>
-            <SelectTrigger className="h-8 w-32 text-xs">
+            <SelectTrigger className="h-8 w-28 text-xs sm:w-32">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -140,9 +147,10 @@ export function GanttToolbar({
             <Button
               variant={showWorkload ? "secondary" : "outline"}
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 max-md:size-9"
               onClick={onToggleWorkload}
               title={t("workloadToggle")}
+              aria-label={t("workloadToggle")}
             >
               <PanelRight className="h-4 w-4" />
             </Button>
@@ -156,8 +164,9 @@ export function GanttToolbar({
       </div>
 
       {/* Row 2: legend + progress bar */}
-      <div className="flex items-center gap-4 text-xs">
-        <div className="flex items-center gap-3">
+      {/* Three counts, a divider and a progress bar are ~480px: the row wraps on a phone. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+        <div className="flex flex-wrap items-center gap-3">
           {(
             [
               ["done", t("legendDone"), done],
@@ -174,7 +183,7 @@ export function GanttToolbar({
         </div>
         {withDates > 0 && (
           <>
-            <span className="select-none text-border">|</span>
+            <span className="select-none text-border max-sm:hidden">|</span>
             <div className="flex items-center gap-2 text-muted-foreground">
               <div className="h-1.5 w-28 overflow-hidden rounded-full bg-muted">
                 <div

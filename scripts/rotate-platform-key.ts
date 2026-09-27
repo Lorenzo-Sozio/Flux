@@ -49,17 +49,17 @@ import { neon } from "@neondatabase/serverless";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 
-import { emailSettings, tenants } from "../src/db/schema";
+import { emailSettings, mailConnections, tenants } from "../src/db/schema";
 import { describe, type EncryptedField, type FieldPlan, planRotation } from "../src/lib/key-rotation";
 import { conditionalWrite } from "../src/lib/key-rotation-db";
 import { decryptWithKey, parseEncryptionKey } from "../src/lib/tenant-db";
 
 type Db = ReturnType<typeof drizzle>;
-type Column = "db_url" | "resend_api_key" | "smtp_password";
+type Column = "db_url" | "resend_api_key" | "smtp_password" | "access_token" | "refresh_token";
 
 interface BackupEntry {
   database: string;
-  table: "tenants" | "email_settings";
+  table: "tenants" | "email_settings" | "mail_connection";
   column: Column;
   id: string;
   previous: string;
@@ -151,6 +151,36 @@ async function gather(db: Db, oldKey: Buffer, newKey: Buffer) {
         });
         fields.push({ database: t.id, table: "email_settings", column: "smtp_password", id: row.id, stored: row.smtp });
       }
+      // Connected mailboxes (V3.2): a workspace migrated before 0052 has no such table.
+      const mailRows = await withTimeout(
+        tdb
+          .select({
+            id: mailConnections.id,
+            access: mailConnections.accessToken,
+            refresh: mailConnections.refreshToken,
+          })
+          .from(mailConnections),
+        CONNECT_TIMEOUT_MS,
+      ).catch((e: unknown) => {
+        if (e instanceof Error && /mail_connection/.test(e.message)) return [];
+        throw e;
+      });
+      for (const row of mailRows) {
+        fields.push({
+          database: t.id,
+          table: "mail_connection",
+          column: "access_token",
+          id: row.id,
+          stored: row.access,
+        });
+        fields.push({
+          database: t.id,
+          table: "mail_connection",
+          column: "refresh_token",
+          id: row.id,
+          stored: row.refresh,
+        });
+      }
     } catch (e) {
       unreachable.push({ id: t.id, reason: e instanceof Error ? e.message.split("\n")[0] : "unknown error" });
     }
@@ -178,6 +208,14 @@ async function readBack(db: Db, entry: BackupEntry): Promise<string | null> {
   if (entry.table === "tenants") {
     const [row] = await db.select({ v: tenants.dbUrl }).from(tenants).where(eq(tenants.id, entry.id));
     return row?.v ?? null;
+  }
+  if (entry.table === "mail_connection") {
+    const [row] = await db
+      .select({ access: mailConnections.accessToken, refresh: mailConnections.refreshToken })
+      .from(mailConnections)
+      .where(eq(mailConnections.id, entry.id));
+    if (!row) return null;
+    return entry.column === "access_token" ? row.access : row.refresh;
   }
   const [row] = await db
     .select({ resend: emailSettings.resendApiKey, smtp: emailSettings.smtpPassword })
@@ -255,14 +293,19 @@ async function rotate() {
   console.log(`\nBackup of the old ciphertexts: ${backup}`);
 
   const conflicts: string[] = [];
+  const skipped = new Set<BackupEntry>();
   for (const entry of entries) {
     const target = entry.database === "platform" ? db : tenantDbs.get(entry.database);
     if (!target) {
       conflicts.push(`${entry.database}/${entry.table}.${entry.column}#${entry.id}: workspace not open`);
+      skipped.add(entry);
       continue;
     }
     const ok = await writeIfUnchanged(target, entry, entry.previous, entry.next);
-    if (!ok) conflicts.push(`${entry.database}/${entry.table}.${entry.column}#${entry.id}: changed since it was read`);
+    if (!ok) {
+      conflicts.push(`${entry.database}/${entry.table}.${entry.column}#${entry.id}: changed since it was read`);
+      skipped.add(entry);
+    }
   }
 
   // Read every written value back, and open it with the new key.
@@ -271,6 +314,10 @@ async function rotate() {
   );
   const broken: string[] = [];
   for (const entry of entries) {
+    // ⚠️ Only what this run wrote. A value skipped because it changed — a mailbox token refreshed
+    // mid-run, as they are every hour — holds new plaintext, and "does not match what was read"
+    // there is not a failure: it read as one, and advised a rollback.
+    if (skipped.has(entry)) continue;
     const target = entry.database === "platform" ? db : tenantDbs.get(entry.database);
     if (!target) continue;
     const stored = await readBack(target, entry);

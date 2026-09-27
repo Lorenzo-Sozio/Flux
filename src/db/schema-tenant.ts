@@ -7,10 +7,14 @@ export {
   // Notifications
   // API idempotency
   apiIdempotency,
+  // Scoped machine-to-machine keys
+  apiKeys,
   // Who wrote through the API
   apiWriteLog,
   appointmentAttendees,
   appointmentAttendeesRelations,
+  // A person's own mailbox
+  appointmentMirrors,
   // Appointments
   appointments,
   appointmentsRelations,
@@ -19,10 +23,15 @@ export {
   // Automation
   automationRules,
   automationRulesRelations,
+  bookingLinks,
   businessCalendar,
   businessHolidays,
   campaignLogs,
   campaignLogsRelations,
+  // Commissions
+  commissionLines,
+  commissionRules,
+  commissionStatements,
   // Chat / DM
   // CRM core
   companies,
@@ -45,6 +54,8 @@ export {
   dealLossReasons,
   deals,
   dealsRelations,
+  dmAttachments,
+  dmAttachmentsRelations,
   dmConversationMembers,
   dmConversationMembersRelations,
   dmConversations,
@@ -67,6 +78,7 @@ export {
   emailTemplatesRelations,
   // Exchange rates cache
   exchangeRatesCache,
+  fieldChanges,
   filterPresets,
   geoCities,
   // Geo reference
@@ -77,8 +89,12 @@ export {
   invoices,
   leads,
   leadsRelations,
+  mailArchiveAddresses,
+  mailBusy,
+  mailConnections,
   marketingCampaigns,
   marketingCampaignsRelations,
+  nextActionSnoozes,
   notificationPreferences,
   notifications,
   notificationsRelations,
@@ -88,6 +104,7 @@ export {
   // Pipeline / deals
   pipelineStages,
   pipelineStagesRelations,
+  pipelines,
   // Price lists
   priceListItems,
   priceLists,
@@ -141,9 +158,11 @@ export {
   // Auth / users
   users,
   verificationTokens,
+  webForms,
   webhookLogs,
   webhookLogsRelations,
   // Webhooks
   webhooks,
   webhooksRelations,
+  workspaceSettings,
 } from "./schema";

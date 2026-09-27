@@ -20,8 +20,8 @@
   {
     "file": "src/lib/api-idempotency.ts",
     "description": "⚠️ una richiesta conclusa che non ha memorizzato niente viene reimportata invece che rigiocata",
-    "find": "    return { kind: \"replay\", body: row.response ? safeParse(row.response) : null };",
-    "replace": "    if (row.response) return { kind: \"replay\", body: safeParse(row.response) };\n    return { kind: \"stale\" };"
+    "find": "  if (!response) return { kind: \"replay\", body: null };",
+    "replace": "  if (!response) return { kind: \"stale\" };"
   },
   {
     "file": "src/lib/api-idempotency.ts",

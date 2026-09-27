@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️⚠️ le attività tornano a contare dal giorno in cui sono state digitate: la chiamata di venerdì registrata lunedì finisce nel periodo sbagliato",
+    "find": "const activityDay = sql`coalesce(${activities.date}, ${activities.createdAt})`;",
+    "replace": "const activityDay = sql`${activities.createdAt}`;"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️ il filtro per persona torna a essere ignorato nel dato principale",
+    "find": "  const actConditions = [...dateRange(from, to), ...(userId ? [eq(activities.ownerId, userId)] : [])];",
+    "replace": "  const actConditions = [...dateRange(from, to)];"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️ la classifica per persona perde il nome di chi ha registrato",
+    "find": "    .leftJoin(users, eq(activities.ownerId, users.id))\n    .where(conditions.length ? and(...conditions) : undefined)\n    .groupBy(activities.ownerId, users.name, users.email)",
+    "replace": "    .leftJoin(users, eq(activities.leadId, users.id))\n    .where(conditions.length ? and(...conditions) : undefined)\n    .groupBy(activities.ownerId, users.name, users.email)"
+  }
+]

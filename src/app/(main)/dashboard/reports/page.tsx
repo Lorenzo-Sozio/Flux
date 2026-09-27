@@ -5,9 +5,7 @@ import { getTranslations } from "next-intl/server";
 import {
   getActivityByAction,
   getActivityByUser,
-  getCampaignPerformanceSummary,
   getDailyActivityTrend,
-  getRecentActivityLog,
   getReportKPIs,
   getReportUsers,
   getSalesReport,
@@ -25,18 +23,15 @@ export default async function ReportsPage() {
   const defaultTo = new Date().toISOString().split("T")[0];
   const filters = { from: defaultFrom, to: defaultTo };
 
-  const [users, kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport] =
-    await Promise.all([
-      getReportUsers(),
-      getReportKPIs(filters),
-      getActivityByUser(filters),
-      getActivityByAction(filters),
-      getDailyActivityTrend(filters),
-      getTaskPerformanceByUser(filters),
-      getRecentActivityLog({ ...filters, limit: 100 }),
-      getCampaignPerformanceSummary(filters),
-      getSalesReport(filters),
-    ]);
+  const [users, kpis, activityByUser, activityByAction, dailyTrend, taskPerf, salesReport] = await Promise.all([
+    getReportUsers(),
+    getReportKPIs(filters),
+    getActivityByUser(filters),
+    getActivityByAction(filters),
+    getDailyActivityTrend(filters),
+    getTaskPerformanceByUser(filters),
+    getSalesReport(filters),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -50,7 +45,7 @@ export default async function ReportsPage() {
 
       <ReportsClient
         users={users}
-        initial={{ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport }}
+        initial={{ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, salesReport }}
       />
     </div>
   );

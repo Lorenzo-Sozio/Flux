@@ -7,6 +7,8 @@ import { Building2, Calendar, Check, Clock, User, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -47,6 +49,9 @@ interface PublicQuote {
   viewedAt: string | null;
   acceptedAt: string | null;
   declinedAt: string | null;
+  /** Who signed and when (src/lib/quote-signature.ts); the rest of the record stays inside. */
+  signedName?: string | null;
+  signedAt?: string | null;
   items: QuoteItem[];
   company: { name: string } | null;
   contact: { firstName: string; lastName: string } | null;
@@ -75,6 +80,12 @@ export function PublicQuoteView({ quote, token }: Props) {
   const [loading, setLoading] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [showDeclineForm, setShowDeclineForm] = useState(false);
+  const [showSignForm, setShowSignForm] = useState(false);
+  const [signerName, setSignerName] = useState("");
+  const [consent, setConsent] = useState(false);
+  const [signed, setSigned] = useState<{ name: string; at: string } | null>(
+    quote.signedName && quote.signedAt ? { name: quote.signedName, at: quote.signedAt } : null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   // The customer's language, not the browser's: the same quote reads the same for
@@ -93,23 +104,32 @@ export function PublicQuoteView({ quote, token }: Props) {
       const res = await fetch("/api/quotes/public", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, action, reason: declineReason || undefined }),
+        body: JSON.stringify({
+          token,
+          action,
+          reason: declineReason || undefined,
+          ...(action === "accepted" ? { signerName, consent } : {}),
+        }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { code?: string };
         setError(
-          data.code === "expired"
-            ? tx.expired
-            : data.code === "not_actionable"
-              ? tx.notActionable
-              : res.status === 404
-                ? tx.notFound
-                : tx.somethingWrong,
+          data.code === "signature_required"
+            ? tx.signatureRequired
+            : data.code === "expired"
+              ? tx.expired
+              : data.code === "not_actionable"
+                ? tx.notActionable
+                : res.status === 404
+                  ? tx.notFound
+                  : tx.somethingWrong,
         );
         return;
       }
       setStatus(action);
       setShowDeclineForm(false);
+      setShowSignForm(false);
+      if (action === "accepted") setSigned({ name: signerName.trim(), at: new Date().toISOString() });
     } catch {
       setError(tx.networkError);
     } finally {
@@ -243,14 +263,56 @@ export function PublicQuoteView({ quote, token }: Props) {
         {canAct && (
           <Card className="shadow-md border-primary/20">
             <CardContent className="pt-6 pb-6 space-y-4">
-              {!showDeclineForm ? (
+              {showSignForm ? (
+                <div className="space-y-3">
+                  <p className="font-medium text-sm">{tx.signTitle}</p>
+                  <div className="space-y-1.5">
+                    <label htmlFor="signer-name" className="text-sm">
+                      {tx.signName}
+                    </label>
+                    <Input
+                      id="signer-name"
+                      autoComplete="name"
+                      value={signerName}
+                      maxLength={120}
+                      placeholder={tx.signNamePlaceholder}
+                      onChange={(e) => setSignerName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Checkbox
+                      id="sign-consent"
+                      checked={consent}
+                      onCheckedChange={(v) => setConsent(v === true)}
+                      className="mt-0.5"
+                    />
+                    <label htmlFor="sign-consent" className="text-sm leading-snug">
+                      {tx.signConsent.replace("{number}", quote.quoteNumber)}
+                    </label>
+                  </div>
+                  <p className="text-muted-foreground text-xs">{tx.signNote}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 max-md:h-11"
+                      disabled={loading || signerName.trim().length < 3 || !consent}
+                      onClick={() => handleAction("accepted")}
+                    >
+                      <Check className="mr-2 h-4 w-4" />
+                      {tx.signAndAccept}
+                    </Button>
+                    <Button variant="ghost" className="max-md:h-11" onClick={() => setShowSignForm(false)}>
+                      {tx.cancel}
+                    </Button>
+                  </div>
+                </div>
+              ) : !showDeclineForm ? (
                 <>
                   <p className="text-sm text-center text-muted-foreground">{tx.reviewPrompt}</p>
                   <div className="flex gap-3 justify-center">
                     <Button
                       className="min-w-28 bg-green-600 hover:bg-green-700"
                       disabled={loading}
-                      onClick={() => handleAction("accepted")}
+                      onClick={() => setShowSignForm(true)}
                     >
                       <Check className="h-4 w-4 mr-2" />
                       {tx.accept}
@@ -301,6 +363,11 @@ export function PublicQuoteView({ quote, token }: Props) {
               </div>
               <p className="font-semibold text-green-700 dark:text-green-400">{tx.acceptedTitle}</p>
               <p className="text-sm text-muted-foreground">{tx.acceptedBody}</p>
+              {signed && (
+                <p className="text-muted-foreground text-xs">
+                  {tx.signedBy.replace("{name}", signed.name).replace("{date}", formatDocumentDate(signed.at, lang))}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

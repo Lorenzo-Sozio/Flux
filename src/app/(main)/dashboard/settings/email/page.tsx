@@ -71,6 +71,7 @@ const COMMON_SMTP_CONFIGS = [
 export default function EmailSettingsPage() {
   const t = useTranslations("settings.email");
   const tForm = useTranslations("settings.email.form");
+  const tc = useTranslations("common");
   const [settings, setSettings] = useState<Settings>(DEFAULT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,7 +150,9 @@ export default function EmailSettingsPage() {
           <CardDescription>{t("subtitle")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          {/* One per row on a phone: two cards of 140px each left their
+              one-line descriptions three lines tall. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={() => set("provider", "resend")}
@@ -164,7 +167,7 @@ export default function EmailSettingsPage() {
                   settings.provider === "resend" ? "text-primary" : "text-muted-foreground"
                 }`}
               />
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-sm">Resend</p>
                 <p className="text-muted-foreground text-xs">{t("resendDesc")}</p>
               </div>
@@ -183,7 +186,7 @@ export default function EmailSettingsPage() {
                   settings.provider === "smtp" ? "text-primary" : "text-muted-foreground"
                 }`}
               />
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-sm">SMTP</p>
                 <p className="text-muted-foreground text-xs">{t("smtpDesc")}</p>
               </div>
@@ -213,8 +216,9 @@ export default function EmailSettingsPage() {
                   <button
                     type="button"
                     onClick={() => setShowApiKey((v) => !v)}
-                    className="-translate-y-1/2 absolute top-1/2 right-3 text-muted-foreground hover:text-foreground"
+                    className="-translate-y-1/2 absolute top-1/2 right-0.5 inline-flex size-9 items-center justify-center text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
+                    aria-label={showApiKey ? tc("hide") : tc("show")}
                   >
                     {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -299,8 +303,9 @@ export default function EmailSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="-translate-y-1/2 absolute top-1/2 right-3 text-muted-foreground hover:text-foreground"
+                      className="-translate-y-1/2 absolute top-1/2 right-0.5 inline-flex size-9 items-center justify-center text-muted-foreground hover:text-foreground"
                       tabIndex={-1}
+                      aria-label={showPassword ? tc("hide") : tc("show")}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
@@ -315,7 +320,7 @@ export default function EmailSettingsPage() {
                   {COMMON_SMTP_CONFIGS.map((cfg) => (
                     <li key={cfg.label} className="flex items-start gap-1.5">
                       <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
-                      <span>
+                      <span className="min-w-0 [overflow-wrap:anywhere]">
                         <strong className="text-foreground/90">{cfg.label}:</strong> {cfg.host} : {cfg.port}
                         {"noteKey" in cfg && cfg.noteKey
                           ? ` (${tForm(cfg.noteKey)})`
@@ -381,7 +386,7 @@ export default function EmailSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex w-full gap-2">
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
             <Input
               type="email"
               value={testTo}
@@ -400,7 +405,7 @@ export default function EmailSettingsPage() {
 
       {/* Save button */}
       <div className="flex w-full justify-end">
-        <Button onClick={handleSave} disabled={saving} className="min-w-[120px] gap-2">
+        <Button onClick={handleSave} disabled={saving} className="w-full min-w-[120px] gap-2 sm:w-auto">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t("saveSettings")}
         </Button>

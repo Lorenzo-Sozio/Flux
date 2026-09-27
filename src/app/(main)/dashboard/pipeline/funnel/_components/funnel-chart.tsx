@@ -41,8 +41,8 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
                 className="absolute inset-y-0 left-0 flex items-center rounded-lg px-3 transition-all duration-500"
                 style={{ width: `${widthPct}%`, backgroundColor: stage.fill }}
               />
-              <div className="absolute inset-y-0 left-0 flex items-center px-3">
-                <span className="text-sm font-semibold text-white drop-shadow">{stage.label}</span>
+              <div className="absolute inset-y-0 right-16 left-0 flex min-w-0 items-center px-3">
+                <span className="truncate font-semibold text-sm text-white drop-shadow">{stage.label}</span>
               </div>
               <div className="absolute inset-y-0 right-4 flex items-center">
                 <span className="font-bold tabular-nums text-sm">{format.number(stage.count)}</span>

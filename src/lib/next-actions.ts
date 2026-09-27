@@ -23,9 +23,15 @@ export type NextActionKind =
   | "deal_stalled"
   | "deal_overdue"
   | "lead_untouched"
-  | "customer_quiet";
+  | "customer_quiet"
+  // An open deal with nothing planned: the one that quietly dies (V2.1).
+  | "deal_no_next_step"
+  // A customer wrote to their owner and is waiting for the answer (V1.4's reply task).
+  | "reply_due"
+  // Accepted and not yet an order: the win is not booked until it is.
+  | "quote_to_order";
 
-export type NextActionEntity = "ticket" | "quote" | "deal" | "lead" | "company";
+export type NextActionEntity = "ticket" | "quote" | "deal" | "lead" | "company" | "task";
 
 export interface NextAction {
   kind: NextActionKind;
@@ -45,6 +51,13 @@ export interface NextAction {
   href: string;
   /** 0–100. Only ever used to order the list. */
   urgency: number;
+  /**
+   * Where "plan the follow-up" puts the task: the record the row is about, or the deal a
+   * quote belongs to. Absent when there is nothing to plan on (a ticket, a reply task).
+   */
+  followUp?: { entity: "deal" | "lead" | "company"; id: string };
+  /** The task behind a `reply_due` row, completed from the row itself. */
+  taskId?: string;
 }
 
 /**
@@ -112,6 +125,11 @@ const BASE_URGENCY: Record<NextActionKind, number> = {
   lead_untouched: 44,
   deal_stalled: 36,
   customer_quiet: 20,
+  // Somebody is waiting on us: just under a ticket about to miss its promise.
+  reply_due: 76,
+  quote_to_order: 64,
+  // Below a stalled deal: nothing planned is a warning, a fortnight of silence is a fact.
+  deal_no_next_step: 32,
 };
 
 /**
@@ -131,6 +149,27 @@ export function urgencyOf(kind: NextActionKind, overBy = 0): number {
 /** Most urgent first; ties broken by kind so the list does not shuffle. */
 function sortActions(actions: NextAction[]): NextAction[] {
   return [...actions].sort((a, b) => b.urgency - a.urgency || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+/** What a snooze says: this person put this row aside until then. */
+export interface Snooze {
+  kind: string;
+  entityId: string;
+  until: Date;
+}
+
+/** The rows nobody has put aside, or whose snooze has run out. */
+export function withoutSnoozed(actions: NextAction[], snoozes: Snooze[], now: number = Date.now()): NextAction[] {
+  const hidden = new Set(snoozes.filter((s) => s.until.getTime() > now).map((s) => `${s.kind}:${s.entityId}`));
+  return actions.filter((a) => !hidden.has(`${a.kind}:${a.id}`));
+}
+
+/**
+ * How much a lead's score adds to its lateness: a hot lead left alone is later than a
+ * cold one left alone as long. Score 100 counts as twice the threshold over.
+ */
+export function leadScoreWeight(score: number | null | undefined): number {
+  return Math.min(100, Math.max(0, score ?? 0)) / 50;
 }
 
 /**

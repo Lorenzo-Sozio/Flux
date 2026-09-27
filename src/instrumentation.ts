@@ -2,8 +2,7 @@
  * Next.js Instrumentation Hook
  *
  * Runs once on server startup (Node.js runtime only).
- * Initialises long-lived services that must exist for the lifetime of
- * the process — currently the automation scheduler.
+ * Reports missing environment variables once, at boot.
  *
  * https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
@@ -30,7 +29,8 @@ export async function register() {
     const { reportEnv } = await import("@/lib/env-check");
     reportEnv();
 
-    const { initializeScheduler } = await import("@/components/crm/automation/scheduler");
-    await initializeScheduler();
+    // ⚠️ No automation scheduler. The node-cron one read the rules once at boot with no
+    // workspace active, never ran on Workers, and where it did fire it sent `onCreate` for
+    // every record it found. Scheduled rules return as a cron job over every workspace.
   }
 }

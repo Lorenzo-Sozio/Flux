@@ -216,7 +216,7 @@ export function IssuerForm({ initial }: { initial: IssuerProfileRow | null }) {
       </Card>
 
       <div className="flex justify-end">
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving} className="w-full sm:w-auto">
           {saving ? t("saving") : t("save")}
         </Button>
       </div>

@@ -279,10 +279,16 @@ export function QuickTaskForm({ entityType, entityId, userId }: Props) {
       {/* ── Assignee + submit ──────────────────────────────────────────────── */}
       <div className="flex flex-col gap-1.5">
         <p className="ml-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{tD("assignToLabel")}</p>
-        <AssigneeSelect value={assigneeValue} onChange={setAssigneeValue} disabled={isPending} />
+        <AssigneeSelect value={assigneeValue} onChange={setAssigneeValue} disabled={isPending} allowGroups={false} />
       </div>
 
-      <Button type="submit" size="sm" disabled={isPending || !title.trim()} className="mt-1 self-end gap-1.5">
+      {/* Full width on a phone, where the right edge is the hardest place for a thumb to reach. */}
+      <Button
+        type="submit"
+        size="sm"
+        disabled={isPending || !title.trim()}
+        className="mt-1 gap-1.5 self-stretch sm:self-end"
+      >
         {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
         {tD("createTask")}
       </Button>

@@ -162,46 +162,6 @@ export async function sendVerificationEmail(email: string, token: string) {
   });
 }
 
-// ─── Call / Meeting Invite ────────────────────────────────────────────────────
-
-export async function sendCallInviteEmail(to: string, contactName: string, description: string, scheduledAt: Date) {
-  if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
-    console.log("[DEV] Call invite email to:", to);
-    return;
-  }
-
-  const dateStr = scheduledAt.toLocaleString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  await sendEmail({
-    to: sanitizeHeader(to),
-    subject: sanitizeHeader(`Call scheduled: ${description}`),
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2>Call Appointment</h2>
-        <p>Hi ${esc(contactName)},</p>
-        <p>A call has been scheduled with you.</p>
-        <table style="border-collapse:collapse;width:100%;margin:16px 0">
-          <tr>
-            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;border-radius:4px 0 0 4px;white-space:nowrap">Topic</td>
-            <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(description)}</td>
-          </tr>
-          <tr>
-            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;border-radius:4px 0 0 4px;white-space:nowrap">Date & Time</td>
-            <td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td>
-          </tr>
-        </table>
-        <p style="color:#6b7280;font-size:13px">If you have any questions, please reply to this email.</p>
-      </div>`,
-  });
-}
-
 // ─── Activity Reminder ────────────────────────────────────────────────────────
 
 export async function sendActivityReminderEmail(
@@ -264,6 +224,17 @@ export interface AppointmentEmailData {
   organizerName: string;
   icsContent: string; // pre-generated ICS string
   method: "REQUEST" | "CANCEL";
+  /**
+   * The zone the times are written in. ⚠️ Without it they are formatted on the
+   * server's clock, which on Workers is UTC: a ten o'clock meeting in Rome was
+   * announced for eight.
+   */
+  timeZone?: string;
+  allDay?: boolean;
+  /** "Ogni settimana il lunedì", when it repeats. */
+  recurrenceText?: string | null;
+  /** A change to an invitation already sent, rather than a first one. */
+  isUpdate?: boolean;
 }
 
 export async function sendAppointmentInviteEmail(
@@ -273,27 +244,37 @@ export async function sendAppointmentInviteEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const safe = (s: string) => sanitizeHeader(s);
 
-  const startStr = data.startAt.toLocaleString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-  const endStr = data.endAt.toLocaleString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const zone = data.timeZone ? { timeZone: data.timeZone } : {};
+  const dayOpts = { weekday: "long", day: "numeric", month: "long", year: "numeric", ...zone } as const;
+  // An all-day event ends at midnight after its last day; the last day is the one before.
+  const lastDay = new Date(data.endAt.getTime() - 60_000);
+  const startStr = data.allDay
+    ? data.startAt.toLocaleDateString("it-IT", dayOpts)
+    : data.startAt.toLocaleString("it-IT", { ...dayOpts, hour: "2-digit", minute: "2-digit" });
+  const endStr = data.allDay
+    ? lastDay.toLocaleDateString("it-IT", dayOpts)
+    : data.endAt.toLocaleString("it-IT", { hour: "2-digit", minute: "2-digit", ...zone });
   const durationMs = data.endAt.getTime() - data.startAt.getTime();
   const durationMin = Math.round(durationMs / 60_000);
-  const durationLabel =
-    durationMin < 60
+  const durationLabel = data.allDay
+    ? "tutto il giorno"
+    : durationMin < 60
       ? `${durationMin} min`
       : `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}min` : ""}`;
 
   const isCancel = data.method === "CANCEL";
-  const subject = isCancel ? safe(`Cancelled: ${data.title}`) : safe(`Invitation: ${data.title}`);
+  const subject = isCancel
+    ? safe(`Cancelled: ${data.title}`)
+    : data.isUpdate
+      ? safe(`Updated invitation: ${data.title}`)
+      : safe(`Invitation: ${data.title}`);
+
+  const recurrenceRow = data.recurrenceText
+    ? `<tr>
+        <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Ricorrenza</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(data.recurrenceText)}</td>
+      </tr>`
+    : "";
 
   const locationRow =
     (data.conferenceLink ?? data.locationUrl ?? data.location)
@@ -351,11 +332,15 @@ export async function sendAppointmentInviteEmail(
       </div>`
     : `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
         <div style="background:#2563eb;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
-          <h2 style="margin:0;font-size:18px">Invito: ${esc(data.title)}</h2>
+          <h2 style="margin:0;font-size:18px">${data.isUpdate ? "Invito aggiornato" : "Invito"}: ${esc(data.title)}</h2>
         </div>
         <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
           <p>Salve ${esc(to.name)},</p>
-          <p>${esc(data.organizerName)} ti ha invitato a un appuntamento.</p>
+          <p>${
+            data.isUpdate
+              ? `${esc(data.organizerName)} ha modificato un appuntamento a cui sei invitato.`
+              : `${esc(data.organizerName)} ti ha invitato a un appuntamento.`
+          }</p>
           <table style="border-collapse:collapse;width:100%;margin:16px 0">
             <tr>
               <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Inizio</td>
@@ -365,6 +350,7 @@ export async function sendAppointmentInviteEmail(
               <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Fine</td>
               <td style="padding:8px 12px;border:1px solid #e5e7eb">${endStr} (${durationLabel})</td>
             </tr>
+            ${recurrenceRow}
             ${locationRow}
             ${
               data.description
@@ -403,26 +389,6 @@ export async function sendAppointmentInviteEmail(
 }
 
 // ─── Task Due Reminder ────────────────────────────────────────────────────────
-
-export async function sendTaskDueEmail(email: string, taskTitle: string, taskLink: string) {
-  if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
-    console.log("[DEV] Task due email to:", email);
-    return;
-  }
-
-  await sendEmail({
-    to: sanitizeHeader(email),
-    subject: sanitizeHeader(`Reminder: "${taskTitle}" is due today`),
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2>Task Reminder</h2>
-        <p>Your task <strong>${esc(taskTitle)}</strong> is due today.</p>
-        <a href="${appBase()}${taskLink}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
-          View Task
-        </a>
-      </div>`,
-  });
-}
 
 // ─── Invoice courtesy copy ────────────────────────────────────────────────────
 
@@ -473,4 +439,37 @@ export async function sendInvoiceCopyEmail(data: {
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],
   });
+}
+
+// ─── Workspace request (to Flux's own staff) ─────────────────────────────────
+
+export async function sendWorkspaceRequestEmail(
+  staff: string[],
+  person: { name: string | null; email: string },
+): Promise<void> {
+  const config = await getPlatformEmailConfig();
+  const who = person.name ? `${esc(person.name)} &lt;${esc(person.email)}&gt;` : esc(person.email);
+  // One message per person: a comma-joined `to` is one malformed address to some providers.
+  const results = await Promise.all(
+    staff.map((to) =>
+      sendEmail(
+        {
+          to: sanitizeHeader(to),
+          subject: sanitizeHeader(`Nuovo account senza workspace: ${person.email}`),
+          html: `
+      <div style="font-family:sans-serif;max-width:520px;margin:0 auto">
+        <h2 style="color:#111827">Qualcuno aspetta un workspace</h2>
+        <p style="color:#374151">${who} si è appena registrato e non fa parte di nessun workspace.
+        Finché non ne viene creato uno, o non riceve un invito, vede solo la pagina che gli dice di aspettare.</p>
+        <p style="color:#374151">Se è un collaboratore di un cliente, basta un invito dal workspace del cliente.
+        Se è un cliente nuovo, crea il workspace dal pannello di amministrazione e aggiungilo come proprietario.</p>
+        <p style="margin:24px 0"><a href="${appBase()}/admin/tenants" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">Apri il pannello</a></p>
+      </div>`,
+        },
+        config,
+      ),
+    ),
+  );
+  const failed = results.filter((r) => !r.success);
+  if (failed.length === results.length) throw new Error(failed[0]?.error ?? "workspace request email not sent");
 }

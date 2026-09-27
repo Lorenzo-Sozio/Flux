@@ -3,17 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, asc, count, desc, eq, ilike, inArray, ne, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, type SQL, sql } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   activities,
   companies,
   contacts,
   deals,
+  invoices,
   orderItems,
   orderPayments,
   orders,
@@ -25,11 +25,17 @@ import {
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { contactReach } from "@/lib/contact-reach";
 import { computeDocument } from "@/lib/document-totals";
+import { recordFieldChanges } from "@/lib/field-history";
 import { nextOrderNumber } from "@/lib/order-number";
-import { isRecordablePayment } from "@/lib/order-payment";
+import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import type { OrderStatus } from "@/lib/order-status";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
+import { closingStageFor } from "@/lib/pipelines";
+import { recordInvoicePayment } from "@/lib/receivables";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -495,7 +501,16 @@ export async function deleteOrder(id: string) {
     throw new Error(t("onlyDraftDeletable"));
   }
 
-  await db.delete(orders).where(eq(orders.id, id));
+  // ⚠️⚠️ Money recorded against one of its invoices outlives the order: the invoice stays
+  // (its link is set null) and so must what was paid on it, or the cascade would silently
+  // turn a paid invoice back into an overdue one. Only money that named the order alone goes.
+  await db.batch([
+    db
+      .update(orderPayments)
+      .set({ orderId: null })
+      .where(and(eq(orderPayments.orderId, id), isNotNull(orderPayments.invoiceId))),
+    db.delete(orders).where(eq(orders.id, id)),
+  ]);
   revalidatePath("/dashboard/sales/orders");
 }
 
@@ -591,15 +606,32 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   // whether an event goes out, and a deal already won must not announce itself twice.
   const [dealPrima] = quote.dealId ? await db.select().from(deals).where(eq(deals.id, quote.dealId)) : [undefined];
   if (quote.dealId) {
+    // ⚠️ Into the won column too, when the pipeline has one: marked won but left in
+    // "Proposal", the card sat among the open deals while every report counted it closed.
+    // Its own pipeline's won column (src/lib/pipelines.ts): the workspace's first one could
+    // be another pipeline's, and the card would change boards as it closed.
+    const won = await closingStageFor(db, dealPrima?.stageId, "won");
+    const wonStage = won ? { id: won.id, probability: won.defaultProbability } : undefined;
     writes.push(
       db
         .update(deals)
-        .set({ status: "won", closedAt: now, updatedAt: now })
+        .set({
+          status: "won",
+          closedAt: now,
+          updatedAt: now,
+          ...(wonStage ? { stageId: wonStage.id, probability: wonStage.probability ?? 100 } : {}),
+        })
         .where(and(eq(deals.id, quote.dealId), ne(deals.status, "won"))),
     );
   }
 
   await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
+
+  // The deal's own history says it was won here, and by whom (src/lib/field-history.ts).
+  if (dealPrima && dealPrima.status !== "won") {
+    const [dealDopo] = await db.select().from(deals).where(eq(deals.id, dealPrima.id));
+    await recordFieldChanges(db, "deal", dealPrima.id, dealPrima, dealDopo, actor.userId);
+  }
 
   dispatchWebhook("order.created", {
     id: orderId,
@@ -791,20 +823,55 @@ export async function recordOrderPayment(
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
   const t = await getTranslations("validation.orders");
-  if (!isRecordablePayment(data.amount)) throw new Error(t("paymentPositive"));
+  const amount = parsePaymentAmount(data.amount);
+  if (amount === null) throw new Error(t("paymentPositive"));
+  const paidAt = paymentDay(data.paidAt, await getWorkspaceTimeZone());
+  if (!paidAt) throw new Error(t("paymentDate"));
 
   const db = await getDb();
   const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
   if (!order) throw new Error(t("notFound"));
 
-  await db.insert(orderPayments).values({
-    orderId,
-    amount: String(data.amount),
-    paidAt: data.paidAt ? new Date(data.paidAt) : new Date(),
-    method: data.method?.trim() || null,
-    note: data.note?.trim() || null,
-    recordedById: actor.userId,
-  });
+  // ⚠️ With exactly one issued invoice there is no doubt which one this money pays (I9, the
+  // same rule migration 0053 applied to the past): it is recorded against it, and the
+  // invoice's balance and the receivables schedule see it. With several, it stays on the
+  // order — guessing would mark the wrong invoice paid.
+  const issued = await tolerateUnmigrated(
+    "invoice payments",
+    () =>
+      db
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "issued"), eq(invoices.documentType, "TD01"))),
+    [] as { id: string }[],
+  );
+  if (issued.length === 1) {
+    const paid = await recordInvoicePayment(db, {
+      invoiceId: issued[0].id,
+      amount,
+      paidAt,
+      method: data.method,
+      note: data.note,
+      by: actor.userId,
+    });
+    if (paid.ok && paid.becamePaid) {
+      dispatchWebhook(
+        "invoice.paid",
+        { id: issued[0].id, paid: paid.balance.paid, due: paid.balance.due },
+        { via: "user", actor: actor.userId },
+      ).catch((err) => console.error("[orders] invoice.paid not dispatched", err));
+    }
+    revalidatePath(`/dashboard/sales/invoices/${issued[0].id}`);
+  } else {
+    await db.insert(orderPayments).values({
+      orderId,
+      amount: String(amount),
+      paidAt,
+      method: data.method?.trim() || null,
+      note: data.note?.trim() || null,
+      recordedById: actor.userId,
+    });
+  }
 
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
   revalidatePath("/dashboard/sales/orders");

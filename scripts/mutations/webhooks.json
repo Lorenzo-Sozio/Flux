@@ -1,50 +1,62 @@
 [
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "⚠️⚠️ un evento senza firma parte lo stesso: il ricevente non puo' distinguerlo da qualunque cosa raggiunga il suo indirizzo, e agirebbe su cio' che gli manda uno sconosciuto",
     "find": "      if (!wh.secret) {",
     "replace": "      if (false) {"
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "il rifiuto per firma mancante viene registrato come una consegna riuscita: il webhook non consegna e il registro dice di si'",
     "find": "          statusCode: null,\n          response:\n            `${UNSIGNABLE_PREFIX}",
     "replace": "          statusCode: 200,\n          response:\n            `${UNSIGNABLE_PREFIX}"
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "la firma copre solo il carico e non la busta: chi riceve puo' cambiare l'origine o l'identificativo dell'evento senza invalidare la firma",
     "find": "crypto.createHmac(\"sha256\", wh.secret).update(body).digest(\"hex\")",
     "replace": "crypto.createHmac(\"sha256\", wh.secret).update(JSON.stringify(envelope.payload)).digest(\"hex\")"
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "l'identificativo dell'evento e' fisso: un ricevente che deduplica su di esso scarta ogni evento successivo al primo",
     "find": "    id: crypto.randomUUID(),",
     "replace": "    id: \"00000000-0000-0000-0000-000000000000\","
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "l'identificativo non viaggia nell'intestazione: chi deduplica prima di leggere il corpo non ha su che cosa farlo",
     "find": "            \"X-Webhook-Id\": envelope.id,",
     "replace": ""
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "l'origine sparisce dalla busta: chi scrive tramite l'API riceve il proprio stesso evento e reagisce a se' stesso, senza smettere",
     "find": "    origin,\n  };",
     "replace": "  };"
   },
   {
-    "file": "src/actions/webhooks.ts",
+    "file": "src/lib/webhook-dispatch.ts",
     "description": "il predefinito dell'origine diventa «macchina»: un cambiamento fatto da una persona viene ignorato da chi filtra le proprie scritture, e un evento vero si perde",
-    "find": "  origin: Origin = { via: \"user\" },",
-    "replace": "  origin: Origin = { via: \"api\" },"
+    "find": "  event: WebhookEventName,\n  payload: Record<string, unknown>,\n  origin: Origin = { via: \"user\" },",
+    "replace": "  event: WebhookEventName,\n  payload: Record<string, unknown>,\n  origin: Origin = { via: \"api\" },"
   },
   {
-    "file": "src/app/api/crm/leads/route.ts",
+    "file": "src/lib/webhook-envelope.ts",
     "description": "la scrittura via API non si dichiara piu' di macchina: torna l'eco che P9 teme",
-    "find": "const API_ORIGIN = { via: \"api\" as const, actor: null };",
-    "replace": "const API_ORIGIN = { via: \"user\" as const, actor: null };"
+    "find": "  return { via: \"api\", actor: who.userId, key: who.key };",
+    "replace": "  return { via: \"user\", actor: who.userId, key: who.key };"
+  },
+  {
+    "file": "src/lib/webhook-envelope.ts",
+    "description": "⚠️⚠️ l'evento non dice quale chiave ha scritto: l'assistente, per non sentire se stesso, scarta anche ciò che scrivono le altre integrazioni",
+    "find": "  return { via: \"api\", actor: who.userId, key: who.key };",
+    "replace": "  return { via: \"api\", actor: who.userId, key: null };"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️ la chiave con ambiti perde il nome: gli eventi che causa non dicono più quale integrazione ha scritto",
+    "find": "        key: { id: found.id, name: found.name },",
+    "replace": "        key: null,"
   }
 ]

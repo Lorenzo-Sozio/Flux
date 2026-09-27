@@ -95,7 +95,13 @@ function recoverFromInterruptedRun() {
 
 function suiteIsGreen() {
   try {
-    execFileSync("npx", ["vitest", "run", "--reporter=dot"], { stdio: "pipe", shell: true });
+    // FLUX_MUTATION_RUN tells src/lib/mutation-specs.test.ts to stand aside: it checks that
+    // each `find` is present, which a mutated file by definition is not.
+    execFileSync("npx", ["vitest", "run", "--reporter=dot"], {
+      stdio: "pipe",
+      shell: true,
+      env: { ...process.env, FLUX_MUTATION_RUN: "1" },
+    });
     return true;
   } catch {
     return false;

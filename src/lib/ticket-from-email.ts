@@ -6,8 +6,6 @@
 
 import { after } from "next/server";
 
-import crypto from "node:crypto";
-
 import { eq } from "drizzle-orm";
 
 import { runAutomations } from "@/components/crm/automation/rule-engine";
@@ -20,11 +18,20 @@ import {
   stripHtmlQuotesAndSignature,
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
+import { fileSalesReply, findSalesOwner } from "@/lib/inbound-sales-reply";
+import { archiveDomain, archiveOwner, fileArchivedEmail, findArchiveAlias } from "@/lib/mail-archive";
+import { notify } from "@/lib/notify";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { stopOnReply } from "@/lib/sequence-runner";
 import { getStorage, newStorageKey } from "@/lib/storage";
 import { runWithTenant } from "@/lib/tenant-context";
 import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
+import { ticketEventPayload } from "@/lib/ticket-events";
+import { generateTicketNumber } from "@/lib/ticket-number";
+import { resolveSla } from "@/lib/ticket-sla";
+import { statusStamps } from "@/lib/ticket-state-machine";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { membersWith } from "@/lib/workspace-members";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
 
@@ -127,14 +134,6 @@ function sanitizeFilename(name: string): string {
 
 // ─── Ticket processing ────────────────────────────────────────────────────────
 
-function generateTicketNumber(): string {
-  const date = new Date();
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const random = crypto.randomBytes(3).toString("hex").toUpperCase();
-  return `TKT-${year}${month}-${random}`;
-}
-
 export interface InboundEmailPayload {
   fromRaw: string;
   /**
@@ -144,6 +143,14 @@ export interface InboundEmailPayload {
    * workspace it belongs to — this runs on a webhook, where nothing else does.
    */
   to: string;
+  /** The Cc header, when the bridge passes it: an archived email is filed on those too. */
+  cc?: string;
+  /**
+   * Every address the message was delivered to — envelope recipients, `Delivered-To`.
+   * A Bcc recipient is in no header, so this is the only place the archive address
+   * (src/lib/mail-archive.ts) can be found.
+   */
+  recipients?: string[];
   subject: string;
   htmlBody: string;
   textBody: string;
@@ -154,8 +161,13 @@ export interface InboundEmailPayload {
 
 export interface InboundEmailResult {
   ok: boolean;
-  action?: "message_appended" | "ticket_created";
+  action?: "message_appended" | "ticket_created" | "sales_reply" | "archived";
+  /** For an archived email: on how many records it was filed. */
+  filed?: number;
   ticketId?: string;
+  /** For a sales reply: the timeline entry and the owner's task to answer it. */
+  activityId?: string;
+  taskId?: string;
   messageId?: string;
   ticketNumber?: string;
   skipped?: string;
@@ -208,10 +220,74 @@ async function resolveInboundTenant(
   return null;
 }
 
+/**
+ * An email somebody copied to their archive address: filed on the records it concerns,
+ * and nothing else — it is not a ticket and not a reply owed (src/lib/mail-archive.ts).
+ */
+async function archiveInbound(
+  alias: { subdomain: string; token: string },
+  domain: string,
+  payload: InboundEmailPayload,
+): Promise<InboundEmailResult> {
+  // The subdomain names the workspace; asking it costs nothing per tenant but a comparison.
+  const found = await resolveTenantByProbe(
+    `mailArchive:${alias.subdomain}`,
+    async (_db, tenant) => tenant.subdomain === alias.subdomain,
+  ).catch(() => null);
+  // ⚠️ Not cached, so a rotated address stops filing at once. And the person must still be
+  // somebody who may write here: an address outlives a membership, and a viewer is read-only.
+  const ownerId = found ? await archiveOwner(found.db, alias.token).catch(() => null) : null;
+  const mayWrite =
+    found && ownerId
+      ? (await membersWith(found.tenant.id, "record:write").catch(() => [] as string[])).includes(ownerId)
+      : false;
+  if (!found || !ownerId || !mayWrite) {
+    console.error(`[inbound-email] archive address not recognised: workspace=${alias.subdomain}`);
+    return { ok: false, skipped: "unknown_archive_address" };
+  }
+
+  const text = payload.htmlBody
+    ? htmlToTextPreview(stripHtmlQuotesAndSignature(payload.htmlBody), 5000)
+    : stripPlainTextQuotes(payload.textBody);
+  const result = await fileArchivedEmail(
+    found.db,
+    ownerId,
+    {
+      from: payload.fromRaw,
+      to: payload.to,
+      cc: payload.cc,
+      subject: payload.subject,
+      text,
+      messageId: payload.inboundMessageId,
+    },
+    domain,
+  );
+
+  // ⚠️ Nobody among the addresses is a contact or a lead: say so, or the person believes it
+  // was archived. The bell only — it is not urgent, and it is not a push type.
+  if (result.matched === 0) {
+    await runWithTenant(found.tenant.id, () =>
+      notify({
+        userId: ownerId,
+        type: "mail_archive",
+        key: "mailArchiveUnmatched",
+        params: { subject: payload.subject },
+      }),
+    ).catch((err) => console.error("[inbound-email] archive unmatched, owner not told:", err));
+  }
+  return { ok: true, action: "archived", filed: result.filed };
+}
+
 export async function processInboundEmail(payload: InboundEmailPayload): Promise<InboundEmailResult> {
   const { fromRaw, to, subject, htmlBody, textBody, inboundMessageId, inReplyTo, attachments = [] } = payload;
 
   if (!fromRaw || !subject) return { ok: false };
+
+  // ⚠️ First: an email carrying an archive address was sent to be kept, not answered. It
+  // names no workspace address, so the resolution below would refuse it anyway.
+  const domain = archiveDomain();
+  const alias = findArchiveAlias([to, payload.cc ?? "", ...(payload.recipients ?? [])], domain);
+  if (alias && domain) return archiveInbound(alias, domain, payload);
 
   const { name: senderName, email: senderEmail } = parseFromHeader(fromRaw);
   const ticketRef = extractTicketReference(subject);
@@ -244,10 +320,14 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
   // ⚠️ Before anything that can return early: an empty or quoted-only reply is
   // still an answer, and the automatic emails must stop for it. Never allowed to
   // fail the delivery of the message itself.
+  let sequencesStopped = 0;
   if (senderEmail) {
-    await runWithTenant(tenantId, () => tolerateUnmigrated("sequences", () => stopOnReply(db, senderEmail), 0)).catch(
-      (err) => console.error("[inbound-email] could not stop sequences on reply:", err),
-    );
+    sequencesStopped = await runWithTenant(tenantId, () =>
+      tolerateUnmigrated("sequences", () => stopOnReply(db, senderEmail), 0),
+    ).catch((err) => {
+      console.error("[inbound-email] could not stop sequences on reply:", err);
+      return 0;
+    });
   }
 
   // Clean body: prefer HTML, fall back to plain text
@@ -261,6 +341,33 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
 
   if (!messageContent.trim() || messageContent === "<p></p>") {
     return { ok: true, skipped: "empty_body" };
+  }
+
+  // ⚠️⚠️ Somebody a salesperson owns, writing about something that is not a ticket: theirs,
+  // not support's (src/lib/inbound-sales-reply.ts). A reply to a ticket stays on the ticket.
+  if (!ticketRef && senderEmail) {
+    const owner = await findSalesOwner(db, senderEmail);
+    if (owner) {
+      const filed = await fileSalesReply(db, owner, {
+        from: senderEmail,
+        to,
+        subject,
+        text: htmlToTextPreview(messageContent, 5000),
+      });
+      // Stopping a sequence already told the owner who answered; once is enough.
+      if (sequencesStopped === 0) {
+        await runWithTenant(tenantId, () =>
+          notify({
+            userId: owner.ownerId,
+            type: "email_reply",
+            key: "emailReply",
+            params: { who: owner.name, subject },
+            link: owner.contactId ? `/dashboard/contacts/${owner.contactId}` : `/dashboard/leads/${owner.leadId}`,
+          }),
+        ).catch((err) => console.error("[inbound-email] reply filed, owner not notified:", err));
+      }
+      return { ok: true, action: "sales_reply", activityId: filed.activityId, taskId: filed.taskId };
+    }
   }
 
   // Find or create a stub contact for the sender
@@ -316,12 +423,16 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
         })
         .returning();
 
-      // Auto-move from waiting → open when customer replies
-      if (ticket.status === "waiting") {
-        await db.update(tickets).set({ status: "open", updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
-      } else {
-        await db.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
-      }
+      // The customer answering moves the ticket back to us: from "waiting on them", and from
+      // "resolved" — the resolution email says a reply reopens it, so a reply must. Through
+      // the shared rule, which also ends the SLA pause the plain status write used to leave on.
+      const now = new Date();
+      const reopen =
+        ticket.status === "waiting" || ticket.status === "resolved" ? statusStamps(ticket, "open", now) : null;
+      await db
+        .update(tickets)
+        .set({ ...(reopen ?? {}), updatedAt: now })
+        .where(eq(tickets.id, ticket.id));
 
       // ⚠️ Inside `runWithTenant`. The rules read the database through `getDb()`, which
       // on a webhook has no workspace to start from: without this they all failed, in
@@ -335,10 +446,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
             entityId: ticket.id,
             event: "onUpdate",
             oldData: ticket as Record<string, unknown>,
-            newData: {
-              ...ticket,
-              status: ticket.status === "waiting" ? "open" : ticket.status,
-            } as Record<string, unknown>,
+            newData: { ...ticket, ...(reopen ?? {}) } as Record<string, unknown>,
           }),
         ).catch(() => {
           /* best-effort */
@@ -358,6 +466,8 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
       .replace(/^Re:\s*/i, "")
       .trim() || subject;
 
+  // An emailed request carries the same promise as a typed one (src/lib/ticket-sla.ts).
+  const sla = await resolveSla(db, "normal");
   const [newTicket] = await db
     .insert(tickets)
     .values({
@@ -369,10 +479,18 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
       status: "new",
       contactId: contactRecord?.id ?? null,
       companyId: contactRecord?.companyId ?? null,
+      slaId: sla.slaId,
+      firstResponseDueAt: sla.firstResponseDueAt,
+      slaDeadlineAt: sla.slaDeadlineAt,
     })
     .returning();
 
   const attachmentIds = await saveAttachments(db, attachments, newTicket.id);
+
+  // The customer wrote it: `user`, with no actor, as a quote accepted from its page.
+  dispatchWebhook("ticket.created", ticketEventPayload(newTicket), { via: "user", actor: null }, db).catch((err) =>
+    console.error("[inbound] ticket.created not dispatched", err),
+  );
 
   await db.insert(ticketMessages).values({
     ticketId: newTicket.id,

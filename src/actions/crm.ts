@@ -16,7 +16,6 @@ import {
   LeadSchema,
   LeadUpdateSchema,
 } from "@/actions/crm-validation";
-import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   activities,
@@ -34,7 +33,10 @@ import {
 } from "@/db/schema";
 import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import { isSameCompanyName, normalizeCompanyName } from "@/lib/company-name";
+import { type ConsentSource, consentPatch } from "@/lib/consent";
+import { announceOptOut } from "@/lib/consent-events";
 import { contactReach } from "@/lib/contact-reach";
+import { recordFieldChanges } from "@/lib/field-history";
 import {
   buildWhereClause,
   COMPANY_FIELDS,
@@ -48,7 +50,11 @@ import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
 import { notify } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
+import { resolvePipelineId } from "@/lib/pipelines";
+import { countRecords } from "@/lib/record-count";
 import { getDb } from "@/lib/tenant-context";
+import { matchesText } from "@/lib/text-match";
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
 
 // ── Company lookup tables ──────────────────────────────────────────────────────
 
@@ -67,45 +73,43 @@ export async function getCompanyTypes() {
   return db.select({ id: companyTypes.id, name: companyTypes.name }).from(companyTypes).orderBy(companyTypes.name);
 }
 
-export async function createCompanyCategory(name: string) {
-  await requireWriteAccess();
+/**
+ * A category or type typed into the company form. ⚠️ One that already exists under other
+ * capitals is that one: the unique index is case-sensitive, and "Prospect" beside
+ * "prospect" split every report grouped by it (Settings → Lists merges old pairs).
+ */
+async function findOrCreateListEntry(table: typeof companyCategories | typeof companyTypes, name: string) {
   const db = await getDb();
-  const [row] = await db
-    .insert(companyCategories)
-    .values({ name: name.trim() })
-    .returning({ id: companyCategories.id, name: companyCategories.name });
+  const clean = name.trim();
+  const [existing] = await db
+    .select({ id: table.id, name: table.name })
+    .from(table)
+    .where(sql`lower(${table.name}) = ${clean.toLowerCase()}`)
+    .limit(1);
+  if (existing) return existing;
+  const [row] = await db.insert(table).values({ name: clean }).returning({ id: table.id, name: table.name });
   revalidatePath("/dashboard/companies");
   return row;
+}
+
+export async function createCompanyCategory(name: string) {
+  await requireWriteAccess();
+  return findOrCreateListEntry(companyCategories, name);
 }
 
 export async function createCompanyType(name: string) {
   await requireWriteAccess();
-  const db = await getDb();
-  const [row] = await db
-    .insert(companyTypes)
-    .values({ name: name.trim() })
-    .returning({ id: companyTypes.id, name: companyTypes.name });
-  revalidatePath("/dashboard/companies");
-  return row;
+  return findOrCreateListEntry(companyTypes, name);
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(users.name);
 }
 
 // ─── Record-limit helper ──────────────────────────────────────────────────────
-
-async function getTotalRecordCount(db: Awaited<ReturnType<typeof getDb>>): Promise<number> {
-  const [[c], [l], [co], [d]] = await Promise.all([
-    db.select({ n: count() }).from(contacts),
-    db.select({ n: count() }).from(leads),
-    db.select({ n: count() }).from(companies),
-    db.select({ n: count() }).from(deals),
-  ]);
-  return Number(c?.n ?? 0) + Number(l?.n ?? 0) + Number(co?.n ?? 0) + Number(d?.n ?? 0);
-}
 
 // LEADS
 export async function getLeads(encodedFilter?: string | null) {
@@ -179,9 +183,11 @@ export async function createLead(data: unknown) {
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
     const validated = LeadSchema.parse(data);
-    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = {
       ...validated,
+      // Dated and sourced as a decision taken here (src/lib/consent.ts).
+      ...consentPatch(null, validated.marketingConsent, "form", new Date(), validated.consentDate),
       leadScore: computeLeadScore(validated),
     };
     const [newLead] = await db.insert(leads).values(payload).returning();
@@ -211,7 +217,7 @@ export async function createLead(data: unknown) {
 
 export async function updateLead(id: string, data: unknown) {
   return guardedT(async () => {
-    await requireWriteAccess();
+    const actor = await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -229,8 +235,8 @@ export async function updateLead(id: string, data: unknown) {
         notify({
           userId: validated.ownerId,
           type: "lead_assigned",
-          title: "Lead assigned to you",
-          message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
+          key: "leadAssigned",
+          params: { name: `${cur.firstName} ${cur.lastName}`.trim() },
           link: `/dashboard/leads/${id}`,
           // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
         }).catch(() => {});
@@ -238,9 +244,24 @@ export async function updateLead(id: string, data: unknown) {
     }
     const payload = {
       ...validated,
-      leadScore: computeLeadScore(validated),
+      // A consent that changes here is a decision taken today, in a form (src/lib/consent.ts).
+      ...consentPatch(previous, validated.marketingConsent, "form", new Date(), validated.consentDate),
+      // ⚠️ Scored on the whole lead, not on the fields sent. The form sends every
+      // field so it never showed, but a partial update — `{ status }` from the
+      // detail page's qualification path — scored only the status and wiped the
+      // points earned by the email, the phone, the rating and the rest.
+      leadScore: computeLeadScore({ ...(previous ?? {}), ...validated }),
     };
     const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
+    await recordFieldChanges(db, "lead", id, previous, updatedLead, actor.user.id);
+    // Withdrawn here, from the record: every system that writes to them hears it.
+    if (previous?.marketingConsent === true && updatedLead.marketingConsent === false) {
+      await announceOptOut(
+        db,
+        { records: [{ entity: "lead", id }], source: "form", channel: "marketing" },
+        { via: "user", actor: actor.user.id },
+      );
+    }
     revalidatePath("/dashboard/leads");
 
     after(() =>
@@ -268,7 +289,7 @@ export async function deleteLead(id: string) {
 export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   await requireWriteAccess();
   const db = await getDb();
-  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+  await requirePlanLimit("maxRecords", await countRecords(db));
 
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) throw new Error("Lead not found");
@@ -361,8 +382,10 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         notes: lead.notes ?? undefined,
         ownerId: lead.ownerId,
         companyId: companyId ?? undefined,
+        // The lead's decision, with its own date and source: converting is not consenting.
         marketingConsent: lead.marketingConsent,
         consentDate: lead.consentDate ?? undefined,
+        consentSource: (lead.consentSource as ConsentSource | null) ?? undefined,
         tags: lead.tags,
         sourceLeadId: lead.id,
       }),
@@ -388,9 +411,11 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   // 6. Optionally create Deal
   let dealId: string | null = null;
   if (shouldCreateDeal) {
+    // The first stage of the first pipeline: a lead converts into new business.
     const [firstStage] = await db
       .select({ id: pipelineStages.id })
       .from(pipelineStages)
+      .where(eq(pipelineStages.pipelineId, await resolvePipelineId(db, null)))
       .orderBy(pipelineStages.order)
       .limit(1);
     if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
@@ -464,9 +489,10 @@ export async function createContact(data: unknown) {
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
     const validated = ContactSchema.parse(data);
-    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = {
       ...validated,
+      ...consentPatch(null, validated.marketingConsent, "form", new Date(), validated.consentDate),
       leadScore: computeLeadScore(validated),
     };
     const [newContact] = await db.insert(contacts).values(payload).returning();
@@ -496,7 +522,7 @@ export async function createContact(data: unknown) {
 
 export async function updateContact(id: string, data: unknown) {
   return guardedT(async () => {
-    await requireWriteAccess();
+    const actor = await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -514,8 +540,8 @@ export async function updateContact(id: string, data: unknown) {
         notify({
           userId: validated.ownerId,
           type: "lead_assigned",
-          title: "Contact assigned to you",
-          message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
+          key: "contactAssigned",
+          params: { name: `${cur.firstName} ${cur.lastName}`.trim() },
           link: `/dashboard/contacts/${id}`,
           // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
         }).catch(() => {});
@@ -523,9 +549,19 @@ export async function updateContact(id: string, data: unknown) {
     }
     const payload = {
       ...validated,
+      ...consentPatch(previous, validated.marketingConsent, "form", new Date(), validated.consentDate),
       leadScore: computeLeadScore(validated),
     };
     const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
+    await recordFieldChanges(db, "contact", id, previous, updatedContact, actor.user.id);
+    // Withdrawn here, from the record: every system that writes to them hears it.
+    if (previous?.marketingConsent === true && updatedContact.marketingConsent === false) {
+      await announceOptOut(
+        db,
+        { records: [{ entity: "contact", id }], source: "form", channel: "marketing" },
+        { via: "user", actor: actor.user.id },
+      );
+    }
     revalidatePath("/dashboard/contacts");
     dispatchWebhook("contact.updated", {
       id: updatedContact.id,
@@ -585,7 +621,7 @@ export async function createCompany(data: unknown) {
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
     const validated = CompanySchema.parse(data);
-    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = { ...validated };
     const [newCompany] = await db.insert(companies).values(payload).returning();
     revalidatePath("/dashboard/companies");
@@ -607,7 +643,7 @@ export async function createCompany(data: unknown) {
 
 export async function updateCompany(id: string, data: unknown) {
   return guardedT(async () => {
-    await requireWriteAccess();
+    const actor = await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -625,8 +661,8 @@ export async function updateCompany(id: string, data: unknown) {
         notify({
           userId: validated.ownerId,
           type: "lead_assigned",
-          title: "Company assigned to you",
-          message: `${cur.name} has been assigned to you.`,
+          key: "companyAssigned",
+          params: { name: cur.name },
           link: `/dashboard/companies/${id}`,
           // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
         }).catch(() => {});
@@ -634,6 +670,7 @@ export async function updateCompany(id: string, data: unknown) {
     }
     const payload = { ...validated };
     const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
+    await recordFieldChanges(db, "company", id, previous, updatedCompany, actor.user.id);
     revalidatePath("/dashboard/companies");
 
     after(() =>
@@ -720,7 +757,7 @@ export async function checkLeadDuplicates(params: {
   if (email?.trim()) conditions.push(ilike(leads.email, email.trim()));
   if (phone?.trim()) conditions.push(ilike(leads.phone, phone.trim()));
   if (firstName?.trim() && lastName?.trim()) {
-    conditions.push(and(ilike(leads.firstName, firstName.trim()), ilike(leads.lastName, lastName.trim())));
+    conditions.push(and(matchesText(leads.firstName, firstName.trim()), matchesText(leads.lastName, lastName.trim())));
   }
   if (!conditions.length) return [];
 
@@ -755,7 +792,9 @@ export async function checkContactDuplicates(params: {
   if (email?.trim()) conditions.push(ilike(contacts.email, email.trim()));
   if (phone?.trim()) conditions.push(ilike(contacts.phone, phone.trim()));
   if (firstName?.trim() && lastName?.trim()) {
-    conditions.push(and(ilike(contacts.firstName, firstName.trim()), ilike(contacts.lastName, lastName.trim())));
+    conditions.push(
+      and(matchesText(contacts.firstName, firstName.trim()), matchesText(contacts.lastName, lastName.trim())),
+    );
   }
   if (!conditions.length) return [];
 
@@ -795,7 +834,7 @@ export async function checkCompanyDuplicates(params: {
   // bounded; the decision happens in `isSameCompanyName`, which knows about legal
   // forms, punctuation and accents.
   const anchor = longestWord(name);
-  if (anchor) conditions.push(ilike(companies.name, `%${anchor}%`));
+  if (anchor) conditions.push(matchesText(companies.name, `%${anchor}%`));
   if (website?.trim()) conditions.push(ilike(companies.website, `%${hostOf(website)}%`));
   if (mainEmail?.trim()) conditions.push(ilike(companies.mainEmail, mainEmail.trim()));
   if (!conditions.length) return [];
@@ -998,7 +1037,7 @@ export async function mergeCompanies(keepId: string, mergeId: string, fields: Co
 
 /** Concatenated-name match, because "Mario Rossi" is what people type. */
 function fullNameMatch(first: AnyPgColumn, last: AnyPgColumn, term: string) {
-  return sql`lower(coalesce(${first}, '') || ' ' || coalesce(${last}, '')) LIKE lower(${`%${term}%`})`;
+  return matchesText(sql`coalesce(${first}, '') || ' ' || coalesce(${last}, '')`, `%${term}%`);
 }
 
 /** Digits-only comparison, so "+39 02 1234567" is found by "021234567". */
@@ -1038,6 +1077,7 @@ const LEAD_SORTS: Record<string, AnyPgColumn> = {
   lastName: leads.lastName,
   email: leads.email,
   companyName: leads.companyName,
+  city: leads.city,
   status: leads.status,
   leadScore: leads.leadScore,
   createdAt: leads.createdAt,
@@ -1059,6 +1099,7 @@ const COMPANY_SORTS: Record<string, AnyPgColumn> = {
   industry: companies.industry,
   city: companies.city,
   status: companies.status,
+  employeeCount: companies.employeeCount,
   createdAt: companies.createdAt,
 };
 
@@ -1076,11 +1117,11 @@ export async function listLeads(params: ListParams) {
 
   const search = term
     ? or(
-        ilike(leads.firstName, `%${term}%`),
-        ilike(leads.lastName, `%${term}%`),
+        matchesText(leads.firstName, `%${term}%`),
+        matchesText(leads.lastName, `%${term}%`),
         fullNameMatch(leads.firstName, leads.lastName, term),
         ilike(leads.email, `%${term}%`),
-        ilike(leads.companyName, `%${term}%`),
+        matchesText(leads.companyName, `%${term}%`),
         phoneMatch(leads.phone, term),
         phoneMatch(leads.mobile, term),
       )
@@ -1126,8 +1167,8 @@ export async function listContacts(params: ListParams) {
 
   const search = term
     ? or(
-        ilike(contacts.firstName, `%${term}%`),
-        ilike(contacts.lastName, `%${term}%`),
+        matchesText(contacts.firstName, `%${term}%`),
+        matchesText(contacts.lastName, `%${term}%`),
         fullNameMatch(contacts.firstName, contacts.lastName, term),
         ilike(contacts.email, `%${term}%`),
         phoneMatch(contacts.phone, term),
@@ -1173,8 +1214,8 @@ export async function listCompanies(params: ListParams) {
 
   const search = term
     ? or(
-        ilike(companies.name, `%${term}%`),
-        ilike(companies.industry, `%${term}%`),
+        matchesText(companies.name, `%${term}%`),
+        matchesText(companies.industry, `%${term}%`),
         ilike(companies.vatNumber, `%${term}%`),
         ilike(companies.mainEmail, `%${term}%`),
         phoneMatch(companies.mainPhone, term),

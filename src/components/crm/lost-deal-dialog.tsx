@@ -138,7 +138,9 @@ export function LostDealDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        {/* On a phone the dialog is the whole screen; the answer goes at the bottom,
+            where the thumb is, rather than wherever three fields happen to end. */}
+        <DialogFooter className="max-sm:mt-auto">
           <Button variant="outline" onClick={onCancel} disabled={saving}>
             {t("cancel")}
           </Button>

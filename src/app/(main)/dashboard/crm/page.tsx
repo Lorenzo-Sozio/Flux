@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { after } from "next/server";
 
-import { and, eq, gte, sum } from "drizzle-orm";
+import { and, eq, sum } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
+  CalendarDaysIcon,
   CalendarIcon,
+  CalendarX2Icon,
   ClipboardIcon,
   FileTextIcon,
   Headphones,
@@ -17,6 +20,7 @@ import {
   TargetIcon,
   TrendingUp,
   TrendingUpIcon,
+  TrophyIcon,
   UsersIcon,
 } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -25,7 +29,9 @@ import { getRecurringRevenueSummary } from "@/actions/contracts";
 import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
 import { getNextActions } from "@/actions/next-actions";
+import { getOnboarding } from "@/actions/onboarding";
 import { getTodayView } from "@/actions/today";
+import { Money } from "@/components/crm/money";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 // Loaded after the page: the chart library is the heaviest thing on this screen
@@ -37,12 +43,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deals, salesTargets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
-import { getDb } from "@/lib/tenant-context";
+import { getEntitlements } from "@/lib/billing/licensing";
+import type { PlanModule } from "@/lib/billing/plans-config";
+import { countOpenDealsWithoutNextStep } from "@/lib/deal-signals";
+import { closedBetween } from "@/lib/metrics";
+import { rememberLocale } from "@/lib/morning-digest";
+import { showOnboarding } from "@/lib/onboarding";
+import { can } from "@/lib/permissions";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { timeLeft } from "@/lib/time-left";
+import { toWallDate } from "@/lib/wall-clock";
+import { monthStart as workspaceMonthStart } from "@/lib/workspace-day";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { AgendaWidget } from "./_components/agenda-widget";
 import { MonthTargetCard } from "./_components/month-target-card";
 import { NextActionsCard } from "./_components/next-actions-card";
+import { OnboardingCard } from "./_components/onboarding-card";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -75,9 +92,54 @@ function formatToday(d: Date, locale: string) {
   return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 }
 
+/**
+ * ⚠️ Two across on a phone leaves ~120px of content per card, and "€1.234.567"
+ * in `text-2xl` is wider than that: it went past the card's edge rather than
+ * wrapping, because a number has nowhere to break. Smaller below `sm`, and
+ * `break-words` for the MRR card, which joins one figure per currency.
+ */
+const KPI_VALUE = "break-words font-bold text-xl tabular-nums sm:text-2xl";
+
+function Kpi({
+  href,
+  accent,
+  title,
+  icon,
+  children,
+}: {
+  href: string;
+  accent: string;
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link href={href} className="group min-w-0">
+      {/* h-full: two cards side by side on a phone with different heights read as a mistake. */}
+      <Card
+        className={`h-full cursor-pointer gap-3 border-l-4 py-4 shadow-sm transition-shadow group-hover:shadow-md sm:gap-6 sm:py-6 ${accent}`}
+      >
+        <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 pb-2 sm:px-6">
+          <CardTitle className="min-w-0 font-medium text-muted-foreground text-sm">{title}</CardTitle>
+          {icon}
+        </CardHeader>
+        <CardContent className="px-4 sm:px-6">{children}</CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export default async function CRMPage() {
+export default async function CRMPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // ⚠️ "Me" by default: the day's numbers, the work list and the agenda are this person's.
+  // The workspace's figures — which the home used to open on, mixed in with the personal
+  // ones — are one tap away, under "Team" (§3.4).
+  const view = (await searchParams).view === "team" ? "team" : "me";
   const db = await getDb();
   const t = await getTranslations("crm");
   const tc = await getTranslations("common");
@@ -87,56 +149,81 @@ export default async function CRMPage() {
   const userId = actor?.userId;
   const userName = actor?.name?.split(" ")[0] ?? tc("there");
   const now = new Date();
-  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const _todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const _todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-  // Limit overdue look-back to 30 days so stale tasks don't flood the agenda
-  const _thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
+  // The month on the workspace's clock: a deal won at 00:30 on the first, Rome time, is
+  // this month's — on the server's UTC clock it was still last month's.
+  const timeZone = await getWorkspaceTimeZone();
+  const currentPeriod = toWallDate(now, timeZone).slice(0, 7);
+  const monthStart = workspaceMonthStart(now, timeZone);
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
 
-  const [stats, rawLeads, topDeals, recentActivities, myTarget, wonThisMonth, nextActions, today, recurring] =
-    await Promise.all([
-      getDashboardStats(),
-      getRecentLeads(5),
-      getTopDeals(5),
-      getRecentActivities(10),
+  const [
+    stats,
+    rawLeads,
+    topDeals,
+    recentActivities,
+    myTarget,
+    wonThisMonth,
+    nextActions,
+    today,
+    recurring,
+    onboarding,
+  ] = await Promise.all([
+    getDashboardStats(),
+    getRecentLeads(5),
+    getTopDeals(5),
+    getRecentActivities(10),
 
-      // Current month target for this user
-      userId
-        ? db
-            .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
-            .from(salesTargets)
-            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
-            .limit(1)
-            .then((rows) => rows[0] ?? null)
-        : Promise.resolve(null),
+    // Current month target for this user
+    userId
+      ? db
+          .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+          .from(salesTargets)
+          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+          .limit(1)
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
 
-      // Won deals this month for this user
-      userId
-        ? db
-            .select({ total: sum(deals.amount) })
-            .from(deals)
-            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
-            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
-        : Promise.resolve(0 as number),
+    // Won deals this month for this user
+    userId
+      ? db
+          .select({ total: sum(deals.amount) })
+          .from(deals)
+          // Dated by when it closed: `updatedAt` moved an old win into this month on any re-save.
+          .where(and(closedBetween("won", monthStart), eq(deals.ownerId, userId)))
+          .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+      : Promise.resolve(0 as number),
 
-      // What needs doing, rather than what exists (audit rilievo S-02). Failing to
-      // build the work list must not take the whole dashboard down with it: an
-      // empty list reads as "nothing waiting", which is the safe way to be wrong.
-      getNextActions(8).catch(() => null),
+    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
+    // build the work list must not take the whole dashboard down with it: an
+    // empty list reads as "nothing waiting", which is the safe way to be wrong.
+    getNextActions(8).catch(() => null),
 
-      // The day's agenda. This page used to assemble it from three queries of its
-      // own and a hundred and thirty lines of mapping; the "today" screen needs the
-      // same list, and two copies of it would have drifted apart within a month.
-      getTodayView(),
+    // The day's agenda. This page used to assemble it from three queries of its
+    // own and a hundred and thirty lines of mapping; the "today" screen needs the
+    // same list, and two copies of it would have drifted apart within a month.
+    getTodayView(),
 
-      // Contracts are optional; a failure here reads as none rather than taking the page down.
-      getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
-    ]);
+    // Contracts are optional; a failure here reads as none rather than taking the page down.
+    getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
+
+    // The first-run steps, for whoever manages the workspace. Never the reason the page fails.
+    getOnboarding().catch(() => null),
+  ]);
 
   const agendaItems = today.agenda;
+
+  // Cards for a module the plan does not include are left out, as in the menu.
+  const tenantId = await getCurrentTenantId();
+  const modules = tenantId ? (await getEntitlements(tenantId).catch(() => null))?.enabledModules : undefined;
+  const inPlan = (module: PlanModule) => !modules || modules.includes(module);
+  const bareDeals = userId ? await countOpenDealsWithoutNextStep(db, userId).catch(() => 0) : 0;
+
+  // The language of the morning digest is the one this person reads the product in; an
+  // email at six has no request to learn it from. After the response, and one statement.
+  if (userId) {
+    after(() => rememberLocale(db, userId, locale).catch(() => undefined));
+  }
 
   // The same list the page used to fetch for itself, ordered by when each ticket
   // stops being on time rather than by when it was last touched — which is the
@@ -151,16 +238,92 @@ export default async function CRMPage() {
   const recentLeads = rawLeads;
 
   return (
-    <div className="space-y-8">
+    /*
+      ⚠️ Below `md` the sections are reordered with `order`, not moved in the
+      markup. On a phone this is the first screen after login and it is read top
+      to bottom, one card at a time: today's agenda, then the numbers, then the
+      work list and the tickets. On a desktop the work list sits first because
+      the agenda and the figures are visible beside and under it at a glance.
+      The agenda/tickets grid is `display: contents` below `md` so its two
+      children can take part in the ordering on their own.
+    */
+    <div className="flex flex-col gap-6 md:gap-8">
       {/* ── Greeting + date ─────────────────────────────────────────── */}
-      <div>
-        <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">
-          {t(now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening", {
-            name: userName,
-          })}{" "}
-          👋
-        </h1>
-        <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">
+            {t(
+              now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening",
+              {
+                name: userName,
+              },
+            )}{" "}
+            👋
+          </h1>
+          <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
+        </div>
+        <nav aria-label={t("viewLabel")} className="flex shrink-0 rounded-md border p-0.5">
+          {(["me", "team"] as const).map((v) => (
+            <Link
+              key={v}
+              href={v === "me" ? "/dashboard/crm" : "/dashboard/crm?view=team"}
+              aria-current={view === v ? "page" : undefined}
+              className={`rounded px-3 py-1 text-sm ${view === v ? "bg-muted font-medium" : "text-muted-foreground"}`}
+            >
+              {t(v === "me" ? "viewMe" : "viewTeam")}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      {/* ── Three numbers of one's own ─────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Kpi
+          // The deals it adds up: mine, won, closed this month on the workspace's clock.
+          href={
+            userId
+              ? `/dashboard/pipeline?owners=${userId}&status=won&closed=${currentPeriod}&pipeline=all`
+              : "/dashboard/pipeline/targets"
+          }
+          accent="border-l-emerald-500"
+          title={t("myWon")}
+          icon={<TrophyIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
+        >
+          <div className={KPI_VALUE}>
+            <Money value={wonThisMonth} />
+          </div>
+          <p className="mt-1 text-muted-foreground text-xs">
+            {myTarget ? (
+              <>
+                {t("myWonOf")} <Money value={Number(myTarget.targetAmount)} />
+              </>
+            ) : (
+              t("myWonNoTarget")
+            )}
+          </p>
+        </Kpi>
+        <Kpi
+          href={userId ? `/dashboard/pipeline?owners=${userId}` : "/dashboard/pipeline"}
+          accent={bareDeals > 0 ? "border-l-red-500" : "border-l-slate-300"}
+          title={t("myBareDeals")}
+          icon={
+            <CalendarX2Icon
+              className={`h-4 w-4 shrink-0 ${bareDeals > 0 ? "text-red-500" : "text-muted-foreground"}`}
+            />
+          }
+        >
+          <div className={KPI_VALUE}>{bareDeals}</div>
+          <p className="mt-1 text-muted-foreground text-xs">{t("myBareDealsDesc")}</p>
+        </Kpi>
+        <Kpi
+          href="/dashboard/calendar"
+          accent="border-l-blue-500"
+          title={t("myToday")}
+          icon={<CalendarDaysIcon className="h-4 w-4 shrink-0 text-blue-500" />}
+        >
+          <div className={KPI_VALUE}>{agendaItems.length}</div>
+          <p className="mt-1 text-muted-foreground text-xs">{t("myTodayDesc")}</p>
+        </Kpi>
       </div>
 
       {/* ── What needs doing ─────────────────────────────────────────── */}
@@ -169,132 +332,140 @@ export default async function CRMPage() {
         one says what to do about it, which is the question the screen is opened
         with (audit rilievo S-02).
       */}
-      <NextActionsCard actions={nextActions ?? []} failed={nextActions === null} />
+      {onboarding && showOnboarding(onboarding) && (
+        <div className="max-md:order-first">
+          <OnboardingCard state={onboarding} />
+        </div>
+      )}
+
+      <div className="max-md:order-3">
+        <NextActionsCard
+          actions={nextActions ?? []}
+          failed={nextActions === null}
+          canWrite={can(actor, "record:write")}
+        />
+      </div>
 
       {/* ── Agenda + Tickets ─────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <div className="grid grid-cols-1 gap-5 max-md:contents xl:grid-cols-3">
+        <div className={`min-w-0 max-md:order-1 ${inPlan("support") ? "xl:col-span-2" : "xl:col-span-3"}`}>
           <AgendaWidget items={agendaItems} dateLabel={formatToday(now, locale)} />
         </div>
 
-        {/* Tickets */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Headphones className="h-4 w-4 text-muted-foreground" />
-                {t("assignedTickets")}
-                {myTickets.length > 0 && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 font-normal text-muted-foreground text-xs">
-                    {myTickets.length}
-                  </span>
-                )}
-              </CardTitle>
-              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" asChild>
-                <Link href="/dashboard/support/tickets">
-                  {tc("all")} <ArrowRight className="h-3 w-3" />
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1 px-4 pb-4">
-            {myTickets.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center">
-                <Headphones className="mb-2 h-8 w-8 text-muted-foreground/20" />
-                <p className="font-medium text-muted-foreground text-sm">{t("noOpenTickets")}</p>
-              </div>
-            ) : (
-              myTickets.map((ticket) => {
-                // How long is left, said the way a person would say it. The card
-                // used to show this only inside the last hour, which is the point
-                // at which knowing is no longer much use.
-                const left = timeLeft(ticket.slaDeadlineAt, tc);
-                return (
-                  <Link
-                    key={ticket.id}
-                    href={`/dashboard/support/tickets/${ticket.id}`}
-                    className="group flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/60"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="mb-1 flex items-center gap-2">
-                        <span className="shrink-0 font-mono text-muted-foreground text-xs">{ticket.ticketNumber}</span>
-                        <TicketStatusBadge status={ticket.status} />
-                        <TicketPriorityBadge priority={ticket.priority} />
-                        {left?.late && (
-                          <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
-                            SLA
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="truncate font-medium text-sm group-hover:text-primary">{ticket.subject}</p>
-                      <p className="mt-0.5 text-muted-foreground text-xs">
-                        {t("updatedAgo", { time: timeAgo(ticket.updatedAt, locale) })}
-                        {left && (
-                          <span className={left.late ? "ml-2 font-medium text-red-500" : "ml-2"}>· {left.text}</span>
-                        )}
-                      </p>
-                    </div>
-                    <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
+        {/* Tickets, when the plan has support */}
+        {inPlan("support") && (
+          <Card className="max-md:order-4">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex min-w-0 items-center gap-2 text-base">
+                  <Headphones className="h-4 w-4 text-muted-foreground" />
+                  {t("assignedTickets")}
+                  {myTickets.length > 0 && (
+                    <span className="rounded-full bg-muted px-2 py-0.5 font-normal text-muted-foreground text-xs">
+                      {myTickets.length}
+                    </span>
+                  )}
+                </CardTitle>
+                <Button variant="ghost" size="sm" className="h-7 shrink-0 gap-1 text-xs" asChild>
+                  <Link href="/dashboard/support/tickets">
+                    {tc("all")} <ArrowRight className="h-3 w-3" />
                   </Link>
-                );
-              })
-            )}
-          </CardContent>
-        </Card>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-1 px-4 pb-4">
+              {myTickets.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center">
+                  <Headphones className="mb-2 h-8 w-8 text-muted-foreground/20" />
+                  <p className="font-medium text-muted-foreground text-sm">{t("noOpenTickets")}</p>
+                </div>
+              ) : (
+                myTickets.map((ticket) => {
+                  // How long is left, said the way a person would say it. The card
+                  // used to show this only inside the last hour, which is the point
+                  // at which knowing is no longer much use.
+                  const left = timeLeft(ticket.slaDeadlineAt, tc);
+                  return (
+                    <Link
+                      key={ticket.id}
+                      href={`/dashboard/support/tickets/${ticket.id}`}
+                      className="group flex items-start gap-3 rounded-lg p-2.5 transition-colors hover:bg-muted/60"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="shrink-0 font-mono text-muted-foreground text-xs">
+                            {ticket.ticketNumber}
+                          </span>
+                          <TicketStatusBadge status={ticket.status} />
+                          <TicketPriorityBadge priority={ticket.priority} />
+                          {left?.late && (
+                            <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
+                              SLA
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="truncate font-medium text-sm group-hover:text-primary">{ticket.subject}</p>
+                        <p className="mt-0.5 text-muted-foreground text-xs">
+                          {t("updatedAgo", { time: timeAgo(ticket.updatedAt, locale) })}
+                          {left && (
+                            <span className={left.late ? "ml-2 font-medium text-red-500" : "ml-2"}>· {left.text}</span>
+                          )}
+                        </p>
+                      </div>
+                      <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
+                    </Link>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* ── Metric Cards ─────────────────────────────────────────────── */}
-      {/* Two across on a phone. Each card is a label and a number; one per row
+      {view === "team" && (
+        <>
+          {/* ── Metric Cards ─────────────────────────────────────────────── */}
+          {/* Two across on a phone. Each card is a label and a number; one per row
           made the dashboard six screens long before the first chart. */}
-      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-4">
-        <Link href="/dashboard/pipeline" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-blue-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("pipelineValue")}</CardTitle>
-              <TrendingUpIcon className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">€{stats.totalDealValue.toLocaleString(locale)}</div>
+          <div className="grid grid-cols-2 gap-3 max-md:order-2 md:gap-6 lg:grid-cols-4">
+            <Kpi
+              // Everybody's open deals, which is what it sums: the board alone opens on one's own.
+              href="/dashboard/pipeline?owners=all&status=open&pipeline=all"
+              accent="border-l-blue-500"
+              title={t("pipelineValue")}
+              icon={<TrendingUpIcon className="h-4 w-4 shrink-0 text-blue-500" />}
+            >
+              <div className={KPI_VALUE}>
+                <Money value={stats.totalDealValue} />
+              </div>
               <p className="mt-1 text-muted-foreground text-xs">{t("pipelineValueDesc")}</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/leads" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-green-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("activeLeads")}</CardTitle>
-              <UsersIcon className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{stats.activeLeadsCount}</div>
+            </Kpi>
+            <Kpi
+              href="/dashboard/leads"
+              accent="border-l-green-500"
+              title={t("activeLeads")}
+              icon={<UsersIcon className="h-4 w-4 shrink-0 text-green-500" />}
+            >
+              <div className={KPI_VALUE}>{stats.activeLeadsCount}</div>
               <p className="mt-1 text-muted-foreground text-xs">{t("activeLeadsDesc")}</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/leads" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-orange-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("conversionRate")}</CardTitle>
-              <TargetIcon className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{stats.conversionRate}%</div>
+            </Kpi>
+            <Kpi
+              href="/dashboard/leads"
+              accent="border-l-orange-500"
+              title={t("conversionRate")}
+              icon={<TargetIcon className="h-4 w-4 shrink-0 text-orange-500" />}
+            >
+              <div className={KPI_VALUE}>{stats.conversionRate}%</div>
               <p className="mt-1 text-muted-foreground text-xs">{t("conversionRateDesc")}</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/tasks" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-red-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("pendingTasks")}</CardTitle>
-              <AlertCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{stats.todayTasks + stats.overdueTasks}</div>
-              <div className="mt-1 flex gap-2">
+            </Kpi>
+            <Kpi
+              href="/dashboard/tasks"
+              accent="border-l-red-500"
+              title={t("pendingTasks")}
+              icon={<AlertCircle className="h-4 w-4 shrink-0 text-red-500" />}
+            >
+              <div className={KPI_VALUE}>{stats.todayTasks + stats.overdueTasks}</div>
+              <div className="mt-1 flex flex-wrap gap-x-2">
                 <span className="font-bold text-[10px] text-red-600 uppercase">
                   {t("overdueLabel", { count: stats.overdueTasks })}
                 </span>
@@ -302,256 +473,284 @@ export default async function CRMPage() {
                   {t("todayLabel", { count: stats.todayTasks })}
                 </span>
               </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/sales/quotes" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-violet-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("quotesPipeline")}</CardTitle>
-              <FileTextIcon className="h-4 w-4 text-violet-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">€{stats.quotesPipelineValue.toLocaleString(locale)}</div>
-              <div className="mt-1 flex gap-2">
-                <span className="text-[10px] text-muted-foreground uppercase">
-                  {t("openQuotesCount", { count: stats.quotesOpenCount })}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/sales/contracts" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-emerald-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("contracts_mrr")}</CardTitle>
-              <RepeatIcon className="h-4 w-4 text-emerald-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl tabular-nums">
-                {(recurring.mrr.length ? recurring.mrr : [{ currency: "EUR", amount: 0 }])
-                  .map((m) =>
-                    new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
-                      style: "currency",
-                      currency: m.currency,
-                      maximumFractionDigits: 0,
-                      useGrouping: "always",
-                    }).format(m.amount),
-                  )
-                  .join(" · ")}
-              </div>
-              <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/sales/contracts?view=renewal_due" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-yellow-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("contracts_renewalsDue")}</CardTitle>
-              <ScrollTextIcon className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{recurring.renewalsDue}</div>
-              <p className="mt-1 text-muted-foreground text-xs">{t("contracts_renewalsDueDesc")}</p>
-            </CardContent>
-          </Card>
-        </Link>
-
-        <Link href="/dashboard/support/tickets" className="group">
-          <Card className="cursor-pointer border-l-4 border-l-amber-500 shadow-sm transition-shadow group-hover:shadow-md">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="font-medium text-muted-foreground text-sm">{t("openTickets")}</CardTitle>
-              <HeadphonesIcon className="h-4 w-4 text-amber-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl">{stats.openTicketsCount}</div>
-              <div className="mt-1 flex gap-2">
-                {stats.urgentTicketsCount > 0 ? (
-                  <span className="font-bold text-[10px] text-red-600 uppercase">
-                    {t("urgentLabel", { count: stats.urgentTicketsCount })}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-muted-foreground uppercase">{t("noUrgentTickets")}</span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
-      </div>
-
-      {/* ── Target mensile ───────────────────────────────────────────── */}
-      {(myTarget || wonThisMonth > 0) && (
-        <MonthTargetCard
-          myTarget={myTarget}
-          wonThisMonth={wonThisMonth}
-          monthLabel={now.toLocaleDateString(locale, { month: "long", year: "numeric" })}
-        />
-      )}
-
-      {/* ── Charts ───────────────────────────────────────────────────── */}
-      <CRMCharts dealDistribution={stats.dealDistribution} leadsBySource={stats.leadsBySource} />
-
-      {/* ── Top Deals + Recent Activities ────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-blue-500" />
-                {t("topDeals")}
-              </CardTitle>
-              <CardDescription>{t("highestValueOpportunities")}</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/pipeline">{t("viewPipeline")}</Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            {topDeals.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground italic">{t("noOpenDeals")}</p>
-            ) : (
-              <div className="divide-y">
-                {topDeals.map((deal) => (
-                  <Link
-                    key={deal.id}
-                    href="/dashboard/pipeline"
-                    className="flex items-center justify-between px-6 py-3 transition-colors hover:bg-muted/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium text-sm">{deal.name}</p>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        {deal.stageName && (
-                          <span
-                            className="rounded-full px-1.5 py-0.5 font-semibold text-[10px] uppercase"
-                            style={{ backgroundColor: `${deal.stageColor}22`, color: deal.stageColor ?? "#3b82f6" }}
-                          >
-                            {deal.stageName}
-                          </span>
-                        )}
-                        {deal.companyName && (
-                          <span className="truncate text-muted-foreground text-xs">{deal.companyName}</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="ml-4 shrink-0 text-right">
-                      <p className="font-semibold text-sm">€{deal.amount.toLocaleString(locale)}</p>
-                      {deal.probability != null && (
-                        <p className="text-[11px] text-muted-foreground">
-                          {t("probPercent", { prob: deal.probability })}
-                        </p>
-                      )}
-                    </div>
-                  </Link>
-                ))}
-              </div>
+            </Kpi>
+            {inPlan("sales") && (
+              <>
+                <Kpi
+                  href="/dashboard/sales/quotes?status=awaiting"
+                  accent="border-l-violet-500"
+                  title={t("quotesPipeline")}
+                  icon={<FileTextIcon className="h-4 w-4 shrink-0 text-violet-500" />}
+                >
+                  <div className={KPI_VALUE}>
+                    <Money value={stats.quotesPipelineValue} />
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-2">
+                    <span className="text-[10px] text-muted-foreground uppercase">
+                      {t("openQuotesCount", { count: stats.quotesOpenCount })}
+                    </span>
+                  </div>
+                </Kpi>
+                <Kpi
+                  href="/dashboard/sales/contracts"
+                  accent="border-l-emerald-500"
+                  title={t("contracts_mrr")}
+                  icon={<RepeatIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
+                >
+                  <div className={KPI_VALUE}>
+                    {(recurring.mrr.length ? recurring.mrr : [{ currency: "EUR", amount: 0 }])
+                      .map((m) =>
+                        new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
+                          style: "currency",
+                          currency: m.currency,
+                          maximumFractionDigits: 0,
+                          useGrouping: "always",
+                        }).format(m.amount),
+                      )
+                      .join(" · ")}
+                  </div>
+                  <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
+                </Kpi>
+                <Kpi
+                  href="/dashboard/sales/contracts?view=renewal_due"
+                  accent="border-l-yellow-500"
+                  title={t("contracts_renewalsDue")}
+                  icon={<ScrollTextIcon className="h-4 w-4 shrink-0 text-yellow-500" />}
+                >
+                  <div className={KPI_VALUE}>{recurring.renewalsDue}</div>
+                  <p className="mt-1 text-muted-foreground text-xs">{t("contracts_renewalsDueDesc")}</p>
+                </Kpi>
+              </>
             )}
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquareIcon className="h-4 w-4 text-green-500" />
-              {t("recentActivity")}
-            </CardTitle>
-            <CardDescription>{t("latestInteractions")}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {recentActivities.length === 0 ? (
-              <p className="py-8 text-center text-muted-foreground italic">{t("noActivitiesYet")}</p>
-            ) : (
-              <div className="divide-y">
-                {recentActivities.map((act) => {
-                  const entityName = act.contactFirstName
-                    ? `${act.contactFirstName} ${act.contactLastName ?? ""}`.trim()
-                    : (act.companyName ?? null);
-                  return (
-                    <div key={act.id} className="flex items-start gap-3 px-6 py-3">
-                      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                        {ACTIVITY_ICON[act.type] ?? <ClipboardIcon className="h-3.5 w-3.5 text-muted-foreground" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-semibold text-xs capitalize">{act.type}</span>
-                          {entityName && <span className="text-muted-foreground text-xs">— {entityName}</span>}
-                        </div>
-                        {act.content && (
-                          <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{act.content}</p>
-                        )}
-                        <div className="mt-1 flex items-center gap-2">
-                          {act.ownerName && <span className="text-[10px] text-muted-foreground">{act.ownerName}</span>}
-                          <span className="text-[10px] text-muted-foreground">{timeAgo(act.createdAt, locale)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            {inPlan("support") && (
+              <Kpi
+                href="/dashboard/support/tickets"
+                accent="border-l-amber-500"
+                title={t("openTickets")}
+                icon={<HeadphonesIcon className="h-4 w-4 shrink-0 text-amber-500" />}
+              >
+                <div className={KPI_VALUE}>{stats.openTicketsCount}</div>
+                <div className="mt-1 flex flex-wrap gap-x-2">
+                  {stats.urgentTicketsCount > 0 ? (
+                    <span className="font-bold text-[10px] text-red-600 uppercase">
+                      {t("urgentLabel", { count: stats.urgentTicketsCount })}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground uppercase">{t("noUrgentTickets")}</span>
+                  )}
+                </div>
+              </Kpi>
             )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ── Recent Leads ─────────────────────────────────────────────── */}
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle>{t("recentLeads")}</CardTitle>
-            <CardDescription>{t("latestCustomers")}</CardDescription>
           </div>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/leads">{t("viewAll")}</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{tc("name")}</TableHead>
-                <TableHead>{tc("company")}</TableHead>
-                <TableHead>{tc("status")}</TableHead>
-                <TableHead>{tc("createdAt")}</TableHead>
-                <TableHead className="text-right">{t("tableAction")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {recentLeads.map((lead) => (
-                <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50">
-                  <TableCell className="font-medium">
-                    <Link href={`/dashboard/leads/${lead.id}`} className="hover:underline">
-                      {lead.firstName} {lead.lastName}
+
+          {/* ── Target mensile ───────────────────────────────────────────── */}
+          {(myTarget || wonThisMonth > 0) && (
+            <div className="max-md:order-5">
+              <MonthTargetCard
+                myTarget={myTarget}
+                wonThisMonth={wonThisMonth}
+                monthLabel={now.toLocaleDateString(locale, { month: "long", year: "numeric" })}
+              />
+            </div>
+          )}
+
+          {/* ── Charts ───────────────────────────────────────────────────── */}
+          <div className="min-w-0 max-md:order-5">
+            <CRMCharts dealDistribution={stats.dealDistribution} leadsBySource={stats.leadsBySource} />
+          </div>
+
+          {/* ── Top Deals + Recent Activities ────────────────────────────── */}
+          <div className="grid grid-cols-1 gap-6 max-md:order-5 md:gap-8 lg:grid-cols-2">
+            <Card className="shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-blue-500" />
+                    {t("topDeals")}
+                  </CardTitle>
+                  <CardDescription>{t("highestValueOpportunities")}</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" className="shrink-0" asChild>
+                  <Link href="/dashboard/pipeline">{t("viewPipeline")}</Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {topDeals.length === 0 ? (
+                  <p className="py-8 text-center text-muted-foreground italic">{t("noOpenDeals")}</p>
+                ) : (
+                  <div className="divide-y">
+                    {topDeals.map((deal) => (
+                      <Link
+                        key={deal.id}
+                        href={`/dashboard/pipeline/${deal.id}`}
+                        className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/40 sm:px-6"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-sm">{deal.name}</p>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            {deal.stageName && (
+                              <span
+                                className="rounded-full px-1.5 py-0.5 font-semibold text-[10px] uppercase"
+                                style={{ backgroundColor: `${deal.stageColor}22`, color: deal.stageColor ?? "#3b82f6" }}
+                              >
+                                {deal.stageName}
+                              </span>
+                            )}
+                            {deal.companyName && (
+                              <span className="truncate text-muted-foreground text-xs">{deal.companyName}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="ml-4 shrink-0 text-right">
+                          <p className="font-semibold text-sm">
+                            <Money value={deal.amount} />
+                          </p>
+                          {deal.probability != null && (
+                            <p className="text-[11px] text-muted-foreground">
+                              {t("probPercent", { prob: deal.probability })}
+                            </p>
+                          )}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquareIcon className="h-4 w-4 text-green-500" />
+                  {t("recentActivity")}
+                </CardTitle>
+                <CardDescription>{t("latestInteractions")}</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {recentActivities.length === 0 ? (
+                  <p className="py-8 text-center text-muted-foreground italic">{t("noActivitiesYet")}</p>
+                ) : (
+                  <div className="divide-y">
+                    {recentActivities.map((act) => {
+                      const entityName = act.contactFirstName
+                        ? `${act.contactFirstName} ${act.contactLastName ?? ""}`.trim()
+                        : (act.companyName ?? null);
+                      return (
+                        <div key={act.id} className="flex items-start gap-3 px-4 py-3 sm:px-6">
+                          <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                            {ACTIVITY_ICON[act.type] ?? <ClipboardIcon className="h-3.5 w-3.5 text-muted-foreground" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-semibold text-xs capitalize">{act.type}</span>
+                              {entityName && <span className="text-muted-foreground text-xs">— {entityName}</span>}
+                            </div>
+                            {act.content && (
+                              <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{act.content}</p>
+                            )}
+                            <div className="mt-1 flex items-center gap-2">
+                              {act.ownerName && (
+                                <span className="text-[10px] text-muted-foreground">{act.ownerName}</span>
+                              )}
+                              <span className="text-[10px] text-muted-foreground">
+                                {timeAgo(act.createdAt, locale)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── Recent Leads ─────────────────────────────────────────────── */}
+          <Card className="shadow-sm max-md:order-5">
+            <CardHeader className="flex flex-row items-center justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle>{t("recentLeads")}</CardTitle>
+                <CardDescription>{t("latestCustomers")}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" className="shrink-0" asChild>
+                <Link href="/dashboard/leads">{t("viewAll")}</Link>
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {/* Five columns do not fit a phone; below `md` each lead is one tappable row. */}
+              <ul className="divide-y md:hidden">
+                {recentLeads.map((lead) => (
+                  <li key={lead.id}>
+                    <Link
+                      href={`/dashboard/leads/${lead.id}`}
+                      className="-mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-sm">
+                          {lead.firstName} {lead.lastName}
+                        </p>
+                        <p className="truncate text-muted-foreground text-xs">
+                          {lead.companyName || "N/A"} · {new Date(lead.createdAt).toLocaleDateString(locale)}
+                        </p>
+                      </div>
+                      <Badge variant={lead.status === "new" ? "default" : "secondary"} className="shrink-0 capitalize">
+                        {lead.status}
+                      </Badge>
                     </Link>
-                  </TableCell>
-                  <TableCell>{lead.companyName || "N/A"}</TableCell>
-                  <TableCell>
-                    <Badge variant={lead.status === "new" ? "default" : "secondary"} className="capitalize">
-                      {lead.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {new Date(lead.createdAt).toLocaleDateString(locale)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/dashboard/leads/${lead.id}`}>{t("viewAll")} →</Link>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {recentLeads.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-4 text-center text-muted-foreground">
-                    {t("noLeadsFound")}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  </li>
+                ))}
+                {recentLeads.length === 0 && (
+                  <li className="py-4 text-center text-muted-foreground text-sm">{t("noLeadsFound")}</li>
+                )}
+              </ul>
+              <Table className="hidden md:table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{tc("name")}</TableHead>
+                    <TableHead>{tc("company")}</TableHead>
+                    <TableHead>{tc("status")}</TableHead>
+                    <TableHead>{tc("createdAt")}</TableHead>
+                    <TableHead className="text-right">{t("tableAction")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentLeads.map((lead) => (
+                    <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50">
+                      <TableCell className="font-medium">
+                        <Link href={`/dashboard/leads/${lead.id}`} className="hover:underline">
+                          {lead.firstName} {lead.lastName}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{lead.companyName || "N/A"}</TableCell>
+                      <TableCell>
+                        <Badge variant={lead.status === "new" ? "default" : "secondary"} className="capitalize">
+                          {lead.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {new Date(lead.createdAt).toLocaleDateString(locale)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/leads/${lead.id}`}>{t("viewAll")} →</Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {recentLeads.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={5} className="py-4 text-center text-muted-foreground">
+                        {t("noLeadsFound")}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

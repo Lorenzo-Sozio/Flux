@@ -89,7 +89,7 @@ export function ListToolbar({ total, page, pageCount, pageSize, shown, searchPla
               setTerm("");
               submitSearch("");
             }}
-            className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute top-1/2 right-0.5 flex size-8 -translate-y-1/2 items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label={t("clear")}
           >
             <X className="size-4" />

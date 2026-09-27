@@ -194,14 +194,14 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
           <div className="space-y-5 pt-1">
             {/* Campaign summary */}
             <div className="space-y-2 rounded-lg border bg-muted/30 p-4 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("campaignLabel")}</span>
-                <span className="font-medium">{campaign.name}</span>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-muted-foreground">{t("campaignLabel")}</span>
+                <span className="min-w-0 truncate font-medium">{campaign.name}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">{t("templateLabel")}</span>
+              <div className="flex justify-between gap-3">
+                <span className="shrink-0 text-muted-foreground">{t("templateLabel")}</span>
                 {hasTemplate ? (
-                  <span className="font-medium">{templateName ?? t("templateSelected")}</span>
+                  <span className="min-w-0 truncate font-medium">{templateName ?? t("templateSelected")}</span>
                 ) : (
                   <span className="flex items-center gap-1 font-medium text-destructive">
                     <AlertTriangle className="h-3.5 w-3.5" /> {t("templateNotSet")}
@@ -325,7 +325,9 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
               </div>
             </div>
 
-            <DialogFooter>
+            {/* Sticky on a phone, where the dialog fills the screen and the launch
+                button would otherwise sit below the fold of a long form. */}
+            <DialogFooter className="sticky bottom-0 border-t bg-background pt-3 sm:static sm:border-0 sm:pt-0">
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 {tc("cancel")}
               </Button>

@@ -9,7 +9,7 @@ import {
 } from "@/lib/document-language";
 import type { SellerIdentity } from "@/lib/seller-identity";
 
-import { type Canvas, createCanvas, type Hex } from "./canvas";
+import { A4, type Canvas, createCanvas, type Hex } from "./canvas";
 
 /**
  * The quote as the customer receives it: in their language, in the quote's own
@@ -66,13 +66,17 @@ const BADGE: Record<string, { bg: Hex; fg: Hex }> = {
 };
 
 const MARGIN = 48;
+/** The largest a logo is drawn, in points; smaller images keep their size. */
+const LOGO_BOX = { width: 160, height: 48 };
 
 export async function renderQuotePdf(input: {
   quote: QuotePdfInput;
   seller: SellerIdentity;
   lang: DocumentLanguage;
+  /** The workspace's logo (Settings → General), drawn above the seller's name. */
+  logo?: { bytes: Uint8Array; contentType: "image/png" | "image/jpeg" } | null;
 }): Promise<Uint8Array> {
-  const { quote, seller, lang } = input;
+  const { quote, seller, lang, logo } = input;
   const tx = QUOTE_TEXT[lang];
   const money = (v: string | number | null | undefined) => formatDocumentMoney(v, quote.currency, lang);
   const pct = (v: string | number | null | undefined) => formatDocumentPercent(v, lang);
@@ -123,6 +127,21 @@ export async function renderQuotePdf(input: {
 
   // ── Header ──
   const headTop = c.y;
+  if (logo) {
+    // ⚠️ An image pdf-lib cannot read is skipped, not fatal: the quote without its logo
+    // is still the quote, and a 500 in its place is not.
+    try {
+      const img =
+        logo.contentType === "image/png" ? await c.doc.embedPng(logo.bytes) : await c.doc.embedJpg(logo.bytes);
+      const scale = Math.min(LOGO_BOX.width / img.width, LOGO_BOX.height / img.height, 1);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      c.page.drawImage(img, { x: c.left, y: A4.height - c.y - h, width: w, height: h });
+      c.y += h + 10;
+    } catch (err) {
+      console.error("[quote-pdf] logo skipped:", err);
+    }
+  }
   c.text(seller.name, c.left, c.y, { size: 18, bold: true });
   c.y += 24;
   for (const l of [

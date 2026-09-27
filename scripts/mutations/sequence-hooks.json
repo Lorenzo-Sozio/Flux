@@ -14,8 +14,8 @@
   {
     "file": "src/lib/ticket-from-email.ts",
     "description": "⚠️⚠️ una risposta non ferma la sequenza: il cliente che ha risposto continua a ricevere email automatiche",
-    "find": "    await runWithTenant(tenantId, () => tolerateUnmigrated(\"sequences\", () => stopOnReply(db, senderEmail), 0)).catch(",
-    "replace": "    await Promise.resolve().catch("
+    "find": "      tolerateUnmigrated(\"sequences\", () => stopOnReply(db, senderEmail), 0),",
+    "replace": "      0,"
   },
   {
     "file": "src/app/api/webhooks/resend/route.ts",

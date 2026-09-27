@@ -16,15 +16,39 @@ export const THEME_PRESET_OPTIONS = [
     value: "default",
     primary: {
       light: "oklch(0.488 0.243 264.376)",
-      dark: "oklch(0.424 0.199 265.638)",
+      dark: "oklch(0.7 0.15 262)",
+    },
+  },
+  {
+    label: "Atelier",
+    value: "atelier",
+    primary: {
+      light: "oklch(0.25 0.012 60)",
+      dark: "oklch(0.82 0.11 82)",
+    },
+  },
+  {
+    label: "Aurora",
+    value: "aurora",
+    primary: {
+      light: "oklch(0.49 0.1 188)",
+      dark: "oklch(0.78 0.12 178)",
     },
   },
   {
     label: "Brutalist",
     value: "brutalist",
     primary: {
-      light: "oklch(0.6489 0.237 26.9728)",
-      dark: "oklch(0.7044 0.1872 23.1858)",
+      light: "oklch(0.56 0.22 27)",
+      dark: "oklch(0.74 0.17 23.2)",
+    },
+  },
+  {
+    label: "Orchid",
+    value: "orchid",
+    primary: {
+      light: "oklch(0.52 0.2 346)",
+      dark: "oklch(0.76 0.15 346)",
     },
   },
   {
@@ -39,8 +63,8 @@ export const THEME_PRESET_OPTIONS = [
     label: "Tangerine",
     value: "tangerine",
     primary: {
-      light: "oklch(0.64 0.17 36.44)",
-      dark: "oklch(0.64 0.17 36.44)",
+      light: "oklch(0.53 0.16 38)",
+      dark: "oklch(0.76 0.14 42)",
     },
   },
 ] as const;

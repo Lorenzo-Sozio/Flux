@@ -44,8 +44,8 @@
   {
     "file": "src/lib/sequence-runner.ts",
     "description": "⚠️⚠️ una sequenza in pausa continua a inviare",
-    "find": "    if (!sequence?.isActive) continue;",
-    "replace": "    if (!sequence) continue;"
+    "find": "    await db.select({ id: emailSequences.id }).from(emailSequences).where(eq(emailSequences.isActive, true))",
+    "replace": "    await db.select({ id: emailSequences.id }).from(emailSequences)"
   },
   {
     "file": "src/lib/sequence-runner.ts",
@@ -68,8 +68,8 @@
   {
     "file": "src/lib/sequence-runner.ts",
     "description": "⚠️⚠️ la risposta non ferma la sequenza perche' l'indirizzo non viene normalizzato",
-    "find": "      and(eq(emailSequenceEnrollments.email, normaliseEmail(email)), eq(emailSequenceEnrollments.status, \"active\")),",
-    "replace": "      and(eq(emailSequenceEnrollments.email, email), eq(emailSequenceEnrollments.status, \"active\")),"
+    "find": "        eq(emailSequenceEnrollments.email, normaliseEmail(email)),",
+    "replace": "        eq(emailSequenceEnrollments.email, email),"
   },
   {
     "file": "src/lib/sequence-plan.ts",

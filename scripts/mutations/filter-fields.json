@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/actions/filters.ts",
+    "description": "⚠️⚠️ la vista privata di un collega compare a tutti",
+    "find": "        or(eq(customFilters.ownerId, actor.userId), eq(customFilters.isPublic, true)),",
+    "replace": "        undefined,"
+  },
+  {
+    "file": "src/actions/filters.ts",
+    "description": "⚠️ le viste condivise dai colleghi non compaiono",
+    "find": "        or(eq(customFilters.ownerId, actor.userId), eq(customFilters.isPublic, true)),",
+    "replace": "        eq(customFilters.ownerId, actor.userId),"
+  },
+  {
+    "file": "src/lib/filter-engine.ts",
+    "description": "⚠️ l'ultima attività di un record diventa quella di qualunque record",
+    "find": "  sql`(select max(coalesce(${activities.date}, ${activities.createdAt})) from ${activities} where ${fk} = ${id})`;",
+    "replace": "  sql`(select max(coalesce(${activities.date}, ${activities.createdAt})) from ${activities})`;"
+  },
+  {
+    "file": "src/lib/filter-engine.ts",
+    "description": "le etichette non si possono filtrare",
+    "find": "const tagsOf = (col: AnyPgColumn) => sql`array_to_string(${col}, ', ')`;",
+    "replace": "const tagsOf = (col: AnyPgColumn) => sql`''`;"
+  },
+  {
+    "file": "src/lib/filter-engine.ts",
+    "description": "l'azienda del contatto non si può filtrare",
+    "find": "    col: sql`(select ${companies.name} from ${companies} where ${companies.id} = ${contacts.companyId})`,",
+    "replace": "    col: sql`''`,"
+  }
+]

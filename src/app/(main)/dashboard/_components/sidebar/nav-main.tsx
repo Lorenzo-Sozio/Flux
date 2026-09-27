@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { ChevronRight, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -64,7 +65,7 @@ const IsComingSoon = () => {
  */
 const LockedBadge = () => <Lock className="ml-auto size-3.5 shrink-0 text-muted-foreground" />;
 
-function lockHref(module: string | undefined) {
+export function lockHref(module: string | undefined) {
   return `/dashboard/settings/billing${module ? `?upgrade=${encodeURIComponent(module)}` : ""}`;
 }
 
@@ -120,6 +121,7 @@ const NavItemExpanded = ({
               >
                 {item.icon && <item.icon />}
                 <span>{title}</span>
+                {!locked && <ChatUnreadBadge url={item.url} />}
                 {item.comingSoon && <IsComingSoon />}
                 {locked && <LockedBadge />}
               </Link>
@@ -243,9 +245,19 @@ export function NavMain({ items, showQuickCreate = true, creatable = [] }: NavMa
                           tooltip={t(`items.${item.titleKey}` as any)}
                           isActive={isItemActive(item.url)}
                         >
-                          <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
+                          <Link
+                            prefetch={false}
+                            href={item.url}
+                            target={item.newTab ? "_blank" : undefined}
+                            className="relative"
+                          >
                             {item.icon && <item.icon />}
                             <span>{t(`items.${item.titleKey}` as any)}</span>
+                            {/* Collapsed to icons: the count sits on the icon's corner. */}
+                            <ChatUnreadBadge
+                              url={item.url}
+                              className="absolute top-0 right-0 h-4 min-w-4 px-1 text-[9px]"
+                            />
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

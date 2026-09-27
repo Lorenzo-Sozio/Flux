@@ -12,15 +12,17 @@ import {
   ChevronsUpDown,
   FolderPlus,
   Loader2,
+  Pin,
   Plus,
   SlidersHorizontal,
   Trash2,
+  Users,
   X,
 } from "lucide-react";
 import { useMessages, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { createCustomFilter, deleteCustomFilter } from "@/actions/filters";
+import { createCustomFilter, deleteCustomFilter, togglePinFilter, updateCustomFilter } from "@/actions/filters";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -156,7 +158,7 @@ function LookupMultiSelect({
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+      <PopoverContent className="w-(--radix-popover-trigger-width) max-w-[calc(100vw-1.5rem)] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput placeholder={t("searchField")} value={search} onValueChange={setSearch} />
           <div
@@ -354,7 +356,11 @@ function ConditionRow({
   const customFieldEntries = Object.entries(fields).filter(([, f]) => f.isCustom);
 
   return (
-    <div className="grid items-start gap-2" style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
+    // ⚠️ Four columns in the 260px a phone leaves inside a group was 65px a
+    // select. Below `sm`: field, operator and the remove button on one line, the
+    // value across the whole line under them (`order-last col-span-3`). From
+    // `sm` up the four columns are the ones the header row above names.
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.25rem] items-start gap-2 sm:grid-cols-[1fr_1fr_1.4fr_32px]">
       {/* Field */}
       <SearchableSelect
         options={[
@@ -383,7 +389,7 @@ function ConditionRow({
       />
 
       {/* Value */}
-      <div className="min-w-0">
+      <div className="order-last col-span-3 min-w-0 sm:order-none sm:col-span-1">
         {fieldMeta ? (
           <ValueInput
             fieldMeta={fieldMeta}
@@ -398,8 +404,9 @@ function ConditionRow({
       <button
         type="button"
         onClick={onRemove}
-        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+        className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:size-8"
         title={t("removeCondition")}
+        aria-label={t("removeCondition")}
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -451,10 +458,10 @@ function GroupNode({
   const colorClass = DEPTH_COLORS[Math.min(depth, DEPTH_COLORS.length - 1)];
 
   return (
-    <div className={`space-y-3 rounded-lg border-l-2 py-3 pr-3 pl-4 ${colorClass}`}>
+    <div className={`space-y-3 rounded-lg border-l-2 py-3 pr-2 pl-3 sm:pr-3 sm:pl-4 ${colorClass}`}>
       {/* Group header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
           <button
             type="button"
             onClick={() => onLogicChange("AND")}
@@ -483,8 +490,9 @@ function GroupNode({
           <button
             type="button"
             onClick={onRemove}
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+            className="flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:size-6"
             title={t("removeGroup")}
+            aria-label={t("removeGroup")}
           >
             <X className="h-3 w-3" />
           </button>
@@ -493,10 +501,9 @@ function GroupNode({
 
       {/* Column headers (only at root level, depth 0) */}
       {depth === 0 && conditions.some((n) => n.type === "condition") && (
-        <div
-          className="grid gap-2 px-0.5 font-medium text-[11px] text-muted-foreground"
-          style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}
-        >
+        // Only from `sm` up: below it the rows are laid out differently and
+        // these headings would label the wrong controls.
+        <div className="hidden grid-cols-[1fr_1fr_1.4fr_32px] gap-2 px-0.5 font-medium text-[11px] text-muted-foreground sm:grid">
           <span>{t("columnField")}</span>
           <span>{t("columnOperator")}</span>
           <span>{t("columnValue")}</span>
@@ -569,7 +576,14 @@ function GroupNode({
 
 // ─── Saved filter item ────────────────────────────────────────────────────────
 
-type SavedFilter = { id: string; name: string; criteria: string };
+type SavedFilter = {
+  id: string;
+  name: string;
+  criteria: string;
+  isPublic?: boolean;
+  isPinned?: boolean;
+  mine?: boolean;
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -646,10 +660,18 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
     setSaving(true);
     try {
       // biome-ignore lint/suspicious/noExplicitAny: criteria is a JSON-compatible object
-      await createCustomFilter({ name: saveName.trim(), entityType, criteria: tree as any });
+      const created = await createCustomFilter({ name: saveName.trim(), entityType, criteria: tree as any });
+      // The real id: a made-up one could be neither deleted nor shared until the page reloaded.
       setSaved((prev) => [
         ...prev,
-        { id: Math.random().toString(36), name: saveName.trim(), criteria: JSON.stringify(tree) },
+        {
+          id: created.id,
+          name: created.name,
+          criteria: created.criteria,
+          isPublic: false,
+          isPinned: false,
+          mine: true,
+        },
       ]);
       setSaveName("");
       toast.success(t("presets.saved"));
@@ -657,6 +679,21 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
       toast.error(t("presets.saveFailed"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ⚠️ Shared and pinned from here (§4.5): the server code existed and no screen called it,
+  // so every view was private and none could sit above the list.
+  const setFlag = async (f: SavedFilter, flag: "isPublic" | "isPinned") => {
+    const next = !f[flag];
+    setSaved((prev) => prev.map((x) => (x.id === f.id ? { ...x, [flag]: next } : x)));
+    try {
+      if (flag === "isPinned") await togglePinFilter(f.id, next);
+      else await updateCustomFilter(f.id, { isPublic: next });
+      router.refresh();
+    } catch {
+      setSaved((prev) => prev.map((x) => (x.id === f.id ? { ...x, [flag]: !next } : x)));
+      toast.error(t("presets.saveFailed"));
     }
   };
 
@@ -716,33 +753,63 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
           </DialogHeader>
 
           {/* Scrollable body */}
-          <div className="flex-1 space-y-5 overflow-y-auto p-5">
+          <div className="flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
             {/* Saved presets */}
             {saved.length > 0 && (
               <div className="space-y-2">
                 <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
                   {t("savedFilters")}
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                   {saved.map((f) => (
                     <div key={f.id} className="flex items-center gap-1 overflow-hidden rounded-md border">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 flex-1 justify-start gap-1.5 rounded-none font-normal text-sm"
+                        className="h-8 min-w-0 flex-1 justify-start gap-1.5 rounded-none font-normal text-sm"
                         onClick={() => loadPreset(f.criteria)}
                       >
                         <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="truncate">{f.name}</span>
+                        {f.mine === false && (
+                          <Badge variant="secondary" className="ml-auto shrink-0 text-[10px]">
+                            {t("presets.team")}
+                          </Badge>
+                        )}
                       </Button>
-                      <button
-                        type="button"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
-                        onClick={() => handleDeleteSaved(f.id)}
-                        title={t("deletePreset")}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {f.mine !== false && (
+                        <>
+                          <button
+                            type="button"
+                            className={`flex size-9 shrink-0 items-center justify-center transition-colors hover:bg-muted sm:size-8 ${f.isPinned ? "text-primary" : "text-muted-foreground"}`}
+                            onClick={() => setFlag(f, "isPinned")}
+                            aria-pressed={Boolean(f.isPinned)}
+                            title={t("presets.pin")}
+                            aria-label={t("presets.pin")}
+                          >
+                            <Pin className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className={`flex size-9 shrink-0 items-center justify-center transition-colors hover:bg-muted sm:size-8 ${f.isPublic ? "text-primary" : "text-muted-foreground"}`}
+                            onClick={() => setFlag(f, "isPublic")}
+                            aria-pressed={Boolean(f.isPublic)}
+                            title={t("presets.share")}
+                            aria-label={t("presets.share")}
+                          >
+                            <Users className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="flex size-9 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-destructive sm:size-8"
+                            onClick={() => handleDeleteSaved(f.id)}
+                            title={t("deletePreset")}
+                            aria-label={t("deletePreset")}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -794,7 +861,9 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
           </div>
 
           {/* Footer */}
-          <DialogFooter className="flex shrink-0 items-center gap-2 border-t px-4 md:px-5 py-3">
+          {/* A row at every width: the primitive's phone column stacked three
+              buttons centred and put "clear all" at the bottom, under the thumb. */}
+          <DialogFooter className="flex shrink-0 flex-row flex-wrap items-center gap-2 border-t px-4 py-3 md:px-5">
             <Button variant="ghost" size="sm" onClick={clearFilters} className="mr-auto gap-1.5">
               <X className="h-3.5 w-3.5" />
               {t("clearAll")}

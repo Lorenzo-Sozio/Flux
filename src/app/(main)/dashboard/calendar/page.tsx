@@ -12,7 +12,7 @@ import {
   isBefore,
   isSameDay,
   isSameMonth,
-  isSameWeek,
+  parseISO,
   startOfDay,
   startOfMonth,
   startOfWeek,
@@ -20,6 +20,7 @@ import {
   subMonths,
   subWeeks,
 } from "date-fns";
+import { enUS, it as itLocale } from "date-fns/locale";
 import {
   CalendarCheck,
   CalendarDays,
@@ -30,22 +31,34 @@ import {
   LayoutGrid,
   List,
   PhoneCall,
+  Repeat,
+  Rows3,
   Users,
 } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
+import { getAppointmentStart } from "@/actions/appointments";
 import { type CalendarFilter, getCalendarEvents, getExternalCalendar } from "@/actions/calendar";
+import { auth } from "@/auth";
 import { CalendarOverdueSection } from "@/components/crm/calendar-overdue-section";
 import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
-import { FormattedTime } from "@/components/crm/formatted-time";
 import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
 import { WeekCurrentTimeLine } from "@/components/crm/week-current-time-line";
 import { Button } from "@/components/ui/button";
+import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+import { toWallValue, wallDiffMinutes } from "@/lib/wall-clock";
+import { getWorkspaceTimeZone, wallClock } from "@/lib/workspace-time-zone";
 
 import { AppointmentDetailSheet } from "./_components/appointment-detail-sheet";
 import { AppointmentDialog } from "./_components/appointment-dialog";
+import { AppointmentLink } from "./_components/appointment-link";
+import { DayMovablePill, type DragInfo, TimedEventBlock } from "./_components/calendar-drag";
+import { CalendarFilterMenu } from "./_components/calendar-filter-menu";
+import { CalendarSlotLayer, NewOnDayButton } from "./_components/calendar-slot-layer";
+import { GridAutoScroll } from "./_components/grid-auto-scroll";
 import { SubscribeDialog } from "./_components/subscribe-dialog";
+import { SwipeNav } from "./_components/swipe-nav";
 
 // ─── URL helper ──────────────────────────────────────────────────────────────
 
@@ -54,6 +67,12 @@ function calUrl(view: string, date: string, filter: string) {
   if (filter !== "all") p.set("filter", filter);
   return `/dashboard/calendar?${p}`;
 }
+
+const VIEWS = ["month", "week", "agenda", "list"] as const;
+type View = (typeof VIEWS)[number];
+
+/** How many days the list view covers from its first one. */
+const LIST_DAYS = 30;
 
 // ─── Event type helpers ───────────────────────────────────────────────────────
 
@@ -79,7 +98,90 @@ type ExternalPill = {
   leadId: string | null;
 };
 
-type CalendarEvent = Awaited<ReturnType<typeof getCalendarEvents>>[number] | ExternalPill;
+type SourceEvent = Awaited<ReturnType<typeof getCalendarEvents>>[number] | ExternalPill;
+type AppointmentEvent = Extract<SourceEvent, { type: "appointment" }>;
+
+/**
+ * An event with where it sits on the grid: `at` and `until` are its start and
+ * end on the workspace's wall clock (see `wallClock`). They are for layout and
+ * labels on the server; `date` stays the real instant, and is what the client
+ * components are handed.
+ */
+type CalendarEvent = SourceEvent & { at: Date; until: Date | undefined; allDayEvent: boolean };
+
+const isAppointment = (e: CalendarEvent): e is CalendarEvent & AppointmentEvent => e.type === "appointment";
+
+/** A task is all day unless it says otherwise; anything else only when it says so. */
+function isAllDay(e: SourceEvent): boolean {
+  const flag = "allDay" in e ? e.allDay : undefined;
+  return e.type === "task" ? flag !== false : flag === true;
+}
+
+/** Whether an event has any part on a day: every day of a three-day conference, not just the first. */
+function spansDay(ev: CalendarEvent, day: Date): boolean {
+  const dayStart = startOfDay(day);
+  const next = addDays(dayStart, 1);
+  if (!ev.until || ev.until <= ev.at) return isSameDay(ev.at, day);
+  return ev.at < next && ev.until > dayStart;
+}
+
+type Segment = {
+  event: CalendarEvent;
+  /** The part of the day it covers, in minutes past midnight. */
+  startMin: number;
+  endMin: number;
+  startsHere: boolean;
+  endsHere: boolean;
+  col: number;
+  numCols: number;
+};
+
+const minutesOf = (d: Date) => d.getHours() * 60 + d.getMinutes();
+
+/** The piece of a timed event that falls on one day. */
+function segmentOn(ev: CalendarEvent, day: Date): Segment {
+  const dayStart = startOfDay(day);
+  const next = addDays(dayStart, 1);
+  const end = ev.until && ev.until > ev.at ? ev.until : new Date(ev.at.getTime() + 60 * 60_000);
+  const startsHere = ev.at >= dayStart;
+  const endsHere = end <= next;
+  const startMin = startsHere ? minutesOf(ev.at) : 0;
+  const endMin = endsHere ? (isSameDay(end, day) ? minutesOf(end) : 1440) : 1440;
+  return { event: ev, startMin, endMin: Math.max(endMin, startMin + 15), startsHere, endsHere, col: 0, numCols: 1 };
+}
+
+/** Side by side where they overlap: greedy columns, then each takes the width of its cluster. */
+function layOut(segments: Segment[]): Segment[] {
+  const laid = [...segments].sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin);
+  // A short event still occupies the height it is drawn at.
+  const drawnEnd = (s: Segment) => Math.max(s.endMin, s.startMin + 30);
+  const colEnds: number[] = [];
+  for (const s of laid) {
+    const free = colEnds.findIndex((end) => end <= s.startMin);
+    s.col = free === -1 ? colEnds.length : free;
+    colEnds[s.col] = drawnEnd(s);
+  }
+  for (const s of laid) {
+    const overlapping = laid.filter((o) => o.startMin < drawnEnd(s) && drawnEnd(o) > s.startMin);
+    s.numCols = Math.max(...overlapping.map((o) => o.col + 1));
+  }
+  return laid;
+}
+
+/**
+ * The hours a time grid shows: seven to ten at night, stretched to take in
+ * anything earlier or later. A fixed window made a half past six meeting vanish
+ * from the grid altogether, with nothing on screen to say it existed.
+ */
+function hourWindow(segments: Segment[]): { start: number; end: number } {
+  let start = 7;
+  let end = 22;
+  for (const s of segments) {
+    start = Math.min(start, Math.floor(s.startMin / 60));
+    end = Math.max(end, Math.min(24, Math.ceil(s.endMin / 60)));
+  }
+  return { start, end };
+}
 
 const TYPE_STYLES = {
   /**
@@ -120,40 +222,35 @@ function getTypeStyle(type: string) {
   return TYPE_STYLES[type as keyof typeof TYPE_STYLES] ?? TYPE_STYLES.task;
 }
 
-// Non-task events (meetings/calls) — static server component pill
-function EventPill({ event, compact = false }: { event: CalendarEvent; compact?: boolean }) {
-  const ts = getTypeStyle(event.type);
-  const Icon = ts.icon;
-  return (
-    <Link href={event.link} title={`${event.displayTitle} — ${event.entityName}`}>
-      <div
-        className={`flex items-center gap-1.5 rounded border-l-[3px] px-1.5 py-1 text-xs leading-tight transition-opacity hover:opacity-80 ${ts.pill}`}
-      >
-        <Icon className="h-3 w-3 shrink-0" />
-        {!compact && event.date && (
-          <span className="shrink-0 font-semibold tabular-nums opacity-70">
-            <FormattedTime date={event.date} />
-          </span>
-        )}
-        <span className="truncate font-medium">{event.displayTitle}</span>
-      </div>
-    </Link>
-  );
-}
+const entityOf = (ev: CalendarEvent) => (ev.entityName && ev.entityName !== "No Entity" ? ev.entityName : null);
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; date?: string; appointment?: string; filter?: string }>;
+  searchParams: Promise<{
+    view?: string;
+    date?: string;
+    appointment?: string;
+    occurrence?: string;
+    filter?: string;
+  }>;
 }) {
-  const [{ view: viewParam, date: dateParam, appointment: appointmentId, filter: filterParam }, t] = await Promise.all([
-    searchParams,
-    getTranslations("calendar"),
-  ]);
+  const [
+    { view: viewParam, date: dateParam, appointment: appointmentId, occurrence: occurrenceParam, filter: filterParam },
+    t,
+    session,
+    timeZone,
+    locale,
+  ] = await Promise.all([searchParams, getTranslations("calendar"), auth(), getWorkspaceTimeZone(), getLocale()]);
+  const dfLocale = locale === "it" ? itLocale : enUS;
+  // ⚠️ The workspace role, never the platform one.
+  const tenantRole = session?.user?.tenantRole ?? null;
+  const canWrite = can(tenantRole, "record:write");
+  const canDelete = can(tenantRole, "record:delete");
 
-  const currentView = viewParam ?? "week";
+  const currentView: View = (VIEWS as readonly string[]).includes(viewParam ?? "") ? (viewParam as View) : "week";
 
   /**
    * ⚠️ Nobody chose the week — it is the default, and on a phone it is seven
@@ -166,13 +263,31 @@ export default async function CalendarPage({
    * second query. Ask for a view explicitly and you get it at every width.
    */
   const weekIsADefault = !viewParam && currentView === "week";
-  const currentFilter = (filterParam ?? "all") as CalendarFilter;
-  const baseDate = dateParam ? new Date(dateParam) : new Date();
-  const today = new Date();
+  const currentFilter = (["all", "mine", "group"].includes(filterParam ?? "") ? filterParam : "all") as CalendarFilter;
+  // Everything below reads days and hours on the workspace's wall clock.
+  const today = wallClock(new Date(), timeZone);
+  // A link to an appointment without a date (search, a notification) opens the
+  // week it is in, not this one.
+  const occurrenceDate = occurrenceParam ? new Date(occurrenceParam) : null;
+  const appointmentStart =
+    appointmentId && !dateParam
+      ? occurrenceDate && !Number.isNaN(occurrenceDate.getTime())
+        ? occurrenceDate
+        : await getAppointmentStart(appointmentId).catch(() => null)
+      : null;
+  const parsedDate = dateParam ? parseISO(dateParam) : null;
+  const baseDate =
+    parsedDate && !Number.isNaN(parsedDate.getTime())
+      ? parsedDate
+      : appointmentStart
+        ? wallClock(appointmentStart, timeZone)
+        : today;
+  const baseDateStr = format(baseDate, "yyyy-MM-dd");
 
   // ── Compute visible range + overdue window ───────────────────────────────────
   const monthStart = startOfMonth(baseDate);
   const weekStart = startOfWeek(baseDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(baseDate, { weekStartsOn: 1 });
   const visibleStart =
     currentView === "month"
       ? startOfWeek(monthStart, { weekStartsOn: 1 })
@@ -183,26 +298,38 @@ export default async function CalendarPage({
     currentView === "month"
       ? endOfWeek(endOfMonth(baseDate), { weekStartsOn: 1 })
       : currentView === "week"
-        ? endOfWeek(baseDate, { weekStartsOn: 1 })
-        : endOfDay(baseDate);
-  // Always extend backwards to cover the 30-day overdue window
+        ? weekEnd
+        : currentView === "list"
+          ? endOfDay(addDays(baseDate, LIST_DAYS - 1))
+          : endOfDay(baseDate);
+  // Always extend backwards to cover the 30-day overdue window, and to the end of
+  // this week so the header's "this week" count is right whatever is on screen.
   const thirtyDaysAgo = startOfDay(subDays(today, 30));
-  const rangeStart = visibleStart < thirtyDaysAgo ? visibleStart : thirtyDaysAgo;
+  const thisWeekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  // A day either side: the bounds are wall-clock times and the query compares
+  // instants, which differ by the zone's offset.
+  // The day view reads its whole week too: the phone's week strip marks which
+  // days have something on them.
+  const fetchStart = [visibleStart, thirtyDaysAgo, weekStart].reduce((a, b) => (b < a ? b : a));
+  const fetchEnd = [visibleEnd, thisWeekEnd, weekEnd].reduce((a, b) => (b > a ? b : a));
+  const rangeStart = subDays(fetchStart, 1);
+  const rangeEnd = addDays(fetchEnd, 1);
 
-  const [crmEvents, external, tFeed] = await Promise.all([
-    getCalendarEvents(currentFilter, { start: rangeStart, end: visibleEnd }),
+  const [crmEvents, external, tFeed, tApt] = await Promise.all([
+    getCalendarEvents(currentFilter, { start: rangeStart, end: rangeEnd }),
     // Never blocks and never throws: a calendar that cannot be reached is shown
     // as empty **and said to be**, because a screen that looks free while
     // somebody is in a meeting is the failure this feature exists to prevent.
-    getExternalCalendar({ from: rangeStart, to: visibleEnd }).catch(() => null),
+    getExternalCalendar({ from: rangeStart, to: rangeEnd }).catch(() => null),
     getTranslations("calendarFeed"),
+    getTranslations("appointment"),
   ]);
 
   const externalEvents: ExternalPill[] = (external?.events ?? []).map((e) => ({
     id: `external:${e.uid}:${e.start.getTime()}`,
     title: e.summary,
     date: e.start,
-    endAt: e.allDay ? undefined : e.end,
+    endAt: e.end,
     allDay: e.allDay,
     type: "external" as const,
     status: "active",
@@ -213,153 +340,573 @@ export default async function CalendarPage({
     leadId: null,
   }));
 
-  const events: CalendarEvent[] = [...crmEvents, ...externalEvents];
+  /**
+   * Where this page is, without the appointment: opening one keeps the view,
+   * the date and the filter behind it, and closing it comes back to them. The
+   * link used to be bare, so clicking a meeting next week jumped to this one.
+   */
+  const hereParams = new URLSearchParams();
+  if (viewParam) hereParams.set("view", currentView);
+  hereParams.set("date", baseDateStr);
+  if (currentFilter !== "all") hereParams.set("filter", currentFilter);
+  const herePath = `/dashboard/calendar?${hereParams}`;
+
+  const events: CalendarEvent[] = ([...crmEvents, ...externalEvents] as SourceEvent[]).map((e) => {
+    const endAt = "endAt" in e ? e.endAt : undefined;
+    const link =
+      e.type === "appointment"
+        ? `${herePath}&appointment=${encodeURIComponent(e.appointmentId)}${
+            e.occurrence ? `&occurrence=${encodeURIComponent(e.occurrence)}` : ""
+          }`
+        : e.link;
+    return {
+      ...e,
+      link,
+      at: wallClock(new Date(e.date), timeZone),
+      until: endAt ? wallClock(new Date(endAt), timeZone) : undefined,
+      allDayEvent: isAllDay(e),
+    };
+  });
+
+  /** How an appointment can be moved by hand; nothing for anything else, or for a reader. */
+  const dragFor = (ev: CalendarEvent): DragInfo | undefined => {
+    if (!canWrite || !isAppointment(ev)) return undefined;
+    const start = new Date(ev.date);
+    const end = ev.endAt ? new Date(ev.endAt) : new Date(start.getTime() + 3_600_000);
+    return {
+      appointmentId: ev.appointmentId,
+      occurrence: ev.occurrence,
+      recurring: ev.recurring,
+      hasInvitees: ev.attendeeCount > 0,
+      allDay: ev.allDay,
+      startWall: toWallValue(start, timeZone),
+      // On the wall clock: an all-day event across the change to summer time
+      // lasts a day, not twenty-three hours, and must still end at midnight.
+      durationMin: wallDiffMinutes(toWallValue(start, timeZone), toWallValue(end, timeZone)),
+      timeZone,
+    };
+  };
+
+  const muted = (ev: CalendarEvent) => isAppointment(ev) && ev.status === "completed";
+  const recurringEvent = (ev: CalendarEvent) => isAppointment(ev) && ev.recurring;
+
+  /** A pill for month cells, the all-day strip and the list: the right kind for each type. */
+  const renderPill = (ev: CalendarEvent, day: Date, compact = false) => {
+    const ts = getTypeStyle(ev.type);
+    if (ev.type === "task") return <CalendarTaskPill key={ev.id} event={ev} compact={compact} />;
+    const timeLabel = ev.allDayEvent || !isSameDay(ev.at, day) || compact ? null : format(ev.at, "HH:mm");
+    if (ev.type === "external") {
+      const Icon = ts.icon;
+      return (
+        <div
+          key={ev.id}
+          title={`${ev.displayTitle} — ${ev.entityName}`}
+          className={`flex items-center gap-1.5 rounded border-l-[3px] px-1.5 py-1 text-xs leading-tight ${ts.pill}`}
+        >
+          <Icon className="h-3 w-3 shrink-0" />
+          {timeLabel && <span className="shrink-0 font-semibold tabular-nums opacity-70">{timeLabel}</span>}
+          <span className="truncate font-medium">{ev.displayTitle}</span>
+        </div>
+      );
+    }
+    return (
+      <DayMovablePill
+        key={ev.id}
+        href={ev.link}
+        title={ev.displayTitle}
+        type={ev.type}
+        pillClass={ts.pill}
+        timeLabel={timeLabel}
+        entityLabel={entityOf(ev)}
+        muted={muted(ev)}
+        recurring={recurringEvent(ev)}
+        drag={dragFor(ev)}
+      />
+    );
+  };
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  const todayEvents = events.filter((e) => e.date && isSameDay(new Date(e.date), today));
-  const weekEvents = events.filter((e) => e.date && isSameWeek(new Date(e.date), today, { weekStartsOn: 1 }));
+  const todayEvents = events.filter((e) => spansDay(e, today));
+  const weekDaysOfToday = eachDayOfInterval({ start: startOfWeek(today, { weekStartsOn: 1 }), end: thisWeekEnd });
+  const weekEvents = events.filter((e) => weekDaysOfToday.some((d) => spansDay(e, d)));
   const overdueEvents = events.filter(
     (e) =>
-      e.date &&
-      isBefore(new Date(e.date), startOfDay(today)) &&
-      !isBefore(new Date(e.date), thirtyDaysAgo) &&
+      isBefore(e.at, startOfDay(today)) &&
+      !isBefore(e.at, thirtyDaysAgo) &&
       e.type === "task" &&
-      (e as any).status !== "done",
+      (e as { status?: string }).status !== "done",
   );
 
   // ── Navigation URLs ──────────────────────────────────────────────────────────
   const todayUrl = calUrl(currentView, format(today, "yyyy-MM-dd"), currentFilter);
-  const prevUrl =
-    currentView === "week"
-      ? calUrl("week", format(subWeeks(baseDate, 1), "yyyy-MM-dd"), currentFilter)
-      : calUrl("month", format(subMonths(baseDate, 1), "yyyy-MM-dd"), currentFilter);
-  const nextUrl =
-    currentView === "week"
-      ? calUrl("week", format(addWeeks(baseDate, 1), "yyyy-MM-dd"), currentFilter)
-      : calUrl("month", format(addMonths(baseDate, 1), "yyyy-MM-dd"), currentFilter);
+  const step = (dir: 1 | -1) => {
+    if (currentView === "week") return format(dir > 0 ? addWeeks(baseDate, 1) : subWeeks(baseDate, 1), "yyyy-MM-dd");
+    if (currentView === "month") return format(dir > 0 ? addMonths(baseDate, 1) : subMonths(baseDate, 1), "yyyy-MM-dd");
+    if (currentView === "list") return format(addDays(baseDate, dir * LIST_DAYS), "yyyy-MM-dd");
+    return format(addDays(baseDate, dir), "yyyy-MM-dd");
+  };
+  const prevUrl = calUrl(currentView, step(-1), currentFilter);
+  const nextUrl = calUrl(currentView, step(1), currentFilter);
+
+  /**
+   * A day, as the phone opens it: the day view, or — when nobody chose a view —
+   * the same default without a `view`, so the desktop keeps its week.
+   */
+  const dayUrl = (day: Date) => {
+    const date = format(day, "yyyy-MM-dd");
+    if (!weekIsADefault) return calUrl("agenda", date, currentFilter);
+    const p = new URLSearchParams({ date });
+    if (currentFilter !== "all") p.set("filter", currentFilter);
+    return `/dashboard/calendar?${p}`;
+  };
+  // What a sideways swipe does on a phone: the day view walks days, the others
+  // their own period. The default week is the day view on a phone.
+  const phoneWalksDays = currentView === "agenda" || weekIsADefault;
+  const swipePrev = phoneWalksDays ? dayUrl(subDays(baseDate, 1)) : prevUrl;
+  const swipeNext = phoneWalksDays ? dayUrl(addDays(baseDate, 1)) : nextUrl;
 
   const periodTitle =
     currentView === "week"
-      ? `${format(weekStart, "MMM d")} – ${format(endOfWeek(baseDate, { weekStartsOn: 1 }), "MMM d, yyyy")}`
-      : format(monthStart, "MMMM yyyy");
+      ? `${format(weekStart, "d MMM", { locale: dfLocale })} – ${format(weekEnd, "d MMM yyyy", { locale: dfLocale })}`
+      : currentView === "list"
+        ? `${format(baseDate, "d MMM", { locale: dfLocale })} – ${format(addDays(baseDate, LIST_DAYS - 1), "d MMM yyyy", { locale: dfLocale })}`
+        : format(monthStart, "LLLL yyyy", { locale: dfLocale });
+
+  const DAY_NAMES: Record<number, string> = {
+    1: t("days.mon"),
+    2: t("days.tue"),
+    3: t("days.wed"),
+    4: t("days.thu"),
+    5: t("days.fri"),
+    6: t("days.sat"),
+    0: t("days.sun"),
+  };
+
+  /**
+   * The hour a time grid opens on: an hour before now on today's, otherwise just
+   * before the first timed thing in view, and eight o'clock when there is none.
+   */
+  const openingHour = (segments: Segment[], includesToday: boolean) => {
+    if (includesToday) return Math.max(0, today.getHours() - 1);
+    const first = segments.reduce((min, s) => Math.min(min, s.startMin), 24 * 60);
+    return first < 24 * 60 ? Math.floor(first / 60) : 8;
+  };
+
+  const segmentLabel = (s: Segment) => {
+    const from = s.startsHere ? format(s.event.at, "HH:mm") : "…";
+    const until = s.event.until && s.endsHere ? format(s.event.until, "HH:mm") : s.event.until ? "…" : null;
+    return until ? `${from} – ${until}` : from;
+  };
+
+  /** One time grid block, for the week and the day view alike. */
+  const renderBlock = (
+    s: Segment,
+    grid: { hourStart: number; hourEnd: number; hourHeight: number; minHeight: number; variant: "week" | "agenda" },
+  ) => {
+    const clampedStart = Math.max(s.startMin, grid.hourStart * 60);
+    const clampedEnd = Math.min(Math.max(s.endMin, s.startMin + 30), grid.hourEnd * 60);
+    if (clampedEnd <= clampedStart) return null;
+    const ev = s.event;
+    const onlyHere = s.startsHere && s.endsHere;
+    return (
+      <TimedEventBlock
+        key={`${ev.id}:${s.startMin}`}
+        href={ev.type === "external" ? null : ev.link}
+        title={ev.displayTitle}
+        type={ev.type}
+        pillClass={getTypeStyle(ev.type).pill}
+        timeLabel={segmentLabel(s)}
+        entityLabel={entityOf(ev)}
+        top={((clampedStart - grid.hourStart * 60) / 60) * grid.hourHeight}
+        height={Math.max(((clampedEnd - clampedStart) / 60) * grid.hourHeight, grid.minHeight)}
+        leftPct={(s.col / s.numCols) * 100}
+        widthPct={100 / s.numCols}
+        variant={grid.variant}
+        muted={muted(ev)}
+        recurring={recurringEvent(ev)}
+        startMin={s.startMin}
+        endMin={s.endMin}
+        hourHeight={grid.hourHeight}
+        // Only a block wholly on its own day can be dragged within it.
+        drag={onlyHere ? dragFor(ev) : undefined}
+      />
+    );
+  };
+
+  const hourLines = (hours: number[], hourStart: number, hourHeight: number) => (
+    <>
+      {hours.map((h) => (
+        <div
+          key={h}
+          className="pointer-events-none absolute right-0 left-0 border-muted/60 border-t"
+          style={{ top: `${(h - hourStart) * hourHeight}px` }}
+        />
+      ))}
+      {hours.slice(0, -1).map((h) => (
+        <div
+          key={`${h}-half`}
+          className="pointer-events-none absolute right-0 left-0 border-muted/30 border-t border-dashed"
+          style={{ top: `${(h - hourStart) * hourHeight + hourHeight / 2}px` }}
+        />
+      ))}
+    </>
+  );
+
+  const hourLabels = (hours: number[], hourStart: number, hourHeight: number) =>
+    hours.map((h) => (
+      <div
+        key={h}
+        className="absolute right-0 flex items-start justify-end pr-2"
+        style={{ top: `${Math.max(2, (h - hourStart) * hourHeight - 8)}px` }}
+      >
+        <span className="font-medium text-[10px] text-muted-foreground/70 tabular-nums">
+          {h === 24 ? "24:00" : `${h.toString().padStart(2, "0")}:00`}
+        </span>
+      </div>
+    ));
+
+  /**
+   * The phone's week strip: seven days, a dot for each that has something on it,
+   * the chosen one filled in. It is how a day is picked on a phone — one tap —
+   * where the arrows walked there one day at a time without saying which days
+   * were busy. Sticky, so it stays under the thumb while the day scrolls.
+   */
+  const renderWeekStrip = ({
+    selected,
+    dayHref,
+    prevHref,
+    nextHref,
+  }: {
+    selected: Date | null;
+    dayHref: (day: Date) => string;
+    prevHref: string;
+    nextHref: string;
+  }) => {
+    const anchor = selected ?? baseDate;
+    const days = eachDayOfInterval({
+      start: startOfWeek(anchor, { weekStartsOn: 1 }),
+      end: endOfWeek(anchor, { weekStartsOn: 1 }),
+    });
+    const headline = selected ?? anchor;
+    const showingToday = selected ? isSameDay(selected, today) : days.some((d) => isSameDay(d, today));
+    return (
+      <div
+        data-no-swipe=""
+        className="-mx-4 sticky top-0 z-20 border-b bg-background/95 px-2 pt-2 pb-1.5 backdrop-blur-md md:hidden"
+      >
+        <div className="flex items-center justify-between gap-2 px-2 pb-1">
+          <p className="min-w-0 truncate font-semibold text-sm capitalize">
+            {selected
+              ? `${isSameDay(selected, today) ? `${t("today")} · ` : ""}${format(headline, "EEEE d MMMM", { locale: dfLocale })}`
+              : format(headline, "LLLL yyyy", { locale: dfLocale })}
+          </p>
+          {!showingToday && (
+            <Link href={dayHref(today)} className="shrink-0 rounded-md px-2 py-1 font-medium text-primary text-sm">
+              {t("today")}
+            </Link>
+          )}
+        </div>
+        <div className="flex items-center">
+          <Link
+            href={prevHref}
+            aria-label={t("previousPeriod")}
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted"
+          >
+            <ChevronLeft className="size-5" />
+          </Link>
+          <ol className="grid min-w-0 flex-1 grid-cols-7">
+            {days.map((day) => {
+              const isSelected = selected ? isSameDay(day, selected) : false;
+              const isToday = isSameDay(day, today);
+              const busy = events.filter((e) => spansDay(e, day));
+              return (
+                <li key={day.toISOString()}>
+                  <Link
+                    href={dayHref(day)}
+                    scroll={false}
+                    aria-current={isSelected ? "date" : undefined}
+                    aria-label={`${format(day, "PPPP", { locale: dfLocale })}, ${t("eventCount", { count: busy.length })}`}
+                    className="flex flex-col items-center gap-0.5 rounded-xl py-1"
+                  >
+                    <span className="font-medium text-[10px] text-muted-foreground uppercase">
+                      {DAY_NAMES[day.getDay()].slice(0, 3)}
+                    </span>
+                    <span
+                      className={cn(
+                        "flex size-8 items-center justify-center rounded-full font-semibold text-sm tabular-nums",
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : isToday
+                            ? "text-primary ring-1 ring-primary/40"
+                            : "text-foreground",
+                      )}
+                    >
+                      {format(day, "d")}
+                    </span>
+                    <span className="flex h-1.5 items-center gap-0.5" aria-hidden>
+                      {busy.slice(0, 3).map((ev) => (
+                        <span key={ev.id} className={cn("size-1 rounded-full", getTypeStyle(ev.type).dot)} />
+                      ))}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ol>
+          <Link
+            href={nextHref}
+            aria-label={t("nextPeriod")}
+            className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-muted"
+          >
+            <ChevronRight className="size-5" />
+          </Link>
+        </div>
+      </div>
+    );
+  };
+
+  /** One event as a row: the list view, and the chosen day under the month on a phone. */
+  const renderRow = (ev: CalendarEvent, day: Date) => {
+    const ts = getTypeStyle(ev.type);
+    const Icon = ts.icon;
+    const s = ev.allDayEvent ? null : segmentOn(ev, day);
+    const time = ev.allDayEvent ? t("allDay") : s ? segmentLabel(s) : "";
+    const entity = entityOf(ev);
+    const inner = (
+      <>
+        <span className="w-[5.5rem] shrink-0 text-muted-foreground text-xs tabular-nums">{time}</span>
+        <span className={cn("size-2 shrink-0 rounded-full", ts.dot)} aria-hidden />
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className={cn("block truncate font-medium text-sm", muted(ev) && "line-through opacity-60")}>
+            {ev.displayTitle}
+          </span>
+          {entity && <span className="block truncate text-muted-foreground text-xs">{entity}</span>}
+        </span>
+        {recurringEvent(ev) && (
+          <Repeat className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label={tApt("recurrence.label")} />
+        )}
+      </>
+    );
+    const rowClass = "flex min-h-12 items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/40";
+    return (
+      <li key={ev.id}>
+        {ev.type === "external" ? (
+          <div className={cn(rowClass, "hover:bg-transparent")}>{inner}</div>
+        ) : ev.type === "appointment" ? (
+          <AppointmentLink href={ev.link} className={rowClass}>
+            {inner}
+          </AppointmentLink>
+        ) : (
+          <Link href={ev.link} scroll={false} className={rowClass}>
+            {inner}
+          </Link>
+        )}
+      </li>
+    );
+  };
 
   // ── VIEW: Month ──────────────────────────────────────────────────────────────
   const renderMonth = () => {
     const startDate = startOfWeek(startOfMonth(baseDate), { weekStartsOn: 1 });
     const endDate = endOfWeek(endOfMonth(baseDate), { weekStartsOn: 1 });
     const calDays = eachDayOfInterval({ start: startDate, end: endDate });
-    const DAYS = [
-      t("days.mon"),
-      t("days.tue"),
-      t("days.wed"),
-      t("days.thu"),
-      t("days.fri"),
-      t("days.sat"),
-      t("days.sun"),
-    ];
+    const DAYS = [1, 2, 3, 4, 5, 6, 0].map((d) => DAY_NAMES[d]);
     const MAX_VISIBLE = 4;
+    const chosenDay = events
+      .filter((e) => spansDay(e, baseDate))
+      .sort((a, b) => Number(b.allDayEvent) - Number(a.allDayEvent) || a.at.getTime() - b.at.getTime());
 
     return (
-      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-        {/* Day headers */}
-        <div className="grid grid-cols-7 border-b bg-muted/40">
-          {DAYS.map((d, i) => (
-            <div
-              key={d}
-              className={`py-2 text-center font-semibold text-[10px] uppercase tracking-wider md:py-3 md:text-xs ${
-                i >= 5 ? "text-muted-foreground/50" : "text-muted-foreground"
-              }`}
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Day cells */}
-        <div className="grid grid-cols-7 divide-x divide-y">
-          {calDays.map((day, idx) => {
-            const dayEvents = events
-              .filter((e) => e.date && isSameDay(new Date(e.date), day))
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            const inMonth = isSameMonth(day, baseDate);
-            const isToday = isSameDay(day, today);
-            const isWeekend = idx % 7 >= 5;
-            const overflow = dayEvents.length - MAX_VISIBLE;
-            const agendaUrl = calUrl("agenda", format(day, "yyyy-MM-dd"), currentFilter);
-
-            return (
+      <div className="space-y-3">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 border-b bg-muted/40">
+            {DAYS.map((d, i) => (
               <div
-                key={day.toISOString()}
-                // ⚠️ Seven columns on a 343px screen is 49px a day. A month grid
-                // cannot show an appointment's name in 49px, so below md it
-                // shows the count as dots and the day itself is the link to its
-                // agenda — which is where the names are readable. The full grid
-                // comes back from md up, where a cell is 130px or more.
-                className={`flex min-h-[68px] flex-col gap-1 p-1 transition-colors md:min-h-[160px] md:gap-1 md:p-2 ${
-                  isToday
-                    ? "bg-primary/[0.04] dark:bg-primary/[0.06]"
-                    : !inMonth
-                      ? "bg-muted/30 dark:bg-muted/10"
-                      : isWeekend
-                        ? "bg-muted/10"
-                        : "bg-background"
+                key={d}
+                className={`py-2 text-center font-semibold text-[10px] uppercase tracking-wider md:py-3 md:text-xs ${
+                  i >= 5 ? "text-muted-foreground/50" : "text-muted-foreground"
                 }`}
               >
-                {/* Date number */}
-                <div className="mb-0.5 flex items-center justify-end">
-                  {isToday ? (
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground text-xs">
-                      {format(day, "d")}
-                    </span>
-                  ) : (
-                    <span
-                      className={`font-semibold text-xs ${!inMonth ? "text-muted-foreground/40" : isWeekend ? "text-muted-foreground/60" : "text-muted-foreground"}`}
-                    >
-                      {format(day, "d")}
-                    </span>
-                  )}
-                </div>
+                {d}
+              </div>
+            ))}
+          </div>
 
-                {/* Phone: one dot per appointment, up to four, and the whole
-                    cell opens that day's agenda. */}
-                {dayEvents.length > 0 && (
-                  <Link
-                    href={agendaUrl}
-                    aria-label={t("more", { count: dayEvents.length })}
-                    className="flex flex-1 flex-wrap content-start items-start gap-0.5 md:hidden"
-                  >
-                    {dayEvents.slice(0, 4).map((ev) => (
-                      <span key={ev.id} className="size-1.5 rounded-full bg-primary/70" />
-                    ))}
-                    {dayEvents.length > 4 && (
-                      <span className="font-medium text-[9px] text-muted-foreground leading-none">
-                        +{dayEvents.length - 4}
+          {/* Day cells */}
+          <div className="grid grid-cols-7 divide-x divide-y">
+            {calDays.map((day, idx) => {
+              // All-day and multi-day first, then by time: the order every calendar uses.
+              const dayEvents = events
+                .filter((e) => spansDay(e, day))
+                .sort((a, b) => Number(b.allDayEvent) - Number(a.allDayEvent) || a.at.getTime() - b.at.getTime());
+              const inMonth = isSameMonth(day, baseDate);
+              const isToday = isSameDay(day, today);
+              const isWeekend = idx % 7 >= 5;
+              const overflow = dayEvents.length - MAX_VISIBLE;
+              const dayStr = format(day, "yyyy-MM-dd");
+              const agendaUrl = calUrl("agenda", dayStr, currentFilter);
+              const isChosen = isSameDay(day, baseDate);
+
+              return (
+                <div
+                  key={day.toISOString()}
+                  data-cal-day={dayStr}
+                  // ⚠️ Seven columns on a 343px screen is 49px a day. A month grid
+                  // cannot show an appointment's name in 49px, so below md it
+                  // shows the count as dots and the day itself is the link to its
+                  // agenda — which is where the names are readable. The full grid
+                  // comes back from md up, where a cell is 130px or more.
+                  className={`group relative flex min-h-[56px] min-w-0 flex-col gap-1 p-1 transition-colors md:min-h-[160px] md:gap-1 md:p-2 ${
+                    isChosen ? "max-md:ring-2 max-md:ring-primary max-md:ring-inset" : ""
+                  } ${
+                    isToday
+                      ? "bg-primary/[0.04] dark:bg-primary/[0.06]"
+                      : !inMonth
+                        ? "bg-muted/30 dark:bg-muted/10"
+                        : isWeekend
+                          ? "bg-muted/10"
+                          : "bg-background"
+                  }`}
+                >
+                  {/* Date number */}
+                  <div className="mb-0.5 flex items-center justify-end gap-1">
+                    {canWrite && (
+                      <span className="mr-auto hidden md:inline-flex">
+                        <NewOnDayButton day={dayStr} />
                       </span>
                     )}
-                  </Link>
-                )}
-
-                {/* Tablet and up: the appointments themselves. */}
-                <div className="hidden flex-1 flex-col gap-1 md:flex">
-                  {dayEvents
-                    .slice(0, MAX_VISIBLE)
-                    .map((ev) =>
-                      ev.type === "task" ? (
-                        <CalendarTaskPill key={ev.id} event={ev} compact />
-                      ) : (
-                        <EventPill key={ev.id} event={ev} compact />
-                      ),
-                    )}
-                  {overflow > 0 && (
                     <Link
                       href={agendaUrl}
-                      className="mt-auto py-0.5 text-center font-medium text-[11px] text-muted-foreground leading-none hover:text-primary"
+                      className="rounded-full hover:ring-2 hover:ring-primary/30 max-md:pointer-events-none"
+                      aria-label={format(day, "PPPP", { locale: dfLocale })}
                     >
-                      {t("more", { count: overflow })}
+                      {isToday ? (
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary font-bold text-primary-foreground text-xs">
+                          {format(day, "d")}
+                        </span>
+                      ) : (
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center font-semibold text-xs ${!inMonth ? "text-muted-foreground/40" : isWeekend ? "text-muted-foreground/60" : "text-muted-foreground"}`}
+                        >
+                          {format(day, "d")}
+                        </span>
+                      )}
                     </Link>
+                  </div>
+
+                  {/* Phone: one dot per event, up to four; the whole cell picks the
+                    day, and its events are listed under the grid — the way a
+                    phone's own calendar reads a month, without leaving it. */}
+                  <Link
+                    href={calUrl("month", dayStr, currentFilter)}
+                    scroll={false}
+                    aria-label={`${format(day, "PPPP", { locale: dfLocale })}, ${t("eventCount", { count: dayEvents.length })}`}
+                    aria-current={isChosen ? "date" : undefined}
+                    className="absolute inset-0 md:hidden"
+                  />
+                  {dayEvents.length > 0 && (
+                    <div
+                      className="pointer-events-none flex flex-1 flex-wrap content-start items-start gap-0.5 md:hidden"
+                      aria-hidden
+                    >
+                      {dayEvents.slice(0, 4).map((ev) => (
+                        <span key={ev.id} className={cn("size-1.5 rounded-full", getTypeStyle(ev.type).dot)} />
+                      ))}
+                      {dayEvents.length > 4 && (
+                        <span className="font-medium text-[9px] text-muted-foreground leading-none">
+                          +{dayEvents.length - 4}
+                        </span>
+                      )}
+                    </div>
                   )}
+
+                  {/* Tablet and up: the appointments themselves. */}
+                  <div className="hidden min-w-0 flex-1 flex-col gap-1 md:flex">
+                    {dayEvents.slice(0, MAX_VISIBLE).map((ev) => renderPill(ev, day, false))}
+                    {overflow > 0 && (
+                      <Link
+                        href={agendaUrl}
+                        className="mt-auto py-0.5 text-center font-medium text-[11px] text-muted-foreground leading-none hover:text-primary"
+                      >
+                        {t("more", { count: overflow })}
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Phone: the chosen day, read as a list under the grid. */}
+        <section
+          className="overflow-hidden rounded-xl border bg-card shadow-sm md:hidden"
+          aria-labelledby="cal-chosen-day"
+        >
+          <div className="flex items-center justify-between gap-2 border-b bg-muted/30 px-4 py-2.5">
+            <h2 id="cal-chosen-day" className="min-w-0 truncate font-semibold text-sm capitalize">
+              {isSameDay(baseDate, today) ? `${t("today")} · ` : ""}
+              {format(baseDate, "EEEE d MMMM", { locale: dfLocale })}
+            </h2>
+            <Link
+              href={calUrl("agenda", baseDateStr, currentFilter)}
+              className="shrink-0 font-medium text-primary text-xs"
+            >
+              {t("agenda")}
+            </Link>
+          </div>
+          {chosenDay.length > 0 ? (
+            <ul className="divide-y">{chosenDay.map((ev) => renderRow(ev, baseDate))}</ul>
+          ) : (
+            <p className="px-4 py-6 text-center text-muted-foreground text-sm">{t("noEventsThisDay")}</p>
+          )}
+        </section>
+      </div>
+    );
+  };
+
+  // ── VIEW: Week, on a phone ──────────────────────────────────────────────────
+  /**
+   * Seven 116px columns scrolled sideways showed two and a half days of a week
+   * on a phone. The week is read here as the phone reads anything long: day by
+   * day, top to bottom, with the strip above to jump into any one of them.
+   */
+  const renderWeekPhone = () => {
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+    return (
+      <div className="space-y-3 md:hidden">
+        {renderWeekStrip({
+          selected: null,
+          dayHref: (d) => calUrl("agenda", format(d, "yyyy-MM-dd"), currentFilter),
+          prevHref: prevUrl,
+          nextHref: nextUrl,
+        })}
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+          {days.map((day) => {
+            const items = events
+              .filter((e) => spansDay(e, day))
+              .sort((a, b) => Number(b.allDayEvent) - Number(a.allDayEvent) || a.at.getTime() - b.at.getTime());
+            const isToday = isSameDay(day, today);
+            return (
+              <section key={day.toISOString()} className="border-b last:border-b-0">
+                <Link
+                  href={calUrl("agenda", format(day, "yyyy-MM-dd"), currentFilter)}
+                  className={cn("flex items-baseline gap-2 bg-muted/40 px-4 py-2", isToday && "bg-primary/5")}
+                >
+                  <span className={cn("font-bold text-lg tabular-nums", isToday && "text-primary")}>
+                    {format(day, "d")}
+                  </span>
+                  <span className="font-medium text-sm capitalize">{format(day, "EEEE", { locale: dfLocale })}</span>
+                  {isToday && <span className="ml-auto font-medium text-primary text-xs">{t("today")}</span>}
+                </Link>
+                {items.length > 0 ? (
+                  <ul className="divide-y">{items.map((ev) => renderRow(ev, day))}</ul>
+                ) : (
+                  <p className="px-4 py-3 text-muted-foreground text-xs">{t("noEventsThisDay")}</p>
+                )}
+              </section>
             );
           })}
         </div>
@@ -369,88 +916,19 @@ export default async function CalendarPage({
 
   // ── VIEW: Week (time-grid) ───────────────────────────────────────────────────
   const renderWeek = () => {
-    const HOUR_START = 7;
-    const HOUR_END = 22;
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    const allDayByDay = weekDays.map((d) => events.filter((e) => e.allDayEvent && spansDay(e, d)));
+    const hasAnyAllDay = allDayByDay.some((arr) => arr.length > 0);
+    const layoutByDay = weekDays.map((d) =>
+      layOut(events.filter((e) => !e.allDayEvent && spansDay(e, d)).map((e) => segmentOn(e, d))),
+    );
+    const span = hourWindow(layoutByDay.flat());
+    const HOUR_START = span.start;
+    const HOUR_END = span.end;
     const HOUR_HEIGHT = 56;
     const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
     const TOTAL_HEIGHT = (HOUR_END - HOUR_START) * HOUR_HEIGHT;
-
-    const weekDays = eachDayOfInterval({
-      start: weekStart,
-      end: endOfWeek(baseDate, { weekStartsOn: 1 }),
-    });
-
-    const DAY_KEYS: Record<number, string> = {
-      1: t("days.mon"),
-      2: t("days.tue"),
-      3: t("days.wed"),
-      4: t("days.thu"),
-      5: t("days.fri"),
-      6: t("days.sat"),
-      0: t("days.sun"),
-    };
-
-    type LayoutEvent = {
-      event: CalendarEvent;
-      startMin: number;
-      endMin: number;
-      col: number;
-      numCols: number;
-    };
-
-    // All-day tasks per day
-    const allDayByDay = weekDays.map((d) =>
-      events.filter(
-        (e) => e.date && isSameDay(new Date(e.date), d) && e.type === "task" && (e as any).allDay !== false,
-      ),
-    );
-    const hasAnyAllDay = allDayByDay.some((arr) => arr.length > 0);
-
-    // Timed events per day with column layout
-    const layoutByDay: LayoutEvent[][] = weekDays.map((d) => {
-      const dayTimed = events.filter(
-        (e) => e.date && isSameDay(new Date(e.date), d) && (e.type !== "task" || (e as any).allDay === false),
-      );
-
-      const laid: LayoutEvent[] = dayTimed
-        .map((ev) => {
-          const start = new Date(ev.date);
-          const startMin = start.getHours() * 60 + start.getMinutes();
-          const endAtRaw = (ev as any).endAt;
-          const endMin = endAtRaw
-            ? (() => {
-                const e = new Date(endAtRaw);
-                return e.getHours() * 60 + e.getMinutes();
-              })()
-            : startMin + 60;
-          return { event: ev, startMin, endMin: Math.max(endMin, startMin + 30), col: 0, numCols: 1 };
-        })
-        .sort((a, b) => a.startMin - b.startMin);
-
-      const colEnds: number[] = [];
-      for (const ev of laid) {
-        let placed = false;
-        for (let c = 0; c < colEnds.length; c++) {
-          if (colEnds[c] <= ev.startMin) {
-            ev.col = c;
-            colEnds[c] = ev.endMin;
-            placed = true;
-            break;
-          }
-        }
-        if (!placed) {
-          ev.col = colEnds.length;
-          colEnds.push(ev.endMin);
-        }
-      }
-
-      for (const ev of laid) {
-        const overlapping = laid.filter((o) => o.startMin < ev.endMin && o.endMin > ev.startMin);
-        ev.numCols = Math.max(...overlapping.map((o) => o.col + 1));
-      }
-
-      return laid;
-    });
 
     // ⚠️ `minmax(0, …)` let a day column fall to 42px on a phone, which is not
     // enough for the hour of an appointment, never mind its name. A floor of
@@ -463,29 +941,47 @@ export default async function CalendarPage({
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {/* Single scroll container — headers, all-day strip, and time grid all share identical width */}
         <div
+          data-cal-scroll=""
           className="overflow-auto"
           style={{ maxHeight: "calc(100dvh - 280px)", minHeight: "480px", scrollbarGutter: "stable" }}
         >
+          <GridAutoScroll
+            offsetPx={
+              (openingHour(
+                layoutByDay.flat(),
+                weekDays.some((d) => isSameDay(d, today)),
+              ) -
+                HOUR_START) *
+                HOUR_HEIGHT -
+              HOUR_HEIGHT / 2
+            }
+          />
           {/* Sticky wrapper: day headers + all-day strip pinned together at top */}
-          <div className="sticky top-0 z-20">
+          <div className="sticky top-0 z-40">
             {/* Day headers */}
-            <div className="border-b bg-muted/40" style={{ display: "grid", gridTemplateColumns: gridCols }}>
+            <div
+              className="border-b bg-muted/40 backdrop-blur"
+              style={{ display: "grid", gridTemplateColumns: gridCols }}
+            >
               <div className="border-r" />
               {weekDays.map((day) => {
                 const isToday = isSameDay(day, today);
                 return (
-                  <div
+                  <Link
                     key={day.toISOString()}
-                    className={`border-r py-3 text-center last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
+                    href={calUrl("agenda", format(day, "yyyy-MM-dd"), currentFilter)}
+                    className={`border-r py-3 text-center transition-colors last:border-r-0 hover:bg-muted/60 ${isToday ? "bg-primary/5" : ""}`}
                   >
                     <div className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
-                      {DAY_KEYS[day.getDay()]}
+                      {DAY_NAMES[day.getDay()]}
                     </div>
                     <div className={`mt-1 font-bold text-2xl tabular-nums ${isToday ? "text-primary" : ""}`}>
                       {format(day, "d")}
                     </div>
-                    <div className="mt-0.5 text-[10px] text-muted-foreground/60">{format(day, "MMM")}</div>
-                  </div>
+                    <div className="mt-0.5 text-[10px] text-muted-foreground/60">
+                      {format(day, "MMM", { locale: dfLocale })}
+                    </div>
+                  </Link>
                 );
               })}
             </div>
@@ -505,17 +1001,22 @@ export default async function CalendarPage({
               </div>
               {weekDays.map((day, idx) => {
                 const isToday = isSameDay(day, today);
+                const dayStr = format(day, "yyyy-MM-dd");
                 return (
                   <div
                     key={day.toISOString()}
-                    className={`border-r p-1.5 last:border-r-0 ${isToday ? "bg-primary/[0.02]" : ""}`}
+                    data-cal-day={dayStr}
+                    className={`group relative min-w-0 border-r p-1.5 last:border-r-0 ${isToday ? "bg-primary/[0.02]" : ""}`}
                     style={{ minHeight: "36px" }}
                   >
+                    {canWrite && (
+                      <span className="absolute top-1 right-1">
+                        <NewOnDayButton day={dayStr} allDay />
+                      </span>
+                    )}
                     {allDayByDay[idx].length > 0 && (
-                      <div className="flex flex-col gap-0.5">
-                        {allDayByDay[idx].map((ev) => (
-                          <CalendarTaskPill key={ev.id} event={ev} compact />
-                        ))}
+                      <div className="flex flex-col gap-0.5 pr-5">
+                        {allDayByDay[idx].map((ev) => renderPill(ev, day, true))}
                       </div>
                     )}
                   </div>
@@ -527,93 +1028,45 @@ export default async function CalendarPage({
 
           <div style={{ display: "grid", gridTemplateColumns: gridCols, height: `${TOTAL_HEIGHT}px` }}>
             {/* Time labels column */}
-            <div className="relative select-none border-r">
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  className="absolute right-0 flex items-start justify-end pr-2"
-                  style={{ top: `${Math.max(2, (h - HOUR_START) * HOUR_HEIGHT - 8)}px` }}
-                >
-                  <span className="font-medium text-[10px] text-muted-foreground/70 tabular-nums">
-                    {`${h.toString().padStart(2, "0")}:00`}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <div className="relative select-none border-r">{hourLabels(HOURS, HOUR_START, HOUR_HEIGHT)}</div>
 
             {/* Day columns */}
             {weekDays.map((day, dayIdx) => {
               const isToday = isSameDay(day, today);
-              const dayLayout = layoutByDay[dayIdx];
+              const dayStr = format(day, "yyyy-MM-dd");
               return (
                 <div
                   key={day.toISOString()}
+                  data-cal-day={dayStr}
                   className={`relative border-r last:border-r-0 ${isToday ? "bg-primary/[0.02]" : ""}`}
                 >
-                  {/* Hour lines */}
-                  {HOURS.map((h) => (
-                    <div
-                      key={h}
-                      className="absolute right-0 left-0 border-muted/60 border-t"
-                      style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT}px` }}
+                  {hourLines(HOURS, HOUR_START, HOUR_HEIGHT)}
+                  {canWrite && (
+                    <CalendarSlotLayer
+                      day={dayStr}
+                      hourStart={HOUR_START}
+                      hourEnd={HOUR_END}
+                      hourHeight={HOUR_HEIGHT}
                     />
-                  ))}
-                  {/* Half-hour lines */}
-                  {HOURS.slice(0, -1).map((h) => (
-                    <div
-                      key={`${h}-half`}
-                      className="absolute right-0 left-0 border-muted/30 border-t border-dashed"
-                      style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
-                    />
-                  ))}
+                  )}
                   {/* Current time indicator (today only) */}
-                  {isToday && <WeekCurrentTimeLine hourStart={HOUR_START} hourHeight={HOUR_HEIGHT} />}
-                  {/* Event blocks */}
-                  {dayLayout.map(({ event: ev, startMin, endMin, col, numCols }) => {
-                    const clampedStart = Math.max(startMin, HOUR_START * 60);
-                    const clampedEnd = Math.min(endMin, HOUR_END * 60);
-                    if (clampedEnd <= clampedStart) return null;
-
-                    const top = ((clampedStart - HOUR_START * 60) / 60) * HOUR_HEIGHT;
-                    const height = Math.max(((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT, 20);
-                    const leftPct = (col / numCols) * 100;
-                    const widthPct = 100 / numCols;
-                    const ts = getTypeStyle(ev.type);
-                    const Icon = ts.icon;
-                    const endAtRaw = (ev as any).endAt;
-
-                    return (
-                      <Link
-                        key={ev.id}
-                        href={ev.link}
-                        className="absolute px-0.5 py-0.5"
-                        style={{
-                          top: `${top}px`,
-                          height: `${height}px`,
-                          left: `${leftPct}%`,
-                          width: `${widthPct}%`,
-                        }}
-                      >
-                        <div
-                          className={`flex h-full flex-col overflow-hidden rounded-[3px] border-l-2 px-1 py-0.5 text-xs transition-opacity hover:opacity-80 ${ts.pill}`}
-                        >
-                          <div className="flex items-center gap-0.5 font-semibold leading-tight">
-                            <Icon className="h-2.5 w-2.5 shrink-0" />
-                            <span className="truncate text-[11px]">{ev.displayTitle}</span>
-                          </div>
-                          {height >= 36 && (
-                            <div className="truncate text-[10px] leading-tight opacity-70">
-                              {format(new Date(ev.date), "HH:mm")}
-                              {endAtRaw && ` – ${format(new Date(endAtRaw), "HH:mm")}`}
-                            </div>
-                          )}
-                          {height >= 52 && ev.entityName && ev.entityName !== "No Entity" && (
-                            <div className="truncate text-[10px] leading-tight opacity-60">{ev.entityName}</div>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  {isToday && (
+                    <WeekCurrentTimeLine
+                      hourStart={HOUR_START}
+                      hourEnd={HOUR_END}
+                      hourHeight={HOUR_HEIGHT}
+                      timeZone={timeZone}
+                    />
+                  )}
+                  {layoutByDay[dayIdx].map((s) =>
+                    renderBlock(s, {
+                      hourStart: HOUR_START,
+                      hourEnd: HOUR_END,
+                      hourHeight: HOUR_HEIGHT,
+                      minHeight: 20,
+                      variant: "week",
+                    }),
+                  )}
                 </div>
               );
             })}
@@ -625,62 +1078,18 @@ export default async function CalendarPage({
 
   // ── VIEW: Agenda (Day Timeline) ──────────────────────────────────────────────
   const renderAgenda = () => {
-    const HOUR_START = 7;
-    const HOUR_END = 22;
+    const dayStr = baseDateStr;
+    const allDayEvents = events.filter((e) => e.allDayEvent && spansDay(e, baseDate));
+    const layoutEvents = layOut(
+      events.filter((e) => !e.allDayEvent && spansDay(e, baseDate)).map((e) => segmentOn(e, baseDate)),
+    );
+
+    const span = hourWindow(layoutEvents);
+    const HOUR_START = span.start;
+    const HOUR_END = span.end;
     const HOUR_HEIGHT = 64; // px per hour
     const HOURS = Array.from({ length: HOUR_END - HOUR_START + 1 }, (_, i) => HOUR_START + i);
     const TOTAL_HEIGHT = (HOUR_END - HOUR_START) * HOUR_HEIGHT;
-
-    const dayEvents = events.filter((e) => e.date && isSameDay(new Date(e.date), baseDate));
-    const allDayEvents = dayEvents.filter((e) => e.type === "task" && (e as any).allDay !== false);
-    const timedEvents = dayEvents.filter((e) => e.type !== "task" || (e as any).allDay === false);
-
-    type LayoutEvent = {
-      event: CalendarEvent;
-      startMin: number;
-      endMin: number;
-      col: number;
-      numCols: number;
-    };
-
-    const layoutEvents: LayoutEvent[] = timedEvents
-      .map((ev) => {
-        const start = new Date(ev.date);
-        const startMin = start.getHours() * 60 + start.getMinutes();
-        const endAtRaw = (ev as any).endAt;
-        const endMin = endAtRaw
-          ? (() => {
-              const e = new Date(endAtRaw);
-              return e.getHours() * 60 + e.getMinutes();
-            })()
-          : startMin + 60;
-        return { event: ev, startMin, endMin: Math.max(endMin, startMin + 30), col: 0, numCols: 1 };
-      })
-      .sort((a, b) => a.startMin - b.startMin);
-
-    // Greedy column assignment
-    const colEnds: number[] = [];
-    for (const ev of layoutEvents) {
-      let placed = false;
-      for (let c = 0; c < colEnds.length; c++) {
-        if (colEnds[c] <= ev.startMin) {
-          ev.col = c;
-          colEnds[c] = ev.endMin;
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        ev.col = colEnds.length;
-        colEnds.push(ev.endMin);
-      }
-    }
-
-    // numCols = max concurrent columns in the same overlap cluster
-    for (const ev of layoutEvents) {
-      const overlapping = layoutEvents.filter((o) => o.startMin < ev.endMin && o.endMin > ev.startMin);
-      ev.numCols = Math.max(...overlapping.map((o) => o.col + 1));
-    }
 
     const prevAgendaUrl = calUrl("agenda", format(subDays(baseDate, 1), "yyyy-MM-dd"), currentFilter);
     const nextAgendaUrl = calUrl("agenda", format(addDays(baseDate, 1), "yyyy-MM-dd"), currentFilter);
@@ -688,23 +1097,33 @@ export default async function CalendarPage({
 
     return (
       <div className="space-y-2">
+        {renderWeekStrip({
+          selected: baseDate,
+          dayHref: dayUrl,
+          prevHref: dayUrl(subWeeks(baseDate, 1)),
+          nextHref: dayUrl(addWeeks(baseDate, 1)),
+        })}
+
         {/* Overdue section */}
         {overdueEvents.length > 0 && <CalendarOverdueSection tasks={overdueEvents} />}
 
         <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
-          {/* Day header with navigation */}
+          {/* Day header with navigation — from md up; on a phone the strip above
+              says which day it is and walks them. */}
           <div
-            className={`flex items-center justify-between border-b px-4 py-3 ${isAgendaToday ? "bg-primary/5" : "bg-muted/30"}`}
+            className={`hidden items-center justify-between border-b px-4 py-3 md:flex ${isAgendaToday ? "bg-primary/5" : "bg-muted/30"}`}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-center gap-3">
               <div className={`font-black text-3xl tabular-nums leading-none ${isAgendaToday ? "text-primary" : ""}`}>
                 {format(baseDate, "d")}
               </div>
-              <div>
-                <div className={`font-semibold text-base ${isAgendaToday ? "text-primary" : ""}`}>
-                  {isAgendaToday ? t("today") : format(baseDate, "EEEE")}
+              <div className="min-w-0">
+                <div className={`font-semibold text-base capitalize ${isAgendaToday ? "text-primary" : ""}`}>
+                  {isAgendaToday ? t("today") : format(baseDate, "EEEE", { locale: dfLocale })}
                 </div>
-                <div className="text-muted-foreground text-xs">{format(baseDate, "MMMM yyyy")}</div>
+                <div className="text-muted-foreground text-xs capitalize">
+                  {format(baseDate, "LLLL yyyy", { locale: dfLocale })}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -716,7 +1135,7 @@ export default async function CalendarPage({
                 <ChevronLeft className="h-4 w-4" />
               </Link>
               <Button variant="outline" size="sm" asChild>
-                <Link href={todayUrl}>{t("today")}</Link>
+                <Link href={calUrl("agenda", format(today, "yyyy-MM-dd"), currentFilter)}>{t("today")}</Link>
               </Button>
               <Link
                 href={nextAgendaUrl}
@@ -728,110 +1147,85 @@ export default async function CalendarPage({
             </div>
           </div>
 
-          {/* All-day tasks strip */}
-          {allDayEvents.length > 0 && (
-            <div className="flex items-start gap-3 border-b bg-blue-50 px-4 py-2 dark:bg-blue-950/30">
-              <div className="w-12 shrink-0 pt-0.5 text-right font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
+          {/* All-day strip */}
+          {(allDayEvents.length > 0 || canWrite) && (
+            <div
+              data-cal-day={dayStr}
+              className="group flex items-start gap-3 border-b bg-blue-50/60 px-4 py-2 dark:bg-blue-950/20"
+            >
+              <div className="w-12 shrink-0 pt-1 text-right font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
                 {t("allDay")}
               </div>
-              <div className="flex flex-1 flex-wrap gap-1.5">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-1.5">
                 {allDayEvents.map((ev) => (
-                  <CalendarTaskPill key={ev.id} event={ev} />
+                  <div key={ev.id} className="min-w-0 max-w-full">
+                    {renderPill(ev, baseDate, false)}
+                  </div>
                 ))}
               </div>
+              {canWrite && <NewOnDayButton day={dayStr} allDay />}
             </div>
           )}
 
           {/* Time grid */}
+          {/* ⚠️ On a phone the page scrolls and the grid does not: a scroll area
+              inside a scrolling page is two things a thumb has to tell apart.
+              From md up the grid keeps its own, with the header in view. */}
           <div
-            className="relative flex overflow-y-auto"
-            style={{ maxHeight: "calc(100dvh - 290px)", minHeight: "400px" }}
+            data-cal-scroll=""
+            className="relative flex md:max-h-[calc(100dvh-290px)] md:min-h-[400px] md:overflow-y-auto"
           >
+            <GridAutoScroll
+              offsetPx={(openingHour(layoutEvents, isAgendaToday) - HOUR_START) * HOUR_HEIGHT - HOUR_HEIGHT / 2}
+              pageFallback
+              // The sticky week strip, which the hour must land under.
+              stickyOffset={112}
+            />
             {/* Time labels */}
             <div className="relative w-14 shrink-0 select-none border-r" style={{ height: `${TOTAL_HEIGHT}px` }}>
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  className="absolute right-0 flex items-start justify-end pr-2"
-                  style={{ top: `${Math.max(2, (h - HOUR_START) * HOUR_HEIGHT - 8)}px` }}
-                >
-                  <span className="font-medium text-[10px] text-muted-foreground/70 tabular-nums">
-                    {`${h.toString().padStart(2, "0")}:00`}
-                  </span>
-                </div>
-              ))}
+              {hourLabels(HOURS, HOUR_START, HOUR_HEIGHT)}
             </div>
 
             {/* Events area */}
-            <div className="relative flex-1" style={{ height: `${TOTAL_HEIGHT}px` }}>
-              {/* Hour lines */}
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  className="absolute right-0 left-0 border-muted/60 border-t"
-                  style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT}px` }}
-                />
-              ))}
-              {/* Half-hour lines */}
-              {HOURS.slice(0, -1).map((h) => (
-                <div
-                  key={`${h}-half`}
-                  className="absolute right-0 left-0 border-muted/30 border-t border-dashed"
-                  style={{ top: `${(h - HOUR_START) * HOUR_HEIGHT + HOUR_HEIGHT / 2}px` }}
-                />
-              ))}
+            <div data-cal-day={dayStr} className="relative flex-1" style={{ height: `${TOTAL_HEIGHT}px` }}>
+              {hourLines(HOURS, HOUR_START, HOUR_HEIGHT)}
 
-              {/* Empty state */}
+              {canWrite && (
+                <CalendarSlotLayer day={dayStr} hourStart={HOUR_START} hourEnd={HOUR_END} hourHeight={HOUR_HEIGHT} />
+              )}
+
+              {isAgendaToday && (
+                <WeekCurrentTimeLine
+                  hourStart={HOUR_START}
+                  hourEnd={HOUR_END}
+                  hourHeight={HOUR_HEIGHT}
+                  timeZone={timeZone}
+                />
+              )}
+
+              {/* Empty state. The slots behind it stay clickable; only its
+                  own button takes a click. */}
               {layoutEvents.length === 0 && allDayEvents.length === 0 && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                   <CalendarDays className="h-10 w-10 opacity-20" />
                   <p className="text-sm">{t("noEventsThisDay")}</p>
-                  <AppointmentDialog defaultDate={`${format(baseDate, "yyyy-MM-dd")}T09:00`} />
+                  {canWrite && (
+                    <div className="pointer-events-auto">
+                      <AppointmentDialog timeZone={timeZone} defaultDate={`${dayStr}T09:00`} />
+                    </div>
+                  )}
                 </div>
               )}
 
-              {/* Event blocks */}
-              {layoutEvents.map(({ event: ev, startMin, endMin, col, numCols }) => {
-                const clampedStart = Math.max(startMin, HOUR_START * 60);
-                const clampedEnd = Math.min(endMin, HOUR_END * 60);
-                if (clampedEnd <= clampedStart) return null;
-
-                const top = ((clampedStart - HOUR_START * 60) / 60) * HOUR_HEIGHT;
-                const height = Math.max(((clampedEnd - clampedStart) / 60) * HOUR_HEIGHT, 28);
-                const leftPct = (col / numCols) * 100;
-                const widthPct = 100 / numCols;
-
-                const ts = getTypeStyle(ev.type);
-                const Icon = ts.icon;
-                const endAtRaw = (ev as any).endAt;
-
-                return (
-                  <Link
-                    key={ev.id}
-                    href={ev.link}
-                    className="absolute px-1 py-0.5"
-                    style={{ top: `${top}px`, height: `${height}px`, left: `${leftPct}%`, width: `${widthPct}%` }}
-                  >
-                    <div
-                      className={`flex h-full flex-col overflow-hidden rounded-[3px] border-l-[3px] px-2 py-1 transition-opacity hover:opacity-80 ${ts.pill}`}
-                    >
-                      <div className="flex items-center gap-1 font-semibold text-xs leading-tight">
-                        <Icon className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{ev.displayTitle}</span>
-                      </div>
-                      {height >= 44 && (
-                        <div className="mt-0.5 truncate text-[10px] leading-tight opacity-75">
-                          {format(new Date(ev.date), "HH:mm")}
-                          {endAtRaw && ` – ${format(new Date(endAtRaw), "HH:mm")}`}
-                        </div>
-                      )}
-                      {height >= 60 && ev.entityName && ev.entityName !== "No Entity" && (
-                        <div className="mt-0.5 truncate text-[10px] leading-tight opacity-65">{ev.entityName}</div>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
+              {layoutEvents.map((s) =>
+                renderBlock(s, {
+                  hourStart: HOUR_START,
+                  hourEnd: HOUR_END,
+                  hourHeight: HOUR_HEIGHT,
+                  minHeight: 28,
+                  variant: "agenda",
+                }),
+              )}
             </div>
           </div>
         </div>
@@ -839,61 +1233,153 @@ export default async function CalendarPage({
     );
   };
 
+  // ── VIEW: List (the days ahead, read top to bottom) ──────────────────────────
+  const renderList = () => {
+    const days = eachDayOfInterval({ start: startOfDay(baseDate), end: addDays(startOfDay(baseDate), LIST_DAYS - 1) });
+    const groups = days
+      .map((day) => ({
+        day,
+        items: events
+          .filter((e) => spansDay(e, day))
+          .sort((a, b) => Number(b.allDayEvent) - Number(a.allDayEvent) || a.at.getTime() - b.at.getTime()),
+      }))
+      .filter((g) => g.items.length > 0);
+
+    if (groups.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border bg-card py-16 text-muted-foreground shadow-sm">
+          <CalendarDays className="h-10 w-10 opacity-20" />
+          <p className="text-sm">{t("listEmpty", { days: LIST_DAYS })}</p>
+          {canWrite && <AppointmentDialog timeZone={timeZone} defaultDate={`${baseDateStr}T09:00`} />}
+        </div>
+      );
+    }
+
+    return (
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        {groups.map(({ day, items }) => {
+          const isToday = isSameDay(day, today);
+          return (
+            <section key={day.toISOString()} className="border-b last:border-b-0">
+              <Link
+                href={calUrl("agenda", format(day, "yyyy-MM-dd"), currentFilter)}
+                className={cn(
+                  "flex items-baseline gap-2 bg-muted/40 px-4 py-2 hover:bg-muted/60",
+                  isToday && "bg-primary/5",
+                )}
+              >
+                <span className={cn("font-bold text-lg tabular-nums", isToday && "text-primary")}>
+                  {format(day, "d")}
+                </span>
+                <span className="font-medium text-sm capitalize">{format(day, "EEEE", { locale: dfLocale })}</span>
+                <span className="text-muted-foreground text-xs capitalize">
+                  {format(day, "LLLL yyyy", { locale: dfLocale })}
+                </span>
+                {isToday && <span className="ml-auto font-medium text-primary text-xs">{t("today")}</span>}
+              </Link>
+              <ul className="divide-y">{items.map((ev) => renderRow(ev, day))}</ul>
+            </section>
+          );
+        })}
+      </div>
+    );
+  };
+
   // ── Render ───────────────────────────────────────────────────────────────────
+  const VIEW_ICONS = { month: LayoutGrid, week: Columns3, agenda: List, list: Rows3 };
+  const VIEW_LABELS = { month: t("month"), week: t("week"), agenda: t("agenda"), list: t("list") };
+
   return (
     <div className="space-y-4">
       {/* ── Header ── */}
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        {/* Left: title + stats + legend inline */}
-        <div>
-          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
-          <div className="mt-1.5 flex flex-wrap items-center gap-3 text-muted-foreground text-sm">
-            <span className="flex items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5" />
-              <span className="font-semibold text-foreground">{todayEvents.length}</span> {t("today")}
-            </span>
-            <span className="text-muted-foreground/40">·</span>
-            <span className="flex items-center gap-1.5">
-              <Columns3 className="h-3.5 w-3.5" />
-              <span className="font-semibold text-foreground">{weekEvents.length}</span> {t("thisWeek")}
-            </span>
-            {overdueEvents.length > 0 && (
-              <>
-                <span className="text-muted-foreground/40">·</span>
-                <OverdueTasksPopover tasks={overdueEvents} />
-              </>
+      {/* ⚠️ Two rows, deliberately. On a phone the controls used to wrap into
+          three or four rows above a grid they are supposed to serve; now the
+          title shares its row with the two actions, and the controls sit on one
+          scrollable row of their own. */}
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            {/* On a phone the top bar already says "Calendar": kept for screen
+                readers, not drawn twice. */}
+            <h1 className="font-bold text-2xl tracking-tight max-md:sr-only">{t("title")}</h1>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground text-sm md:mt-1">
+              <span className="flex items-center gap-1.5">
+                <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+                <span className="font-semibold text-foreground">{todayEvents.length}</span> {t("today")}
+              </span>
+              <span className="text-muted-foreground/40" aria-hidden>
+                ·
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Columns3 className="h-3.5 w-3.5" aria-hidden />
+                <span className="font-semibold text-foreground">{weekEvents.length}</span> {t("thisWeek")}
+              </span>
+              {overdueEvents.length > 0 && (
+                <>
+                  <span className="text-muted-foreground/40" aria-hidden>
+                    ·
+                  </span>
+                  <OverdueTasksPopover tasks={overdueEvents} />
+                </>
+              )}
+              {/* ⚠️ The colour key is reference, not a control, and on a phone it
+                  took a whole row above a grid it explains. The dots are on the
+                  events themselves; from lg up the key comes back. */}
+              <span className="hidden text-muted-foreground/40 lg:inline" aria-hidden>
+                ·
+              </span>
+              {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
+                const label =
+                  {
+                    external: tFeed("externalBusy"),
+                    task: t("typeTask"),
+                    meeting: t("typeMeeting"),
+                    call: t("typeCall"),
+                    appointment: t("typeAppointment"),
+                  }[key] ?? key;
+                if (key === "external" && externalEvents.length === 0) return null;
+                return (
+                  <span key={key} className="hidden items-center gap-1.5 lg:flex">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} aria-hidden />
+                    {label}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="md:hidden">
+              <CalendarFilterMenu
+                label={t("filterLabel")}
+                options={(["all", "mine", "group"] as CalendarFilter[]).map((f) => ({
+                  value: f,
+                  label: { all: t("filterAll"), mine: t("filterMine"), group: t("filterGroup") }[f],
+                  href: calUrl(currentView, baseDateStr, f),
+                  active: currentFilter === f,
+                }))}
+              />
+            </div>
+            <SubscribeDialog />
+            {canWrite && (
+              <AppointmentDialog
+                timeZone={timeZone}
+                defaultDate={dateParam ? `${baseDateStr}T09:00` : undefined}
+                openOnNew
+                // The bottom bar's Create offers a new appointment first on this page.
+                triggerClassName="max-md:hidden"
+              />
             )}
-            {/* ⚠️ The colour key is reference, not a control, and on a phone it
-                took a whole row above a grid it explains. The dots are on the
-                events themselves; from sm up the key comes back. */}
-            <span className="hidden text-muted-foreground/40 sm:inline">·</span>
-            {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
-              const label =
-                {
-                  task: t("typeTask"),
-                  meeting: t("typeMeeting"),
-                  call: t("typeCall"),
-                  appointment: t("typeAppointment"),
-                }[key] ?? key;
-              return (
-                <span key={key} className="hidden items-center gap-1.5 sm:flex">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />
-                  {label}
-                </span>
-              );
-            })}
           </div>
         </div>
 
-        {/* Right: controls. Six segments and two dialogs; on a phone they wrap
-            into two rows instead of four. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
-          {/* View toggle */}
-          <div className="flex shrink-0 rounded-lg border bg-muted/40 p-0.5">
-            {(["month", "week", "agenda"] as const).map((v) => {
-              const ICONS = { month: LayoutGrid, week: Columns3, agenda: List };
-              const LABELS = { month: t("month"), week: t("week"), agenda: t("agenda") };
-              const Icon = ICONS[v];
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View toggle: the full width on a phone, four equal segments. */}
+          <nav
+            aria-label={t("viewLabel")}
+            className="grid w-full grid-cols-4 rounded-lg border bg-muted/40 p-0.5 sm:flex sm:w-auto"
+          >
+            {VIEWS.map((v) => {
+              const Icon = VIEW_ICONS[v];
               const isActive = currentView === v;
               // When the week is a default, the switch has to say what is on
               // screen: agenda below md, week above it.
@@ -911,18 +1397,19 @@ export default async function CalendarPage({
               return (
                 <Link
                   key={v}
-                  href={calUrl(v, format(baseDate, "yyyy-MM-dd"), currentFilter)}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium text-xs transition-all sm:px-3 ${state}`}
+                  href={calUrl(v, baseDateStr, currentFilter)}
+                  aria-current={isActive && !weekIsADefault ? "page" : undefined}
+                  className={`flex min-h-9 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-medium text-xs transition-all sm:px-3 ${state}`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
-                  {LABELS[v]}
+                  <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{VIEW_LABELS[v]}</span>
                 </Link>
               );
             })}
-          </div>
+          </nav>
 
           {/* Filter toggle */}
-          <div className="flex shrink-0 rounded-lg border bg-muted/40 p-0.5">
+          <nav aria-label={t("filterLabel")} className="hidden shrink-0 rounded-lg border bg-muted/40 p-0.5 md:flex">
             {(["all", "mine", "group"] as CalendarFilter[]).map((f) => {
               const LABELS: Record<CalendarFilter, string> = {
                 all: t("filterAll"),
@@ -933,8 +1420,9 @@ export default async function CalendarPage({
               return (
                 <Link
                   key={f}
-                  href={calUrl(currentView, format(baseDate, "yyyy-MM-dd"), f)}
-                  className={`rounded-md px-3 py-1.5 font-medium text-xs transition-all ${
+                  href={calUrl(currentView, baseDateStr, f)}
+                  aria-current={isActive ? "true" : undefined}
+                  className={`flex min-h-9 items-center rounded-md px-3 py-1.5 font-medium text-xs transition-all ${
                     isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -942,7 +1430,7 @@ export default async function CalendarPage({
                 </Link>
               );
             })}
-          </div>
+          </nav>
 
           {/* Navigation */}
           {/* The agenda walks its own days, so the week's range walker would be a
@@ -951,61 +1439,64 @@ export default async function CalendarPage({
           {currentView !== "agenda" && (
             <div
               className={cn(
-                "flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5",
-                weekIsADefault && "hidden md:flex",
+                "flex items-center gap-2 sm:ml-auto",
+                (weekIsADefault || currentView === "week") && "hidden md:flex",
               )}
             >
-              <Link
-                href={prevUrl}
-                aria-label={t("previousPeriod")}
-                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Link>
-              <span className="px-2 text-center font-semibold text-sm sm:min-w-[148px]">{periodTitle}</span>
-              <Link
-                href={nextUrl}
-                aria-label={t("nextPeriod")}
-                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Link>
+              <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
+                <Link
+                  href={prevUrl}
+                  aria-label={t("previousPeriod")}
+                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Link>
+                <span
+                  aria-live="polite"
+                  className="px-1 text-center font-semibold text-sm capitalize sm:min-w-[148px] sm:px-2"
+                >
+                  {periodTitle}
+                </span>
+                <Link
+                  href={nextUrl}
+                  aria-label={t("nextPeriod")}
+                  className="flex size-9 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Link>
+              </div>
+              <Button variant="outline" size="sm" asChild className="h-9 sm:h-8">
+                <Link href={todayUrl}>{t("today")}</Link>
+              </Button>
             </div>
           )}
-
-          {/* Today */}
-          {currentView !== "agenda" && (
-            <Button variant="outline" size="sm" asChild className={cn(weekIsADefault && "hidden md:inline-flex")}>
-              <Link href={todayUrl}>{t("today")}</Link>
-            </Button>
-          )}
-
-          <SubscribeDialog />
-
-          <AppointmentDialog defaultDate={dateParam ? `${dateParam}T09:00` : undefined} openOnNew />
         </div>
+        {canWrite && <p className="hidden text-muted-foreground/80 text-xs md:block">{t("dragHint")}</p>}
       </div>
 
       {/* ── Calendar view ── */}
       <div>
-        {currentView === "month" && renderMonth()}
-        {currentView === "week" &&
-          (weekIsADefault ? (
-            <>
-              <div className="md:hidden">{renderAgenda()}</div>
-              <div className="hidden md:block">{renderWeek()}</div>
-            </>
-          ) : (
-            renderWeek()
-          ))}
-        {currentView === "agenda" && renderAgenda()}
+        <SwipeNav prevHref={swipePrev} nextHref={swipeNext}>
+          {currentView === "month" && renderMonth()}
+          {currentView === "week" &&
+            (weekIsADefault ? (
+              <>
+                <div className="md:hidden">{renderAgenda()}</div>
+                <div className="hidden md:block">{renderWeek()}</div>
+              </>
+            ) : (
+              <>
+                {renderWeekPhone()}
+                <div className="hidden md:block">{renderWeek()}</div>
+              </>
+            ))}
+          {currentView === "agenda" && renderAgenda()}
+          {currentView === "list" && renderList()}
+        </SwipeNav>
       </div>
 
       {/* ── Appointment detail sheet ── */}
-      <AppointmentDetailSheet
-        appointmentId={appointmentId ?? null}
-        closePath={calUrl(viewParam ?? "week", dateParam ?? format(today, "yyyy-MM-dd"), currentFilter)}
-      />
+      <AppointmentDetailSheet canWrite={canWrite} canDelete={canDelete} timeZone={timeZone} />
     </div>
   );
 }

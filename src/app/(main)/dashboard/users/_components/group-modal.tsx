@@ -204,7 +204,11 @@ export function GroupModal({ group, children, onSaved }: Props) {
                     key={c}
                     type="button"
                     onClick={() => setValue("color", c, { shouldDirty: true })}
-                    className={`h-6 w-6 rounded-full transition-all ${
+                    // ⚠️ `data-no-touch-target`: the global 44px minimum height for
+                    // buttons on a touchscreen turned these 24px circles into 24×44
+                    // ovals. They are sized for a thumb below sm instead.
+                    data-no-touch-target
+                    className={`size-8 rounded-full transition-all sm:size-6 ${
                       watchedColor === c
                         ? "scale-110 ring-2 ring-primary ring-offset-2"
                         : "opacity-80 hover:opacity-100"
@@ -215,7 +219,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
                 <Input
                   {...register("color")}
                   type="color"
-                  className="h-6 w-10 cursor-pointer rounded-full border p-0.5"
+                  className="h-8 w-12 cursor-pointer rounded-full border p-0.5 sm:h-6 sm:w-10"
                 />
               </div>
             </div>
@@ -279,13 +283,15 @@ export function GroupModal({ group, children, onSaved }: Props) {
             </div>
           </div>
 
-          <DialogFooter className="flex-row items-center border-t bg-muted/30 px-4 md:px-6 py-4">
+          {/* Stacked below sm like every other dialog footer: three buttons in one
+              row needed about 360px, which is the whole of a small phone. */}
+          <DialogFooter className="border-t bg-muted/30 px-4 py-4 sm:items-center md:px-6">
             {isEditing && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive/90"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive/90 sm:mr-auto"
                 onClick={handleDelete}
               >
                 {t("deleteGroup")}

@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️⚠️ l'import CSV torna a non chiedere record:import: un viewer importa cinquemila righe",
+    "find": "    actor = await requireCapability(\"record:import\");",
+    "replace": "    actor = await requireCapability(\"record:read\");"
+  },
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️⚠️ il limite di piano torna a non essere chiesto: un file sfora il piano senza che nessuno lo fermi",
+    "find": "      await requirePlanLimit(\"maxRecords\", (await countRecords(db)) + plan.newRecords - 1);",
+    "replace": "      await requirePlanLimit(\"maxRecords\", 0);"
+  },
+  {
+    "file": "src/lib/csv-import-route.ts",
+    "description": "⚠️ il limite conta solo quanto c'è già, non le righe del file: un file enorme passa se il workspace è quasi vuoto",
+    "find": "      await requirePlanLimit(\"maxRecords\", (await countRecords(db)) + plan.newRecords - 1);",
+    "replace": "      await requirePlanLimit(\"maxRecords\", await countRecords(db));"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️⚠️ due righe con la stessa email nello stesso file tornano a creare due contatti",
+    "find": "      if (row.key) pending.set(row.key, row);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️ le aziende tornano a confrontarsi col nome esatto: ALFA SRL accanto ad Alfa Srl",
+    "find": "    valid.push({ input, data, key: typeof keyValue === \"string\" ? keyValue.toLowerCase() : null, company });",
+    "replace": "    valid.push({ input, data, key: typeof keyValue === \"string\" ? keyValue : null, company });"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "⚠️⚠️ la scrittura torna una riga alla volta: cinquemila istruzioni contro un budget di mille",
+    "find": "      for (const slice of chunk(toInsert, INSERT_CHUNK)) await db.insert(table).values(slice as never);",
+    "replace": "      for (const row of toInsert) await db.insert(table).values(row as never);"
+  },
+  {
+    "file": "src/lib/csv-import.ts",
+    "description": "le intestazioni in italiano tornano a non essere riconosciute",
+    "find": "    const field = map.get(normaliseHeader(header));",
+    "replace": "    const field = map.get(header);"
+  }
+]

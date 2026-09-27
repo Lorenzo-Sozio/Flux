@@ -35,7 +35,7 @@ export function TemplateDeleteButton({ templateId }: TemplateDeleteButtonProps) 
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 text-destructive hover:bg-destructive/10"
+      className="size-9 text-destructive hover:bg-destructive/10 md:size-8"
       onClick={handleDelete}
       disabled={loading}
     >

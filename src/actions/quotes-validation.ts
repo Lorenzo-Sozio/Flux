@@ -31,4 +31,6 @@ export const UpdateQuoteSchema = z.object({
   companyId: z.string().optional(),
   contactId: z.string().optional(),
   expiresAt: z.string().optional(),
+  /** Why the customer said no, when it was heard on the phone rather than typed on their page. */
+  declineReason: z.string().max(1000).optional(),
 });

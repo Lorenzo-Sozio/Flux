@@ -27,17 +27,26 @@ vi.mock("@/components/crm/automation/rule-engine", () => ({
     regole.push(ctx);
   },
 }));
-vi.mock("@/actions/webhooks", () => ({
+vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: async (evento: string) => {
     eventi.push(evento);
   },
 }));
+/** What `after()` was handed, so a test waits for it to finish rather than for a tick. */
+const dopo: unknown[] = [];
 vi.mock("next/server", async () => {
   const vero = await vi.importActual<typeof import("next/server")>("next/server");
-  return { ...vero, after: (fn: () => unknown) => fn() };
+  return {
+    ...vero,
+    after: (fn: () => unknown) => {
+      dopo.push(fn());
+    },
+  };
 });
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: { via: "apikey", userId: null, role: "editor", tenantId: "t1", scopes: null },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -49,6 +58,16 @@ vi.mock("@/lib/contact-point", async () => {
   };
 });
 vi.mock("@/lib/order-number", () => ({ nextOrderNumber: async () => "ORD-2026-0007" }));
+// Who the bell rings for is asked of the workspace's membership, by capability — see
+// workspace-members.test.ts for the filtering itself. Recorded, so the question asked is
+// checked as well as the answer used.
+const chiesti: { tenantId: string; capability: string }[] = [];
+vi.mock("@/lib/workspace-members", () => ({
+  membersWith: async (tenantId: string, capability: string) => {
+    chiesti.push({ tenantId, capability });
+    return amministratori.map((a) => a.id);
+  },
+}));
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
     // ⚠️ The double **declares** its reads too, and without this line the notification was
@@ -108,7 +127,9 @@ const ORDINE = {
   when: "alle 20:30",
 };
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Whatever the previous test left running after its response lands now, not in this one.
+  await Promise.all(dopo.splice(0));
   inseriti.length = 0;
   regole.length = 0;
   eventi.length = 0;
@@ -279,7 +300,7 @@ describe("la campanella dell'ordine", () => {
     amministratori = [{ id: "u1" }, { id: "u2" }];
 
     await POST(richiesta(ORDINE));
-    await new Promise((r) => setTimeout(r, 0));
+    await Promise.all(dopo.splice(0));
 
     // ⚠️ One call with **a list of rows**: the shape the double records, and also the shape
     // the CRM uses elsewhere to notify several people at once.
@@ -291,6 +312,9 @@ describe("la campanella dell'ordine", () => {
     expect(String(avvisi[0].type)).toBe("order_created");
     // The link goes to the order, not to the list: whoever receives it must be able to open it.
     expect(String(avvisi[0].link)).toContain("/dashboard/sales/orders/");
+    // ⚠️⚠️ Asked of this workspace's members in the registry, not of `users.role` — a copy
+    // in the workspace's own `user` table, refreshed on a visit and never pruned.
+    expect(chiesti.at(-1)).toEqual({ tenantId: "t1", capability: "settings:manage" });
   });
 
   it("⚠️ senza nessun destinatario non scrive righe vuote", async () => {
@@ -298,7 +322,7 @@ describe("la campanella dell'ordine", () => {
     amministratori = [];
 
     const risposta = await POST(richiesta(ORDINE));
-    await new Promise((r) => setTimeout(r, 0));
+    await Promise.all(dopo.splice(0));
 
     // The order stays written: the notification is an extra, and cannot bring it down.
     expect(risposta.status).toBe(201);

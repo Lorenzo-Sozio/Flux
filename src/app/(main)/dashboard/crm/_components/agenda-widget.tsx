@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 
@@ -16,9 +16,8 @@ import {
   Users,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { toast } from "sonner";
 
-import { updateTaskStatus } from "@/actions/tasks";
+import { TaskOutcomeDialog } from "@/components/crm/task-outcome-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -27,6 +26,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export type AgendaItem = {
   id: string;
   kind: "task" | "meeting" | "call" | "appointment";
+  /** A task's own kind (call, email, meeting, todo) — what "done" asks about. */
+  taskType?: string;
   title: string;
   timeISO: string | null;
   endTimeISO: string | null;
@@ -117,7 +118,8 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
       <button
         type="button"
         onClick={() => !isDone && onDone(item.id)}
-        className="shrink-0 text-muted-foreground transition-colors hover:text-emerald-500"
+        // The padding is the finger's target, the negative margin keeps the row where it was.
+        className="-m-2.5 shrink-0 p-2.5 text-muted-foreground transition-colors hover:text-emerald-500"
         title={tTasks("markComplete")}
       >
         {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Square className="h-4 w-4" />}
@@ -157,8 +159,9 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
       {item.taskHref && (
         <Link
           href={item.taskHref}
-          className="mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+          className="-m-2 mt-0.5 shrink-0 p-2 opacity-0 transition-opacity group-hover:opacity-100"
           title={t("openDetail")}
+          aria-label={t("openDetail")}
         >
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
         </Link>
@@ -212,6 +215,63 @@ function layoutTimedItems(items: AgendaItem[]): LayoutEvent[] {
   return mapped;
 }
 
+// ─── Phone list ───────────────────────────────────────────────────────────────
+
+/**
+ * The timed part of the agenda as a chronological list, below `sm`.
+ *
+ * Same items, same links, same order as the grid; what is lost is only the
+ * picture of free time between them, which a phone has no room to draw.
+ */
+function PhoneAgenda({ events, empty, nowMin }: { events: LayoutEvent[]; empty: boolean; nowMin: number }) {
+  const t = useTranslations("crm.agendaWidget");
+  const locale = useLocale();
+
+  if (empty) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border px-3 py-4 text-muted-foreground text-xs sm:hidden">
+        <CalendarDays className="h-4 w-4 opacity-40" />
+        {t("noTimedItems")}
+      </div>
+    );
+  }
+
+  return (
+    <ul className="space-y-1.5 sm:hidden">
+      {events.map((ev) => {
+        const style = KIND_STYLE[ev.kind];
+        const Icon = style.icon;
+        const past = ev.endMin <= nowMin;
+        return (
+          <li key={ev.id}>
+            <Link
+              href={ev.taskHref ?? ev.entityHref ?? "#"}
+              className={`flex min-h-11 items-stretch gap-3 rounded-lg border-l-[3px] px-3 py-2 transition-opacity hover:opacity-80 ${style.pill} ${style.border} ${past ? "opacity-60" : ""}`}
+            >
+              <span className="min-w-11 shrink-0 whitespace-nowrap pt-px font-semibold text-xs tabular-nums">
+                {ev.timeISO ? fmtTime(ev.timeISO, locale) : ""}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1 font-semibold text-sm leading-tight">
+                  <Icon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="truncate">{ev.title}</span>
+                </span>
+                {(ev.endTimeISO || ev.entityName) && (
+                  <span className="mt-0.5 block truncate text-xs opacity-75">
+                    {ev.endTimeISO && `– ${fmtTime(ev.endTimeISO, locale)}`}
+                    {ev.endTimeISO && ev.entityName && " · "}
+                    {ev.entityName}
+                  </span>
+                )}
+              </span>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 // ─── Widget ───────────────────────────────────────────────────────────────────
 
 export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLabel: string }) {
@@ -219,7 +279,6 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
   const tCal = useTranslations("calendar");
   const locale = useLocale();
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
-  const [, startTransition] = useTransition();
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -238,20 +297,11 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
     scrollRef.current.scrollTop = Math.max(0, scrollTop);
   }, []);
 
+  // Completing asks "how did it go?" — the outcome, a note and the next step in one panel.
+  const [asking, setAsking] = useState<AgendaItem | null>(null);
   const handleDone = (id: string) => {
-    setDoneIds((prev) => new Set([...prev, id]));
-    startTransition(async () => {
-      try {
-        await updateTaskStatus(id, "done", "/dashboard/crm");
-      } catch {
-        setDoneIds((prev) => {
-          const s = new Set(prev);
-          s.delete(id);
-          return s;
-        });
-        toast.error(t("updateError"));
-      }
-    });
+    const item = items.find((i) => i.id === id);
+    if (item) setAsking(item);
   };
 
   const taskItems = items.filter((i) => i.kind === "task" && i.allDay);
@@ -270,21 +320,21 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
     <Card className="flex flex-col shadow-sm">
       <CardHeader className="shrink-0 pb-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <CalendarDays className="h-5 w-5 text-primary" />
-            <div>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <CalendarDays className="h-5 w-5 shrink-0 text-primary" />
+            <div className="min-w-0">
               <CardTitle className="text-base leading-none">{t("title")}</CardTitle>
               <p className="mt-1 text-muted-foreground text-xs capitalize">{dateLabel}</p>
             </div>
             {totalCount > 0 && (
-              <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs">
+              <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs">
                 {totalCount}
               </span>
             )}
           </div>
-          <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
-            <Link href="/dashboard/calendar">
-              <CalendarDays className="h-3.5 w-3.5" /> {tCal("title")}
+          <Button variant="outline" size="sm" className="h-8 shrink-0 gap-1.5 max-sm:size-9 max-sm:p-0" asChild>
+            <Link href="/dashboard/calendar" aria-label={tCal("title")}>
+              <CalendarDays className="h-3.5 w-3.5" /> <span className="max-sm:sr-only">{tCal("title")}</span>
             </Link>
           </Button>
         </div>
@@ -331,9 +381,17 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
                 </div>
               )}
 
+              <PhoneAgenda events={layoutEvents} empty={timedItems.length === 0} nowMin={nowMin} />
+
+              {/*
+                The time grid from `sm` up. On a phone the events column is ~250px
+                wide, two overlapping meetings get 125px each and their titles are
+                cut to a word; and the grid is 900px of mostly empty hours inside
+                a page that already scrolls. The list above says the same thing.
+              */}
               <div
                 ref={scrollRef}
-                className="relative flex overflow-y-auto rounded-lg border"
+                className="relative hidden overflow-y-auto rounded-lg border sm:flex"
                 style={{ maxHeight: "560px" }}
               >
                 {/* Time labels */}
@@ -444,6 +502,17 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
           </div>
         )}
       </CardContent>
+      {asking && (
+        <TaskOutcomeDialog
+          task={{ id: asking.id, title: asking.title, type: asking.taskType }}
+          open
+          onOpenChange={(v) => {
+            if (!v) setAsking(null);
+          }}
+          revalidate="/dashboard/crm"
+          onCompleted={() => setDoneIds((prev) => new Set([...prev, asking.id]))}
+        />
+      )}
     </Card>
   );
 }

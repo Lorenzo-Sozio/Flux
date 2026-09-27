@@ -24,6 +24,21 @@ describe("the email worker", () => {
   it("⚠️ records the provider's message id, which is how a bounce finds its workspace", () => {
     expect(src).toContain("messageId: result.messageId ?? null");
   });
+
+  it("⚠️⚠️ sends a sequence email under the Message-ID the thread recorded, and a reply answering it", () => {
+    // Dropped, every reply still says "Re:" and answers an id no email ever carried.
+    expect(src).toContain("...(job.messageHeaderId ? { messageId: job.messageHeaderId } : {})");
+    expect(src).toContain("...(job.inReplyTo ? { inReplyTo: job.inReplyTo, references: job.inReplyTo } : {})");
+  });
+});
+
+describe("both email providers", () => {
+  const src = read("src/lib/email-provider.ts");
+
+  it("⚠️⚠️ put the Message-ID they were given on the email", () => {
+    expect(src).toContain('if (options.messageId) threadHeaders["Message-ID"] = options.messageId;');
+    expect(src).toContain("...(options.messageId ? { messageId: options.messageId } : {})");
+  });
 });
 
 describe("an email arriving", () => {

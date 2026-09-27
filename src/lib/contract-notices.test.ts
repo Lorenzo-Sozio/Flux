@@ -8,6 +8,8 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { composeNotification, type NotificationKey } from "@/lib/notification-text";
+
 type Cond =
   | { op: "eq"; col: string; val: unknown }
   | { op: "ne"; col: string; val: unknown }
@@ -30,7 +32,10 @@ vi.mock("@/db/schema", () => {
 
 type Row = Record<string, unknown>;
 let rows: Row[] = [];
-const notified: { userId: string; type: string; message: string }[] = [];
+type Sent = { userId: string; type: string; key: NotificationKey; params: Record<string, string | number> };
+const notified: Sent[] = [];
+/** The notice as its reader sees it: composed from the key and values it was written with. */
+const textOf = async (n: Sent) => (await composeNotification(n.key, n.params)).message;
 let failNotify = false;
 let beforeClaim: (() => void) | null = null;
 let writes = 0;
@@ -78,7 +83,7 @@ const db = {
 };
 
 vi.mock("@/lib/notify", () => ({
-  notify: async (n: { userId: string; type: string; message: string }) => {
+  notify: async (n: Sent) => {
     if (failNotify) throw new Error("notification store unavailable");
     notified.push(n);
   },
@@ -117,7 +122,7 @@ describe("the renewal notice", () => {
     const r = await sendContractNotices(db, "2026-10-02");
     expect(r).toEqual({ due: 1, notified: 1, unowned: 0 });
     expect(notified[0]).toMatchObject({ userId: "anna", type: "contract_renewal" });
-    expect(notified[0].message).toContain("2026-11-01");
+    expect(await textOf(notified[0])).toContain("2026-11-01");
   });
 
   it("⚠️⚠️ goes out once a term, however many mornings the job runs", async () => {
@@ -144,7 +149,7 @@ describe("the renewal notice", () => {
     await sendContractNotices(db, "2026-10-02");
     await sendContractNotices(db, "2027-10-02");
     expect(notified).toHaveLength(2);
-    expect(notified[0].message).toContain("renews itself on 2027-01-01");
+    expect(await textOf(notified[0])).toContain("renews itself on 2027-01-01");
   });
 
   it("⚠️⚠️ is sent once when two runs race for the same contract", async () => {

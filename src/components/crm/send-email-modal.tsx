@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { emailLogTarget } from "@/lib/email-log-target";
 import { renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { cn } from "@/lib/utils";
@@ -27,9 +28,12 @@ type Mode = "preview" | "html";
 
 export function SendEmailModal({
   entity,
+  entityType,
   templates = [],
   ownerId,
 }: {
+  /** Which record the sent email is logged on. Pass it: see src/lib/email-log-target.ts. */
+  entityType?: "lead" | "contact";
   // Whatever record the mail is about: a contact, a lead or a company. Only the
   // fields the placeholders read are needed.
   entity: {
@@ -39,6 +43,7 @@ export function SendEmailModal({
     email?: string | null;
     name?: string | null;
     companyName?: string | null;
+    isConverted?: boolean | null;
     jobTitle?: string | null;
     phone?: string | null;
     mainPhone?: string | null;
@@ -137,8 +142,7 @@ export function SendEmailModal({
         to: entity.email,
         subject: resolvePlaceholders(data.subject),
         body: resolvePlaceholders(finalBody),
-        leadId: entity.companyName ? entity.id : undefined,
-        contactId: entity.firstName && !entity.companyName ? entity.id : undefined,
+        ...emailLogTarget(entity, entityType),
         ownerId,
       });
       toast.success(t("sent"));
@@ -200,7 +204,7 @@ export function SendEmailModal({
           <div className="shrink-0 border-b">
             {/* Template row */}
             {safeTemplates.length > 0 && (
-              <div className="flex items-center gap-0 border-b px-6 py-2.5">
+              <div className="flex items-center gap-0 border-b px-4 py-2.5 md:px-6">
                 <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("templateLabel")}
                 </span>
@@ -220,7 +224,7 @@ export function SendEmailModal({
             )}
 
             {/* Subject row */}
-            <div className="flex items-center gap-0 px-6 py-2.5">
+            <div className="flex items-center gap-0 px-4 py-2.5 md:px-6">
               <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 {tc("subject")}
               </span>
@@ -231,7 +235,7 @@ export function SendEmailModal({
               />
             </div>
             {form.formState.errors.subject && (
-              <p className="px-6 pb-2 text-destructive text-xs">{t("subjectRequired")}</p>
+              <p className="px-4 pb-2 text-destructive text-xs md:px-6">{t("subjectRequired")}</p>
             )}
           </div>
 
@@ -240,14 +244,14 @@ export function SendEmailModal({
             Underline-style tabs that sit flush against the content area below.
             The active tab's bottom border visually "connects" to the content.
           */}
-          <div className="flex shrink-0 items-center gap-0 border-b bg-muted/20 px-4">
+          <div className="flex shrink-0 items-center gap-0 border-b bg-muted/20 px-2 sm:px-4">
             {(["preview", "html"] as Mode[]).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => switchMode(m)}
                 className={cn(
-                  "-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 font-medium text-xs transition-colors",
+                  "-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 font-medium text-xs transition-colors sm:px-4",
                   mode === m
                     ? "border-primary text-primary"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
@@ -266,7 +270,7 @@ export function SendEmailModal({
             ))}
 
             {/* Contextual hint — right-aligned, same bar */}
-            <span className="ml-auto flex select-none items-center gap-1 pr-2 text-[10px] text-muted-foreground">
+            <span className="ml-auto flex min-w-0 select-none items-center gap-1 pr-2 text-[10px] text-muted-foreground max-sm:hidden">
               {mode === "preview" ? (
                 <>
                   <PencilIcon className="h-2.5 w-2.5" />
@@ -296,7 +300,7 @@ export function SendEmailModal({
             >
               {body ? (
                 /* Centered email card — mimics how email clients render messages */
-                <div className="min-h-full px-6 py-6">
+                <div className="min-h-full px-3 py-4 sm:px-6 sm:py-6">
                   <div
                     key={templateKey}
                     ref={previewRef}
@@ -336,7 +340,7 @@ export function SendEmailModal({
               spellCheck={false}
               className={cn(
                 "absolute inset-0 h-full w-full resize-none",
-                "px-6 py-4 font-mono text-xs leading-relaxed",
+                "px-4 py-4 font-mono text-xs leading-relaxed md:px-6",
                 "bg-background text-foreground",
                 "border-0 outline-none focus:ring-0",
                 mode !== "html" && "hidden",
@@ -345,7 +349,7 @@ export function SendEmailModal({
           </div>
 
           {/* ── Footer ─────────────────────────────────────────────────────── */}
-          <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-6 py-3">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-4 py-3 md:px-6">
             {/* Placeholder reference — unobtrusive, left side */}
             <p className="hidden text-[10px] text-muted-foreground sm:block">
               {t.rich("tip", {

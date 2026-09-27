@@ -61,7 +61,10 @@ function CommandDialog({
           // `p-0` drops the base padding, and with it the safe-area insets, so
           // the palette gets them back explicitly — otherwise its input sits
           // under the notch on a full-screen phone layout.
-          "overflow-hidden p-0 max-sm:pt-[var(--safe-top)] max-sm:pb-[var(--safe-bottom)]",
+          // ⚠️ `gap-0 sm:p-0` as well: the base content box adds `gap-6` and, from
+          // sm up, `p-6`, and `p-0` alone does not undo a breakpoint's padding —
+          // the palette's dividers and footer stopped 24px short of its edges.
+          "gap-0 overflow-hidden p-0 sm:p-0 max-sm:pt-[var(--safe-top)] max-sm:pb-[var(--safe-bottom)]",
           "sm:top-1/3 sm:translate-y-0",
           className
         )}

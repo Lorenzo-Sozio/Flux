@@ -1,19 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { buildActivityPayload, validateActivityInput } from "@/lib/api-import-validators";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/** Marks the event as written by a machine, so an integrator does not
- *  receive its own import back and react to it. */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the idempotency ledger and the write log both
@@ -21,11 +18,16 @@ const API_ORIGIN = { via: "api" as const, actor: null };
  */
 const ENDPOINT = "/api/crm/companies/{companyId}/activities";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "activities", access: "write" } as const;
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ companyId: string }> }) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -75,7 +77,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -110,7 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

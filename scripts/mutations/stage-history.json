@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "⚠️⚠️ la prima fase comincia adesso invece che alla creazione della trattativa",
+    "find": "  let from = deal.createdAt;",
+    "replace": "  let from = new Date();"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "l'ultima fase di una trattativa chiusa non finisce mai",
+    "find": "  if (current) stays.push({ stageId: current, from, to: deal.status === \"open\" ? null : (deal.closedAt ?? null) });",
+    "replace": "  if (current) stays.push({ stageId: current, from, to: null });"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "⚠️⚠️ i giorni nella fase contano anche le permanenze in corso, e la media scende",
+    "find": "      if (stay.to) durations[stay.stageId].push((stay.to.getTime() - stay.from.getTime()) / DAY_MS);",
+    "replace": "      durations[stay.stageId].push(((stay.to ?? now).getTime() - stay.from.getTime()) / DAY_MS);"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "⚠️ una trattativa vinta non conta come avanzata dall'ultima fase in cui è stata",
+    "find": "      if (movedOn || deal.status === \"won\") {",
+    "replace": "      if (movedOn) {"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "⚠️ Vinta e Persa figurano come fasi in cui si resta e si ristagna",
+    "find": "      if (!figures || closing.has(stay.stageId)) return;",
+    "replace": "      if (!figures) return;"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "una trattativa arrivata esattamente alla soglia risulta già ferma",
+    "find": "  return staleAfterDays != null && staleAfterDays > 0 && daysInStage > staleAfterDays;",
+    "replace": "  return staleAfterDays != null && staleAfterDays > 0 && daysInStage >= staleAfterDays;"
+  },
+  {
+    "file": "src/lib/stage-history.ts",
+    "description": "la velocità di vendita moltiplica per il ciclo invece di dividere",
+    "find": "  return (input.openCount * avgWon * winRate) / input.cycleDays;",
+    "replace": "  return input.openCount * avgWon * winRate * input.cycleDays;"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ il report torna a non leggere la storia delle fasi",
+    "find": "              eq(fieldChanges.field, \"stageId\"),",
+    "replace": "              eq(fieldChanges.field, \"status\"),"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ la board non segna più le trattative ferme oltre la soglia",
+    "find": "      deal.status === \"open\" && isStale(daysBetween(since ?? deal.createdAt, now), staleAfter.get(deal.stageId ?? \"\")),",
+    "replace": "      false && isStale(daysBetween(since ?? deal.createdAt, now), staleAfter.get(deal.stageId ?? \"\")),"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "una fase Vinta accetta una soglia di ristagno",
+    "find": "    closing = Boolean(current?.isWon || current?.isLost);",
+    "replace": "    closing = false;"
+  }
+]

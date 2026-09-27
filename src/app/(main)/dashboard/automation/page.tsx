@@ -19,7 +19,9 @@ export default async function AutomationPage() {
   // "user" for every customer, so a workspace viewer was shown every button and
   // every one of them was refused by the server (audit rilievo U-02, in a corner
   // the fix did not reach). The capability is the same question the action asks.
-  const canEdit = await hasCapability("record:write");
+  // Rules act for the whole workspace — they email customers and call outside addresses —
+  // so writing one is an admin's decision, not every editor's.
+  const canEdit = await hasCapability("automation:manage");
 
   const [rules, logs, emailLogs] = await Promise.all([
     getAutomationRules(),

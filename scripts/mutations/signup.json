@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/actions/auth.ts",
+    "description": "⚠️⚠️ chi si registra torna a non essere annunciato: aspetta un workspace che nessuno sa di dover creare",
+    "find": "  after(() => announceAccountWithoutWorkspace({ name: displayName, email }));",
+    "replace": "  void announceAccountWithoutWorkspace;"
+  },
+  {
+    "file": "src/lib/platform-staff.ts",
+    "description": "⚠️ un avviso non recapitato torna a far fallire la registrazione di un account già creato",
+    "find": "  } catch (err) {\n    console.error(`[signup] could not tell the platform staff about ${person.email}:`, err);\n  }",
+    "replace": "  } finally {\n  }"
+  }
+]

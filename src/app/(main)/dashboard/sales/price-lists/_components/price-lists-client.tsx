@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { deletePriceList } from "@/actions/price-lists";
 import { EmptyState } from "@/components/crm/empty-state";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -186,57 +187,40 @@ export function PriceListsClient({ page, filter, canManage }: Props) {
         searchPlaceholder={t("searchPlaceholder")}
       />
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.adjustment")}</th>
-              <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">{t("columns.prices")}</th>
-              <th className="hidden px-4 py-2.5 text-right font-medium md:table-cell">{t("columns.customers")}</th>
-              <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
-              <th className="w-20 px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-0">
-                  {search || filter !== "all" ? (
-                    <EmptyState icon={Tags} title={te("filteredTitle")} description={te("filteredDescription")} />
-                  ) : (
-                    <EmptyState
-                      icon={Tags}
-                      title={t("empty.title")}
-                      description={t("empty.description")}
-                      action={
-                        canManage ? (
-                          <Button size="sm" onClick={handleOpenCreate}>
-                            {t("newPriceList")}
-                          </Button>
-                        ) : undefined
-                      }
-                    />
-                  )}
-                </td>
-              </tr>
-            ) : (
-              rows.map((row) => (
-                <tr key={row.id} className="group transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <Link href={`/dashboard/sales/price-lists/${row.id}`} className="block min-w-0">
-                      <p className={cn("font-medium hover:underline", !row.isActive && "text-muted-foreground")}>
-                        {row.name}
-                      </p>
-                      {row.description && <p className="truncate text-muted-foreground text-xs">{row.description}</p>}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <AdjustmentText adjustmentPercent={row.adjustmentPercent} />
-                  </td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">{Number(row.priceCount)}</td>
-                  <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{Number(row.companyCount)}</td>
-                  <td className="px-4 py-3 text-center">
+      {/* Below `md` the rows are cards: the edit and delete buttons were revealed
+          on hover only, and the counts were hidden altogether. The table from `md`
+          up is unchanged. */}
+      {rows.length === 0 ? (
+        <div className="rounded-md border">
+          {search || filter !== "all" ? (
+            <EmptyState icon={Tags} title={te("filteredTitle")} description={te("filteredDescription")} />
+          ) : (
+            <EmptyState
+              icon={Tags}
+              title={t("empty.title")}
+              description={t("empty.description")}
+              action={
+                canManage ? (
+                  <Button size="sm" onClick={handleOpenCreate}>
+                    {t("newPriceList")}
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+        </div>
+      ) : (
+        <ResponsiveRecordList
+          cards={
+            <RecordCards
+              items={rows.map((row) => ({
+                id: row.id,
+                href: `/dashboard/sales/price-lists/${row.id}`,
+                title: <span className={cn(!row.isActive && "text-muted-foreground")}>{row.name}</span>,
+                subtitle: row.description ?? undefined,
+                badge: <AdjustmentText adjustmentPercent={row.adjustmentPercent} />,
+                meta: (
+                  <>
                     <span
                       className={cn(
                         "inline-flex rounded-full px-2 py-0.5 text-xs",
@@ -247,37 +231,120 @@ export function PriceListsClient({ page, filter, canManage }: Props) {
                     >
                       {row.isActive ? t("filters.active") : t("filters.inactive")}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {canManage && (
-                      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => handleOpenEdit(row)}
-                          title={t("edit")}
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {t("columns.prices")} {Number(row.priceCount)}
+                    </span>
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {t("columns.customers")} {Number(row.companyCount)}
+                    </span>
+                  </>
+                ),
+                actions: canManage ? (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9"
+                      onClick={() => handleOpenEdit(row)}
+                      aria-label={t("edit")}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteTarget(row)}
+                      aria-label={t("deletePriceList")}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ) : undefined,
+              }))}
+            />
+          }
+          table={
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.adjustment")}</th>
+                    <th className="hidden px-4 py-2.5 text-right font-medium sm:table-cell">{t("columns.prices")}</th>
+                    <th className="hidden px-4 py-2.5 text-right font-medium md:table-cell">
+                      {t("columns.customers")}
+                    </th>
+                    <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
+                    <th className="w-20 px-4 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {rows.map((row) => (
+                    <tr key={row.id} className="group transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <Link href={`/dashboard/sales/price-lists/${row.id}`} className="block min-w-0">
+                          <p className={cn("font-medium hover:underline", !row.isActive && "text-muted-foreground")}>
+                            {row.name}
+                          </p>
+                          {row.description && (
+                            <p className="truncate text-muted-foreground text-xs">{row.description}</p>
+                          )}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <AdjustmentText adjustmentPercent={row.adjustmentPercent} />
+                      </td>
+                      <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">
+                        {Number(row.priceCount)}
+                      </td>
+                      <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">
+                        {Number(row.companyCount)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-2 py-0.5 text-xs",
+                            row.isActive
+                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
                         >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteTarget(row)}
-                          title={t("deletePriceList")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                          {row.isActive ? t("filters.active") : t("filters.inactive")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {canManage && (
+                          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleOpenEdit(row)}
+                              title={t("edit")}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteTarget(row)}
+                              title={t("deletePriceList")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      )}
 
       {canManage && (
         <PriceListDialog open={dialogOpen} onOpenChange={setDialogOpen} priceList={editing} onSaved={handleSaved} />

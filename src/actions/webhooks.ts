@@ -6,17 +6,10 @@ import crypto from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import type { createTenantDb } from "@/db";
 import { webhookLogs, webhooks } from "@/db/schema";
-
-/** A tenant database handle, for callers that resolve the workspace themselves. */
-export type WebhookDispatchDb = ReturnType<typeof createTenantDb>;
-
 import { ForbiddenError, requireAdminAccess, requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
-// ⚠️ The envelope lives in a library with **no dependencies**: whoever uses it to retry
-// should not have to import authentication in order to read a constant.
-import { type EventEnvelope, type Origin, UNSIGNABLE_PREFIX } from "@/lib/webhook-envelope";
+import { cleanSubscription } from "@/lib/webhook-events";
 import { validateWebhookUrl } from "@/lib/webhook-validator";
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -43,8 +36,8 @@ export async function getWebhookSecret(id: string): Promise<string | null> {
   return wh?.secret ?? null;
 }
 
-export async function createWebhook(data: { name: string; url: string; events: string[]; ownerId: string }) {
-  await requireAdminAccess();
+export async function createWebhook(data: { name: string; url: string; events: string[]; ownerId?: string }) {
+  const admin = await requireAdminAccess();
 
   const urlError = validateWebhookUrl(data.url);
   if (urlError) throw new ForbiddenError(urlError);
@@ -53,7 +46,9 @@ export async function createWebhook(data: { name: string; url: string; events: s
   const secret = crypto.randomBytes(32).toString("hex");
   const [wh] = await db
     .insert(webhooks)
-    .values({ ...data, secret })
+    // Only events that exist (src/lib/webhook-events.ts): a misspelt one is a subscription
+    // that never fires, and nobody finds out. The owner is whoever is saving, not a field.
+    .values({ name: data.name, url: data.url, events: cleanSubscription(data.events), ownerId: admin.user.id, secret })
     .returning();
   revalidatePath("/dashboard/settings/webhooks");
   const { secret: _secret, ...rest } = wh;
@@ -74,7 +69,11 @@ export async function updateWebhook(
   const db = await getDb();
   const [wh] = await db
     .update(webhooks)
-    .set({ ...data, updatedAt: new Date() })
+    .set({
+      ...data,
+      ...(data.events !== undefined ? { events: cleanSubscription(data.events) } : {}),
+      updatedAt: new Date(),
+    })
     .where(eq(webhooks.id, id))
     .returning();
   revalidatePath("/dashboard/settings/webhooks");
@@ -95,128 +94,5 @@ export async function getWebhookLogs(webhookId: string) {
   return await db.select().from(webhookLogs).where(eq(webhookLogs.webhookId, webhookId)).limit(50);
 }
 
-// ─── Dispatch ────────────────────────────────────────────────────────────────
-
-/**
- * Fire webhooks for a given event.
- * Call this from server actions after data mutations.
- *
- * @example
- * await dispatchWebhook("contact.created", { id: contact.id, ... });
- */
-export async function dispatchWebhook(
-  event: string,
-  payload: Record<string, unknown>,
-  origin: Origin = { via: "user" },
-  /**
-   * The workspace to dispatch for. Server actions omit it and the active tenant
-   * is resolved from the request. Callers with no request context — the public
-   * quote page, inbound email, the retry job — must pass one, because `getDb()`
-   * has nothing to read the tenant from there (audit rilievo B-01).
-   */
-  explicitDb?: WebhookDispatchDb,
-) {
-  const db = explicitDb ?? (await getDb());
-  const activeWebhooks = await db.select().from(webhooks).where(eq(webhooks.isActive, true));
-
-  const eligible = activeWebhooks.filter((wh) => wh.events.includes(event) || wh.events.includes("*"));
-
-  const envelope: EventEnvelope = {
-    id: crypto.randomUUID(),
-    event,
-    payload,
-    timestamp: new Date().toISOString(),
-    origin,
-  };
-  const body = JSON.stringify(envelope);
-
-  await Promise.allSettled(
-    eligible.map(async (wh) => {
-      // Runtime SSRF guard: skip webhooks whose URLs became invalid after save
-      // (e.g. an internal address that slipped through an older version of the validator).
-      const urlError = validateWebhookUrl(wh.url);
-      if (urlError) {
-        console.error("[dispatchWebhook] Skipping webhook with invalid URL", {
-          id: wh.id,
-          url: wh.url,
-          reason: urlError,
-        });
-        return;
-      }
-
-      // ⚠️⚠️ **No secret, no delivery.** An unsigned event is one the receiver cannot tell
-      // apart from anything else that can reach its URL, so acting on it means acting on
-      // whatever a stranger sends. Delivering it anyway and letting the receiver decide
-      // would put the choice in the place with the least context.
-      //
-      // Refusing is recorded, not silent: the log row is how the owner finds out that a
-      // webhook they configured is not delivering, and why.
-      if (!wh.secret) {
-        await db.insert(webhookLogs).values({
-          webhookId: wh.id,
-          event,
-          payload: body,
-          statusCode: null,
-          response:
-            `${UNSIGNABLE_PREFIX}, so the event could not be signed. ` +
-            "Add one — an unsigned event is indistinguishable from one sent by anybody.",
-          success: false,
-        });
-        return;
-      }
-      const signature = `sha256=${crypto.createHmac("sha256", wh.secret).update(body).digest("hex")}`;
-
-      try {
-        const res = await fetch(wh.url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Webhook-Signature": signature,
-            // The id travels in a header too, so a receiver that dedupes before parsing
-            // does not have to parse the body to do it.
-            "X-Webhook-Id": envelope.id,
-          },
-          body,
-          signal: AbortSignal.timeout(10_000),
-        });
-
-        await db.insert(webhookLogs).values({
-          webhookId: wh.id,
-          event,
-          payload: body,
-          statusCode: res.status,
-          response: await res.text().catch(() => ""),
-          success: res.ok,
-        });
-      } catch (err) {
-        await db.insert(webhookLogs).values({
-          webhookId: wh.id,
-          event,
-          payload: body,
-          statusCode: null,
-          response: String(err),
-          success: false,
-        });
-      }
-    }),
-  );
-}
-
-/**
- * Whether this workspace has any active webhook at all.
- *
- * ⚠️ For loops. `dispatchWebhook` reads the webhook table on every call, which is
- * one round trip per row in a bulk import — five hundred of them for a full
- * batch, on a driver where every statement is its own request, against a
- * Cloudflare subrequest budget of a thousand per request. Asking once before the
- * loop and skipping the calls entirely when the answer is no costs one statement
- * instead of five hundred, and no workspace notices a webhook it never
- * configured not being dispatched.
- *
- * It does not make the loop cheap when webhooks *are* configured. That cost is
- * inherent to one event per record and belongs to whoever configured them.
- */
-export async function hasActiveWebhook(db: WebhookDispatchDb): Promise<boolean> {
-  const [row] = await db.select({ id: webhooks.id }).from(webhooks).where(eq(webhooks.isActive, true)).limit(1);
-  return Boolean(row);
-}
+// Sending events is not an action: it lives in src/lib/webhook-dispatch.ts, where no
+// browser can call it.

@@ -5,13 +5,27 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { ChevronLeft, Loader2, Package, Plus, ShoppingCart, StickyNote, Trash2 } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  ChevronLeft,
+  ClipboardList,
+  ListOrdered,
+  Loader2,
+  Package,
+  Plus,
+  Receipt,
+  ShoppingCart,
+  StickyNote,
+  Trash2,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
 import { createOrder, type getOrderFormData } from "@/actions/orders";
 import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +91,13 @@ const emptyLine = (): LineValues => ({
 });
 
 /**
+ * What a phone shows at a time. "details" is the order's details and its notes
+ * together: both are about the order as a whole rather than one line of it, as the
+ * quote's "terms" tab is, and five tabs across a phone leave each label too narrow.
+ */
+type OrderSection = "customer" | "lines" | "details" | "summary";
+
+/**
  * Writing an order by hand.
  *
  * This was a 560-pixel dialog with four fields: status, date, and a row of
@@ -111,12 +132,19 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
   // in both places or the two screens disagree about the same row.
   const tStatus = useTranslations("orders.statuses");
   const tc = useTranslations("common");
+  const tR = useTranslations("record");
   const { formatMoney } = useCurrency();
 
   const data = initialData;
   const [submitting, setSubmitting] = useState(false);
   /** Which lines have their note open. A note with something in it is never hidden. */
   const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
+  // What a phone shows: one card at a time, and one line open at a time, as the
+  // quote editor does. The form is one form whatever is on screen - every field
+  // stays mounted. The first line starts open: a new order's only line is empty,
+  // and a folded empty row is one more tap before anything can be typed.
+  const [section, setSection] = useState<OrderSection>("customer");
+  const [openLine, setOpenLine] = useState<number | null>(0);
 
   const form = useForm<OrderFormValues>({
     defaultValues: {
@@ -246,6 +274,10 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
     const usable = values.items.filter((l) => l.productId || l.description.trim());
     if (usable.length === 0) {
       toast.error(t("needALine"));
+      // ⚠️ This is the form's one refusal, and on a phone the lines may be on
+      // another tab or folded: show them, or the toast points at nothing.
+      setSection("lines");
+      setOpenLine(0);
       return;
     }
 
@@ -296,7 +328,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
               <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:flex">
             <ShoppingCart className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
@@ -305,13 +337,19 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* The number the writer keeps glancing at, without scrolling back for it. */}
           <div className="mr-2 hidden items-baseline gap-2 sm:flex">
             <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
             <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
           </div>
-          <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/orders")}>
+          {/* The back chevron already leaves; on a phone this second way out is what pushed the bar onto two lines. */}
+          <Button
+            type="button"
+            variant="ghost"
+            className="hidden sm:inline-flex"
+            onClick={() => router.push("/dashboard/sales/orders")}
+          >
             {tc("cancel")}
           </Button>
           <Button type="submit" disabled={submitting} className="gap-2">
@@ -321,9 +359,36 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
         </div>
       </div>
 
-      {/* ── Band one: who it is for, and what kind of order it is ─────────── */}
-      <div className="grid gap-6 md:grid-cols-12">
-        <Card className="md:col-span-5">
+      {/*
+        ⚠️ On a phone the form is four tabs, as the quote editor is. Stacked, every
+        line's fields open at once put the notes and the total a long scroll down.
+        Not sticky: the bar above already holds the top edge, and two pinned bars
+        leave little of a phone's screen for the form. The wrapper's negative margin
+        takes back the tab bar's own bottom margin, which the form's gap already
+        provides; from lg up neither is there.
+      */}
+      <div className="-mb-3 sm:-mb-4 lg:hidden">
+        <RecordTabBar
+          sticky={false}
+          tabs={[
+            { id: "customer", label: t("customerTitle"), icon: <Building2 aria-hidden /> },
+            { id: "lines", label: t("linesTitle"), icon: <ListOrdered aria-hidden />, count: fields.length },
+            { id: "details", label: tR("tabs.details"), icon: <ClipboardList aria-hidden /> },
+            { id: "summary", label: t("summaryTitle"), icon: <Receipt aria-hidden /> },
+          ]}
+          active={section}
+          onChange={(id) => setSection(id as OrderSection)}
+          label={tR("sectionsLabel")}
+        />
+      </div>
+
+      {/* ── Band one: who it is for, and what kind of order it is ───────────
+          Side by side from lg, where the tabs end: below it only one of the two
+          is ever on screen, and it takes the width. */}
+      <div
+        className={cn("grid gap-6 lg:grid-cols-12", section !== "customer" && section !== "details" && "max-lg:hidden")}
+      >
+        <Card className={cn("lg:col-span-5", section !== "customer" && "max-lg:hidden")}>
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               {t("customerTitle")}
@@ -364,7 +429,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
         </Card>
 
         {/* Short answers, two by two; the currency takes a row of its own. */}
-        <Card className="md:col-span-7">
+        <Card className={cn("lg:col-span-7", section !== "details" && "max-lg:hidden")}>
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               {t("detailsTitle")}
@@ -433,7 +498,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
       </div>
 
       {/* ── Band two: what is being sold, given the whole width ───────────── */}
-      <Card>
+      <Card className={cn(section !== "lines" && "max-lg:hidden")}>
         <CardHeader className="flex flex-row items-start justify-between gap-3">
           <div className="min-w-0">
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
@@ -442,7 +507,16 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
             <CardDescription>{t("linesSubtitle")}</CardDescription>
             <PriceListNote rules={priceRules} onApply={applyPriceList} className="mt-1.5" />
           </div>
-          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => append(emptyLine())}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              append(emptyLine());
+              setOpenLine(fields.length);
+            }}
+          >
             <Plus className="h-3.5 w-3.5" /> {t("addLine")}
           </Button>
         </CardHeader>
@@ -481,8 +555,16 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className={cn("h-7 w-7 text-muted-foreground hover:text-foreground", noteOpen && "text-primary")}
-                  onClick={() => setOpenNotes((prev) => ({ ...prev, [field.id]: !prev[field.id] }))}
+                  className={cn(
+                    "h-9 w-9 text-muted-foreground hover:text-foreground xl:h-7 xl:w-7",
+                    noteOpen && "text-primary",
+                  )}
+                  onClick={() => {
+                    setOpenNotes((prev) => ({ ...prev, [field.id]: !prev[field.id] }));
+                    // On a phone the note sits inside the line's fields: a note
+                    // opened on a folded line would open out of sight.
+                    setOpenLine(index);
+                  }}
                   aria-label={t("lineNote")}
                   aria-pressed={noteOpen}
                 >
@@ -495,7 +577,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  className="h-9 w-9 text-muted-foreground hover:text-destructive xl:h-7 xl:w-7"
                   onClick={() => remove(index)}
                   disabled={fields.length === 1}
                   aria-label={t("removeLine")}
@@ -509,22 +591,49 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                   key={field.id}
                   className="rounded-lg border bg-muted/20 p-3 xl:rounded-none xl:border-0 xl:border-b xl:bg-transparent xl:px-0 xl:py-2 xl:hover:bg-muted/20 xl:last:border-b-0"
                 >
-                  {/* Narrow screens get the line's own header; wide ones read it off the row. */}
-                  <div className="mb-3 flex items-center justify-between gap-2 xl:hidden">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-muted-foreground text-xs">
-                        {t("line", { number: index + 1 })}
+                  {/* Narrow screens get the line's own header; wide ones read it off the row.
+                      On a phone the header is also a summary row that opens to edit:
+                      six fields a line, open for every line, was most of the page. */}
+                  <div
+                    className={cn(
+                      "mb-3 flex items-center justify-between gap-2 xl:hidden",
+                      openLine !== index && "max-lg:mb-0",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setOpenLine(openLine === index ? null : index)}
+                      aria-expanded={openLine === index}
+                      className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 text-left lg:pointer-events-none lg:min-h-0"
+                    >
+                      <span className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="font-medium text-muted-foreground text-xs">
+                          {t("line", { number: index + 1 })}
+                        </span>
+                        {isCustom && (
+                          <Badge
+                            variant="outline"
+                            className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                          >
+                            {t("offCatalogue")}
+                          </Badge>
+                        )}
+                        <ChevronDown
+                          className={cn(
+                            "size-3.5 text-muted-foreground transition-transform lg:hidden",
+                            openLine === index && "rotate-180",
+                          )}
+                          aria-hidden
+                        />
                       </span>
-                      {isCustom && (
-                        <Badge
-                          variant="outline"
-                          className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                        >
-                          {t("offCatalogue")}
-                        </Badge>
+                      {openLine !== index && (
+                        <span className="max-w-full truncate font-medium text-sm lg:hidden">
+                          {line?.description ||
+                            (isCustom ? t("descriptionCustomPlaceholder") : t("descriptionPlaceholder"))}
+                        </span>
                       )}
-                    </div>
-                    <div className="flex items-center gap-1">
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1">
                       <span className="mr-1 font-semibold text-sm tabular-nums">
                         {formatMoney(lineTotal, currency)}
                       </span>
@@ -533,7 +642,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                     </div>
                   </div>
 
-                  <div className={LINE_GRID}>
+                  <div className={cn(LINE_GRID, openLine !== index && "max-lg:hidden")}>
                     <span className="hidden text-muted-foreground text-xs tabular-nums xl:block">{index + 1}</span>
 
                     <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
@@ -631,7 +740,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                   </div>
 
                   {noteOpen && (
-                    <div className="mt-2 xl:pb-1 xl:pl-9">
+                    <div className={cn("mt-2 xl:pb-1 xl:pl-9", openLine !== index && "max-lg:hidden")}>
                       <Input
                         className="h-8 bg-background text-xs"
                         placeholder={t("lineNotePlaceholder")}
@@ -656,7 +765,10 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
             type="button"
             variant="ghost"
             className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
-            onClick={() => append(emptyLine())}
+            onClick={() => {
+              append(emptyLine());
+              setOpenLine(fields.length);
+            }}
           >
             <Plus className="h-4 w-4" /> {t("addAnotherLine")}
           </Button>
@@ -664,8 +776,10 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
       </Card>
 
       {/* ── Band three: what to know about it, and what it comes to ───────── */}
-      <div className="grid gap-6 lg:grid-cols-12">
-        <Card className="lg:col-span-7 xl:col-span-8">
+      <div
+        className={cn("grid gap-6 lg:grid-cols-12", section !== "details" && section !== "summary" && "max-lg:hidden")}
+      >
+        <Card className={cn("lg:col-span-7 xl:col-span-8", section !== "details" && "max-lg:hidden")}>
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               {t("notesTitle")}
@@ -682,7 +796,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
         </Card>
 
         {/* The money, where the eye ends. */}
-        <Card className="lg:col-span-5 xl:col-span-4">
+        <Card className={cn("lg:col-span-5 xl:col-span-4", section !== "summary" && "max-lg:hidden")}>
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               {t("summaryTitle")}
@@ -732,6 +846,14 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
               <span className="font-bold text-lg tabular-nums">{formatMoney(totals.total, currency)}</span>
             </div>
           </CardContent>
+          {/* On a phone the bar at the top is a long way up from the last line
+              written; the quote form has had this button beside its total all along. */}
+          <div className="px-6 pb-6 md:hidden">
+            <Button type="submit" disabled={submitting} className="w-full gap-2">
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {t("createOrder")}
+            </Button>
+          </div>
         </Card>
       </div>
     </form>

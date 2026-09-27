@@ -38,6 +38,14 @@ describe("come si legge un contactPoint", () => {
     expect(readContactPoint("  Mario@Example.IT ")).toEqual({ email: "mario@example.it", digits: null });
   });
 
+  it("⚠️⚠️ un indirizzo con delle cifre resta un indirizzo, non diventa anche un telefono", () => {
+    // Read as a phone too, it opted out — or erased — whoever has 333 111 2223.
+    expect(readContactPoint("mario.3331112223@gmail.com")).toEqual({
+      email: "mario.3331112223@gmail.com",
+      digits: null,
+    });
+  });
+
   it("un numero si confronta sulle sole cifre", () => {
     // A number written with spaces and one written without are the same person.
     expect(readContactPoint("+39 333 111 2223").digits).toBe(readContactPoint("+393331112223").digits);

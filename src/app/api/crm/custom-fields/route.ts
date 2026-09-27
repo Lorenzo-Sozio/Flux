@@ -1,11 +1,11 @@
-import { after, type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { and, eq, inArray } from "drizzle-orm";
 
-import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
@@ -17,6 +17,9 @@ import { decryptDbUrl } from "@/lib/tenant-db";
  * record it, and two literals that have to agree are one literal too many.
  */
 const ENDPOINT = "/api/crm/custom-fields";
+
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "custom_fields", access: "write" } as const;
 
 /**
  * Record, on a person's own record, values an integration collected from them.
@@ -57,10 +60,9 @@ const ENDPOINT = "/api/crm/custom-fields";
  * exist, is worse than one that knows it could not.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -210,15 +212,13 @@ export async function POST(req: NextRequest) {
   // ⚠️⚠️ The values travel as `customFields`, which is the path a condition uses:
   // `customFields.budget`. The evaluator already walks dots, so nothing new was needed
   // there — but a snapshot that omitted them would make every such rule silently false.
-  after(() =>
-    runAutomations({
-      entityType,
-      entityId,
-      event: "onUpdate",
-      oldData: { id: entityId, customFields: prima },
-      newData: { id: entityId, customFields: dopo },
-    }),
-  );
+  runRulesAfterApiWrite(tenant.id, {
+    entityType,
+    entityId,
+    event: "onUpdate",
+    oldData: { id: entityId, customFields: prima },
+    newData: { id: entityId, customFields: dopo },
+  });
 
   // ⚠️ `recordId` is the record the fields hang from, not a row id of their own: a custom
   // field value has an id nobody would recognise, and «which lead was enriched» is the

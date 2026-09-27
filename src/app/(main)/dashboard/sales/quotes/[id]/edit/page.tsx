@@ -14,9 +14,10 @@ interface Props {
  * Only while it is a draft: a quote that has been sent is a promise somebody has
  * already read, and changing it under them is not an edit.
  *
- * The heading lives in the form rather than here, because the form's is the bar
- * that does not scroll away — it carries the quote number, the running total and
- * the two ways out, and a second title above it would only repeat itself.
+ * The heading lives in the form rather than here: its hero carries the quote
+ * number and the live figures, and its footer the running total and the two ways
+ * out, all of which change as the form is typed into. A second title above it
+ * would only repeat itself.
  */
 export default async function QuoteEditPage({ params }: Props) {
   const { id } = await params;

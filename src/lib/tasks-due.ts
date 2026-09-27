@@ -2,6 +2,7 @@ import { and, eq, gte, lte } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 import { tasks } from "@/db/schema";
+import { dayBounds } from "@/lib/workspace-day";
 
 /**
  * tasks-due.ts — the tasks-due-today query, where both callers can reach it.
@@ -19,12 +20,11 @@ import { tasks } from "@/db/schema";
 // biome-ignore lint/suspicious/noExplicitAny: the schema generic is irrelevant to one select
 type AnyDb = NeonHttpDatabase<any>;
 
-export async function selectTasksDueToday(db: AnyDb) {
-  // Local midnight to local midnight, which is what someone means by "today".
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
+export async function selectTasksDueToday(db: AnyDb, timeZone: string) {
+  // The workspace's midnight to midnight, which is what someone means by "today" — the
+  // server's is UTC on Workers.
+  const { start, end: next } = dayBounds(new Date(), timeZone);
+  const end = new Date(next.getTime() - 1);
 
   return db
     .select({

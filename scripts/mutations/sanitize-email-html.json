@@ -2,13 +2,13 @@
   {
     "file": "src/lib/sanitize-email-html.ts",
     "description": "⚠️⚠️ i gestori di eventi tra virgolette sopravvivono: «onerror=\"…\"» in una mail di un cliente esegue nella sessione dell'operatore",
-    "find": "  out = out.replace(/\\son[a-z]+\\s*=\\s*\"[^\"]*\"/gi, \"\");",
+    "find": "  out = out.replace(/[\\s/]on[a-z]+\\s*=\\s*\"[^\"]*\"/gi, \"\");",
     "replace": ""
   },
   {
     "file": "src/lib/sanitize-email-html.ts",
     "description": "⚠️⚠️ i gestori senza virgolette sopravvivono: «<img src=x onerror=alert(1)>» passa intero",
-    "find": "  out = out.replace(/\\son[a-z]+\\s*=\\s*[^\\s>]+/gi, \"\");",
+    "find": "  out = out.replace(/[\\s/]on[a-z]+\\s*=\\s*[^\\s>]+/gi, \"\");",
     "replace": ""
   },
   {
@@ -50,7 +50,13 @@
   {
     "file": "src/lib/sanitize-email-html.ts",
     "description": "il CSS in linea non viene piu' controllato affatto",
-    "find": "  out = out.replace(/\\sstyle\\s*=\\s*\"([^\"]*)\"/gi, (whole, css: string) => (isSafeCss(css) ? whole : \"\"));",
+    "find": "  out = out.replace(/[\\s/]style\\s*=\\s*\"([^\"]*)\"/gi, (whole, css: string) => (isSafeCss(css) ? whole : \"\"));",
     "replace": ""
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️⚠️ una barra al posto dello spazio fa passare il gestore: «<img src=x/onerror=…>» esegue",
+    "find": "  out = out.replace(/[\\s/]on[a-z]+\\s*=\\s*\"[^\"]*\"/gi, \"\");",
+    "replace": "  out = out.replace(/\\son[a-z]+\\s*=\\s*\"[^\"]*\"/gi, \"\");"
   }
 ]

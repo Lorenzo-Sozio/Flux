@@ -1,0 +1,86 @@
+[
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ una fase scelta dal modulo non decide più lo stato: la trattativa in «Vinta» resta aperta e pesa sulla previsione",
+    "find": "    return { stageId: wantedStageId, status: closed ?? \"open\" };",
+    "replace": "    return { stageId: wantedStageId };"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ una trattativa segnata vinta o persa resta nella sua colonna aperta",
+    "find": "    return { status: wantedStatus, ...(column ? { stageId: column.id } : {}) };",
+    "replace": "    return { status: wantedStatus };"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ una trattativa riaperta resta nella colonna «Persa»",
+    "find": "    return { status: \"open\", stageId: back };",
+    "replace": "    return { status: \"open\" };"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ la fase in cui la trattativa si è fermata non viene più ricordata alla chiusura come persa",
+    "find": "    ...(isClosing && status === \"lost\" ? { lostAtStageId: oldDeal?.stageId ?? null } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️ convertire un preventivo in ordine segna vinta la trattativa ma la lascia tra quelle aperte",
+    "find": "          ...(wonStage ? { stageId: wonStage.id, probability: wonStage.probability ?? 100 } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/stage-kind.ts",
+    "description": "⚠️⚠️ una seconda fase vinta o persa viene accettata: «spostala in vinta» diventa ambiguo",
+    "find": "  if (kind !== \"open\" && stages.some((s) => s.id !== stageId && kindOf(s) === kind)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/stage-kind.ts",
+    "description": "⚠️⚠️ il tipo di una fase con trattative dentro cambia: ognuna resta con uno stato che la colonna contraddice",
+    "find": "  if (current && dealsInStage > 0) return \"hasDeals\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/stage-kind.ts",
+    "description": "rinominare la fase vinta viene rifiutato come se ce ne fosse un'altra",
+    "find": "  if (current && kindOf(current) === kind) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️⚠️ il rifiuto sul tipo della fase viene calcolato e ignorato",
+    "find": "    const refusal = checkStageKind(stages, id, kind, Number(n));\n    if (refusal) return { ok: false, reason: refusal };",
+    "replace": "    checkStageKind(stages, id, kind, Number(n));"
+  },
+  {
+    "file": "src/lib/deal-signals.ts",
+    "description": "⚠️ un incontro fissato per la settimana prossima conta come contatto già avvenuto",
+    "find": "    .where(and(isNotNull(activities.dealId), sql`${activityMoment} <= ${now}`))",
+    "replace": "    .where(isNotNull(activities.dealId))"
+  },
+  {
+    "file": "src/lib/deal-signals.ts",
+    "description": "⚠️ un'attività già completata conta come passo successivo",
+    "find": "    .where(and(isNotNull(tasks.dealId), ne(tasks.status, \"done\")));",
+    "replace": "    .where(isNotNull(tasks.dealId));"
+  },
+  {
+    "file": "src/lib/deal-signals.ts",
+    "description": "⚠️ una trattativa mai toccata dalla creazione risulta appena contattata",
+    "find": "  const since = deal.lastActivityAt ?? deal.createdAt;",
+    "replace": "  const since = deal.lastActivityAt ?? new Date();"
+  },
+  {
+    "file": "src/lib/deal-signals.ts",
+    "description": "⚠️ una trattativa ferma da tre settimane non risulta ferma",
+    "find": "    stalled: idleDays >= THRESHOLDS.dealStalledDays,",
+    "replace": "    stalled: idleDays > THRESHOLDS.dealStalledDays * 2,"
+  },
+  {
+    "file": "src/actions/pipeline.ts",
+    "description": "⚠️ sulla lavagna un'attività aperta senza scadenza non conta come passo successivo",
+    "find": "hasNextStep: (nextStepCount ?? 0) > 0 },",
+    "replace": "hasNextStep: nextStepAt != null },"
+  }
+]

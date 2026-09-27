@@ -27,7 +27,6 @@ export const ENTITY_CONFIGS: Record<string, EntityConfig> = {
       { key: "currency", label: "Currency", type: "text", groupable: true },
       { key: "probability", label: "Probability (%)", type: "number", aggregatable: true, groupable: true },
       { key: "status", label: "Status", type: "enum", enumValues: ["open", "won", "lost"], groupable: true },
-      { key: "healthScore", label: "Health Score", type: "number", aggregatable: true },
       { key: "expectedCloseDate", label: "Expected Close", type: "date" },
       { key: "createdAt", label: "Created At", type: "date", groupable: true },
     ],

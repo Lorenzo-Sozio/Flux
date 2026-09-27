@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️⚠️ completare un task torna a far squillare il telefono di chi l'ha appena completato",
+    "find": "      (id): id is string => Boolean(id) && id !== completer,",
+    "replace": "      (id): id is string => Boolean(id),"
+  },
+  {
+    "file": "src/actions/tasks.ts",
+    "description": "⚠️ il completamento torna a essere un task_due, che fa squillare di default",
+    "find": "          type: \"task_completed\",",
+    "replace": "          type: \"task_due\","
+  },
+  {
+    "file": "src/lib/notify.ts",
+    "description": "⚠️⚠️ la notifica torna a non ricordare chiave e valori: la campanella non può più dirla nella lingua di chi legge",
+    "find": "    return { ...base, ...text, titleKey: n.key, params };",
+    "replace": "    return { ...base, ...text };"
+  },
+  {
+    "file": "src/app/api/cron/task-reminders/route.ts",
+    "description": "⚠️ un promemoria torna a essere scritto in inglese nel codice",
+    "find": "    await notify({ userId, type: \"task_due\", key: \"taskDueToday\", params, link });",
+    "replace": "    await notify({ userId, type: \"task_due\", title: \"Task due today\", link });"
+  }
+]

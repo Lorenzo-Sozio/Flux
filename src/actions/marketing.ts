@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
+import { notWithAssistant } from "@/lib/assistant-handling";
 import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { canUseSegment, listSegments, resolveSegmentIds } from "@/lib/campaign-segment";
 import { executeCampaignSend } from "@/lib/campaign-send";
@@ -300,12 +301,12 @@ export async function getEligibleRecipientCounts() {
   const allContacts = await db
     .select({ email: contacts.email })
     .from(contacts)
-    .where(eq(contacts.marketingConsent, true));
+    .where(and(eq(contacts.marketingConsent, true), notWithAssistant.contacts));
 
   const allLeads = await db
     .select({ email: leads.email })
     .from(leads)
-    .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false)));
+    .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), notWithAssistant.leads));
 
   const eligibleContacts = allContacts.filter((c) => c.email && !suppressedEmails.has(c.email.toLowerCase())).length;
 

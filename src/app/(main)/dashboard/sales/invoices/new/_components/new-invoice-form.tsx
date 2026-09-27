@@ -5,12 +5,23 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { CheckCircle2, ChevronLeft, CircleAlert, ExternalLink, Loader2, Receipt } from "lucide-react";
+import {
+  Building2,
+  CheckCircle2,
+  ChevronLeft,
+  CircleAlert,
+  CreditCard,
+  ExternalLink,
+  ListOrdered,
+  Loader2,
+  Receipt,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createInvoice, type getNewInvoiceData, getOrderForInvoice, issueInvoiceAction } from "@/actions/invoices";
 import { PriceListNote } from "@/components/crm/price-list-note";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { usePriceRules } from "@/components/crm/use-price-rules";
 import {
   AlertDialog,
@@ -39,6 +50,7 @@ import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
 import { priceFor } from "@/lib/price-list";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
+import { cn } from "@/lib/utils";
 
 import { asDraftLines, blankLine, type EditableLine, editableFields, num } from "../../_components/invoice-lines";
 import { InvoiceLinesTable, InvoiceTotals } from "../../_components/invoice-parts";
@@ -76,6 +88,7 @@ export function NewInvoiceForm({
   const t = useTranslations("invoices");
   const say = useMessageText();
   const tn = useTranslations("invoices.new");
+  const tR = useTranslations("record");
   const tI = useTranslations("invoicing");
   const router = useRouter();
   const { formatMoney } = useCurrency();
@@ -94,6 +107,8 @@ export function NewInvoiceForm({
   const [loadingOrder, setLoadingOrder] = useState(false);
   const [busy, setBusy] = useState<"draft" | "issue" | null>(null);
   const [confirmIssue, setConfirmIssue] = useState(false);
+  // Which card a phone shows; every field stays mounted whatever is on screen.
+  const [section, setSection] = useState<"customer" | "lines" | "payment" | "summary">("customer");
 
   const company = data.companies.find((c) => c.id === companyId) ?? null;
   const order: Order | null = data.orders.find((o) => o.id === orderId) ?? null;
@@ -242,7 +257,7 @@ export function NewInvoiceForm({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* ── The bar that stays put ── */}
       <div className="-mx-4 md:-mx-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur md:px-6">
         <div className="flex min-w-0 items-center gap-3">
@@ -251,7 +266,7 @@ export function NewInvoiceForm({
               <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 sm:flex">
             <Receipt className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
@@ -259,8 +274,12 @@ export function NewInvoiceForm({
             <p className="hidden truncate text-muted-foreground text-xs sm:block">{tn("subtitle")}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mr-2 flex items-baseline gap-2">
+        {/* On a phone this row takes the full width, the total on the left and the
+            two buttons on the right: left to wrap on its own it stacked the total
+            above the buttons, and a sticky bar three lines tall covers the lines
+            being typed. */}
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <div className="mr-auto flex items-baseline gap-2 sm:mr-2">
             <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
             <span className="font-bold text-base tabular-nums">{money(totals.total)}</span>
           </div>
@@ -277,10 +296,30 @@ export function NewInvoiceForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
-        <div className="min-w-0 space-y-6 xl:col-span-8">
+      {/*
+        ⚠️ On a phone the page is four tabs. Stacked it was some 3,400px: the
+        customer, every line's inputs, the payment terms, the totals, the stamp
+        and what blocks issuing, one under the other. The Summary tab is marked
+        while something blocks issuing, so it is found without scrolling for it.
+      */}
+      <RecordTabBar
+        sticky={false}
+        tabs={[
+          { id: "customer", label: tn("customerTitle"), icon: <Building2 aria-hidden /> },
+          { id: "lines", label: t("lines"), icon: <ListOrdered aria-hidden />, count: lines.length },
+          { id: "payment", label: tR("tabs.payments"), icon: <CreditCard aria-hidden /> },
+          { id: "summary", label: tn("summaryTitle"), icon: <Receipt aria-hidden /> },
+        ]}
+        active={section}
+        onChange={(id) => setSection(id as typeof section)}
+        label={tR("sectionsLabel")}
+        invalid={problems.length > 0 ? ["summary"] : []}
+      />
+
+      <div className="-mt-3 grid grid-cols-1 gap-4 sm:gap-6 lg:mt-0 xl:grid-cols-12">
+        <div className="min-w-0 space-y-4 sm:space-y-6 xl:col-span-8">
           {/* ── Customer ── */}
-          <Card>
+          <Card className={cn(section !== "customer" && "max-lg:hidden")}>
             <CardHeader className="pb-3">
               <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                 {tn("customerTitle")}
@@ -345,7 +384,7 @@ export function NewInvoiceForm({
               {company && (
                 <div className="rounded-md border bg-muted/30 p-3 text-sm">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0 space-y-0.5">
+                    <div className="min-w-0 space-y-0.5 break-words">
                       <p className="font-medium">{company.name}</p>
                       <p className="text-muted-foreground text-xs">
                         {[
@@ -391,7 +430,7 @@ export function NewInvoiceForm({
           </Card>
 
           {/* ── Lines ── */}
-          <Card>
+          <Card className={cn(section !== "lines" && "max-lg:hidden")}>
             <CardHeader className="pb-3">
               <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                 {t("lines")}
@@ -414,7 +453,7 @@ export function NewInvoiceForm({
           </Card>
 
           {/* ── Payment and details ── */}
-          <Card>
+          <Card className={cn(section !== "payment" && "max-lg:hidden")}>
             <CardHeader className="pb-3">
               <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                 {tn("paymentTitle")}
@@ -473,7 +512,7 @@ export function NewInvoiceForm({
         </div>
 
         {/* ── Summary: totals, stamp, what is missing ── */}
-        <div className="min-w-0 space-y-6 xl:col-span-4">
+        <div className={cn("min-w-0 space-y-6 xl:col-span-4", section !== "summary" && "max-lg:hidden")}>
           <div className="space-y-6 xl:sticky xl:top-20">
             <Card>
               <CardHeader className="pb-3">

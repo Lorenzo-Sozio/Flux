@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ una trattativa aperta senza niente in programma non compare nella lista",
+    "find": "    if (!(Number(d.steps) > 0)) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ la stessa trattativa compare due volte, ferma e senza passo",
+    "find": "        urgency: urgencyOf(\"deal_stalled\", quiet / THRESHOLDS.dealStalledDays - 1),\n        followUp: { entity: \"deal\", id: d.id },\n      });\n      continue;",
+    "replace": "        urgency: urgencyOf(\"deal_stalled\", quiet / THRESHOLDS.dealStalledDays - 1),\n        followUp: { entity: \"deal\", id: d.id },\n      });"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ la risposta che un cliente aspetta non compare nella lista",
+    "find": "        like(tasks.title, `${REPLY_TASK_PREFIX}%`),",
+    "replace": "        like(tasks.title, `${REPLY_TASK_PREFIX}%`),\n        sql`false`,"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ ogni attività email diventa una «risposta da dare»",
+    "find": "        like(tasks.title, `${REPLY_TASK_PREFIX}%`),",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ un preventivo accettato non chiede di diventare un ordine",
+    "find": "    if (q.status === \"accepted\") {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ una riga rimandata ricompare subito",
+    "find": "  return buildWorkList(withoutSnoozed(found, snoozes, now), limit);",
+    "replace": "  return buildWorkList(found, limit);"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "un rinvio può durare quanto si vuole",
+    "find": "  if (!SNOOZE_DAYS.has(days)) throw new Error(\"A snooze is 1, 3 or 7 days.\");",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "il punteggio di un lead non pesa sull'urgenza",
+    "find": "quiet / THRESHOLDS.leadUntouchedDays - 1 + leadScoreWeight(l.leadScore)",
+    "replace": "quiet / THRESHOLDS.leadUntouchedDays - 1"
+  },
+  {
+    "file": "src/lib/next-actions.ts",
+    "description": "⚠️ un rinvio scaduto continua a nascondere la riga",
+    "find": "  const hidden = new Set(snoozes.filter((s) => s.until.getTime() > now).map((s) => `${s.kind}:${s.entityId}`));",
+    "replace": "  const hidden = new Set(snoozes.map((s) => `${s.kind}:${s.entityId}`));"
+  }
+]

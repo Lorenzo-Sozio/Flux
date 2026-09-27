@@ -1,0 +1,92 @@
+[
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ un'email in Ccn all'indirizzo di archivio torna a essere un ticket di supporto",
+    "find": "  if (alias && domain) return archiveInbound(alias, domain, payload);",
+    "replace": "  if (false) return archiveInbound(alias, domain, payload);"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ l'indirizzo in Ccn non viene cercato tra i destinatari di consegna",
+    "find": "  const alias = findArchiveAlias([to, payload.cc ?? \"\", ...(payload.recipients ?? [])], domain);",
+    "replace": "  const alias = findArchiveAlias([to, payload.cc ?? \"\"], domain);"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ chi non può più scrivere nel workspace archivia ancora con il vecchio indirizzo",
+    "find": "  if (!found || !ownerId || !mayWrite) {",
+    "replace": "  if (!found || !ownerId) {"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️ un indirizzo di un altro workspace archivia nel primo che risponde",
+    "find": "    async (_db, tenant) => tenant.subdomain === alias.subdomain,",
+    "replace": "    async () => true,"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️ un'email che non corrisponde a nessuno sparisce in silenzio",
+    "find": "  if (result.matched === 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️⚠️ un indirizzo sostituito continua ad archiviare",
+    "find": "    .onConflictDoUpdate({ target: mailArchiveAddresses.userId, set: { token, createdAt: new Date() } });",
+    "replace": "    .onConflictDoNothing();"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️ un indirizzo di un altro dominio viene preso per un archivio",
+    "find": "  if (at < 0 || clean.slice(at + 1) !== domain) return null;",
+    "replace": "  if (at < 0) return null;"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️⚠️ un webhook consegnato due volte archivia l'email due volte",
+    "find": "          messageId: email.messageId,",
+    "replace": "          messageId: null,"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️ un'email scritta dal cliente risulta scritta da chi l'ha archiviata",
+    "find": "          ownerId: incoming ? null : ownerId,",
+    "replace": "          ownerId,"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️ i destinatari in copia non vengono cercati",
+    "find": "      [sender, ...recipientAddresses(email.to), ...recipientAddresses(email.cc ?? \"\")].filter(",
+    "replace": "      [sender, ...recipientAddresses(email.to)].filter("
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "un lead già convertito riceve ancora le email",
+    "find": "          .where(and(inArray(sql`lower(${leads.email})`, rest), eq(leads.isConverted, false)));",
+    "replace": "          .where(inArray(sql`lower(${leads.email})`, rest));"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️ un indirizzo scritto con le maiuscole sulla scheda non viene riconosciuto",
+    "find": "    .where(inArray(sql`lower(${contacts.email})`, participants));",
+    "replace": "    .where(inArray(contacts.email, participants));"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "⚠️ un'email a una lista viene archiviata su tutti i suoi membri",
+    "find": "  ].slice(0, ARCHIVE_MAX_RECORDS);",
+    "replace": "  ];"
+  },
+  {
+    "file": "src/lib/mail-archive.ts",
+    "description": "la scheda del contatto non porta l'email all'azienda",
+    "find": "    ...contactRows.map((c) => ({ email: c.email, contactId: c.id, leadId: null, companyId: c.companyId })),",
+    "replace": "    ...contactRows.map((c) => ({ email: c.email, contactId: c.id, leadId: null, companyId: null })),"
+  },
+  {
+    "file": "src/lib/email-parser.ts",
+    "description": "⚠️ un'intestazione in forma di oggetto di mailparser non porta indirizzi",
+    "find": "    if (Array.isArray(v.value)) return addressHeaderText(v.value);",
+    "replace": ""
+  }
+]

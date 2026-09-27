@@ -14,7 +14,8 @@
 import { count } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
-import { companyCategories, companyTypes, dealLossReasons, pipelineStages, slas } from "@/db/schema";
+import { companyCategories, companyTypes, dealLossReasons, pipelineStages, slas, workspaceSettings } from "@/db/schema";
+import { NEW_WORKSPACE_FEATURES } from "@/lib/workspace-features";
 
 /**
  * Any tenant handle.
@@ -99,6 +100,13 @@ export async function seedWorkspace(db: SeedDb): Promise<SeedResult> {
   if (Number(stageCount?.n ?? 0) === 0) {
     await db.insert(pipelineStages).values(DEFAULT_STAGES);
     result.stages = DEFAULT_STAGES.length;
+
+    // A workspace with no pipeline yet is one being born: it starts with the optional parts
+    // off (src/lib/workspace-features.ts). An existing one has no row, and keeps them on.
+    await db
+      .insert(workspaceSettings)
+      .values(Object.entries(NEW_WORKSPACE_FEATURES).map(([feature, on]) => ({ key: `feature.${feature}`, value: on })))
+      .onConflictDoNothing();
   }
 
   const [slaCount] = await db.select({ n: count() }).from(slas);

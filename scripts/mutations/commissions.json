@@ -1,0 +1,152 @@
+[
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ una trattativa senza titolare prende l'aliquota di tutti: si matura una provvigione che nessuno incassa",
+    "find": "  if (!deal.userId) return null;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ un'aliquota futura vale già: un aumento deciso per ottobre paga di più le vendite di settembre",
+    "find": "    if (r.validFrom > deal.day) continue;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ l'aliquota di una persona vale per tutti",
+    "find": "    if (r.userId !== null && r.userId !== deal.userId) continue;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ l'aliquota di una pipeline vale per tutte",
+    "find": "    if (r.pipelineId !== null && r.pipelineId !== deal.pipelineId) continue;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ la regola più specifica non vince: la pipeline pesa quanto la persona",
+    "find": "    const score = (r.userId !== null ? 2 : 0) + (r.pipelineId !== null ? 1 : 0);",
+    "replace": "    const score = (r.userId !== null ? 1 : 0) + (r.pipelineId !== null ? 1 : 0);"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ nello stesso ambito vince la prima aliquota invece dell'ultima iniziata: un cambio di aliquota non ha effetto",
+    "find": "    if (score > bestScore || (score === bestScore && best !== null && r.validFrom > best.validFrom)) {",
+    "replace": "    if (score > bestScore) {"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "la provvigione non è arrotondata al centesimo",
+    "find": "  return Math.round((Math.round(base * 100) * ratePercent) / 100) / 100;",
+    "replace": "  return (base * ratePercent) / 100;"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ una trattativa già pagata matura di nuovo se torna vinta",
+    "find": "        isNull(commissionLines.id),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ il mese di una vittoria è quello del server (UTC), non quello del workspace",
+    "find": "      const day = toWallDate(d.closedAt, input.timeZone);",
+    "replace": "      const day = d.closedAt.toISOString().slice(0, 10);"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ una trattativa riaperta dopo l'approvazione non viene segnalata",
+    "find": "          : l.nowStatus !== \"won\"",
+    "replace": "          : false"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ un cambio di titolare dopo l'approvazione non viene segnalato",
+    "find": "            : l.nowOwner !== l.userId",
+    "replace": "            : false"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ un cambio d'importo dopo l'approvazione non viene segnalato",
+    "find": "              : Math.abs(Number(l.nowBase) - base) >= 0.005",
+    "replace": "              : false"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ una vittoria datata in un mese già approvato non è indicata come tardiva",
+    "find": "    ...unpaid.map((l) => ({ ...l, late: approvedMonths.has(l.month) })),",
+    "replace": "    ...unpaid.map((l) => ({ ...l, late: false })),"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ si approva un mese non ancora finito: il resto del mese non verrà mai pagato",
+    "find": "  if (bounds.to.getTime() > now.getTime()) return { ok: false, reason: \"not_over\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ le vittorie tardive dei mesi approvati non vengono mai pagate",
+    "find": "  const lines = candidates.filter((l) => l.month === month || approvedMonths.has(l.month));",
+    "replace": "  const lines = candidates.filter((l) => l.month === month);"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ approvare un mese si porta dietro le vittorie dei mesi mai approvati",
+    "find": "  const lines = candidates.filter((l) => l.month === month || approvedMonths.has(l.month));",
+    "replace": "  const lines = candidates;"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ due approvazioni contemporanee dello stesso mese: la seconda fallisce con un errore invece di dire che è già approvato",
+    "find": "      on conflict (period) do nothing\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️⚠️ la seconda approvazione contemporanea risponde come se avesse approvato",
+    "find": "  if (Number(row.approved) === 0) return { ok: false, reason: \"already\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "un'aliquota oltre il 100% o negativa viene accettata",
+    "find": "  if (typeof rate !== \"number\" || !Number.isFinite(rate) || rate < 0 || rate > 100) return null;",
+    "replace": "  if (typeof rate !== \"number\" || !Number.isFinite(rate)) return null;"
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "una data inesistente (31 febbraio) viene accettata come inizio di un'aliquota",
+    "find": "  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== input.validFrom) return null;",
+    "replace": "  if (Number.isNaN(d.getTime())) return null;"
+  },
+  {
+    "file": "src/actions/commissions.ts",
+    "description": "⚠️⚠️ chi non gestisce le provvigioni vede quelle dei colleghi filtrando per loro",
+    "find": "  const owners = canManage ? (input.owners ?? []) : [actor.userId];",
+    "replace": "  const owners = input.owners ?? [];"
+  },
+  {
+    "file": "src/actions/commissions.ts",
+    "description": "⚠️⚠️ chiunque può impostare le aliquote",
+    "find": "  const actor = await requireCapability(\"commission:manage\");\n  const rule = readRule(input);",
+    "replace": "  const actor = await requireCapability(\"record:read\");\n  const rule = readRule(input);"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ un editor gestisce le provvigioni: vede quanto guadagnano tutti e approva i propri mesi",
+    "find": "  \"commission:manage\": \"admin\",",
+    "replace": "  \"commission:manage\": \"editor\","
+  },
+  {
+    "file": "src/lib/commissions.ts",
+    "description": "⚠️ il mese approvato si registra come scritto (« 2026-08»): nessun report lo trova e le sue vittorie spariscono",
+    "find": "      values (${statementId}, ${month}, ${input.approverId}, ${now.toISOString()})",
+    "replace": "      values (${statementId}, ${input.month}, ${input.approverId}, ${now.toISOString()})"
+  },
+  {
+    "file": "src/actions/commissions.ts",
+    "description": "una regola per una persona o una pipeline inesistente risponde 500",
+    "find": "  if (person.length === 0 || pipeline.length === 0) return { ok: false, reason: \"invalid\" };",
+    "replace": ""
+  }
+]

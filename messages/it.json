@@ -75,7 +75,28 @@
       "participantsNamePlaceholder": "Nome",
       "participantsEmailPlaceholder": "Email",
       "participantsNone": "Nessun partecipante aggiunto.",
-      "participantsInternal": "interno"
+      "participantsInternal": "interno",
+      "durationLabel": "Durata",
+      "relatedLabel": "Collegato a",
+      "relatedPlaceholder": "Collega un contatto, un'azienda, una trattativa o un lead…",
+      "relatedSearch": "Scrivi almeno due lettere…",
+      "relatedNone": "Nessun risultato.",
+      "relatedClear": "Rimuovi il collegamento",
+      "reminderAtStart": "All'inizio",
+      "reminderMinutes": "{count, plural, one {# minuto prima} other {# minuti prima}}",
+      "reminderHours": "{count, plural, one {# ora prima} other {# ore prima}}",
+      "reminderDays": "{count, plural, one {# giorno prima} other {# giorni prima}}",
+      "reminderHint": "Tu e i colleghi invitati ricevete una notifica; gli ospiti esterni ricevono il promemoria nel proprio calendario.",
+      "roleRequired": "obbligatorio",
+      "roleOptional": "facoltativo",
+      "roleToggleHint": "Passa da obbligatorio a facoltativo",
+      "participantsAdd": "Aggiungi partecipante",
+      "participantsRemove": "Rimuovi {name}",
+      "allDay": "Tutto il giorno",
+      "startDateLabel": "Dal",
+      "endDateLabel": "Al",
+      "timeZoneHint": "Gli orari sono nel fuso orario del workspace ({zone}).",
+      "reminderHintAllDay": "Per un appuntamento di tutto il giorno il promemoria si calcola dalla mezzanotte di inizio."
     },
     "rsvp": {
       "accepted": "Accettato",
@@ -95,7 +116,17 @@
       "conflict": "<strong>Possibile sovrapposizione</strong> con: {titles}",
       "jitsiHint": "Un link Jitsi Meet verrà generato automaticamente e incluso nell'invito.",
       "noParticipants": "Nessun partecipante aggiunto. Puoi creare l'appuntamento anche senza partecipanti.",
-      "checkAvailability": "Verifica disponibilità colleghi"
+      "checkAvailability": "Verifica disponibilità colleghi",
+      "duplicateTitle": "Duplica appuntamento",
+      "invalidEmail": "L'indirizzo email non è valido.",
+      "invalidLink": "Il link della videochiamata deve iniziare con http:// o https://.",
+      "timeChangedHint": "L'orario è cambiato: ai partecipanti verrà chiesto di rispondere di nuovo.",
+      "jitsiKept": "La stanza esistente viene mantenuta: {link}",
+      "notifyCreate": "Invia l'invito via email ai partecipanti",
+      "notifyUpdate": "Invia l'aggiornamento via email ai partecipanti",
+      "save": "Salva modifiche",
+      "createOnly": "Crea appuntamento",
+      "updated": "Appuntamento aggiornato."
     },
     "detail": {
       "cancelled": "Appuntamento annullato.",
@@ -111,12 +142,145 @@
       "confirmTitle": "Annullare l'appuntamento?",
       "confirmBody": "Tutti i partecipanti riceveranno una notifica di cancellazione via email. Questa azione non è reversibile.",
       "confirmBack": "No, torna indietro",
-      "confirmYes": "Sì, annulla"
+      "confirmYes": "Sì, annulla",
+      "description": "Dettagli, partecipanti e azioni di questo appuntamento.",
+      "edit": "Modifica",
+      "duplicate": "Duplica",
+      "moreActions": "Altre azioni",
+      "markCompleted": "Segna come svolto",
+      "markScheduled": "Segna come non svolto",
+      "markedCompleted": "Segnato come svolto.",
+      "markedScheduled": "Di nuovo in programma.",
+      "delete": "Elimina",
+      "deleteError": "Errore durante l'eliminazione.",
+      "deleteConfirmTitle": "Eliminare l'appuntamento?",
+      "deleteConfirmBody": "Viene rimosso definitivamente, con i partecipanti e le loro risposte.",
+      "deleteYes": "Sì, elimina",
+      "confirmBodyShort": "Resta nello storico del calendario come annullato. L'azione non è reversibile.",
+      "notifyOnRemove": "{count, plural, one {Invia un avviso di annullamento al partecipante} other {Invia un avviso di annullamento ai # partecipanti}}",
+      "notFound": "Questo appuntamento non esiste più.",
+      "join": "Partecipa alla videochiamata",
+      "copyLink": "Copia link",
+      "linkCopied": "Link copiato.",
+      "copyFailed": "Impossibile copiare il link.",
+      "organizer": "Organizzatore",
+      "lastUpdated": "Ultima modifica {date}",
+      "restore": "Ripristina",
+      "restored": "Appuntamento di nuovo in calendario.",
+      "resend": "Invia di nuovo l'invito",
+      "resent": "Invito inviato di nuovo.",
+      "downloadIcs": "Aggiungi al mio calendario (.ics)",
+      "detachedOccurrence": "Modificato singolarmente da un appuntamento ricorrente.",
+      "setAnswer": "Registra una risposta",
+      "setAnswerFor": "Registra la risposta di {name}",
+      "answerSaved": "Risposta registrata.",
+      "seriesAnswers": "Le risposte valgono per tutta la serie.",
+      "occurrencesRemoved": "Rimosso dalla serie.",
+      "close": "Chiudi",
+      "back": "Torna ai dettagli",
+      "tally": {
+        "accepted": "{count} sì",
+        "tentative": "{count} forse",
+        "declined": "{count} no",
+        "pending": "{count} in attesa"
+      }
     },
     "availability": {
       "time": "Ora",
       "busy": "Occupato",
       "free": "Libero"
+    },
+    "status": {
+      "scheduled": "In programma",
+      "completed": "Svolto",
+      "cancelled": "Annullato"
+    },
+    "duration": {
+      "minutes": "{m} min",
+      "hours": "{h} h",
+      "hoursMinutes": "{h} h {m} min",
+      "days": "{d, plural, one {# giorno} other {# giorni}}",
+      "daysHours": "{d, plural, one {# giorno} other {# giorni}} {h} h"
+    },
+    "recurrence": {
+      "label": "Ripeti",
+      "badge": "Ricorrente",
+      "none": "Non si ripete",
+      "custom": "Personalizzata…",
+      "every": "Ogni",
+      "interval": "Ogni quanto",
+      "frequency": "Unità",
+      "unit": {
+        "DAILY": {
+          "one": "giorno",
+          "other": "giorni"
+        },
+        "WEEKLY": {
+          "one": "settimana",
+          "other": "settimane"
+        },
+        "MONTHLY": {
+          "one": "mese",
+          "other": "mesi"
+        },
+        "YEARLY": {
+          "one": "anno",
+          "other": "anni"
+        }
+      },
+      "ends": "Termina",
+      "endNever": "mai",
+      "endUntil": "in una data",
+      "endCount": "dopo un numero di volte",
+      "occurrences": {
+        "one": "volta",
+        "other": "volte"
+      },
+      "daily": "{n, plural, one {Ogni giorno} other {Ogni # giorni}}",
+      "weekdays": "Ogni giorno feriale (dal lunedì al venerdì)",
+      "weekly": "{n, plural, one {Ogni settimana} other {Ogni # settimane}}: {days}",
+      "monthlyDay": "{n, plural, one {Ogni mese} other {Ogni # mesi}} il giorno {day}",
+      "monthlyNth": "{n, plural, one {Ogni mese} other {Ogni # mesi}} {ordinal} {weekday}",
+      "yearly": "{n, plural, one {Ogni anno} other {Ogni # anni}} il {date}",
+      "count": "{count, plural, one {# volta} other {# volte}}",
+      "until": "fino al {date}",
+      "ordinal": {
+        "m": {
+          "1": "il primo",
+          "2": "il secondo",
+          "3": "il terzo",
+          "4": "il quarto",
+          "last": "l'ultimo"
+        },
+        "f": {
+          "1": "la prima",
+          "2": "la seconda",
+          "3": "la terza",
+          "4": "la quarta",
+          "last": "l'ultima"
+        }
+      }
+    },
+    "scope": {
+      "label": "Quali eventi",
+      "this": "Questo evento",
+      "following": "Questo evento e i successivi",
+      "all": "Tutti gli eventi della serie",
+      "editTitle": "Modifica un appuntamento ricorrente",
+      "editBody": "A quali occorrenze si applica la modifica?",
+      "continue": "Continua",
+      "removeBody": "Quali occorrenze vuoi rimuovere?",
+      "editing": {
+        "this": "Stai modificando solo questa occorrenza: diventerà un appuntamento a sé.",
+        "following": "Stai modificando questa occorrenza e tutte quelle successive.",
+        "all": "Stai modificando tutte le occorrenze della serie. Gli orari si spostano di quanto si sposta questa."
+      }
+    },
+    "drag": {
+      "moved": "Appuntamento spostato.",
+      "confirmTitle": "Spostare l'appuntamento?",
+      "confirmBody": "Da {from} a {to}.",
+      "confirmYes": "Sposta"
     }
   },
   "auth": {
@@ -235,6 +399,19 @@
       "password": "Password",
       "copyPassword": "Copia password",
       "fill": "Compila i campi"
+    },
+    "workspaces": {
+      "title": "Scegli il workspace",
+      "subtitle": "Scegli il workspace in cui vuoi entrare.",
+      "switchFailed": "Non è stato possibile entrare in questo workspace.",
+      "unexpected": "Si è verificato un errore imprevisto. Riprova.",
+      "noneTitle": "Il tuo account è pronto",
+      "noneLead": "Non fai ancora parte di nessun workspace.",
+      "invitedTitle": "Ti hanno invitato?",
+      "invitedBody": "Apri il link nell'email di invito: ti porta direttamente nel workspace del tuo team. Se non la trovi, controlla lo spam o chiedi a chi ti ha invitato di reinviarla.",
+      "newTitle": "Vuoi un workspace per la tua azienda?",
+      "newBody": "Il team Flux ha ricevuto la tua richiesta e ti scriverà a {email} appena il workspace è pronto.",
+      "signOut": "Esci"
     }
   },
   "automation": {
@@ -280,7 +457,9 @@
       "onUpdate": "All'Aggiornamento",
       "onCreateDesc": "Si attiva quando viene creato un nuovo record",
       "onUpdateDesc": "Si attiva quando un record viene modificato",
-      "scheduled": "Pianificata"
+      "scheduled": "Pianificata",
+      "scheduledInactive": "Pianificazione non attiva",
+      "scheduledInactiveHint": "Le regole a orario non vengono eseguite. Apri la regola per rimuovere la pianificazione."
     },
     "cron": {
       "daily": "Ogni giorno alle {hour}:{minute}",
@@ -413,7 +592,9 @@
         "slaBreach": "Violazione SLA",
         "orSchedule": "Oppure pianifica questa automazione:",
         "dailySchedule": "Pianificazione giornaliera (orario)",
-        "scheduledAt": "Pianificata ogni giorno alle {time}"
+        "scheduledAt": "Pianificata ogni giorno alle {time}",
+        "scheduleUnavailable": "Questa regola ha una pianificazione giornaliera (alle {time}) che non viene eseguita: le regole a orario non sono ancora attive. Rimuovila, e affida a una regola su evento ciò che deve succedere.",
+        "onSchedule": "Ogni mattina, quando valgono le condizioni"
       },
       "conditions": {
         "empty": "Nessuna condizione aggiunta",
@@ -439,7 +620,10 @@
         "is_not_empty": "non è vuoto",
         "changed": "è cambiato",
         "changed_to": "è cambiato in",
-        "changed_from": "è cambiato da"
+        "changed_from": "è cambiato da",
+        "date_in_past": "è nel passato",
+        "date_within_days": "è entro i prossimi (giorni)",
+        "older_than_days": "è più di (giorni) fa"
       },
       "actionTypes": {
         "create_task": "Crea attività",
@@ -544,7 +728,7 @@
         "currency": "Valuta",
         "probability": "Probabilità (%)",
         "status": "Stato",
-        "stageId": "Fase (ID)",
+        "stageId": "Fase",
         "notes": "Note",
         "firstName": "Nome",
         "lastName": "Cognome",
@@ -564,7 +748,10 @@
         "subject": "Oggetto",
         "totalAmount": "Totale",
         "discountPercent": "Sconto (%)",
-        "orderNumber": "Numero ordine"
+        "orderNumber": "Numero ordine",
+        "ownerId": "Titolare",
+        "expectedCloseDate": "Chiusura prevista",
+        "idleDays": "Giorni senza attività"
       },
       "options": {
         "deal": {
@@ -632,6 +819,18 @@
         "triggerRequired": "Seleziona almeno un evento di attivazione",
         "conditionRequired": "Serve almeno una condizione",
         "actionRequired": "Serve almeno un'azione"
+      },
+      "test": {
+        "title": "Prova su un record",
+        "pick": "Scegli un record",
+        "none": "Ancora nessun record di questo tipo",
+        "run": "Prova",
+        "wouldRun": "La regola partirebbe su questo record.",
+        "wouldNotRun": "La regola non partirebbe su questo record.",
+        "holds": "vera",
+        "fails": "falsa",
+        "line": "{field}: {actual}",
+        "empty": "(vuoto)"
       }
     },
     "expressionEditor": {
@@ -669,8 +868,6 @@
     "title": "Orari di apertura",
     "description": "Le politiche impostate su orario lavorativo contano solo il tempo dentro queste finestre, così una promessa fatta venerdì sera non si rompe nella notte.",
     "notMigrated": "Il database del workspace non è ancora stato migrato per questo, quindi questi sono i valori predefiniti e non si possono salvare. Lancia Migrate DB dal pannello amministratore, poi ricarica.",
-    "timeZone": "Fuso orario",
-    "timeZoneHint": "Un nome IANA, per esempio Europe/Rome o America/New_York.",
     "to": "alle",
     "closed": "Chiuso",
     "save": "Salva gli orari",
@@ -692,7 +889,8 @@
     "wednesday": "Mercoledì",
     "thursday": "Giovedì",
     "friday": "Venerdì",
-    "saturday": "Sabato"
+    "saturday": "Sabato",
+    "timeZoneElsewhere": "Gli orari si contano sul fuso orario del workspace, <b>{zone}</b>, che si imposta in <link>Impostazioni → Generale</link>."
   },
   "calendar": {
     "title": "Calendario",
@@ -751,7 +949,15 @@
     "noEventsThisDay": "Nessun evento programmato per questo giorno",
     "previousPeriod": "Periodo precedente",
     "nextPeriod": "Periodo successivo",
-    "newAppointment": "Nuovo appuntamento"
+    "newAppointment": "Nuovo appuntamento",
+    "newAppointmentAt": "Nuovo appuntamento alle {time}",
+    "newAppointmentOn": "Nuovo appuntamento in questo giorno",
+    "list": "Elenco",
+    "listEmpty": "Nulla nei prossimi {days} giorni.",
+    "dragHint": "Trascina un appuntamento per spostarlo, o il suo bordo inferiore per cambiarne la durata. Clicca uno spazio vuoto per aggiungerne uno.",
+    "newAllDayOn": "Nuovo appuntamento di tutto il giorno in questa data",
+    "viewLabel": "Vista del calendario",
+    "filterLabel": "Di chi sono gli appuntamenti"
   },
   "calendarFeed": {
     "subscribe": "Iscriviti",
@@ -788,7 +994,7 @@
   },
   "chat": {
     "title": "Chat",
-    "newConversation": "Nuova Conversazione",
+    "newConversation": "Nuova conversazione",
     "searchConversations": "Cerca conversazioni…",
     "typeMessage": "Scrivi un messaggio…",
     "sendMessage": "Invia",
@@ -798,16 +1004,16 @@
     "offline": "Offline",
     "typing": "Sta scrivendo…",
     "messages": "Messaggi",
-    "newDmTitle": "Nuovo Messaggio Diretto",
-    "newGroupTitle": "Nuovo Gruppo",
+    "newDmTitle": "Nuovo messaggio diretto",
+    "newGroupTitle": "Nuovo gruppo",
     "searchPlaceholder": "Cerca…",
     "allTab": "Tutti",
     "dmTab": "DM",
     "groupsTab": "Gruppi",
     "noConversationsPanel": "Nessuna conversazione",
     "selectConversation": "Seleziona una conversazione per iniziare",
-    "newMessageBtn": "Nuovo Messaggio",
-    "newGroupBtn": "Nuovo Gruppo",
+    "newMessageBtn": "Nuovo messaggio",
+    "newGroupBtn": "Nuovo gruppo",
     "membersCount": "{count} membri",
     "noMessagesYet": "Nessun messaggio ancora. Di' ciao!",
     "groupLabel": "Gruppo",
@@ -825,11 +1031,11 @@
     "mutedForever": "Silenziato per sempre",
     "mutedDays": "Silenziato {count}g",
     "mutedHours": "Silenziato {count}h",
-    "leaveGroupConfirm": "Lasciare questo gruppo?",
+    "leaveGroupConfirm": "Uscirai dal gruppo e non riceverai più i suoi messaggi. Gli altri partecipanti continueranno a vederlo.",
     "deleteConvConfirm": "Eliminare questa conversazione? L'azione è irreversibile.",
     "groupNamePlaceholder": "Nome gruppo…",
     "selectMembers": "Seleziona membri",
-    "createGroup": "Crea Gruppo",
+    "createGroup": "Crea gruppo",
     "widget": {
       "unknown": "Sconosciuto",
       "openConversation": "Apri {name}",
@@ -840,7 +1046,7 @@
       "createGroupFailed": "Non è stato possibile creare il gruppo.",
       "muteFailed": "Non è stato possibile salvare l'impostazione delle notifiche.",
       "leaveFailed": "Non è stato possibile uscire dal gruppo.",
-      "deleteConfirm": "Eliminare questa conversazione? Tutti i messaggi verranno rimossi definitivamente.",
+      "deleteConfirm": "La conversazione e tutti i suoi messaggi verranno eliminati per entrambi. L'azione è irreversibile.",
       "deleteFailed": "Non è stato possibile eliminare la conversazione.",
       "directTab": "Diretti",
       "noGroups": "Ancora nessun gruppo",
@@ -852,7 +1058,19 @@
       "noUsers": "Nessun utente trovato",
       "addMembers": "Aggiungi membri…",
       "createGroupWithCount": "Crea gruppo ({count, plural, one {# membro} other {# membri}})"
-    }
+    },
+    "loadOlder": "Carica i messaggi precedenti",
+    "loadOlderFailed": "Non è stato possibile caricare i messaggi precedenti.",
+    "deleteConvTitle": "Eliminare la conversazione?",
+    "noColleagues": "In questo workspace non ci sono ancora colleghi con cui scrivere. Invitali da Utenti.",
+    "attach": "Allega un file",
+    "removeAttachment": "Togli il file",
+    "attachmentHint": "PDF, documenti Office, immagini o testo, fino a 10 MB.",
+    "attachmentTooLarge": "Il file supera i 10 MB.",
+    "download": "Scarica {name}",
+    "mentionPeople": "Menziona qualcuno",
+    "mentionNoMatch": "Nessuno con questo nome nella conversazione",
+    "youWereMentioned": "Ti hanno menzionato"
   },
   "common": {
     "actions": "Azioni",
@@ -1005,10 +1223,10 @@
   },
   "companies": {
     "title": "Aziende",
-    "newCompany": "Nuova Azienda",
-    "editCompany": "Modifica Azienda",
-    "deleteCompany": "Elimina Azienda",
-    "companyDetails": "Dettagli Azienda",
+    "newCompany": "Nuova azienda",
+    "editCompany": "Modifica azienda",
+    "deleteCompany": "Elimina azienda",
+    "companyDetails": "Dettagli azienda",
     "noCompanies": "Nessuna azienda trovata.",
     "noCompaniesFiltered": "Nessuna azienda corrisponde ai filtri attuali.",
     "noCompaniesYet": "Nessuna azienda ancora.",
@@ -1052,7 +1270,7 @@
       "assignFailed": "Impossibile assegnare le aziende"
     },
     "form": {
-      "newTitle": "Nuova Azienda",
+      "newTitle": "Nuova azienda",
       "editTitle": "Modifica Azienda — {name}",
       "tabs": {
         "info": "Info",
@@ -1068,17 +1286,17 @@
       "tags": "Tag (separati da virgola)",
       "vatNumber": "Partita IVA",
       "sdiCode": "Codice SDI",
-      "annualRevenue": "Fatturato Annuo",
-      "employeeCount": "Numero Dipendenti",
+      "annualRevenue": "Fatturato annuo",
+      "employeeCount": "Numero dipendenti",
       "selectType": "Seleziona tipo",
-      "category": "Categoria Commerciale",
+      "category": "Categoria commerciale",
       "selectCategory": "— Seleziona categoria —",
-      "companyType": "Tipo di Attività",
+      "companyType": "Tipo di attività",
       "selectCompanyType": "— Seleziona tipo di attività —",
       "createNew": "Crea",
       "selectSource": "— Seleziona fonte —",
-      "saveChanges": "Salva Modifiche",
-      "createCompany": "Crea Azienda",
+      "saveChanges": "Salva modifiche",
+      "createCompany": "Crea azienda",
       "saveFailed": "Impossibile salvare l'azienda.",
       "namePlaceholder": "Nome azienda…",
       "websitePlaceholder": "https://esempio.it",
@@ -1115,14 +1333,27 @@
     },
     "fields": {
       "priceList": "Listino"
+    },
+    "detail": {
+      "metricPipeline": "Pipeline aperta",
+      "openDeals": "{count, plural, =0 {Nessuna trattativa aperta} one {# trattativa aperta} other {# trattative aperte}}",
+      "metricWon": "Fatturato vinto",
+      "wonDeals": "{count, plural, =0 {Nessuna trattativa vinta} one {# trattativa vinta} other {# trattative vinte}}",
+      "metricTickets": "Ticket aperti",
+      "metricLastActivity": "Ultima attività",
+      "score": "Punteggio {score}",
+      "noPeople": "Nessun contatto di questa azienda è ancora nel CRM.",
+      "peopleShown": "{shown} di {total} visualizzati",
+      "callPerson": "Chiama {name}",
+      "emailPerson": "Scrivi a {name}"
     }
   },
   "contacts": {
     "title": "Contatti",
-    "newContact": "Nuovo Contatto",
-    "editContact": "Modifica Contatto",
-    "deleteContact": "Elimina Contatto",
-    "contactDetails": "Dettagli Contatto",
+    "newContact": "Nuovo contatto",
+    "editContact": "Modifica contatto",
+    "deleteContact": "Elimina contatto",
+    "contactDetails": "Dettagli contatto",
     "noContacts": "Nessun contatto trovato.",
     "noContactsFiltered": "Nessun contatto corrisponde ai filtri attuali.",
     "noContactsYet": "Nessun contatto ancora.",
@@ -1149,7 +1380,7 @@
       "cold_outreach": "Cold Outreach",
       "trade_show": "Fiera",
       "advertisement": "Pubblicità",
-      "email_campaign": "Campagna Email",
+      "email_campaign": "Campagna email",
       "other": "Altro"
     },
     "columns": {
@@ -1175,7 +1406,7 @@
       "assignFailed": "Impossibile assegnare i contatti"
     },
     "form": {
-      "newTitle": "Nuovo Contatto",
+      "newTitle": "Nuovo contatto",
       "editTitle": "Modifica Contatto — {name}",
       "tabs": {
         "info": "Info",
@@ -1187,12 +1418,12 @@
       "status": "Stato",
       "source": "Fonte",
       "tags": "Tag (separati da virgola)",
-      "marketingConsent": "Consenso Marketing",
+      "marketingConsent": "Consenso marketing",
       "marketingConsentDesc": "L'utente ha accettato di ricevere comunicazioni marketing",
       "noCompany": "— Nessuna azienda —",
       "selectSource": "— Seleziona fonte —",
-      "saveChanges": "Salva Modifiche",
-      "createContact": "Crea Contatto",
+      "saveChanges": "Salva modifiche",
+      "createContact": "Crea contatto",
       "saveFailed": "Impossibile salvare il contatto.",
       "firstNamePlaceholder": "Nome…",
       "lastNamePlaceholder": "Cognome…",
@@ -1219,6 +1450,16 @@
     "modal": {
       "departmentPlaceholder": "Vendite, Marketing…",
       "similarExist": "Esistono già contatti simili:"
+    },
+    "detail": {
+      "metricNextDue": "Prossima scadenza",
+      "metricLastActivity": "Ultima attività",
+      "metricOpenDeals": "Trattative aperte",
+      "dealsCount": "{count, plural, =0 {Nessuna trattativa aperta} one {# trattativa} other {# trattative}}",
+      "moreTasks": "{count, plural, one {Mostra un'altra attività} other {Mostra altre # attività}}",
+      "earlierActivity": "{count, plural, one {Mostra un'attività precedente} other {Mostra # attività precedenti}}",
+      "noContactInfo": "Nessuna email o numero di telefono.",
+      "fieldMarketing": "Consenso marketing"
     }
   },
   "crm": {
@@ -1245,7 +1486,7 @@
     "noOpenTickets": "Nessun ticket aperto",
     "noUrgentTickets": "Nessun ticket urgente",
     "openDeals": "Trattative Aperte",
-    "openQuotesCount": "{count} preventivi aperti",
+    "openQuotesCount": "{count} in attesa del cliente",
     "openTickets": "Ticket Aperti",
     "overdueLabel": "{count} Scadute",
     "overview": "Panoramica",
@@ -1329,7 +1570,17 @@
       "viewAllTasks": "Vedi tutte le attività",
       "schedule": "Programma",
       "noTimedItems": "Nessun appuntamento programmato"
-    }
+    },
+    "viewLabel": "Di chi sono i numeri",
+    "viewMe": "Io",
+    "viewTeam": "Squadra",
+    "myWon": "Vinto nel mese",
+    "myWonOf": "su un obiettivo di",
+    "myWonNoTarget": "Nessun obiettivo per questo mese",
+    "myBareDeals": "Trattative senza passo successivo",
+    "myBareDealsDesc": "Tue trattative aperte senza niente in programma",
+    "myToday": "Oggi",
+    "myTodayDesc": "Attività, chiamate e incontri in agenda"
   },
   "currency": {
     "switchCurrency": "Cambia valuta",
@@ -1406,42 +1657,42 @@
     "fieldCompany": "Azienda",
     "fieldJobTitle": "Mansione",
     "fieldSource": "Fonte",
-    "fieldWebsite": "Sito Web",
+    "fieldWebsite": "Sito web",
     "fieldIndustry": "Settore",
     "fieldVatNumber": "Partita IVA",
     "noCompanyLinked": "Nessuna azienda collegata",
     "marketingLabel": "Marketing:",
     "marketingAgreed": "Consenso",
-    "marketingNoConsent": "Nessun Consenso",
+    "marketingNoConsent": "Nessun consenso",
     "notApplicable": "N/A",
-    "timelineTitle": "Timeline e Attività",
+    "timelineTitle": "Cronologia",
     "activityPlaceholder": "Registra una chiamata, riunione o nota...",
     "typeLabel": "Tipo:",
-    "logActivity": "Registra Attività",
+    "logActivity": "Registra attività",
     "noActivities": "Nessuna attività ancora.",
     "emailTo": "A",
     "emailShowMore": "Mostra il messaggio completo",
     "emailShowLess": "Mostra meno",
     "system": "Sistema",
-    "tasksNextStepsTitle": "Task e Prossimi Passi",
-    "companyTasksTitle": "Task Azienda",
-    "taskTitlePlaceholder": "Titolo del task...",
+    "tasksNextStepsTitle": "Attività e prossimi passi",
+    "companyTasksTitle": "Attività dell'azienda",
+    "taskTitlePlaceholder": "Titolo dell'attività…",
     "taskDescPlaceholder": "Breve descrizione (opzionale)...",
-    "companyTaskPlaceholder": "Nuovo task azienda...",
+    "companyTaskPlaceholder": "Nuova attività per l'azienda…",
     "priorityLabel": "Priorità",
-    "dueDateLabel": "Data e Ora di Scadenza",
+    "dueDateLabel": "Data e ora di scadenza",
     "assignToLabel": "Assegna A",
-    "createTask": "Crea Task",
-    "noTasks": "Nessun task in sospeso.",
+    "createTask": "Crea attività",
+    "noTasks": "Nessuna attività in sospeso.",
     "createdLabel": "Creato:",
     "completedLabel": "Completato:",
     "dueLabel": "Scadenza:",
     "byLabel": "Da:",
-    "toLabel": "Per:",
+    "toLabel": "Assegnata a:",
     "undo": "Annulla",
     "markDone": "Segna come Fatto",
-    "myself": "Me stesso",
-    "unnamedUser": "Utente Sconosciuto",
+    "myself": "me",
+    "unnamedUser": "Utente sconosciuto",
     "activityTypes": {
       "note": "Nota",
       "call": "Chiamata",
@@ -1459,8 +1710,8 @@
     "endDateLabel": "Fine",
     "addDescription": "Descrizione",
     "hideDescription": "Nascondi",
-    "taskCreated": "Task creato",
-    "taskCreateFailed": "Impossibile creare il task",
+    "taskCreated": "Attività creata",
+    "taskCreateFailed": "Impossibile creare l'attività",
     "startLabel": "Inizio:",
     "fieldMobile": "Cellulare",
     "fieldRating": "Valutazione",
@@ -1468,9 +1719,9 @@
     "fieldNotes": "Note",
     "fieldOwner": "Responsabile",
     "fieldTags": "Tag",
-    "sectionContactInfo": "Informazioni di Contatto",
+    "sectionContactInfo": "Informazioni di contatto",
     "sectionQualification": "Qualificazione",
-    "sectionCompanyInfo": "Azienda e Ruolo",
+    "sectionCompanyInfo": "Azienda e ruolo",
     "sectionAddress": "Indirizzo",
     "convertedStatus": "Convertito",
     "fieldDepartment": "Reparto",
@@ -1478,9 +1729,12 @@
     "sectionCrmInfo": "CRM e Punteggio",
     "fieldType": "Tipo",
     "fieldEmployees": "Dipendenti",
-    "fieldRevenue": "Fatturato Annuale",
+    "fieldRevenue": "Fatturato annuale",
     "fieldDescription": "Descrizione",
-    "fieldSdiCode": "Codice SDI"
+    "fieldSdiCode": "Codice SDI",
+    "callAction": "Chiama",
+    "undoFailed": "Impossibile riaprire l'attività.",
+    "emailFrom": "Da"
   },
   "errors": {
     "404": "Pagina non trovata",
@@ -1589,7 +1843,10 @@
       "companyCategoryId": "Categoria",
       "companyTypeId": "Tipo di Attività",
       "leadTypeId": "Tipo di lead",
-      "leadCategoryId": "Categoria lead"
+      "leadCategoryId": "Categoria lead",
+      "ownerId": "Titolare",
+      "tags": "Etichette",
+      "lastActivity": "Ultima attività"
     },
     "cancel": "Annulla",
     "save": "Salva",
@@ -1602,7 +1859,11 @@
       "saved": "Filtro salvato.",
       "saveFailed": "Impossibile salvare il filtro.",
       "deleted": "Filtro eliminato.",
-      "deleteFailed": "Impossibile eliminare il filtro."
+      "deleteFailed": "Impossibile eliminare il filtro.",
+      "team": "Squadra",
+      "pin": "Fissa sopra la lista",
+      "share": "Condividi con la squadra",
+      "pinnedLabel": "Viste fissate"
     },
     "optionValues": {
       "new": "Nuovo",
@@ -1649,7 +1910,7 @@
     "lastMonth": "Mese scorso",
     "thisYear": "Quest'anno",
     "lastYear": "Anno scorso",
-    "totalRevenue": "Fatturato Totale",
+    "totalRevenue": "Valore vinto",
     "totalExpenses": "Spese Totali",
     "netProfit": "Utile Netto",
     "averageOrderValue": "Valore Medio Ordine",
@@ -1657,15 +1918,13 @@
     "overviewSubtitle": "Performance dei ricavi, valore pipeline e tasso di vittoria.",
     "viewPipeline": "Vai alla Pipeline",
     "pipelineValue": "Valore Pipeline",
-    "winRate": "Tasso di Vittoria",
     "lastMonthRevenue": "{amount} il mese scorso",
-    "dealsAndOrders": "Trattative vinte + Ordini completati",
-    "dealsAndOrdersShort": "Trattative vinte + Ordini",
+    "dealsAndOrders": "Trattative chiuse come vinte, da sempre",
+    "dealsAndOrdersShort": "Trattative chiuse come vinte questo mese",
     "pipelineWeighted": "{raw} lordo · ponderato per probabilità",
     "vsLastMonth": "{delta}% rispetto al mese scorso",
-    "winRateDesc": "{won} vinte · {lost} perse · ultimi 90 giorni",
     "revenueTrend": "Andamento Ricavi",
-    "revenueTrendDesc": "Trattative vinte e ordini completati — ultimi 12 mesi",
+    "revenueTrendDesc": "Trattative vinte e ordini completati, affiancati e non sommati — ultimi 12 mesi",
     "dealsLabel": "Trattative",
     "ordersLabel": "Ordini",
     "dealsWonLabel": "Trattative Vinte",
@@ -1674,11 +1933,6 @@
     "revenueSources": "Fonti di Ricavo",
     "revenueSourcesDesc": "Breakdown del fatturato totale per fonte",
     "total": "Totale",
-    "pipelineHealth": "Salute Pipeline",
-    "openDealsByStage": "Trattative aperte per fase",
-    "viewArrow": "Vedi →",
-    "openDealsInPipeline": "{count, plural, one {# trattativa aperta in pipeline} other {# trattative aperte in pipeline}}",
-    "noOpenDeals": "Nessuna trattativa aperta in pipeline.",
     "cardOverview": {
       "title": "La mia carta",
       "description": "1 carta su 4 aggiunta · Panoramica della carta principale e dei prossimi pagamenti",
@@ -1697,18 +1951,45 @@
       "rent": "Affitto dell'appartamento",
       "electricity": "Bolletta della luce",
       "creditCard": "Pagamento della carta di credito"
+    },
+    "ordersThisMonth": "Ordini completati nel mese",
+    "ordersThisMonthDesc": "{count, plural, one {# ordine} other {# ordini}}",
+    "ordersThisMonthUnconverted": "{count, plural, one {# ordine} other {# ordini}}, esclusi {unconverted} in una valuta senza cambio noto",
+    "receivables": {
+      "title": "Crediti da incassare",
+      "subtitle": "Fatture emesse con ancora qualcosa da incassare, le più scadute prima. Il pagamento si registra sulla fattura.",
+      "empty": "Nulla da incassare: tutte le fatture emesse sono pagate.",
+      "owed": "{amount} da incassare",
+      "overdue": "{amount} scaduti",
+      "daysOverdue": "{days, plural, one {# giorno di ritardo} other {# giorni di ritardo}}",
+      "notDue": "Non ancora scaduta",
+      "bucket": {
+        "current": "Non scadute",
+        "1-30": "1–30 giorni",
+        "31-60": "31–60 giorni",
+        "61-90": "61–90 giorni",
+        "90+": "Oltre 90 giorni"
+      },
+      "cols": {
+        "invoice": "Fattura",
+        "customer": "Cliente",
+        "due": "Scadenza",
+        "status": "Stato",
+        "total": "Importo dovuto",
+        "outstanding": "Da incassare"
+      }
     }
   },
   "leads": {
     "title": "Lead",
-    "newLead": "Nuovo Lead",
-    "editLead": "Modifica Lead",
-    "deleteLead": "Elimina Lead",
-    "leadDetails": "Dettagli Lead",
+    "newLead": "Nuovo lead",
+    "editLead": "Modifica lead",
+    "deleteLead": "Elimina lead",
+    "leadDetails": "Dettagli lead",
     "noLeads": "Nessun lead trovato.",
     "noLeadsFiltered": "Nessun lead corrisponde ai filtri attuali.",
     "noLeadsYet": "Nessun lead ancora.",
-    "convertToContact": "Converti in Contatto",
+    "convertToContact": "Converti in contatto",
     "score": "Punteggio",
     "source": "Fonte",
     "rating": "Valutazione",
@@ -1752,7 +2033,7 @@
       "assignFailed": "Impossibile assegnare i lead"
     },
     "form": {
-      "newTitle": "Nuovo Lead",
+      "newTitle": "Nuovo lead",
       "editTitle": "Modifica Lead — {name}",
       "tabs": {
         "info": "Info",
@@ -1766,9 +2047,9 @@
       "rating": "Valutazione",
       "leadScore": "Punteggio Lead (0–100)",
       "tags": "Tag (separati da virgola)",
-      "companyName": "Nome Azienda",
-      "saveChanges": "Salva Modifiche",
-      "createLead": "Crea Lead",
+      "companyName": "Nome azienda",
+      "saveChanges": "Salva modifiche",
+      "createLead": "Crea lead",
       "saveFailed": "Impossibile salvare il lead.",
       "firstNamePlaceholder": "Nome…",
       "lastNamePlaceholder": "Cognome…",
@@ -1779,9 +2060,9 @@
       "selectStatus": "Seleziona stato",
       "selectSource": "Seleziona fonte",
       "selectAssignee": "Seleziona assegnatario",
-      "leadType": "Tipo di Attività",
+      "leadType": "Tipo di attività",
       "selectLeadType": "— Seleziona tipo —",
-      "leadCategory": "Categoria Commerciale",
+      "leadCategory": "Categoria commerciale",
       "selectLeadCategory": "— Seleziona categoria —",
       "createNew": "Crea"
     },
@@ -1789,7 +2070,7 @@
     "updateSuccess": "Lead aggiornato.",
     "deleteSuccess": "Lead eliminato.",
     "deleteFailed": "Impossibile eliminare il lead.",
-    "deleteTitle": "Elimina Lead",
+    "deleteTitle": "Elimina lead",
     "deleteConfirm": "Eliminare questo lead? Questa azione non può essere annullata.",
     "deleteCancel": "Annulla",
     "deleteConvertedTitle": "Eliminare il lead convertito?",
@@ -1799,10 +2080,10 @@
     "deleteConvertedDeal": "Trattativa",
     "deleteConvertedConfirm": "Elimina solo il lead",
     "convertSuccess": "Lead convertito in contatto.",
-    "convertLead": "Converti Lead",
+    "convertLead": "Converti lead",
     "convertLeadDesc": "Sei sicuro di voler convertire questo lead? Verrà creata una nuova azienda e un nuovo contatto, e il lead sarà contrassegnato come convertito.",
     "convertCreateDeal": "Crea una nuova Trattativa/Opportunità",
-    "convertConfirm": "Conferma Conversione",
+    "convertConfirm": "Conferma conversione",
     "convertCancel": "Annulla",
     "convertSuccessToast": "Lead convertito con successo!",
     "convertErrorToast": "Impossibile convertire il lead. Riprova.",
@@ -1822,7 +2103,19 @@
     },
     "detail": {
       "convertedTo": "Convertito in",
-      "convertedOn": "Convertito il <date></date>"
+      "convertedOn": "Convertito il <date></date>",
+      "convertedContact": "Contatto",
+      "convertedDeal": "Trattativa",
+      "convertedGone": "I record creati da questo lead sono stati eliminati.",
+      "metricLastContact": "Ultimo contatto",
+      "neverContacted": "Mai",
+      "metricNextStep": "Prossimo passo",
+      "nothingPlanned": "Nessuno",
+      "stepOf": "Fase {current} di {total}",
+      "marketingConsent": "Consenso marketing",
+      "statusChanged": "Stato: {status}",
+      "statusFailed": "Impossibile cambiare lo stato. Riprova.",
+      "moveTo": "Imposta lo stato su {status}"
     }
   },
   "lostDeal": {
@@ -1841,12 +2134,12 @@
   "marketing": {
     "title": "Marketing",
     "templates": {
-      "title": "Modelli Email",
+      "title": "Modelli email",
       "subtitle": "Crea modelli email responsive con l'editor visivo drag-and-drop.",
       "noTemplatesDescription": "Crea il tuo primo modello email per iniziare.",
-      "newTemplate": "Nuovo Modello",
-      "editTemplate": "Modifica Modello",
-      "deleteTemplate": "Elimina Modello",
+      "newTemplate": "Nuovo modello",
+      "editTemplate": "Modifica modello",
+      "deleteTemplate": "Elimina modello",
       "noTemplates": "Nessun modello trovato.",
       "subject": "Oggetto",
       "preview": "Anteprima",
@@ -1868,19 +2161,19 @@
       }
     },
     "campaigns": {
-      "title": "Campagne Marketing",
+      "title": "Campagne marketing",
       "subtitle": "Crea, lancia e monitora le tue campagne email in uscita.",
-      "newCampaign": "Nuova Campagna",
-      "editCampaign": "Modifica Campagna",
-      "deleteCampaign": "Elimina Campagna",
-      "campaignDetails": "Dettagli Campagna",
+      "newCampaign": "Nuova campagna",
+      "editCampaign": "Modifica campagna",
+      "deleteCampaign": "Elimina campagna",
+      "campaignDetails": "Dettagli campagna",
       "noCampaigns": "Nessuna campagna trovata.",
-      "audienceSize": "Dimensione Pubblico",
+      "audienceSize": "Dimensione pubblico",
       "sent": "Inviati",
       "opened": "Aperti",
       "clicked": "Clic",
-      "openRate": "Tasso Apertura",
-      "clickRate": "Tasso Clic",
+      "openRate": "Tasso apertura",
+      "clickRate": "Tasso clic",
       "unsubscribed": "Disiscritti",
       "bounced": "Respinti",
       "scheduledAt": "Pianificata",
@@ -1900,8 +2193,8 @@
         "status": "Stato",
         "audience": "Pubblico",
         "sent": "Inviati",
-        "openRate": "Tasso Apertura",
-        "clickRate": "Tasso Clic",
+        "openRate": "Tasso apertura",
+        "clickRate": "Tasso clic",
         "scheduledAt": "Pianificata"
       },
       "createSuccess": "Campagna creata.",
@@ -2025,7 +2318,14 @@
         "unsubscribedCount": "{count, plural, one {# disiscritto} other {# disiscritti}}",
         "complaintsCount": "{count, plural, one {# segnalazione} other {# segnalazioni}}",
         "sendLogTitle": "Log di invio",
-        "sendLogDesc": "{count, plural, one {# destinatario in totale} other {# destinatari in totale}}: filtra per stato o cerca per nome o email"
+        "sendLogDesc": "{count, plural, one {# destinatario in totale} other {# destinatari in totale}}: filtra per stato o cerca per nome o email",
+        "recipientsHint": "{sent, number} inviati{queued, plural, =0 {} other { · # in coda}}{failed, plural, =0 {} other { · # non riusciti}}",
+        "ofSent": "{count, number} su {sent, number} inviati",
+        "openTemplate": "Apri nell'editor",
+        "previewTextLabel": "Testo di anteprima",
+        "segmentLabel": "Segmento",
+        "segmentNotVisible": "Un filtro salvato che non puoi vedere",
+        "trackingLabel": "Tracciamento"
       }
     },
     "templateCategories": {
@@ -2357,7 +2657,7 @@
     "items": {
       "apiKeys": "Chiavi API",
       "automations": "Automazioni",
-      "billing": "Fatturazione",
+      "billing": "Abbonamento",
       "assistantContribution": "Contributo dell'assistente",
       "calendar": "Calendario",
       "campaigns": "Campagne",
@@ -2399,11 +2699,20 @@
       "sequences": "Sequenze",
       "invoicing": "Fatturazione elettronica",
       "invoices": "Fatture",
-      "priceLists": "Listini"
+      "priceLists": "Listini",
+      "features": "Funzioni",
+      "general": "Generale",
+      "lists": "Elenchi",
+      "notificationSettings": "Le mie notifiche",
+      "profile": "Profilo",
+      "repScorecard": "Per commerciale",
+      "webForms": "Moduli",
+      "supportAgents": "Assistenza per agente",
+      "commissions": "Provvigioni"
     },
     "user": {
       "profile": "Profilo",
-      "billing": "Fatturazione",
+      "billing": "Abbonamento",
       "notifications": "Notifiche",
       "logout": "Esci",
       "unknownUser": "Utente Sconosciuto"
@@ -2413,6 +2722,30 @@
     "notInPlan": "{title} — non incluso nel tuo piano",
     "accountSwitcher": {
       "account": "Account"
+    },
+    "mobile": {
+      "barLabel": "Navigazione principale",
+      "create": "Crea",
+      "menu": "Menu",
+      "createTitle": "Crea",
+      "menuTitle": "Menu",
+      "menuDescription": "Tutte le sezioni del CRM, il tuo account e le preferenze.",
+      "shortcutsTitle": "Scorciatoie della barra",
+      "shortcutsHint": "{count, plural, one {Scegli la sezione} other {Scegli fino a # sezioni}} da tenere nella barra in basso, nell'ordine.",
+      "shortcutsReset": "Ripristina predefinite",
+      "shortcutsDone": "Fatto",
+      "shortcutsEdit": "Modifica",
+      "shortcutsDefault": "predefinite",
+      "preferences": "Preferenze",
+      "language": "Lingua",
+      "currency": "Valuta",
+      "theme": "Tema",
+      "switchWorkspace": "Cambia workspace",
+      "back": "Indietro"
+    },
+    "scope": {
+      "showAll": "Mostra tutte le sezioni (altre {count})",
+      "essentials": "Mostra solo l'essenziale"
     }
   },
   "nextActions": {
@@ -2436,20 +2769,35 @@
     "shouldHaveClosed": "Doveva chiudersi {n} g fa",
     "noContactFor": "Nessun contatto da {n} g",
     "arrivedNeverContacted": "Arrivato {n} g fa, mai contattato",
-    "failed": "Non è stato possibile caricare questo elenco. Il resto della pagina è a posto."
+    "failed": "Non è stato possibile caricare questo elenco. Il resto della pagina è a posto.",
+    "dealNoNextStep": "Pianifica il prossimo passo",
+    "replyDue": "Rispondi",
+    "quoteToOrder": "Trasformalo in ordine",
+    "nothingPlanned": "Niente in programma, ferma da {n} g",
+    "waitingReply": "Aspetta la tua risposta da {n} g",
+    "acceptedWaiting": "Accettato {n} g fa",
+    "rowActions": "Azioni per {title}",
+    "replied": "Risposto",
+    "planFollowUp": "Pianifica il seguito",
+    "snoozeTomorrow": "Non oggi",
+    "snooze3": "Fra 3 giorni",
+    "snoozeWeek": "Fra una settimana",
+    "snoozed": "Rimandato di {days, plural, one {un giorno} other {# giorni}}.",
+    "actionFailed": "Non è stato possibile.",
+    "startQueue": "Lavorali in fila"
   },
   "orders": {
     "title": "Ordini",
     "subtitle": "Gestisci gli ordini dei clienti e monitora l'evasione.",
-    "newOrder": "Nuovo Ordine",
-    "editOrder": "Modifica Ordine",
-    "deleteOrder": "Elimina Ordine",
-    "orderDetails": "Dettagli Ordine",
+    "newOrder": "Nuovo ordine",
+    "editOrder": "Modifica ordine",
+    "deleteOrder": "Elimina ordine",
+    "orderDetails": "Dettagli ordine",
     "noOrders": "Nessun ordine trovato.",
-    "orderNumber": "Numero Ordine",
-    "orderDate": "Data Ordine",
+    "orderNumber": "Numero ordine",
+    "orderDate": "Data ordine",
     "stats": {
-      "totalOrders": "Totale Ordini",
+      "totalOrders": "Totale ordini",
       "processing": "In lavorazione",
       "completed": "Completati",
       "revenue": "Fatturato"
@@ -2575,7 +2923,10 @@
       "totalCol": "Totale",
       "closedHint": "Chiuso. Cambia lo stato per riaprirlo.",
       "cancelledHint": "Annullato.",
-      "openTickets": "Ticket aperti su questo ordine"
+      "openTickets": "Ticket aperti su questo ordine",
+      "sourceQuote": "Dall'offerta",
+      "sourceDeal": "Dalla trattativa",
+      "noInvoices": "Non ancora fatturato."
     },
     "payments": {
       "title": "Pagamento",
@@ -2602,29 +2953,136 @@
       }
     }
   },
+  "record": {
+    "sectionsLabel": "Sezioni della scheda",
+    "tabs": {
+      "overview": "Panoramica",
+      "nextSteps": "Da fare",
+      "activity": "Cronologia",
+      "details": "Dettagli",
+      "sales": "Vendite",
+      "deals": "Trattative",
+      "contacts": "Contatti",
+      "people": "Persone",
+      "tickets": "Ticket",
+      "documents": "Documenti",
+      "files": "File",
+      "lines": "Righe",
+      "payments": "Pagamenti",
+      "history": "Cronologia",
+      "settings": "Impostazioni",
+      "invoices": "Fatture",
+      "quotes": "Offerte",
+      "orders": "Ordini",
+      "steps": "Passaggi",
+      "enrollments": "Iscritti",
+      "conversation": "Conversazione",
+      "recipients": "Destinatari",
+      "content": "Contenuto",
+      "prices": "Prezzi",
+      "terms": "Condizioni",
+      "comments": "Commenti",
+      "tasks": "Da fare"
+    },
+    "email": "Email",
+    "call": "Chiama",
+    "edit": "Modifica",
+    "more": "Altro",
+    "assignedTo": "Assegnato a {name}",
+    "unassigned": "Non assegnato",
+    "notSet": "Non impostato",
+    "today": "Oggi",
+    "inDays": "{days, plural, one {tra # giorno} other {tra # giorni}}",
+    "daysAgo": "{days, plural, one {# giorno fa} other {# giorni fa}}",
+    "overdueBy": "{days, plural, one {in ritardo di # giorno} other {in ritardo di # giorni}}",
+    "overdue": "in ritardo",
+    "created": "Creato",
+    "updated": "Ultima modifica",
+    "owner": "Responsabile",
+    "notes": "Note",
+    "detailsTitle": "Dettagli",
+    "showMore": "Mostra altro",
+    "showLess": "Mostra meno",
+    "nothingYet": "Ancora niente qui.",
+    "withAssistant": "Seguito da {name} dal {date}"
+  },
   "pipeline": {
+    "detail": {
+      "stagePathLabel": "Fasi della pipeline",
+      "stepOf": "Fase {current} di {total}",
+      "noStages": "La pipeline non ha ancora fasi.",
+      "moveToStage": "Sposta in {stage}",
+      "stageMoved": "Spostata in {stage}",
+      "moveFailed": "Impossibile aggiornare la trattativa. Riprova.",
+      "markWon": "Segna come vinta",
+      "markLost": "Segna come persa",
+      "markedWon": "Trattativa segnata come vinta",
+      "markedLost": "Trattativa chiusa come persa",
+      "wonTitle": "Chiudere “{name}” come vinta?",
+      "wonDescription": "La trattativa esce dalla pipeline aperta e conta come fatturato da oggi. Integrazioni e automazioni vengono notificate. Potrai riaprirla in seguito.",
+      "cancel": "Annulla",
+      "wonOn": "Vinta il {date}",
+      "lostOn": "Persa il {date}",
+      "closedWon": "Vinta",
+      "closedLost": "Persa",
+      "reopen": "Riapri",
+      "reopened": "Trattativa riaperta",
+      "assignedTo": "Assegnata a {name}",
+      "unassigned": "Non assegnata",
+      "email": "Email",
+      "metricValue": "Valore",
+      "metricProbability": "Probabilità",
+      "metricWeighted": "Valore ponderato",
+      "metricClose": "Chiusura prevista",
+      "metricClosed": "Chiusa il",
+      "notSet": "Non impostata",
+      "today": "Oggi",
+      "inDays": "{days, plural, one {tra # giorno} other {tra # giorni}}",
+      "overdueBy": "{days, plural, one {scaduta da # giorno} other {scaduta da # giorni}}",
+      "overdue": "scaduta",
+      "noOpenTasks": "Nessuna attività pianificata. Qual è il prossimo passo?",
+      "completedTasks": "Completate ({count})",
+      "tabActivity": "Cronologia",
+      "tabComments": "Commenti",
+      "detailsTitle": "Dettagli",
+      "fieldStage": "Fase",
+      "fieldOwner": "Responsabile",
+      "fieldCompany": "Azienda",
+      "fieldContact": "Contatto",
+      "fieldCreated": "Creata",
+      "fieldUpdated": "Ultima modifica",
+      "fieldLostAt": "Ferma a",
+      "fieldLossReason": "Motivo della perdita",
+      "fieldCompetitor": "Vinta da",
+      "fieldLossNote": "Nota",
+      "salesTitle": "Offerte e ordini",
+      "quotesHeading": "Offerte",
+      "ordersHeading": "Ordini",
+      "changeStage": "Cambia fase",
+      "addQuote": "Nuovo preventivo"
+    },
     "title": "Pipeline",
-    "newDeal": "Nuova Trattativa",
-    "editDeal": "Modifica Trattativa",
-    "deleteDeal": "Elimina Trattativa",
-    "dealDetails": "Dettagli Trattativa",
+    "newDeal": "Nuova trattativa",
+    "editDeal": "Modifica trattativa",
+    "deleteDeal": "Elimina trattativa",
+    "dealDetails": "Dettagli trattativa",
     "noDeals": "Nessuna trattativa trovata.",
     "stage": "Fase",
-    "dealValue": "Valore Trattativa",
-    "expectedClose": "Chiusura Prevista",
+    "dealValue": "Valore trattativa",
+    "expectedClose": "Chiusura prevista",
     "probability": "Probabilità",
     "report": "Report Pipeline",
     "manageStages": "Gestisci fasi",
-    "totalValue": "Valore Totale",
-    "weightedValue": "Valore Ponderato",
-    "dealCount": "Numero Trattative",
+    "totalValue": "Valore totale",
+    "weightedValue": "Valore ponderato",
+    "dealCount": "Numero trattative",
     "columns": {
       "name": "Nome",
       "company": "Azienda",
       "stage": "Fase",
       "value": "Valore",
       "probability": "Probabilità",
-      "closeDate": "Data Chiusura",
+      "closeDate": "Data chiusura",
       "owner": "Proprietario"
     },
     "form": {
@@ -2643,22 +3101,22 @@
     "created": "Creata: {date}",
     "backToPipeline": "Torna alla Pipeline",
     "reportSubtitle": "Analisi del funnel vendite e previsioni.",
-    "pipelineValue": "Valore Pipeline",
+    "pipelineValue": "Valore pipeline",
     "openDeals": "{count, plural, one {# trattativa aperta} other {# trattative aperte}}",
-    "revenueWon": "Ricavi Vinti",
+    "revenueWon": "Ricavi vinti",
     "dealsClosed": "{count, plural, one {# trattativa chiusa} other {# trattative chiuse}}",
-    "winRate": "Tasso di Vittoria",
+    "winRate": "Tasso di vittoria",
     "lostWon": "{lost} perse · {won} vinte",
-    "weightedForecast": "Previsione Ponderata",
+    "weightedForecast": "Previsione ponderata",
     "probabilityAdjusted": "Aggiustato per probabilità",
-    "stageBreakdown": "Dettaglio per Fase",
+    "stageBreakdown": "Dettaglio per fase",
     "deals": "Trattative",
-    "avgDays": "Gg. Medi",
+    "avgDays": "Giorni nella fase",
     "charts": {
-      "valueByStage": "Valore per Fase",
+      "valueByStage": "Valore per fase",
       "dealVelocity": "Velocità Trattative (gg. medi per fase)",
-      "totalValue": "Valore Totale",
-      "weightedForecast": "Previsione Ponderata",
+      "totalValue": "Valore totale",
+      "weightedForecast": "Previsione ponderata",
       "avgDays": "Gg. Medi",
       "deals": "Trattative"
     },
@@ -2671,29 +3129,29 @@
     "fieldOwner": "Responsabile:",
     "fieldNotes": "Note",
     "createdOn": "Creato",
-    "quotesProposals": "Preventivi e Proposte",
+    "quotesProposals": "Preventivi e proposte",
     "noQuotesYet": "Nessun preventivo ancora. Creane uno per iniziare la gestione delle proposte.",
-    "activityTimeline": "Timeline Attività",
+    "activityTimeline": "Cronologia",
     "logActivityPlaceholder": "Registra una nota, chiamata, riunione…",
     "logBtn": "Registra",
     "noActivitiesYet": "Nessuna attività ancora.",
-    "openTasksCount": "{count} aperti",
-    "newTaskPlaceholder": "Nuovo task…",
+    "openTasksCount": "{count} aperte",
+    "newTaskPlaceholder": "Nuova attività…",
     "addBtn": "Aggiungi",
-    "noTasksYet": "Nessun task ancora.",
+    "noTasksYet": "Ancora nessuna attività.",
     "modal": {
       "editTitle": "Modifica Trattativa — {name}",
-      "newTitle": "Nuova Trattativa",
+      "newTitle": "Nuova trattativa",
       "tabDeal": "Trattativa",
       "tabPipeline": "Pipeline",
       "tabNotes": "Note",
-      "fieldDealName": "Nome Trattativa",
+      "fieldDealName": "Nome trattativa",
       "fieldAmount": "Importo",
       "fieldCurrency": "Valuta",
       "fieldStatus": "Stato",
       "fieldStageLabel": "Fase",
       "fieldProbability": "Probabilità (%)",
-      "fieldExpectedClose": "Data di Chiusura Prevista",
+      "fieldExpectedClose": "Data di chiusura prevista",
       "fieldAssignedTo": "Assegnato a",
       "fieldCompany": "Azienda",
       "fieldContact": "Contatto",
@@ -2705,21 +3163,21 @@
       "notesPlaceholder": "Note interne su questa trattativa…",
       "noneOption": "— Nessuno —",
       "cancel": "Annulla",
-      "saveChanges": "Salva Modifiche",
-      "createDeal": "Crea Trattativa",
+      "saveChanges": "Salva modifiche",
+      "createDeal": "Crea trattativa",
       "saveError": "Errore nel salvataggio della trattativa."
     },
     "forecast": {
-      "title": "Previsione Ricavi",
+      "title": "Previsione ricavi",
       "subtitle": "Previsione ponderata per i prossimi 6 mesi basata sulla probabilità delle trattative",
-      "totalPipeline": "Pipeline Totale",
-      "totalPipelineDesc": "Ponderato per probabilità (tutte le trattative aperte)",
-      "bestCase": "Caso Ottimistico",
+      "totalPipeline": "Pipeline totale",
+      "totalPipelineDesc": "Ponderato per probabilità: trattative aperte con chiusura nei prossimi sei mesi",
+      "bestCase": "Caso ottimistico",
       "bestCaseDesc": "Trattative con probabilità ≥ 50%",
       "committed": "Confermato",
       "committedDesc": "Trattative con probabilità ≥ 80%",
       "vsTarget": "vs. Obiettivo",
-      "vsTargetDesc": "Confermato vs obiettivo di {amount}",
+      "vsTargetDesc": "{won} già vinti + {committed} confermati, su un obiettivo di {amount}",
       "noTarget": "Nessun obiettivo impostato.",
       "setTargets": "Imposta obiettivi →",
       "monthlyChart": "Previsione Mensile — Prossimi 6 Mesi",
@@ -2727,12 +3185,17 @@
       "legendBestCase": "Caso Ottimistico (≥50%)",
       "legendCommitted": "Confermato (≥80%)",
       "legendTarget": "Obiettivo",
-      "pipelineByOwner": "Pipeline per Responsabile",
-      "ownerBreakdown": "Dettaglio per Responsabile",
+      "pipelineByOwner": "Pipeline per responsabile",
+      "ownerBreakdown": "Dettaglio per responsabile",
       "noAssignedDeals": "Nessuna trattativa assegnata",
       "colOwner": "Responsabile",
       "colDeals": "Trattative",
-      "colWeightedValue": "Valore Ponderato"
+      "colWeightedValue": "Valore ponderato",
+      "outsideTitle": "Fuori dalla previsione",
+      "outsideOverdue": "{count, plural, one {# trattativa aperta ha} other {# trattative aperte hanno}} la data di chiusura già passata · {amount}",
+      "outsideUnscheduled": "{count, plural, one {# trattativa aperta non ha} other {# trattative aperte non hanno}} una data di chiusura nei prossimi sei mesi · {amount}",
+      "outsideHint": "Non entrano nei numeri qui sopra: vanno datate, oppure chiuse.",
+      "outsideOpenBoard": "Apri la pipeline"
     },
     "comments": {
       "placeholder": "Aggiungi un commento…",
@@ -2803,7 +3266,6 @@
       "stageRequired": "La fase è obbligatoria",
       "probabilityRange": "Inserisci un valore tra 0 e 100"
     },
-    "healthScore": "Salute: {score}/100",
     "deleteTask": "Elimina attività",
     "noData": "Nessun dato",
     "views": {
@@ -2813,7 +3275,8 @@
       "winLoss": "Vinte / Perse",
       "targets": "Obiettivi",
       "territories": "Territori",
-      "report": "Report"
+      "report": "Report",
+      "commissions": "Provvigioni"
     },
     "filters": {
       "sections": "Sezioni della pipeline",
@@ -2840,11 +3303,72 @@
         "lost": "Perse"
       },
       "searchDeals": "Cerca trattativa…",
-      "reset": "Azzera filtri"
+      "reset": "Azzera filtri",
+      "closedIn": "Chiuse in {period}",
+      "closedRemove": "Togli il filtro: chiuse in {period}",
+      "pipeline": "Pipeline",
+      "allPipelines": "Tutte le pipeline",
+      "sectionPicker": "Sezione: {section}. Cambia sezione",
+      "filters": "Filtri",
+      "filtersAria": "{count, plural, =0 {Filtri} one {Filtri, # attivo} other {Filtri, # attivi}}",
+      "activeFilters": "Filtri attivi",
+      "removeFilter": "Togli il filtro: {label}",
+      "showResults": "Mostra risultati",
+      "statusAllShort": "Tutte",
+      "agentsTitle": "Agenti"
     },
     "reportSubtitlePeriod": "Pipeline aperta oggi; vinte e perse chiuse negli ultimi {days} giorni.",
     "foldStage": "Riduci la fase",
-    "unfoldStage": "Espandi la fase"
+    "unfoldStage": "Espandi la fase",
+    "signals": {
+      "noNextStep": "Nessun passo successivo",
+      "idle": "Ferma da {days, plural, one {# giorno} other {# giorni}}"
+    },
+    "weighted": "{amount} ponderato",
+    "weightedHelp": "Ogni trattativa aperta contata alla sua probabilità: quanto vale la colonna secondo le probabilità.",
+    "quickActions": "Azioni rapide per {name}",
+    "quick": {
+      "log": "Registra attività",
+      "plan": "Pianifica il prossimo passo",
+      "won": "Segna come vinta",
+      "lost": "Segna come persa"
+    },
+    "nextStepOn": "Prossimo passo {date}",
+    "nextStepUndated": "Prossimo passo pianificato, senza data",
+    "daysInStage": "{days, plural, =0 {In questa fase da oggi} one {# giorno in questa fase} other {# giorni in questa fase}}",
+    "avgDaysHelp": "Giorni medi passati in questa fase dalle trattative che ne sono uscite — non la loro età.",
+    "conversion": "Avanzano",
+    "conversionHelp": "Delle trattative uscite da questa fase, la quota che è arrivata a una fase successiva o è stata vinta.",
+    "stale": "Ferme",
+    "staleHelp": "Trattative aperte qui da più giorni di quanti la fase ne consente (impostati nelle fasi della pipeline).",
+    "velocity": "Velocità di vendita",
+    "velocityHelp": "Trattative aperte × valore medio vinto × tasso di vincita ÷ giorni medi per vincere: quanto la pipeline trasforma in ricavo ogni giorno al ritmo attuale.",
+    "velocityPerDay": "al giorno, su un ciclo medio di {days} giorni",
+    "velocityUnknown": "Servono trattative vinte e perse nel periodo",
+    "stuckInStage": "{days, plural, one {Ferma: # giorno in questa fase} other {Ferma: # giorni in questa fase}}",
+    "list": {
+      "subtitle": "Tocca ⇄ per spostare una trattativa in un'altra fase",
+      "viewLabel": "Visualizzazione",
+      "viewBoard": "Kanban",
+      "viewList": "Elenco",
+      "move": "Sposta in un'altra fase",
+      "moveTitle": "Sposta nella fase",
+      "moveAria": "Fase di {name}: {stage}. Tocca per spostarla",
+      "open": "Aperte",
+      "value": "Valore",
+      "weighted": "Ponderato",
+      "attention": "Da seguire",
+      "attentionHelp": "Trattative aperte senza un prossimo passo, ferme nella fase, trascurate o con la chiusura prevista già passata.",
+      "attentionNone": "Nessuna trattativa da seguire: ogni trattativa aperta ha un prossimo passo e nessuna è ferma.",
+      "sortBy": "Ordina per",
+      "sort": {
+        "close": "Chiusura prevista",
+        "amount": "Valore",
+        "idle": "Più trascurate",
+        "name": "Nome"
+      },
+      "emptyStage": "Nessuna trattativa in questa fase."
+    }
   },
   "placeholders": {
     "unknown": "Niente riempirà {list}. Arriverà al destinatario esattamente com'è scritto.",
@@ -2961,26 +3485,26 @@
   },
   "quotes": {
     "title": "Preventivi",
-    "newQuote": "Nuovo Preventivo",
-    "editQuote": "Modifica Preventivo",
-    "deleteQuote": "Elimina Preventivo",
-    "quoteDetails": "Dettagli Preventivo",
+    "newQuote": "Nuovo preventivo",
+    "editQuote": "Modifica preventivo",
+    "deleteQuote": "Elimina preventivo",
+    "quoteDetails": "Dettagli preventivo",
     "noQuotes": "Nessun preventivo trovato.",
-    "quoteNumber": "Numero Preventivo",
-    "issuedDate": "Data Emissione",
-    "expiresDate": "Data Scadenza",
+    "quoteNumber": "Numero preventivo",
+    "issuedDate": "Data emissione",
+    "expiresDate": "Data scadenza",
     "lineItems": "Voci",
-    "addItem": "Aggiungi Voce",
-    "removeItem": "Rimuovi Voce",
-    "unitPrice": "Prezzo Unitario",
+    "addItem": "Aggiungi voce",
+    "removeItem": "Rimuovi voce",
+    "unitPrice": "Prezzo unitario",
     "discount": "Sconto",
     "tax": "IVA",
     "grandTotal": "Totale",
-    "sendQuote": "Invia Preventivo",
-    "acceptQuote": "Accetta Preventivo",
-    "declineQuote": "Rifiuta Preventivo",
-    "convertToOrder": "Converti in Ordine",
-    "publicLink": "Link Pubblico",
+    "sendQuote": "Invia preventivo",
+    "acceptQuote": "Accetta preventivo",
+    "declineQuote": "Rifiuta preventivo",
+    "convertToOrder": "Converti in ordine",
+    "publicLink": "Link pubblico",
     "statuses": {
       "draft": "Bozza",
       "pending_approval": "In approvazione",
@@ -2990,7 +3514,9 @@
       "expired": "Scaduto",
       "approved": "Approvato",
       "viewed": "Visualizzato",
-      "converted": "Convertito"
+      "converted": "Convertito",
+      "superseded": "Superato",
+      "awaiting": "In attesa del cliente"
     },
     "columns": {
       "number": "Numero",
@@ -3147,8 +3673,31 @@
         "updated": "Preventivo aggiornato",
         "approval_requested": "Approvazione richiesta",
         "approved": "Preventivo approvato",
-        "rejected": "Preventivo rifiutato in approvazione"
-      }
+        "rejected": "Preventivo rifiutato in approvazione",
+        "proposed": "Proposto come bozza dall'assistente"
+      },
+      "validUntil": "Valido fino al",
+      "noExpiry": "Nessuna scadenza",
+      "expiredAgo": "{days, plural, one {scaduto da # giorno} other {scaduto da # giorni}}",
+      "trackingTitle": "Condivisione e tracciamento",
+      "notSentYet": "Non ancora inviato",
+      "notOpenedYet": "Non ancora aperto",
+      "emailOpens": "Aperture dell'email",
+      "linkClicks": "Clic sul link",
+      "declineReason": "Motivo del rifiuto",
+      "publicLink": "Pagina per il cliente",
+      "openPublicPage": "Apri la pagina",
+      "newRevision": "Nuova revisione",
+      "revisionCreated": "Revisione {quoteNumber} creata come bozza.",
+      "revisionFailed": "Impossibile creare la revisione.",
+      "declineTitle": "Segna come rifiutato",
+      "declineReasonPlaceholder": "Perché ha detto no? (facoltativo)",
+      "signatureTitle": "Firma elettronica semplice",
+      "signedBy": "Firmato da",
+      "signedAt": "Firmato il",
+      "signedIp": "Dall'indirizzo",
+      "signedFingerprint": "Impronta del PDF firmato (SHA-256)",
+      "downloadSigned": "Scarica il PDF firmato"
     },
     "createModal": {
       "addQuote": "Aggiungi preventivo",
@@ -3325,7 +3874,6 @@
         "currency": "Valuta",
         "probability": "Probabilità (%)",
         "status": "Stato",
-        "healthScore": "Indice di salute",
         "expectedCloseDate": "Chiusura prevista",
         "createdAt": "Data di creazione",
         "firstName": "Nome",
@@ -3453,82 +4001,60 @@
     "vsPrevPeriod": "{pct}% rispetto al periodo precedente",
     "noActivity": "Nessuna attività registrata.",
     "noTaskData": "Nessun dato attività per il periodo selezionato.",
-    "noCampaigns": "Nessuna campagna nel periodo selezionato.",
-    "auditNoActivity": "Nessuna attività registrata. Le azioni degli utenti appariranno qui.",
-    "auditDesc": "Ultimi {count} eventi — dal più recente",
     "kpi": {
-      "trackedActions": "Azioni Tracciate",
-      "trackedActionsSub": "Totale eventi di audit nel periodo",
+      "trackedActions": "Attività registrate",
+      "trackedActionsSub": "Chiamate, riunioni, email e note nel periodo",
       "tasksCompleted": "Attività Completate",
       "tasksCompletedSub": "{rate}% tasso di completamento",
       "dealsWon": "Trattative Vinte",
-      "dealsWonSub": "{rate}% tasso di vincita",
+      "dealsWonSub": "Tasso di vincita: {rate}",
       "newLeads": "Nuovi Lead",
       "newLeadsSub": "Lead aggiunti nel periodo",
       "quotesCreated": "Preventivi Creati",
       "quotesCreatedSub": "Tutti gli stati",
       "openTickets": "Ticket Aperti",
-      "openTicketsSub": "Aperti + in corso + in attesa",
+      "openTicketsSub": "Tutti quelli non ancora risolti né chiusi",
       "winRate": "Tasso di Vincita",
-      "winRateSub": "Trattative vinte vs. create",
+      "winRateSub": "Vinte sul totale delle chiuse nel periodo",
       "taskRate": "Tasso Attività",
       "taskRateSub": "Attività completate vs. totali",
-      "totalRevenue": "Fatturato Totale",
-      "totalRevenueSub": "Trattative vinte + Ordini completati",
+      "totalRevenue": "Valore vinto",
+      "totalRevenueSub": "Trattative chiuse come vinte nel periodo",
       "dealsWonSales": "Trattative Vinte",
-      "dealsWonSalesSub": "€{value} fatturato",
+      "dealsWonSalesSub": "{value} di valore vinto",
       "quotesAccepted": "Preventivi Accettati",
-      "quotesAcceptedSub": "€{value} valore",
+      "quotesAcceptedSub": "{value} di valore",
       "ordersCompleted": "Ordini Completati",
-      "ordersCompletedSub": "€{value} fatturato"
+      "ordersCompletedSub": "{value} di fatturato",
+      "ordersCompletedSubUnconverted": "{value} di fatturato; {count, plural, one {escluso # ordine in un'altra valuta senza cambio noto} other {esclusi # ordini in un'altra valuta senza cambio noto}}"
     },
     "tabs": {
       "activity": "Attività",
       "performance": "Performance",
-      "sales": "Vendite",
-      "campaigns": "Campagne",
-      "auditLog": "Registro Audit"
+      "sales": "Vendite"
     },
     "charts": {
       "dailyTrend": "Tendenza Attività Giornaliera",
-      "dailyTrendDesc": "Azioni registrate al giorno",
-      "actionsByType": "Azioni per Tipo",
-      "actionsByTypeDesc": "Distribuzione delle operazioni tracciate",
-      "userLeaderboard": "Classifica Attività Utenti",
-      "userLeaderboardDesc": "Ordinata per totale azioni tracciate",
+      "dailyTrendDesc": "Attività registrate al giorno",
+      "actionsByType": "Attività per tipo",
+      "actionsByTypeDesc": "Chiamate, riunioni, email e note",
+      "userLeaderboard": "Attività per persona",
+      "userLeaderboardDesc": "Ordinata per numero di attività registrate",
       "taskPerf": "Performance Attività per Utente",
       "taskPerfDesc": "Tasso di completamento, totali, attività scadute",
       "monthlyRevenue": "Fatturato Mensile (Trattative Vinte)",
       "monthlyRevenueDesc": "Fatturato da trattative chiuse per mese",
       "revenueByStage": "Fatturato per Fase Pipeline",
       "revenueByStageDesc": "Fatturato da trattative vinte per fase",
-      "campaignEngagement": "Coinvolgimento Campagne",
-      "campaignEngagementDesc": "Tassi di apertura e clic per campagna",
-      "campaignVolume": "Volume Campagne",
-      "campaignVolumeDesc": "Email inviate per campagna",
-      "campaignSummary": "Riepilogo Campagne",
-      "actionsLabel": "Azioni",
-      "revenueLabel": "Fatturato",
-      "openPct": "% Aperture",
-      "clickPct": "% Clic"
+      "actionsLabel": "Attività",
+      "revenueLabel": "Fatturato"
     },
     "cols": {
       "user": "Utente",
       "total": "Totale",
       "done": "Completate",
       "overdue": "Scadute",
-      "completionRate": "Tasso Completamento",
-      "time": "Ora",
-      "action": "Azione",
-      "entity": "Entità",
-      "ipAddress": "Indirizzo IP",
-      "campaign": "Campagna",
-      "status": "Stato",
-      "recipients": "Destinatari",
-      "opens": "Aperture",
-      "clicks": "Clic",
-      "openPct": "% Ap.",
-      "clickPct": "% Cl."
+      "completionRate": "Tasso Completamento"
     },
     "actionLabels": {
       "login": "Accesso",
@@ -3562,6 +4088,33 @@
     "overviewPage": {
       "title": "Report e analisi",
       "subtitle": "Monitora l'attività degli utenti, le metriche di performance e i risultati delle campagne. Solo per amministratori."
+    },
+    "scorecard": {
+      "title": "Per commerciale",
+      "subtitle": "Vinto contro obiettivo, copertura della pipeline e il lavoro dietro, per ogni persona nel periodo.",
+      "unassigned": "Nessuno",
+      "former": "{name} (non più nel workspace)",
+      "total": "Squadra",
+      "empty": "Ancora nessuno in questo workspace.",
+      "days": "{days, plural, one {# giorno} other {# giorni}}",
+      "coverageValue": "{value}×",
+      "activityValue": "{calls} chiamate · {meetings} incontri · {emails} email",
+      "coverageHelp": "Pipeline aperta divisa per quanto resta dell'obiettivo. 3× vuol dire che è in gioco il triplo di quanto resta da vincere.",
+      "cycleHelp": "Giorni medi dalla creazione alla vittoria, sulle trattative vinte nel periodo.",
+      "openHelp": "Aperte adesso, qualunque sia il periodo.",
+      "footnote": "Vinte e perse sono datate dalla chiusura, gli importi sono in euro convertiti nella tua valuta e il tasso di vincita è sulle trattative decise nel periodo: gli stessi numeri delle pagine Pipeline. Ogni importo apre le trattative che conta.",
+      "cols": {
+        "rep": "Commerciale",
+        "won": "Vinto",
+        "target": "Obiettivo",
+        "coverage": "Copertura",
+        "winRate": "Tasso di vincita",
+        "lost": "Perse",
+        "avgWon": "Valore medio",
+        "cycle": "Ciclo",
+        "open": "Aperte",
+        "activity": "Attività"
+      }
     }
   },
   "roles": {
@@ -3631,14 +4184,14 @@
   },
   "search": {
     "buttonLabel": "Cerca",
-    "placeholder": "Cerca contatti, lead, trattative, ticket, preventivi…",
+    "placeholder": "Cerca nomi, email, telefoni, numeri di documento…",
     "clear": "Cancella",
     "quickAccess": "Accesso rapido",
     "keepTyping": "Continua a digitare per cercare…",
     "noResults": "Nessun risultato per",
     "noResultsTip": "Prova con un nome, numero, email o oggetto diverso.",
     "resultsHeading": "Risultati",
-    "foundCount": "{count} trovati",
+    "foundCount": "{count, plural, one {# risultato} other {# risultati}}",
     "navigate": "naviga",
     "open": "apri",
     "close": "chiudi",
@@ -3661,37 +4214,25 @@
       "quote": "Preventivo",
       "order": "Ordine"
     },
-    "commands": {
-      "go-to-dashboard": "Vai alla dashboard",
-      "new-company": "Nuova azienda",
-      "new-contact": "Nuovo contatto",
-      "new-deal": "Nuova trattativa",
-      "new-lead": "Nuovo lead",
-      "new-order": "Nuovo ordine",
-      "new-quote": "Nuovo preventivo",
-      "new-task": "Nuova attività",
-      "new-ticket": "Nuovo ticket",
-      "win-loss": "Vinte / perse"
-    },
     "commandGroups": {
       "crm": "CRM",
       "sales": "Vendite",
       "support": "Assistenza",
       "work": "Lavoro"
-    }
+    },
+    "placeholderShort": "Cerca in tutto il CRM…",
+    "tip": "Trova persone e aziende per nome, email o telefono (almeno 4 cifre), e i documenti per numero.",
+    "clearLabel": "Cancella la ricerca",
+    "searching": "Ricerca in corso…",
+    "error": "La ricerca non è andata a buon fine. Controlla la connessione e riprova.",
+    "retry": "Riprova",
+    "seeAll": "Vedi tutti: {type}",
+    "searchEverywhere": "Cerca in tutte le sezioni",
+    "noResultsFor": "Nessun risultato per “{query}”",
+    "noResultsIn": "Nessun risultato per “{query}” in {section}"
   },
   "settings": {
     "title": "Impostazioni",
-    "general": {
-      "title": "Impostazioni Generali",
-      "companyName": "Nome Azienda",
-      "timezone": "Fuso Orario",
-      "dateFormat": "Formato Data",
-      "currency": "Valuta",
-      "language": "Lingua",
-      "logo": "Logo",
-      "favicon": "Favicon"
-    },
     "customFields": {
       "title": "Campi Personalizzati",
       "newField": "Nuovo Campo",
@@ -3844,16 +4385,35 @@
         "createWebhook": "Crea Webhook"
       },
       "webhookEvents": {
-        "contactCreated": "Contatto Creato",
-        "contactUpdated": "Contatto Aggiornato",
-        "contactDeleted": "Contatto Eliminato",
-        "leadCreated": "Lead Creato",
-        "leadConverted": "Lead Convertito",
-        "dealCreated": "Trattativa Creata",
-        "dealStageChanged": "Fase Trattativa Cambiata",
-        "dealWon": "Trattativa Vinta",
-        "dealLost": "Trattativa Persa",
-        "taskCompleted": "Attività Completata"
+        "all": "Tutto, compresi gli eventi delle tue regole",
+        "contact_created": "Contatto creato",
+        "contact_updated": "Contatto modificato",
+        "contact_deleted": "Contatto eliminato",
+        "company_created": "Azienda creata",
+        "company_updated": "Azienda modificata",
+        "consent_withdrawn": "Consenso ritirato (qualcuno ha chiesto di smettere)",
+        "lead_created": "Lead creato",
+        "lead_updated": "Lead modificato",
+        "lead_converted": "Lead convertito",
+        "deal_created": "Trattativa creata",
+        "deal_stage_changed": "Trattativa spostata di fase",
+        "deal_won": "Trattativa vinta",
+        "deal_lost": "Trattativa persa",
+        "activity_created": "Attività registrata",
+        "task_completed": "Attività da fare completata",
+        "quote_sent": "Preventivo inviato",
+        "quote_accepted": "Preventivo accettato dal cliente",
+        "quote_declined": "Preventivo rifiutato dal cliente",
+        "order_created": "Ordine creato",
+        "order_draft": "Ordine tornato in bozza",
+        "order_processing": "Ordine in lavorazione",
+        "order_completed": "Ordine completato",
+        "order_cancelled": "Ordine annullato",
+        "invoice_issued": "Fattura emessa",
+        "ticket_created": "Ticket aperto",
+        "ticket_resolved": "Ticket risolto",
+        "ticket_rated": "Ticket giudicato dal cliente",
+        "invoice_paid": "Fattura pagata"
       },
       "fillAllFields": "Compila tutti i campi e seleziona almeno un evento.",
       "secretMissing": "Questo webhook non ha un segreto di firma: ricrealo.",
@@ -3884,7 +4444,12 @@
         "creating": "Creazione…",
         "saving": "Salvataggio…",
         "createStage": "Crea Fase",
-        "saveChanges": "Salva Modifiche"
+        "saveChanges": "Salva Modifiche",
+        "kindLabel": "Tipo",
+        "kindHelp": "Una trattativa spostata in una fase Vinta o Persa viene chiusa; riportata in una fase aperta, viene riaperta.",
+        "staleLabel": "Ferma dopo (giorni)",
+        "stalePlaceholder": "Nessun limite",
+        "staleHelp": "Una trattativa aperta qui da più di questi giorni viene segnata come ferma sulla board e contata nel report della pipeline."
       },
       "createSuccess": "Fase creata.",
       "createFailed": "Errore nella creazione della fase.",
@@ -3892,7 +4457,49 @@
       "updateFailed": "Errore nell'aggiornamento della fase.",
       "deleteConfirm": "Eliminare questa fase? Tutte le trattative devono essere spostate in un'altra fase prima.",
       "deleteSuccess": "Fase eliminata.",
-      "deleteFailed": "Impossibile eliminare una fase con trattative attive."
+      "deleteFailed": "Impossibile eliminare una fase con trattative attive.",
+      "deleteTitle": "Eliminare «{name}»?",
+      "kind": {
+        "open": "Aperta",
+        "won": "Vinta",
+        "lost": "Persa"
+      },
+      "kindRefused": {
+        "anotherWon": "C'è già una fase che chiude le trattative come vinte. Modifica prima quella.",
+        "anotherLost": "C'è già una fase che chiude le trattative come perse. Modifica prima quella.",
+        "hasDeals": "In questa fase ci sono trattative. Spostale prima di cambiare il significato della fase."
+      },
+      "lossReasons": {
+        "title": "Motivi di perdita",
+        "description": "Tra questi si sceglie quando una trattativa viene persa. Disattivane uno per non proporlo più: le trattative già chiuse con quel motivo lo conservano.",
+        "empty": "Nessun motivo di perdita.",
+        "nameLabel": "Motivo",
+        "placeholder": "es. Prezzo troppo alto",
+        "add": "Aggiungi",
+        "rename": "Rinomina",
+        "offered": "Proposto alla chiusura",
+        "retired": "Non proposto",
+        "saveFailed": "Impossibile salvare il motivo di perdita."
+      },
+      "pipelines": {
+        "label": "Pipeline",
+        "new": "Nuova pipeline",
+        "newTitle": "Nuova pipeline",
+        "newHelp": "Parte con le fasi consuete, colonne Vinta e Persa comprese: rinominale e riordinale come vendi.",
+        "create": "Crea",
+        "rename": "Rinomina",
+        "renameTitle": "Rinomina la pipeline",
+        "name": "Nome",
+        "delete": "Elimina pipeline",
+        "deleteTitle": "Eliminare «{name}»?",
+        "deleteBody": "Le sue fasi vengono eliminate con lei. Una pipeline con trattative dentro non si può eliminare: spostale o chiudile prima.",
+        "oneHelp": "Vendi in più modi — nuovi clienti e rinnovi, prodotti e servizi? Ognuno può avere la sua pipeline.",
+        "failed": "Non è andato a buon fine. Riprova.",
+        "refused": {
+          "default": "La prima pipeline non si può eliminare.",
+          "hasDeals": "Ci sono trattative in questa pipeline: spostale o chiudile prima."
+        }
+      }
     },
     "targets": {
       "title": "Obiettivi di Vendita",
@@ -3916,7 +4523,7 @@
       "removeTarget": "Rimuovi obiettivo"
     },
     "billing": {
-      "title": "Fatturazione e Abbonamento",
+      "title": "Abbonamento",
       "description": "Gestisci il tuo piano di abbonamento, utilizzo, componenti aggiuntivi e fatture.",
       "upgradeNoticeSuffix": "non è incluso nel tuo piano attuale. Esegui un upgrade per sbloccarlo.",
       "tabs": {
@@ -4102,50 +4709,205 @@
       "description": "Denominazione, partita IVA, regime fiscale e sede di chi emette le fatture."
     },
     "apiKey": {
-      "cardDescription": "La chiave con cui un sistema esterno scrive qui dentro, e l'identificativo di questa attività.",
-      "createFailed": "Non sono riuscito a creare la chiave.",
-      "revoked": "Chiave revocata: le chiamate con quella chiave smettono subito.",
-      "revokeFailed": "Non sono riuscito a revocare la chiave.",
-      "title": "Chiave API",
-      "description": "Serve a un sistema esterno per scrivere qui dentro: contatti, note, campi raccolti. Non è la password di nessuno, ed è legata a questa attività.",
-      "copyNow": "Copiala adesso: non te la mostrerò più.",
-      "copyKey": "Copia la chiave",
-      "exists": "Una chiave esiste già. Non si può rileggere: se l'hai persa, creane una nuova — quella vecchia smette di funzionare nello stesso momento.",
-      "createNew": "Crea una chiave nuova",
-      "create": "Crea la chiave",
+      "title": "Chiavi API",
+      "description": "Ogni chiave permette a un sistema esterno di leggere o scrivere qui — esattamente le parti che spunti, e niente altro. Non è la password di nessuno, ed è legata a questa attività.",
+      "cardDescription": "Le chiavi con cui i sistemi esterni leggono e scrivono qui, e l'identificativo di questa attività.",
+      "none": "Ancora nessuna chiave.",
+      "new": "Nuova chiave",
+      "name": "Nome",
+      "namePlaceholder": "Chi la usa — es. Modulo del sito, Zapier",
+      "scopesTitle": "Che cosa può fare",
+      "scopesHelp": "Scrivere non comprende leggere. Dai a ogni integrazione solo ciò che le serve: un modulo del sito deve scrivere lead, non leggere i tuoi clienti.",
+      "read": "Leggere",
+      "write": "Scrivere",
+      "entities": {
+        "contacts": "Contatti",
+        "leads": "Lead",
+        "companies": "Aziende",
+        "deals": "Trattative",
+        "orders": "Ordini",
+        "activities": "Attività e note",
+        "custom_fields": "Campi personalizzati",
+        "privacy": "Opt-out e cancellazione",
+        "webhooks": "Iscrizioni agli eventi (Zapier, Make)",
+        "assistant": "Segnare chi segue l'assistente",
+        "products": "Prodotti e prezzi del cliente",
+        "quotes": "Bozze di preventivo"
+      },
+      "create": "Crea chiave",
+      "cancel": "Annulla",
+      "copyNow": "Copiala adesso: non verrà più mostrata.",
+      "copyKey": "Copia chiave",
+      "madeBy": "Creata da {who} il {date}",
+      "lastUsed": "usata l'ultima volta il {date}",
+      "neverUsed": "mai usata",
       "revoke": "Revoca",
-      "rotateWarning": "Creandone una nuova, quella di prima smette di funzionare subito: l'integrazione che la usa va aggiornata nello stesso momento.",
+      "revokeConfirm": "Revocare questa chiave? Ciò che la usa smette di funzionare subito.",
+      "revoked": "Chiave revocata: le chiamate fatte con quella chiave smettono di funzionare subito.",
+      "revokeFailed": "Non è stato possibile revocare la chiave.",
+      "createFailed": "Non è stato possibile creare la chiave.",
+      "legacyTitle": "Chiave precedente ai permessi",
+      "legacyDescription": "Scrive tutto e non legge niente, come ha sempre fatto.",
+      "legacyHelp": "Ora le chiavi si possono limitare a ciò che serve. Creane una per l'integrazione che usa questa chiave, falla passare alla nuova, poi revoca questa.",
       "tenantIdTitle": "Identificativo di questa attività",
-      "tenantIdDescription": "Serve a comporre l'indirizzo a cui un sistema esterno manda i propri eventi.",
-      "copyTenantId": "Copia l'identificativo"
+      "tenantIdDescription": "Serve a comporre l'indirizzo a cui un sistema esterno manda i suoi eventi.",
+      "copyTenantId": "Copia identificativo"
+    },
+    "features": {
+      "title": "Funzioni",
+      "description": "Scegli quali parti facoltative del prodotto usa il workspace.",
+      "intro": "Spegnere una funzione la toglie dal menu di tutti e ne chiude le pagine; i dati restano, e riaccenderla le fa tornare come erano.",
+      "projects": {
+        "label": "Progetti: Gantt e carico di lavoro",
+        "help": "Pianificazione con dipendenze tra attività e matrice del carico per persona. Serve a chi gestisce progetti; per un team commerciale di solito è in più."
+      },
+      "chat": {
+        "label": "Chat interna",
+        "help": "Messaggi diretti e di gruppo tra colleghi, con la finestra in basso su ogni pagina. Spenta, pagina e finestra spariscono e smettono di interrogare il server ogni trenta secondi."
+      },
+      "saved": "Impostazione salvata.",
+      "failed": "Non è stato possibile salvare. Riprova."
+    },
+    "indexSubtitle": "Cosa puoi cambiare — per te e per il workspace.",
+    "generalPage": {
+      "title": "Generale",
+      "subtitle": "L'orologio del workspace, da cosa parte un nuovo preventivo e il logo sui documenti.",
+      "save": "Salva",
+      "saved": "Salvato.",
+      "failed": "Impossibile salvare.",
+      "timeZone": {
+        "title": "Fuso orario",
+        "help": "L'orologio di tutto il workspace: calendario, promemoria, cosa conta come oggi e ogni data dei report.",
+        "search": "Cerca un fuso orario…",
+        "invalid": "Non è un fuso orario che il sistema conosce."
+      },
+      "quotes": {
+        "title": "Preventivi",
+        "help": "Da cosa parte ogni nuovo preventivo. Viene copiato nel preventivo, quindi cambiarlo dopo non riscrive quelli già inviati.",
+        "validity": "Validità (giorni)",
+        "validityHelp": "0 lascia vuota la data di scadenza.",
+        "terms": "Condizioni standard",
+        "termsPlaceholder": "Pagamento, consegna, validità…",
+        "termsHelp": "Inserite nelle note di ogni nuovo preventivo, dove si possono ancora cambiare."
+      },
+      "logo": {
+        "title": "Logo",
+        "help": "Stampato in cima al PDF dei preventivi. PNG o JPEG, fino a 512 KB.",
+        "alt": "Logo del workspace",
+        "none": "Nessun logo",
+        "upload": "Carica il logo",
+        "replace": "Sostituisci",
+        "remove": "Rimuovi",
+        "errors": {
+          "missing": "Scegli prima un'immagine.",
+          "tooBig": "L'immagine supera i 512 KB.",
+          "notImage": "Su un PDF possono andare solo immagini PNG e JPEG.",
+          "storage": "Impossibile salvare il logo. Verifica che l'archivio documenti sia configurato."
+        }
+      },
+      "approval": {
+        "title": "Approvazione dei preventivi",
+        "help": "Un preventivo oltre questi limiti ha bisogno della firma di chi approva prima di essere inviato. Contano gli sconti di riga come quello sull'intero preventivo.",
+        "maxDiscount": "Sconto massimo senza approvazione (%)",
+        "maxTotal": "Totale massimo senza approvazione",
+        "zeroOff": "0 disattiva quel limite."
+      }
+    },
+    "lists": {
+      "title": "Elenchi",
+      "subtitle": "Categorie e tipi di azienda: rinominali, unisci i doppioni, togli quelli non usati.",
+      "category": {
+        "title": "Categorie di azienda",
+        "help": "Che tipo di attività è un'azienda."
+      },
+      "type": {
+        "title": "Tipi di azienda",
+        "help": "Cos'è un'azienda per voi."
+      },
+      "lossReasons": {
+        "title": "Motivi di perdita",
+        "help": "Tra questi si sceglie quando una trattativa viene persa — si gestiscono accanto alle fasi della pipeline."
+      },
+      "empty": "Ancora niente: le voci si creano dal modulo dell'azienda.",
+      "companies": "{count, plural, one {# azienda} other {# aziende}}",
+      "rename": "Rinomina",
+      "merge": "Unisci",
+      "delete": "Elimina",
+      "save": "Salva",
+      "cancel": "Annulla",
+      "saved": "Salvato.",
+      "merged": "Uniti.",
+      "deleted": "Eliminato.",
+      "failed": "Impossibile completare la modifica.",
+      "mergeTitle": "Unisci «{name}» a…",
+      "mergeHelp": "{count, plural, =0 {Non ha aziende.} one {La sua # azienda passa alla voce che scegli.} other {Le sue # aziende passano alla voce che scegli.}} Poi viene eliminata.",
+      "mergeInto": "Scegli a quale voce unirla",
+      "deleteTitle": "Eliminare «{name}»?",
+      "deleteHelp": "{count, plural, =0 {Nessuna azienda la usa.} one {# azienda resterà senza.} other {# aziende resteranno senza.}}",
+      "refused": {
+        "empty": "Serve un nome.",
+        "taken": "C'è già una voce con quel nome. Uniscile invece.",
+        "same": "Scegli una voce diversa a cui unirla."
+      }
+    },
+    "sla": {
+      "title": "SLA e orari",
+      "description": "Tempi di risposta e di risoluzione promessi, orari lavorativi e festività."
+    },
+    "forms": {
+      "title": "Moduli",
+      "description": "Moduli pubblici con cui un sito può inviare lead e richieste di assistenza: un link, un riquadro sul tuo sito, o un tuo modulo che invia a Flux.",
+      "open": "Aperto: accetta invii",
+      "closed": "Chiuso",
+      "nobody": "Nessuno",
+      "link": "Pagina",
+      "embed": "Per metterlo sul tuo sito",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "preview": "Apri la pagina",
+      "saved": "Salvato",
+      "failed": "Non è andato a buon fine. Riprova.",
+      "ownForm": "Oppure un tuo modulo: POST a {endpoint} con workspace={workspace}, token={token} e i campi {fields}. Aggiungi un campo redirect per portare poi il visitatore su una tua pagina.",
+      "turnstileOn": "Protetto dallo spam con Cloudflare Turnstile, un campo nascosto e un limite di cinque invii al minuto per indirizzo.",
+      "turnstileOff": "Protetto dallo spam con un campo nascosto e un limite di cinque invii al minuto per indirizzo. Imposta TURNSTILE_SITE_KEY e TURNSTILE_SECRET_KEY per aggiungere Cloudflare Turnstile.",
+      "lead": {
+        "name": "Modulo di contatto",
+        "help": "Crea un nuovo lead — oppure, per chi è già nel CRM, aggiunge il messaggio alla sua cronologia invece di un doppione. Il consenso marketing è solo quello che il visitatore spunta.",
+        "owner": "I lead vanno a"
+      },
+      "ticket": {
+        "name": "Modulo di richiesta di assistenza",
+        "help": "Apre un ticket, trovando il mittente tra i contatti o aggiungendolo. Il ticket segue le tue regole di assistenza come ogni altro.",
+        "owner": "Avvisa anche"
+      }
     }
   },
   "support": {
     "title": "Assistenza",
     "dashboard": {
-      "title": "Centro Assistenza",
+      "title": "Centro assistenza",
       "subtitle": "Gestisci i ticket dei clienti e monitora le performance SLA",
-      "openTickets": "Ticket Aperti",
+      "openTickets": "Ticket aperti",
       "openTicketsDesc": "In attesa di risposta",
-      "totalTickets": "Ticket Totali",
+      "totalTickets": "Ticket totali",
       "totalTicketsDesc": "Totale storico",
-      "resolutionRate": "Tasso di Risoluzione",
+      "resolutionRate": "Tasso di risoluzione",
       "resolvedDesc": "{count} risolti",
-      "avgResolution": "Risoluzione Media",
+      "avgResolution": "Risoluzione media",
       "avgResolutionDesc": "Tempo alla chiusura",
-      "openTicketsList": "Ticket Aperti",
+      "openTicketsList": "Ticket aperti",
       "openTicketsListDesc": "Problemi recenti in attesa di risposta",
       "viewAll": "Vedi tutti",
       "allCaughtUp": "Tutto in ordine!",
       "noOpenTickets": "Nessun ticket aperto al momento.",
-      "recentlyResolved": "Recentemente Risolti",
+      "recentlyResolved": "Recentemente risolti",
       "seeAll": "Vedi tutti →",
       "noResolvedYet": "Nessun ticket risolto ancora.",
       "slaPerformance": "Performance SLA",
-      "currentMonth": "Mese corrente",
-      "onTimeResolution": "Risoluzione Puntuale",
-      "firstResponse": "Prima Risposta",
-      "satisfaction": "Soddisfazione",
+      "currentMonth": "Ultimi 30 giorni, più tutti i ticket ancora aperti",
+      "onTimeResolution": "Risoluzione puntuale",
+      "firstResponse": "Prima risposta",
+      "satisfaction": "Soddisfazione ({count, plural, one {# risposta} other {# risposte}})",
       "channels": "Canali",
       "channelsDesc": "Volume ticket per fonte",
       "manageAllTickets": "Gestisci Tutti i Ticket",
@@ -4157,16 +4919,19 @@
         "email": "Email",
         "chat": "Chat",
         "phone": "Telefono",
-        "social": "Social"
+        "social": "Social",
+        "web": "Modulo web"
       },
-      "noData": "n/d"
+      "noData": "n/d",
+      "noRatings": "Ancora nessuna risposta",
+      "byAgent": "Per agente →"
     },
     "tickets": {
       "title": "Ticket",
-      "newTicket": "Nuovo Ticket",
-      "editTicket": "Modifica Ticket",
+      "newTicket": "Nuovo ticket",
+      "editTicket": "Modifica ticket",
       "deleteTicket": "Elimina ticket",
-      "ticketDetails": "Dettagli Ticket",
+      "ticketDetails": "Dettagli ticket",
       "noTickets": "Nessun ticket trovato.",
       "ticketNumber": "Ticket #",
       "subject": "Oggetto",
@@ -4176,18 +4941,18 @@
       "channel": "Canale",
       "firstResponse": "Prima risposta",
       "resolution": "Risoluzione",
-      "addReply": "Aggiungi Risposta",
+      "addReply": "Aggiungi risposta",
       "replyPlaceholder": "Scrivi la tua risposta…",
-      "sendReply": "Invia Risposta",
+      "sendReply": "Invia risposta",
       "internalNote": "Nota interna",
-      "addNote": "Aggiungi Nota",
+      "addNote": "Aggiungi nota",
       "statuses": {
         "new": "Nuovo",
         "open": "Aperto",
-        "pending": "In Attesa",
-        "in_progress": "In Lavorazione",
-        "waiting": "In Attesa del Cliente",
-        "on_hold": "In Sospeso",
+        "pending": "In attesa",
+        "in_progress": "In lavorazione",
+        "waiting": "In attesa del cliente",
+        "on_hold": "In sospeso",
         "resolved": "Risolto",
         "closed": "Chiuso"
       },
@@ -4221,8 +4986,8 @@
       "deleteSuccess": "Ticket eliminato.",
       "replySuccess": "Risposta inviata.",
       "macros": "Macro",
-      "supportCenter": "Centro Assistenza",
-      "supportTickets": "Ticket di Supporto",
+      "supportCenter": "Centro assistenza",
+      "supportTickets": "Ticket di supporto",
       "totalOpen": "{total} totali · {open} aperti",
       "listView": "Lista",
       "kanbanView": "Kanban",
@@ -4241,7 +5006,7 @@
       "daysAgo": "{count}g fa",
       "showingTickets": "Visualizzando {shown} di {total} ticket",
       "createModal": {
-        "title": "Nuovo Ticket di Supporto",
+        "title": "Nuovo ticket di supporto",
         "subtitle": "Apri un nuovo caso o problema cliente per il tuo team",
         "subjectLabel": "Oggetto",
         "subjectRequired": "Obbligatorio",
@@ -4266,7 +5031,7 @@
         "tagsPlaceholder": "Aggiungi tag… premi Invio per confermare",
         "cancelButton": "Annulla",
         "creatingButton": "Apertura…",
-        "openTicketButton": "Apri Ticket",
+        "openTicketButton": "Apri ticket",
         "successTitle": "Ticket {number} aperto",
         "successDesc": "Il ticket di supporto è stato creato.",
         "viewTicket": "Visualizza ticket",
@@ -4387,7 +5152,65 @@
         "reassigning": "Riassegnazione…",
         "deleteConfirm": "Sei sicuro di voler eliminare <strong>{number}</strong>? Questa azione rimuoverà definitivamente il ticket e tutti i suoi messaggi.",
         "deleting": "Eliminazione…",
-        "delete": "Elimina"
+        "delete": "Elimina",
+        "viewDetails": "Dettagli",
+        "viewConversation": "Conversazione",
+        "reply": "Rispondi",
+        "resolve": "Risolvi",
+        "reopen": "Riapri",
+        "readOnly": "Puoi consultare questo ticket, ma il tuo ruolo non consente di rispondere.",
+        "messagesCount": "{count, plural, =0 {Nessun messaggio} one {# messaggio} other {# messaggi}}",
+        "duration": {
+          "days": "{days}g {hours}h",
+          "hours": "{hours}h {minutes}m",
+          "minutes": "{minutes}m"
+        },
+        "metrics": {
+          "resolutionDue": "Risoluzione entro",
+          "overdue": "in ritardo di {duration}",
+          "after": "dopo {duration}",
+          "notYet": "Non ancora",
+          "age": "Aperto da",
+          "since": "dal {date}",
+          "closedOn": "chiuso il {date}",
+          "messages": "Messaggi"
+        },
+        "sla": {
+          "title": "SLA",
+          "policy": "Criterio",
+          "dueAt": "entro il {date}",
+          "paused": "SLA in pausa",
+          "pausedSince": "In pausa dal",
+          "breachedAt": "Violato il",
+          "state": {
+            "breached": "SLA violato",
+            "atRisk": "SLA a rischio",
+            "paused": "SLA in pausa",
+            "met": "SLA rispettato",
+            "onTrack": "SLA nei tempi"
+          }
+        },
+        "fields": {
+          "type": "Tipo",
+          "component": "Componente",
+          "team": "Team",
+          "dueDate": "Scadenza"
+        },
+        "types": {
+          "support": "Assistenza",
+          "bug": "Bug",
+          "complaint": "Reclamo",
+          "info_request": "Richiesta di informazioni",
+          "internal_task": "Attività interna"
+        },
+        "csat": {
+          "label": "Giudizio del cliente",
+          "good": "È andata bene",
+          "bad": "Non è andata bene",
+          "noComment": "Nessun commento",
+          "askedOn": "Chiesto il {date}",
+          "waiting": "Nessuna risposta"
+        }
       }
     },
     "sla": {
@@ -4395,18 +5218,18 @@
       "newPolicy": "Nuova Policy SLA",
       "editPolicy": "Modifica Policy SLA",
       "noPolicies": "Nessuna policy SLA trovata.",
-      "responseTime": "Tempo di Risposta",
-      "resolutionTime": "Tempo di Risoluzione",
-      "businessHours": "Orario Lavorativo",
+      "responseTime": "Tempo di risposta",
+      "resolutionTime": "Tempo di risoluzione",
+      "businessHours": "Orario lavorativo",
       "breached": "Violato",
       "onTrack": "In linea",
       "columns": {
-        "name": "Nome Policy",
+        "name": "Nome policy",
         "priority": "Priorità",
-        "responseTime": "Tempo Risposta",
-        "resolutionTime": "Tempo Risoluzione",
+        "responseTime": "Tempo risposta",
+        "resolutionTime": "Tempo risoluzione",
         "status": "Stato",
-        "firstResponse": "Prima Risposta",
+        "firstResponse": "Prima risposta",
         "resolution": "Risoluzione",
         "active": "Attivo"
       },
@@ -4434,7 +5257,7 @@
         "firstResponse": "Prima Risposta (min)",
         "resolution": "Risoluzione (min)",
         "activeLabel": "Attivo",
-        "saveChanges": "Salva Modifiche",
+        "saveChanges": "Salva modifiche",
         "createSla": "Crea SLA",
         "businessHoursLabel": "Conta solo le ore lavorative",
         "businessHoursHint": "Spento, l'orologio corre anche di notte e nel fine settimana: una promessa fatta venerdì pomeriggio può scadere quando non c'è nessuno.",
@@ -4454,8 +5277,8 @@
     "macros": {
       "title": "Macro",
       "subtitle": "Modelli di risposta predefiniti per velocizzare le risposte ai ticket.",
-      "newMacro": "Nuova Macro",
-      "editMacro": "Modifica Macro",
+      "newMacro": "Nuova macro",
+      "editMacro": "Modifica macro",
       "noMacros": "Nessuna macro ancora. Creane una per velocizzare le risposte.",
       "nameLabel": "Nome",
       "namePlaceholder": "es. Richiedi maggiori informazioni",
@@ -4484,17 +5307,73 @@
       "create": "Crea",
       "saving": "Salvataggio…",
       "variables": "Variabili"
+    },
+    "agents": {
+      "title": "Assistenza per agente",
+      "subtitle": "Cosa è arrivato, cosa è stato risolto e in quanto, quali promesse sono state mantenute e cosa hanno detto i clienti — persona per persona.",
+      "unassigned": "Non assegnati",
+      "former": "Ex membro",
+      "total": "Tutto il reparto",
+      "empty": "Nessun ticket si è mosso in questo periodo.",
+      "minutes": "{n} min",
+      "hours": "{n} h",
+      "days": "{n} g",
+      "priorities": {
+        "urgent": "Urgente",
+        "high": "Alta",
+        "normal": "Normale",
+        "low": "Bassa"
+      },
+      "cols": {
+        "agent": "Agente",
+        "received": "Ricevuti",
+        "solved": "Risolti",
+        "openNow": "Aperti ora",
+        "firstResponse": "Prima risposta",
+        "resolution": "Tempo di risoluzione",
+        "firstOnTime": "Prima risposta nei tempi",
+        "resolvedOnTime": "Risolti nei tempi",
+        "missed": "Mancati, per priorità",
+        "csat": "Soddisfazione"
+      },
+      "help": {
+        "received": "Ticket creati nel periodo e assegnati ora a questa persona.",
+        "solved": "Risolti, o chiusi senza risoluzione, nel periodo — e ancora tali. Un ticket riaperto non conta come risolto.",
+        "openNow": "Tutto ciò che oggi non è finito, qualunque sia il periodo.",
+        "firstResponse": "Tempo mediano dall'arrivo alla prima risposta pubblica, per le risposte date nel periodo.",
+        "resolution": "Tempo mediano dall'arrivo alla risoluzione, per i ticket risolti nel periodo.",
+        "firstOnTime": "Delle prime risposte in scadenza nel periodo, la quota data in tempo. Una non ancora scaduta non si conta.",
+        "resolvedOnTime": "Dei ticket risolti nel periodo con una scadenza, la quota risolta in tempo, al netto delle pause.",
+        "missed": "Promesse mancate nel periodo, prima risposta o risoluzione, per priorità del ticket.",
+        "csat": "Dei clienti che hanno risposto nel periodo, la quota che ha detto che è andata bene."
+      },
+      "csatOff": "La soddisfazione resta vuota finché ai clienti non viene chiesto.",
+      "csatOffLink": "Attivala nelle impostazioni SLA",
+      "backlogTitle": "Ticket aperti, settimana per settimana",
+      "backlogHelp": "Quanti ticket erano ancora aperti alla fine di ogni settimana: il carico del reparto.",
+      "truncated": "Sono stati letti solo i primi 20.000 ticket: i numeri coprono una parte del periodo.",
+      "footnote": "I tempi sono di calendario, dall'arrivo. Le quote nei tempi usano lo SLA di ogni ticket; un ticket senza SLA non si conta."
+    },
+    "csat": {
+      "title": "Soddisfazione del cliente",
+      "description": "Quando un ticket viene risolto, il cliente riceve un'email che lo dice, con due pulsanti: è andata bene, oppure no.",
+      "label": "Scrivi al cliente quando un ticket è risolto e chiedi com'è andata",
+      "on": "Ai clienti verrà chiesto dal prossimo ticket risolto.",
+      "off": "Ai clienti non verrà più chiesto.",
+      "failed": "Non è andato a buon fine. Riprova.",
+      "notReady": "Il deployment non ha un indirizzo pubblico (NEXT_PUBLIC_APP_URL), quindi i link dell'email non porterebbero da nessuna parte. Impostalo prima.",
+      "help": "Chiesto una volta per ticket, nella lingua del cliente. Una risposta a quell'email riapre il ticket. Una risposta negativa arriva a chi l'ha gestito."
     }
   },
   "tasks": {
     "title": "Attività",
     "subtitle": "Tutte le attività legate a lead, contatti e trattative.",
-    "newTask": "Nuova Attività",
-    "editTask": "Modifica Attività",
-    "deleteTask": "Elimina Attività",
+    "newTask": "Nuova attività",
+    "editTask": "Modifica attività",
+    "deleteTask": "Elimina attività",
     "noTasks": "Nessuna attività trovata.",
     "dueDate": "Scadenza",
-    "dueTime": "Ora Scadenza",
+    "dueTime": "Ora scadenza",
     "assignTo": "Assegna a",
     "markComplete": "Segna come completata",
     "markIncomplete": "Segna come non completata",
@@ -4563,7 +5442,7 @@
     "updateSuccess": "Attività aggiornata.",
     "deleteSuccess": "Attività eliminata.",
     "dialog": {
-      "newTitle": "Nuova Attività",
+      "newTitle": "Nuova attività",
       "subtitle": "Compila i dettagli per creare una nuova attività.",
       "tabs": {
         "details": "Dettagli",
@@ -4642,7 +5521,7 @@
       "tooltipAssignee": "Assegnato a",
       "tooltipPriority": "Priorità",
       "workloadToggle": "Workload",
-      "workloadPanelTitle": "Carico del Team",
+      "workloadPanelTitle": "Carico del team",
       "workloadNextDays": "{n} giorni lavorativi",
       "workloadNoData": "Nessun assegnatario con date in questo periodo.",
       "workloadViewFull": "Vista workload completa →",
@@ -4650,7 +5529,7 @@
       "deleteLinkError": "Errore nell'eliminazione della dipendenza."
     },
     "workload": {
-      "title": "Carico di Lavoro",
+      "title": "Carico di lavoro",
       "overbookedDays": "{count, plural, one {# giorno sovraccarico} other {# giorni sovraccarichi}}",
       "teamMember": "Membro del team",
       "noTasksTitle": "Nessuna attività con assegnatari e date in questo periodo.",
@@ -4709,6 +5588,17 @@
         "SS": "Inizio → Inizio",
         "FF": "Fine → Fine",
         "SF": "Inizio → Fine"
+      },
+      "sections": {
+        "time": "Tempo"
+      },
+      "hero": {
+        "due": "Scadenza {date}",
+        "timeSpent": "Tempo impiegato",
+        "hours": "{hours} h",
+        "ofEstimate": "su {hours} h stimate",
+        "noEstimate": "Nessuna stima",
+        "depsDone": "Tutte completate"
       }
     },
     "newTaskDialog": {
@@ -4903,7 +5793,10 @@
       "storageNote": "*Le preferenze sono salvate nei cookie. Nel codice puoi scegliere tra cookie, localStorage o nessun salvataggio."
     },
     "presets": {
-      "default": "Predefinito"
+      "default": "Predefinito",
+      "aurora": "Aurora",
+      "atelier": "Atelier",
+      "orchid": "Orchidea"
     }
   },
   "handover": {
@@ -5086,6 +5979,42 @@
       "sequence_reply": {
         "label": "Un destinatario risponde a una sequenza",
         "help": "Qualcuno a cui scrive una tua sequenza di follow-up ha risposto; gli invii automatici si sono fermati."
+      },
+      "appointment_reminder": {
+        "label": "Un appuntamento a cui partecipo sta per iniziare",
+        "help": "Il promemoria impostato sull'appuntamento: 15 minuti prima, un giorno prima, quello che è stato scelto."
+      },
+      "task_completed": {
+        "label": "Viene completata un'attività mia o affidata a me",
+        "help": "Quando un collega completa un'attività di cui sei titolare o assegnatario. Mai per quelle che completi tu."
+      },
+      "email_reply": {
+        "label": "Un mio cliente mi scrive",
+        "help": "Una email da un contatto o lead di cui sei titolare, fuori da un ticket di assistenza. È nella sua cronologia, e un task per rispondere è nella tua lista di oggi."
+      },
+      "quote_viewed": {
+        "label": "Un cliente apre un mio preventivo",
+        "help": "La prima volta che apre il link che hai inviato."
+      },
+      "quote_accepted": {
+        "label": "Un cliente accetta un mio preventivo",
+        "help": "Dalla pagina del preventivo."
+      },
+      "quote_declined": {
+        "label": "Un cliente rifiuta un mio preventivo",
+        "help": "Dalla pagina del preventivo, con il motivo se l'ha indicato."
+      },
+      "booking_received": {
+        "label": "Qualcuno mi prenota un appuntamento",
+        "help": "Un visitatore ha prenotato un incontro dalla tua pagina di prenotazione. È già nel tuo calendario."
+      },
+      "ticket_rated_bad": {
+        "label": "Un cliente giudica male un mio ticket",
+        "help": "Dopo la risoluzione di un ticket che hai gestito, il cliente ha risposto che non è andata bene."
+      },
+      "chat_mention": {
+        "label": "Una menzione in chat",
+        "help": "Un collega ti nomina in una conversazione (@Nome), anche se l'hai silenziata."
       }
     },
     "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito.",
@@ -5207,7 +6136,14 @@
       "notesPlaceholder": "Condizioni particolari, riferimenti, cosa comprende"
     },
     "searchPlaceholder": "Cerca per titolo, cliente o titolare…",
-    "back": "Torna ai contratti"
+    "back": "Torna ai contratti",
+    "detail": {
+      "perYearHint": "{amount} all'anno",
+      "tabCustomer": "Cliente",
+      "tabValue": "Valore",
+      "tabTerm": "Durata",
+      "tabNotes": "Note"
+    }
   },
   "sequences": {
     "title": "Sequenze di follow-up",
@@ -5274,14 +6210,45 @@
       "missing_email": "Senza email",
       "record_deleted": "Record eliminato",
       "email_changed": "Email cambiata",
-      "manual": "Fermata a mano"
+      "manual": "Fermata a mano",
+      "with_assistant": "Seguito dall'assistente"
     },
     "sequenceButton": "Sequenza",
     "noSequencesFor": "Nessuna sequenza attiva per questo tipo di record.",
     "chooseSequence": "Scegli una sequenza…",
     "enroll": "Iscrivi",
     "enrolledToast": "Iscritto alla sequenza.",
-    "close": "Chiudi"
+    "close": "Chiudi",
+    "detail": {
+      "active": "Attiva",
+      "paused": "In pausa",
+      "forEntity": "{entity, select, lead {Per i lead} contact {Per i contatti} other {}}",
+      "stepCount": "{count, plural, one {# passo} other {# passi}}",
+      "stepDelay": "{days, plural, =0 {appena iscritto} one {dopo # giorno} other {dopo # giorni}}",
+      "noSubject": "Nessun oggetto"
+    },
+    "businessDays": "Conta solo i giorni lavorativi (dal lunedì al venerdì)",
+    "sendWindow": "Invia tra le",
+    "sendFrom": "Dalle",
+    "sendUntil": "Alle",
+    "sendWindowHelp": "Sull'orario dello spazio di lavoro. Un passo che cade fuori attende la finestra successiva. Lascia vuoto per inviare a qualsiasi ora.",
+    "stepKind": "Passo",
+    "kinds": {
+      "email": "Invia un'email",
+      "task": "Crea un'attività"
+    },
+    "taskType": "Tipo di attività",
+    "taskTypes": {
+      "call": "Chiamata",
+      "email": "Email",
+      "meeting": "Riunione",
+      "todo": "Da fare"
+    },
+    "taskTitle": "Titolo dell'attività",
+    "taskNote": "Nota per il commerciale",
+    "replyInThread": "Invia come risposta nello stesso thread (Re: l'oggetto della prima email)",
+    "taskSummary": "{type}: {title}",
+    "replySummary": "Risposta nel thread"
   },
   "invoicing": {
     "title": "Fatturazione elettronica",
@@ -5520,6 +6487,9 @@
       "creditsInvoice": "Storna la",
       "residualLeft": "residuo stornabile {amount}",
       "noteNumber": "Nota di credito n. {number}"
+    },
+    "payments": {
+      "due": "Dovuto al netto delle note di credito"
     }
   },
   "entities": {
@@ -5655,7 +6625,8 @@
       "waiting": "In attesa",
       "resolved": "Risolto",
       "closed": "Chiuso",
-      "sending": "In invio"
+      "sending": "In invio",
+      "superseded": "Superato"
     },
     "attachedTo": "Allegato a: {type}",
     "search": {
@@ -5695,21 +6666,12 @@
     "tagsPlaceholder": "tech, startup, b2b"
   },
   "importExport": {
-    "selectFile": "Seleziona un file CSV.",
     "csvOnly": "Sono supportati solo file CSV.",
     "importFailed": "Importazione non riuscita.",
     "importFailedRetry": "Importazione non riuscita. Riprova.",
-    "complete": "Importazione completata: {created} creati, {skipped} saltati.",
-    "completeWithDuplicates": "Importazione completata: {created} creati, {skipped} saltati ({duplicates, plural, one {# duplicato} other {# duplicati}}).",
     "exportCsv": "Esporta CSV",
     "importCsv": "Importa CSV",
-    "required": "Obbligatori:",
-    "optional": "Facoltativi:",
-    "semicolonSeparated": "separati da ;",
-    "dedup": "I duplicati vengono riconosciuti tramite <b>{field}</b> e saltati automaticamente.",
-    "csvFile": "File CSV",
     "importing": "Importazione…",
-    "import": "Importa",
     "titles": {
       "contacts": "Importa contatti",
       "leads": "Importa lead",
@@ -5768,7 +6730,9 @@
     "setStatus": "Imposta stato",
     "changeStatusTo": "Cambia stato in",
     "assign": "Assegna",
-    "assignTo": "Assegna a"
+    "assignTo": "Assegna a",
+    "confirmDeleteTitle": "{count, plural, one {Eliminare # record?} other {Eliminare # record?}}",
+    "confirmDeleteBody": "Con i record vengono eliminati anche le attività, i task e le note collegati. L'operazione non si può annullare."
   },
   "recordTable": {
     "selectRecord": "Seleziona {name}"
@@ -5858,7 +6822,7 @@
           },
           "t04": {
             "q": "Posso importare lead da un file Excel o CSV?",
-            "a": "Sì. Nella lista Lead trovi il pulsante 'Importa CSV'. Prepara il file con le colonne richieste (nome, cognome, email, ecc.), caricalo e il sistema importerà i record saltando automaticamente i duplicati (stessa email = aggiornamento del record esistente)."
+            "a": "Sì. Nella lista Lead, 'Importa CSV' (serve il ruolo di editor o superiore) apre un'importazione guidata. Scegli il file — da Excel salva come CSV; il punto e virgola va bene. Poi indica quale campo riempie ogni colonna: Flux lo propone dai nomi delle colonne, in italiano o in inglese, e un'esportazione di Flux si abbina da sola. Scegli cosa fare di un lead con un'email già presente (con qualunque maiuscola, o ripetuta nel file): saltarlo, aggiornarlo con le celle compilate della riga, o crearlo comunque. L'anteprima mostra quanti lead verranno creati, aggiornati e saltati, e quali righe hanno errori, prima di scrivere qualsiasi cosa. Per ogni lead serve almeno uno fra nome, cognome, email e telefono. Fino a 5.000 righe per file; un file che supererebbe il limite di record del tuo piano non viene importato, e l'anteprima lo dice. L'importazione non fa partire le automazioni."
           },
           "t05": {
             "q": "Come uso i filtri e i filtri salvati?",
@@ -6391,11 +7355,11 @@
         "topics": {
           "t01": {
             "q": "Come collego un programma esterno a Flux?",
-            "a": "Impostazioni → API, dove generi la chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo altrove e non può sbagliare workspace per errore. Nella stessa pagina c'è l'identificativo di questa attività, che serve a comporre gli indirizzi dell'integrazione.\nC'è una chiave sola per workspace e la vedi una volta sola, al momento della creazione: non è rileggibile. Se la perdi ne crei un'altra, e la vecchia smette di funzionare nello stesso istante — quindi l'integrazione va aggiornata nello stesso momento. 'Revoca' la spegne subito senza crearne una nuova. Flux non registra quando una chiave è stata usata l'ultima volta: per capire se un'integrazione sta lavorando si guarda il Contributo dell'assistente."
+            "a": "Impostazioni → API, dove crei una chiave per ogni integrazione, con un nome e con ciò che può fare. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo altrove e non può sbagliare workspace per errore.\nUna chiave la vedi una volta sola, al momento della creazione: non è rileggibile, e la distingui dalle altre per nome e per le ultime quattro cifre. Per cambiarla ne crei una nuova, aggiorni l'integrazione e poi revochi la vecchia, che smette di funzionare subito. Accanto a ogni chiave c'è quando è stata usata l'ultima volta, al giorno. Il riferimento completo — ogni rotta, cosa risponde, quale permesso chiede — è su /developers, e lo stesso in OpenAPI su /api/openapi.json."
           },
           "t02": {
             "q": "Che cosa può fare una chiave API?",
-            "a": "Scrivere, non leggere. Le rotte disponibili sono tutte in POST e coprono contatti, lead, aziende, note, ordini, attività (anche collegate a un contatto, un lead, un'azienda o una trattativa), campi personalizzati, il cambio di fase di un lead, la chiusura delle trattative di una persona, l'opt-out da un recapito e la cancellazione GDPR. Quasi tutte hanno anche una versione 'bulk' per mandare più record in una volta.\n⚠️ Non esiste nessuna rotta di lettura: dall'esterno non si può rileggere un elenco di contatti o di ordini, quindi riconciliare a distanza di settimane quello che il CRM contiene davvero oggi non è possibile e va fatto dalle schermate. Una chiave equivale a un utente che può scrivere i record, non a un amministratore: non cambia impostazioni. Le chiamate sono contate sul piano del workspace, e oltre il limite la risposta è 429."
+            "a": "Ciò che le spunti, entità per entità: leggere e scrivere contatti, lead, aziende, trattative e ordini; scrivere attività e note, campi personalizzati, opt-out e cancellazioni. Scrivere non comprende leggere, e ciò che una chiave non copre riceve 403 con il nome del permesso mancante.\nLe letture restituiscono una pagina alla volta, dalla modifica più vecchia, con `updatedSince` per riprendere dall'ultima sincronizzazione: così si può riconciliare quello che un'integrazione ha con quello che il CRM contiene. Un record eliminato non compare nelle letture: lo dicono i webhook. La chiave creata prima dei permessi continua a scrivere tutto e a non leggere niente. Nessuna chiave cambia le impostazioni, e le chiamate sono contate sul piano del workspace: oltre il limite la risposta è 429."
           },
           "t03": {
             "q": "Che cosa risponde una richiesta con più record?",
@@ -6407,7 +7371,7 @@
           },
           "t05": {
             "q": "Che cosa mostra la pagina 'Contributo dell'assistente'?",
-            "a": "Che cosa è entrato nel CRM dalle integrazioni, nel mese in corso: quanti record sono stati scritti, in quante richieste, quando è arrivata l'ultima, e una tabella per tipo — contatti, aziende, lead, note, attività, ordini, campi personalizzati, trattative chiuse, consensi revocati, cancellazioni. La trovi in Analisi, non dentro i Report, perché chi collega un'integrazione deve poterla controllare anche senza aver acquistato il modulo dei report.\nTre avvertenze. Conta solo le scritture arrivate dalle rotte API: quello che il team fa dentro Flux non passa di lì e non compare, quindi non è un confronto tra le persone e l'assistente. Una richiesta può scrivere molte righe — un'importazione da cinquecento contatti è una richiesta e cinquecento righe — ed è per questo che le due colonne sono separate. E una chiave identifica il workspace, non chi la usa: con due integrazioni collegate i numeri sono la loro somma. Le cancellazioni sono contate senza dire su chi, per non lasciare traccia di chi ha chiesto di sparire."
+            "a": "Che cosa è entrato nel CRM dalle integrazioni, nel mese in corso: quanti record sono stati scritti, in quante richieste, quando è arrivata l'ultima, e una tabella per tipo — contatti, aziende, lead, note, attività, ordini, campi personalizzati, trattative chiuse, consensi revocati, cancellazioni. La trovi in Analisi, non dentro i Report, perché chi collega un'integrazione deve poterla controllare anche senza aver acquistato il modulo dei report.\nTre avvertenze. Conta solo le scritture arrivate dalle rotte API: quello che il team fa dentro Flux non passa di lì e non compare, quindi non è un confronto tra le persone e l'assistente. Una richiesta può scrivere molte righe — un'importazione da cinquecento contatti è una richiesta e cinquecento righe — ed è per questo che le due colonne sono separate. E il registro dice «integrazione», non quale chiave: con due integrazioni collegate i numeri sono la loro somma. Le cancellazioni sono contate senza dire su chi, per non lasciare traccia di chi ha chiesto di sparire."
           }
         }
       },
@@ -6668,7 +7632,13 @@
       "archiveFailed": "Non è stato possibile archiviare i file.",
       "emailInvalid": "L'indirizzo email non è valido.",
       "sendOnlyIssued": "Si possono inviare solo le fatture emesse.",
-      "emailNotSent": "Non è stato possibile inviare l'email."
+      "emailNotSent": "Non è stato possibile inviare l'email.",
+      "payment": {
+        "invalid_amount": "Inserisci un importo maggiore di zero.",
+        "not_found": "Questa fattura non esiste più.",
+        "not_receivable": "Si può pagare solo una fattura emessa: non una bozza, non una nota di credito.",
+        "invalid_date": "Inserisci il giorno in cui è arrivato il pagamento."
+      }
     },
     "contracts": {
       "notFound": "Questo contratto non esiste più."
@@ -6684,7 +7654,8 @@
         "missingEmail": "Questo record non ha un indirizzo email.",
         "converted": "Questo lead è già stato convertito.",
         "recordDeleted": "Questo record non esiste più.",
-        "unknown": "Non è stato possibile iscrivere il record."
+        "unknown": "Non è stato possibile iscrivere il record.",
+        "withAssistant": "Un assistente sta seguendo questa persona: le sequenze di Flux la lasciano stare finché non la rilascia."
       }
     },
     "territories": {
@@ -6795,7 +7766,8 @@
       "quoteAlreadyConverted": "Questo preventivo risulta già convertito.",
       "quoteNotAccepted": "Solo un preventivo accettato diventa un ordine. Registra prima la risposta del cliente.",
       "quoteHasNoLines": "Questo preventivo non ha righe da ordinare.",
-      "paymentPositive": "Un pagamento deve avere un importo positivo."
+      "paymentPositive": "Un pagamento deve avere un importo positivo.",
+      "paymentDate": "Inserisci il giorno in cui è arrivato il pagamento."
     },
     "products": {
       "nameRequired": "Il nome è obbligatorio.",
@@ -6848,6 +7820,10 @@
       "nameRequired": "Indicare un nome per il listino",
       "adjustmentRange": "La variazione deve essere compresa tra -100% e +100%",
       "priceNegative": "Il prezzo non può essere negativo"
+    },
+    "apiKeys": {
+      "nameRequired": "Dai un nome alla chiave: è ciò che la distinguerà dalle altre.",
+      "scopesRequired": "Spunta almeno una cosa che la chiave può fare."
     }
   },
   "priceLists": {
@@ -6946,7 +7922,699 @@
       "customerRemoved": "Cliente tolto dal listino.",
       "customerFailed": "Non è stato possibile aggiornare i clienti del listino.",
       "noCustomers": "Nessun cliente assegnato",
-      "noCustomersDesc": "Finché nessuno è su questo listino, i prezzi qui indicati non compaiono su alcun documento."
+      "noCustomersDesc": "Finché nessuno è su questo listino, i prezzi qui indicati non compaiono su alcun documento.",
+      "adjustmentHint": "Su ogni prodotto senza un prezzo indicato"
     }
+  },
+  "notificationTexts": {
+    "taskCompleted": {
+      "title": "Attività completata",
+      "message": "{completer} ha completato «{title}»."
+    },
+    "taskDueToday": {
+      "title": "Scade oggi: «{title}»",
+      "message": "Questa attività scade oggi."
+    },
+    "activityToday": {
+      "title": "{kind, select, call {Chiamata} meeting {Riunione} other {Attività}} oggi: «{description}»",
+      "message": "{kind, select, call {Hai una chiamata in programma oggi.} meeting {Hai una riunione in programma oggi.} other {Hai un'attività in programma oggi.}}"
+    },
+    "activityReminder": {
+      "title": "{kind, select, call {Chiamata in arrivo} meeting {Riunione in arrivo} other {Attività in arrivo}}: «{description}»",
+      "message": "In programma alle {time}"
+    },
+    "taskOverdue": {
+      "title": "«{title}» è in ritardo",
+      "message": "{count, plural, one {# attività collegata è a rischio} other {# attività collegate sono a rischio}}: valuta di ripianificare."
+    },
+    "leadAssigned": {
+      "title": "Ti è stato assegnato un lead",
+      "message": "{name} ora è tuo."
+    },
+    "contactAssigned": {
+      "title": "Ti è stato assegnato un contatto",
+      "message": "{name} ora è tuo."
+    },
+    "companyAssigned": {
+      "title": "Ti è stata assegnata un'azienda",
+      "message": "{name} ora è tua."
+    },
+    "dealWon": {
+      "title": "Trattativa vinta! 🏆",
+      "message": "«{name}» è stata segnata come vinta."
+    },
+    "quoteApprovalRequested": {
+      "title": "Preventivo da approvare",
+      "message": "Il preventivo {number} va approvato prima di essere inviato."
+    },
+    "quoteApproved": {
+      "title": "Preventivo approvato",
+      "message": "Il preventivo {number} è approvato: puoi inviarlo al cliente."
+    },
+    "quoteRejected": {
+      "title": "Preventivo rimandato indietro",
+      "message": "{hasReason, select, yes {Il preventivo {number} non è stato approvato. Motivo: {reason}} other {Il preventivo {number} non è stato approvato.}}"
+    },
+    "chatMessage": {
+      "title": "Nuovo messaggio da {sender}",
+      "message": "{preview}"
+    },
+    "orderCreated": {
+      "title": "Nuovo ordine {number}",
+      "message": "{total} — {lines, plural, one {# riga} other {# righe}}."
+    },
+    "slaBreach": {
+      "title": "SLA mancato — {ticket}",
+      "message": "{subject}"
+    },
+    "slaWarning": {
+      "title": "Usato il {percent} dell'SLA — {ticket}",
+      "message": "{subject}"
+    },
+    "appointmentReminder": {
+      "title": "Appuntamento in arrivo: «{title}»",
+      "message": "Inizia tra {unit, select, minute {{count, plural, one {# minuto} other {# minuti}}} hour {{count, plural, one {# ora} other {# ore}}} other {{count, plural, one {# giorno} other {# giorni}}}}."
+    },
+    "contractRenewal": {
+      "title": "Il contratto «{title}» richiede una decisione",
+      "message": "{autoRenew, select, yes {Si rinnova da solo il {renewsOn}, se la disdetta non arriva entro il {deadline}.} other {Scade il {end}. Rinnovo o disdetta vanno comunicati entro il {deadline}.}}"
+    },
+    "sequenceReply": {
+      "title": "{email} ha risposto",
+      "message": "La sequenza «{sequence}» ha smesso di scrivergli."
+    },
+    "emailReply": {
+      "title": "{who} ti ha scritto",
+      "message": "{subject}"
+    },
+    "quoteViewed": {
+      "title": "{number} aperto dal cliente",
+      "message": "Lo sta leggendo adesso: un buon momento per chiamare."
+    },
+    "quoteAccepted": {
+      "title": "{number} accettato dal cliente",
+      "message": "Trasformalo in ordine per registrare la vittoria."
+    },
+    "quoteDeclined": {
+      "title": "{number} rifiutato dal cliente",
+      "message": "{hasReason, select, yes {Il motivo: {reason}} other {Nessun motivo indicato.}}"
+    },
+    "automationQuota": {
+      "title": "Automazioni in pausa per questo mese",
+      "message": "Il workspace ha esaurito le esecuzioni di automazioni del mese: {rules, plural, one {# regola è stata saltata} other {# regole sono state saltate}}. Vedi il piano per alzare il limite."
+    },
+    "mailArchiveUnmatched": {
+      "title": "Non archiviata: «{subject}»",
+      "message": "Nessuno dei suoi indirizzi appartiene a un contatto o a un lead. Aggiungili, poi inviala di nuovo al tuo indirizzo di archivio."
+    },
+    "bookingReceived": {
+      "title": "{who} ha prenotato un incontro",
+      "message": "{when}"
+    },
+    "webFormLead": {
+      "title": "{who} ha scritto dal modulo di contatto",
+      "message": "È nella sua scheda."
+    },
+    "webFormTicket": {
+      "title": "Richiesta di assistenza {number}",
+      "message": "{subject}"
+    },
+    "ticketRatedBad": {
+      "title": "{ticket}: il cliente dice che non è andata bene",
+      "message": "Apri il ticket per leggere il suo commento, se ne ha lasciato uno."
+    },
+    "quoteProposed": {
+      "title": "{who} ha proposto il preventivo {number}",
+      "message": "Una bozza con i prezzi del cliente, che aspetta che tu la controlli e la mandi."
+    },
+    "chatMention": {
+      "title": "{sender} ti ha menzionato in {conversation}",
+      "message": "{preview}"
+    }
+  },
+  "taskTypes": {
+    "label": "Tipo",
+    "call": "Chiamata",
+    "email": "Email",
+    "meeting": "Incontro",
+    "todo": "Da fare"
+  },
+  "taskOutcome": {
+    "title": "Com'è andata?",
+    "outcomeLabel": "Esito",
+    "outcomes": {
+      "reached": "Raggiunto",
+      "no_answer": "Non risponde",
+      "voicemail": "Segreteria",
+      "sent": "Inviata",
+      "held": "Svolto",
+      "no_show": "Non si è presentato",
+      "done": "Fatto"
+    },
+    "noteLabel": "Nota",
+    "notePlaceholder": "Cosa vi siete detti, cosa avete concordato…",
+    "nextLabel": "Prossimo passo",
+    "nextTitleLabel": "Cosa fare dopo",
+    "nextTitlePlaceholder": "es. Inviare il preventivo aggiornato",
+    "nextHint": "Lascia vuoto se non c'è niente da pianificare.",
+    "dateLabel": "Data",
+    "timeLabel": "Ora (facoltativa)",
+    "quick": {
+      "tomorrow": "Domani",
+      "in3": "Tra 3 giorni",
+      "nextWeek": "Tra una settimana"
+    },
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "Fatto — registrato nella cronologia.",
+    "savedWithNext": "Fatto — registrato, e il prossimo passo è pianificato.",
+    "failed": "Impossibile completare l'attività."
+  },
+  "importWizard": {
+    "steps": {
+      "file": "Scegli un file CSV esportato da un foglio di calcolo o da un altro CRM.",
+      "map": "Indica quale campo riempie ogni colonna. I suggerimenti vengono dai nomi delle colonne.",
+      "preview": "Ecco cosa farà l'importazione. Non è ancora stato scritto niente."
+    },
+    "chooseFile": "Scegli un file CSV",
+    "fileHint": "Separato da virgole o punti e virgola, nomi delle colonne nella prima riga, fino a {max} righe.",
+    "noColumns": "Il file non ha i nomi delle colonne nella prima riga.",
+    "tooManyRows": "Il file ha più di {max} righe. Dividilo e importa le parti una alla volta.",
+    "fileSummary": "{name}: {rows, plural, one {# riga} other {# righe}}, separate da «{delimiter}».",
+    "emptyColumn": "(vuota)",
+    "mapTo": "Campo per la colonna {column}",
+    "ignore": "— Non importare —",
+    "missingRequired": "Scegli una colonna per: {fields}.",
+    "duplicatesLabel": "Quando il campo {field} è già nel CRM",
+    "duplicates": {
+      "skip": "Salta la riga",
+      "skipHelp": "Il record esistente resta com'è.",
+      "update": "Aggiorna il record",
+      "updateHelp": "Le celle compilate della riga sostituiscono i valori presenti; le celle vuote non cambiano nulla. Il titolare resta lo stesso.",
+      "create": "Crea comunque",
+      "createHelp": "Un nuovo record per ogni riga, anche se ne esiste già uno."
+    },
+    "counts": {
+      "created": "da creare",
+      "updated": "da aggiornare",
+      "skipped": "doppioni saltati",
+      "invalid": "righe con errori"
+    },
+    "errorsTitle": "Righe che non verranno importate",
+    "errorLine": "Riga {line}: {detail}",
+    "nothingToDo": "Con queste scelte non c'è niente da importare.",
+    "back": "Indietro",
+    "preview": "Anteprima",
+    "checking": "Verifica…",
+    "confirm": "Importa {count, plural, one {# record} other {# record}}",
+    "done": "Importazione completata: {created} creati, {updated} aggiornati, {skipped} saltati.",
+    "fields": {
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "email": "Email",
+      "phone": "Telefono",
+      "mobile": "Cellulare",
+      "jobTitle": "Ruolo",
+      "street": "Indirizzo",
+      "city": "Città",
+      "state": "Provincia",
+      "zipCode": "CAP",
+      "country": "Paese",
+      "source": "Fonte",
+      "notes": "Note",
+      "tags": "Etichette",
+      "marketingConsent": "Consenso marketing",
+      "leadScore": "Punteggio",
+      "department": "Reparto",
+      "linkedinUrl": "LinkedIn",
+      "company": "Azienda",
+      "companyName": "Azienda",
+      "industry": "Settore",
+      "website": "Sito web",
+      "status": "Stato",
+      "rating": "Valutazione",
+      "name": "Ragione sociale",
+      "description": "Descrizione",
+      "type": "Tipo",
+      "employeeCount": "Dipendenti",
+      "annualRevenue": "Fatturato annuo",
+      "mainPhone": "Telefono",
+      "mainEmail": "Email",
+      "vatNumber": "Partita IVA",
+      "sdiCode": "Codice SDI",
+      "fiscalCode": "Codice fiscale",
+      "pec": "PEC",
+      "language": "Lingua"
+    },
+    "missingOneOf": "Scegli una colonna per almeno uno fra: {fields}."
+  },
+  "recordTimeline": {
+    "filterLabel": "Mostra",
+    "filters": {
+      "all": "Tutto",
+      "activity": "Attività",
+      "change": "Modifiche",
+      "quote": "Preventivi"
+    },
+    "nothing": "Qui non è ancora successo niente.",
+    "nothingOfKind": "Niente di questo tipo nelle pagine caricate.",
+    "loadMore": "Carica i precedenti",
+    "loading": "Caricamento…",
+    "loadFailed": "Impossibile caricare le voci precedenti.",
+    "deleteFailed": "Impossibile eliminare l'attività.",
+    "via": "su {name}",
+    "changed": "<b>{who}</b> ha cambiato <b>{field}</b>:",
+    "someone": "Qualcuno",
+    "empty": "(vuoto)",
+    "fields": {
+      "name": "Nome",
+      "amount": "Importo",
+      "currency": "Valuta",
+      "stageId": "Fase",
+      "status": "Stato",
+      "probability": "Probabilità",
+      "expectedCloseDate": "Chiusura prevista",
+      "ownerId": "Titolare",
+      "companyId": "Azienda",
+      "contactId": "Contatto",
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "email": "Email",
+      "phone": "Telefono",
+      "mobile": "Cellulare",
+      "jobTitle": "Ruolo",
+      "type": "Tipo",
+      "industry": "Settore",
+      "website": "Sito web",
+      "mainEmail": "Email",
+      "mainPhone": "Telefono",
+      "city": "Città",
+      "vatNumber": "Partita IVA",
+      "priceListId": "Listino",
+      "companyName": "Azienda",
+      "rating": "Valutazione",
+      "marketingConsent": "Consenso marketing"
+    },
+    "statuses": {
+      "open": "Aperta",
+      "won": "Vinta",
+      "lost": "Persa",
+      "active": "Attivo",
+      "inactive": "Inattivo",
+      "new": "Nuovo",
+      "contacting": "In contatto",
+      "engaged": "Coinvolto",
+      "qualified": "Qualificato",
+      "unqualified": "Non qualificato"
+    },
+    "quoteEvents": {
+      "created": "creato",
+      "updated": "modificato",
+      "sent": "inviato",
+      "reminded": "inviato di nuovo come sollecito",
+      "viewed": "aperto dal cliente",
+      "opened_email": "email aperta",
+      "clicked_email": "link nell'email cliccato",
+      "accepted": "accettato",
+      "declined": "rifiutato",
+      "superseded": "sostituito da una nuova revisione",
+      "proposed": "proposto come bozza dall'assistente"
+    },
+    "consentGiven": "dato",
+    "consentWithdrawn": "revocato"
+  },
+  "profile": {
+    "title": "Profilo",
+    "subtitle": "Il tuo account: il tuo nome, la tua password, cosa arriva al tuo telefono.",
+    "save": "Salva",
+    "saved": "Salvato.",
+    "failed": "Impossibile salvare.",
+    "name": {
+      "title": "Nome",
+      "help": "Come ti vedono i colleghi, accanto a ogni record di cui sei titolare e in ogni workspace di cui fai parte.",
+      "label": "Nome",
+      "errors": {
+        "empty": "Serve un nome.",
+        "tooLong": "Il nome è troppo lungo."
+      }
+    },
+    "email": {
+      "label": "Email",
+      "help": "L'indirizzo con cui accedi. Per cambiarlo, chiedi a un amministratore."
+    },
+    "password": {
+      "title": "Password",
+      "help": "Cambia la password con cui accedi.",
+      "social": "Accedi con Google, quindi qui non c'è una password da cambiare.",
+      "current": "Password attuale",
+      "new": "Nuova password",
+      "confirm": "Ripeti la nuova password",
+      "rule": "Almeno 8 caratteri.",
+      "submit": "Cambia password",
+      "changed": "Password cambiata.",
+      "tooShort": "La nuova password deve avere almeno 8 caratteri.",
+      "mismatch": "Le due nuove password non coincidono."
+    },
+    "notifications": {
+      "title": "Le mie notifiche",
+      "help": "Cosa arriva al tuo telefono, e cosa mostra solo la campanella."
+    },
+    "archive": {
+      "title": "Archivio email",
+      "help": "Metti questo indirizzo in Ccn quando scrivi a un cliente da Gmail o Outlook: l'email viene archiviata sul contatto o sul lead a cui è indirizzata.",
+      "label": "Il tuo indirizzo di archivio",
+      "copy": "Copia",
+      "copied": "Indirizzo copiato",
+      "howMatched": "Viene archiviata su ogni contatto e lead aperto il cui indirizzo email compare tra mittente e destinatari. Se nessuno corrisponde, ricevi una notifica.",
+      "secret": "Chi conosce questo indirizzo può archiviare email a tuo nome. Se l'hai condiviso per errore, creane uno nuovo: il vecchio smette subito di funzionare.",
+      "rotate": "Nuovo indirizzo",
+      "rotateTitle": "Sostituire l'indirizzo di archivio?",
+      "rotateBody": "Le email inviate all'indirizzo attuale non verranno più archiviate. Aggiorna l'eventuale Ccn salvato nel tuo programma di posta.",
+      "rotated": "Nuovo indirizzo creato",
+      "notConfigured": "Non disponibile su questa installazione: non è stato configurato un dominio per la posta in entrata. Chiedi a chi gestisce Flux di attivarlo.",
+      "readOnly": "Il tuo ruolo in questo workspace è di sola lettura, quindi nessuna email può essere archiviata a tuo nome."
+    },
+    "booking": {
+      "title": "Pagina di prenotazione",
+      "help": "Un link da condividere perché ti prenotino un appuntamento: offre solo gli orari liberi nel tuo calendario, dentro le ore qui sotto.",
+      "open": "Aperta: si può prenotare",
+      "closed": "Chiusa",
+      "copy": "Copia il link",
+      "copied": "Link copiato",
+      "preview": "Apri la pagina",
+      "meetingTitle": "Nome dell'incontro",
+      "meetingTitlePlaceholder": "es. Chiamata conoscitiva",
+      "duration": "Durata",
+      "daysAhead": "Con quanto anticipo",
+      "from": "Dalle",
+      "to": "Alle",
+      "buffer": "Margine tra un incontro e l'altro",
+      "noBuffer": "Nessuno",
+      "minutes": "{count} minuti",
+      "days": "{count} giorni",
+      "weekdays": "Giorni",
+      "weekday": {
+        "1": "Lun",
+        "2": "Mar",
+        "3": "Mer",
+        "4": "Gio",
+        "5": "Ven",
+        "6": "Sab",
+        "7": "Dom"
+      },
+      "whatHappens": "La prenotazione compare nel tuo calendario, chi prenota riceve un invito e viene archiviato come il contatto o il lead che è, oppure come un tuo nuovo lead.",
+      "invalid": "Controlla gli orari e scegli almeno un giorno.",
+      "readOnly": "Il tuo ruolo in questo workspace è di sola lettura, quindi nessuno può prenotarti qui.",
+      "notConfigured": "Non disponibile su questa installazione."
+    },
+    "mailbox": {
+      "title": "La tua casella e il tuo calendario",
+      "description": "Collega il tuo account Google o Microsoft 365 perché il CRM lavori con la casella e il calendario che usi già.",
+      "does": {
+        "send": "Le email che scrivi da un contatto o da un lead partono dal tuo indirizzo e restano nella tua posta inviata.",
+        "file": "La posta che scambi con contatti e lead aperti viene archiviata sulla loro cronologia. Nient'altro viene conservato.",
+        "busy": "I tuoi impegni bloccano la tua pagina di prenotazione e si vedono dai colleghi che organizzano una riunione.",
+        "mirror": "Gli appuntamenti che organizzi compaiono nel tuo calendario (quelli ricorrenti non ancora)."
+      },
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft 365"
+      },
+      "connect": {
+        "google": "Collega Google",
+        "microsoft": "Collega Microsoft 365"
+      },
+      "status": {
+        "active": "Collegata",
+        "revoked": "Da ricollegare"
+      },
+      "mailSynced": "Posta letta l'ultima volta",
+      "busySynced": "Calendario letto l'ultima volta",
+      "never": "non ancora",
+      "lastError": "Ultimo problema ({when}):",
+      "reconnect": "Ricollega",
+      "disconnect": "Scollega",
+      "disconnectTitle": "Scollegare la tua casella?",
+      "disconnectBody": "Flux smette di inviare da essa e di leggerla. Ciò che è già sulle cronologie resta, e così gli eventi già nel tuo calendario.",
+      "cancel": "Annulla",
+      "disconnected": "Casella scollegata.",
+      "readOnly": "Accesso in sola lettura: collegare una casella scrive sui record, quindi non è disponibile per te.",
+      "notAvailable": "Non ancora disponibile su questa installazione: servono le credenziali del fornitore e la sua verifica dell'app.",
+      "beingVerified": "In attesa che il fornitore verifichi l'app: non ancora disponibile.",
+      "testingNote": "Modalità di prova: solo il personale di Flux può collegarsi finché il fornitore non ha verificato l'app.",
+      "outcome": {
+        "connected": "Casella collegata.",
+        "denied": "Collegamento annullato nella schermata di consenso.",
+        "error": "Non è stato possibile collegare la casella. Riprova.",
+        "unavailable": "Il collegamento di una casella non è disponibile qui."
+      }
+    }
+  },
+  "planFollowUp": {
+    "title": "Qual è il prossimo passo?",
+    "plan": "Pianifica",
+    "notNow": "Non ora",
+    "planned": "Pianificato.",
+    "failed": "Impossibile pianificare l'attività."
+  },
+  "digestSetting": {
+    "title": "Riepilogo mattutino via email",
+    "help": "Una email ogni mattina con cosa scade oggi, cosa è in ritardo, le trattative senza niente in programma e i clienti che aspettano una tua risposta — al posto di una email per ogni attività.",
+    "saved": "Salvato.",
+    "failed": "Impossibile salvare."
+  },
+  "workQueue": {
+    "title": "Coda di lavoro",
+    "progress": "{current} di {total}",
+    "progressLabel": "Avanzamento nella coda",
+    "email": "Email",
+    "openRecord": "Apri la scheda",
+    "noReach": "Nessun telefono né email su questa scheda.",
+    "skip": "Salta",
+    "saveNext": "Salva e avanti",
+    "logged": "Registrato.",
+    "failed": "Impossibile salvare.",
+    "emptyTitle": "Niente in attesa",
+    "empty": "La lista è vuota: ogni trattativa, preventivo e ticket che segui è in linea.",
+    "doneTitle": "Coda finita",
+    "doneBody": "{n, plural, =0 {Nessun contatto registrato questa volta.} one {# contatto registrato.} other {# contatti registrati.}}",
+    "backHome": "Torna alla home"
+  },
+  "periods": {
+    "quarter": "{quarter}° trimestre {year}",
+    "kind": "Periodo",
+    "kinds": {
+      "month": "Mese",
+      "quarter": "Trimestre",
+      "year": "Anno"
+    },
+    "previous": "Periodo precedente",
+    "next": "Periodo successivo",
+    "current": "Periodo in corso"
+  },
+  "onboarding": {
+    "title": "Prepara il tuo workspace",
+    "subtitle": "{done} di {total} fatti. Ogni passo si spunta da solo quando è fatto.",
+    "dismiss": "Nascondi questi passi",
+    "done": "Fatto",
+    "todo": "Da fare",
+    "open": "Apri",
+    "failed": "Non è andato a buon fine. Riprova tra un momento.",
+    "steps": {
+      "company": {
+        "title": "I dati della tua azienda",
+        "help": "Ragione sociale e partita IVA per i documenti, o almeno un logo."
+      },
+      "team": {
+        "title": "Invita la squadra",
+        "help": "Un CRM per una persona sola è un'agenda: invita chi vende e chi fa assistenza."
+      },
+      "contacts": {
+        "title": "Importa i contatti",
+        "help": "Da un foglio di calcolo o da un altro CRM, con le colonne abbinate per te."
+      },
+      "stages": {
+        "title": "Rivedi le fasi della pipeline",
+        "help": "Rinomina, aggiungi o togli fasi perché somiglino al tuo modo di vendere.",
+        "fine": "Vanno bene così"
+      },
+      "email": {
+        "title": "Collega la posta",
+        "help": "Un account di invio, così le email partono dal tuo indirizzo e le risposte tornano."
+      }
+    },
+    "sample": {
+      "help": "Vuoi prima dare un'occhiata? Carica qualche azienda, trattativa e attività d'esempio.",
+      "load": "Carica dati d'esempio",
+      "loaded": "Nel workspace ci sono dati d'esempio. Toglili prima di cominciare sul serio.",
+      "loadedToast": "Dati d'esempio caricati",
+      "remove": "Rimuovi dati d'esempio",
+      "removeTitle": "Rimuovere i dati d'esempio?",
+      "removeBody": "Aziende, contatti, lead, trattative, attività e task d'esempio verranno eliminati. Niente di ciò che hai creato viene toccato.",
+      "removeBodyDependents": "Aziende, contatti, lead, trattative, attività e task d'esempio verranno eliminati, insieme a {count, plural, one {# nota o task che hai aggiunto} other {# note e task che hai aggiunto}}.",
+      "removed": "Dati d'esempio rimossi",
+      "errors": {
+        "notEmpty": "Questo workspace ha già trattative o contatti suoi: i dati d'esempio si mescolerebbero ai numeri veri.",
+        "alreadyLoaded": "I dati d'esempio sono già caricati.",
+        "noStages": "La pipeline non ha fasi aperte in cui mettere le trattative d'esempio."
+      }
+    }
+  },
+  "privacy": {
+    "title": "Privacy",
+    "help": "I diritti della persona raggiungibile a {contactPoint}: una copia dei suoi dati, o la cancellazione — su tutte le sue schede, non solo questa.",
+    "noContactPoint": "Nessuna email o telefono su questa scheda: una persona si trova dall'indirizzo o dal numero che dà, quindi non c'è nulla da esportare o cancellare.",
+    "export": "Esporta i suoi dati",
+    "exported": "Dati esportati. Invia il file alla persona con un canale sicuro.",
+    "erase": "Cancella questa persona",
+    "eraseTitle": "Cancellare questa persona?",
+    "eraseBody": "Tutto ciò che si raggiunge da {contactPoint} se ne va: {leads, plural, =0 {nessun lead} one {# lead eliminato} other {# lead eliminati}} con attività e task, {contacts, plural, =0 {nessun contatto} one {# contatto anonimizzato} other {# contatti anonimizzati}}, e la loro storia, i messaggi e le tracce delle email.",
+    "eraseKeeps": "Trattative, preventivi e ordini restano, senza la persona. L'indirizzo resta nella lista di esclusione, così non gli si scrive più. Non si può annullare.",
+    "typeToConfirm": "Scrivi {contactPoint} per confermare",
+    "eraseConfirm": "Cancella definitivamente",
+    "erased": "Persona cancellata.",
+    "invalid": "Non è un indirizzo email né un numero di telefono.",
+    "failed": "Non è andato a buon fine. Non è stato cambiato nulla; riprova tra un momento.",
+    "consent": {
+      "since": "dal {date}",
+      "withdrawnOn": "revocato il {date}",
+      "sources": {
+        "form": "registrato in Flux",
+        "import": "da un'importazione",
+        "api": "tramite API",
+        "unsubscribe": "con la disiscrizione",
+        "conversion": "ripreso dal lead",
+        "web": "da un modulo web"
+      }
+    }
+  },
+  "booking": {
+    "pageTitle": "Prenota un appuntamento con {name}",
+    "closedTitle": "Pagina di prenotazione",
+    "defaultTitle": "Incontro",
+    "duration": "{minutes} minuti con {name} · orari in {zone}",
+    "noSlots": "Nessun orario libero nei prossimi giorni. Riprova più avanti.",
+    "formTitle": "{day}, {time}",
+    "name": "Il tuo nome",
+    "email": "La tua email",
+    "phone": "Telefono (facoltativo)",
+    "note": "Qualcosa da dire prima? (facoltativo)",
+    "privacy": "Nome ed email vengono condivisi con {name} per organizzare l'incontro, e riceverai un invito di calendario.",
+    "confirm": "Conferma la prenotazione",
+    "confirmedTitle": "Prenotazione confermata",
+    "confirmedBody": "{day} alle {time} ({zone}) con {name}. Un invito di calendario sta arrivando nella tua casella.",
+    "errors": {
+      "taken": "Quell'orario è appena stato preso. Scegline un altro.",
+      "invalid": "Controlla nome e indirizzo email.",
+      "tooMany": "Troppi tentativi. Aspetta un minuto e riprova.",
+      "notFound": "Questa pagina di prenotazione non è più disponibile.",
+      "failed": "La prenotazione non è andata a buon fine. Riprova."
+    }
+  },
+  "webForm": {
+    "closed": "Modulo",
+    "name": "Il tuo nome",
+    "email": "La tua email",
+    "phone": "Telefono (facoltativo)",
+    "company": "Azienda (facoltativo)",
+    "message": "Il tuo messaggio",
+    "subject": "Oggetto",
+    "description": "Descrivi il problema",
+    "consent": "Acconsento a ricevere via email novità e offerte da {name}. Posso disiscrivermi in qualunque momento.",
+    "send": "Invia",
+    "lead": {
+      "title": "Contatta {name}",
+      "help": "Lascia i tuoi dati e ti ricontatteremo.",
+      "doneTitle": "Grazie",
+      "doneBody": "Il tuo messaggio è arrivato a {name}. Ti ricontatteremo presto."
+    },
+    "ticket": {
+      "title": "Richiesta di assistenza a {name}",
+      "help": "Raccontaci cosa succede: ogni richiesta riceve un numero e una risposta via email.",
+      "doneTitle": "Richiesta ricevuta",
+      "doneBody": "La tua richiesta è la numero {number}. Conservala: la risposta arriverà via email e la citerà."
+    },
+    "errors": {
+      "invalid": "Compila nome, un'email valida e i campi obbligatori.",
+      "captcha": "Il controllo anti-spam non è andato a buon fine. Riprova.",
+      "notFound": "Questo modulo non è più disponibile.",
+      "tooMany": "Troppi tentativi. Aspetta un minuto e riprova.",
+      "failed": "Non è stato possibile inviare il modulo. Riprova."
+    }
+  },
+  "commissions": {
+    "title": "Provvigioni",
+    "subtitleManager": "Quanto hanno fruttato le trattative vinte di ciascuno, mese per mese. Approva un mese quando è finito per congelare quanto si paga.",
+    "subtitleOwn": "Quanto hanno fruttato le tue trattative vinte, mese per mese.",
+    "unassigned": "Nessuno",
+    "former": "{name} (non più presente)",
+    "someone": "Una persona non più presente",
+    "pipelineGone": "Una pipeline eliminata",
+    "allPipelines": "Tutte le pipeline",
+    "everyone": "Tutti",
+    "approvedToast": "{month} approvato: {lines, plural, one {# trattativa} other {# trattative}}, {total}.",
+    "reopenedToast": "{month} riaperto: si ricalcola dalle trattative e dalle aliquote di oggi.",
+    "errors": {
+      "invalid": "Non è un mese.",
+      "not_over": "Un mese si può approvare solo quando è finito.",
+      "already": "Questo mese è già approvato.",
+      "invalidRule": "Inserisci un'aliquota tra 0 e 100 e una data di inizio valida."
+    },
+    "drift": {
+      "deleted": "Trattativa poi eliminata",
+      "reopened": "Poi riaperta",
+      "owner": "Poi cambiato titolare",
+      "amount": "Poi cambiato importo"
+    },
+    "state": {
+      "approved": "Approvata",
+      "late": "Vinta dopo l'approvazione",
+      "noRule": "Senza aliquota",
+      "noOwner": "Senza titolare",
+      "accruing": "Da approvare"
+    },
+    "monthApproved": "Approvato il {date} da {by}",
+    "monthWaiting": "In attesa di approvazione",
+    "monthRunning": "In corso",
+    "approve": "Approva",
+    "approveTitle": "Approvare {month}?",
+    "approveBody": "Ogni trattativa vinta del mese viene congelata con il suo importo e la sua aliquota. Le modifiche successive a una trattativa non cambieranno quanto paga questo mese: verranno segnalate qui.",
+    "reopen": "Riapri",
+    "reopenTitle": "Riaprire {month}?",
+    "reopenBody": "Le righe approvate vengono scartate e il mese si ricalcola dalle trattative e dalle aliquote di oggi. Fallo solo se il mese non è stato pagato.",
+    "cancel": "Annulla",
+    "byPerson": "Per persona",
+    "empty": "Nessuna trattativa vinta in questo periodo.",
+    "total": "Totale",
+    "lines": "Trattative",
+    "linesHelp": "Ogni trattativa vinta nel periodo, con l'aliquota che le si applica.",
+    "unpaidHelp": "Trattative vinte a cui non si applica nessuna aliquota: nessuno le incassa finché una regola non le copre.",
+    "cols": {
+      "person": "Persona",
+      "deals": "Vinte",
+      "base": "Valore vinto",
+      "amount": "Provvigione",
+      "approved": "Di cui approvata",
+      "unpaid": "Senza aliquota",
+      "deal": "Trattativa",
+      "won": "Vinta il",
+      "rate": "Aliquota",
+      "state": "Stato"
+    },
+    "rules": "Aliquote",
+    "rulesHelp": "Vale l'aliquota più specifica: persona e pipeline, poi persona, poi pipeline, poi tutti. Per cambiarla aggiungine una nuova da una data successiva: le trattative già vinte tengono la loro.",
+    "noRules": "Nessuna aliquota: le trattative vinte non maturano nulla finché non ne aggiungi una.",
+    "ruleLine": "{rate}% dal {from}",
+    "deleteRule": "Elimina aliquota",
+    "addRule": "Aggiungi aliquota",
+    "ruleSaved": "Aliquota salvata.",
+    "fields": {
+      "person": "Persona",
+      "pipeline": "Pipeline",
+      "rate": "Aliquota (%)",
+      "from": "Dal"
+    },
+    "footnote": "La provvigione matura quando la trattativa è vinta, sul suo valore in EUR, con l'aliquota in vigore quel giorno. I mesi non ancora approvati seguono le trattative e le aliquote di oggi."
   }
 }

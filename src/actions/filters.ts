@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, or } from "drizzle-orm";
 
 import { customFilters, customFilterTags, filterPresets } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
@@ -30,6 +30,44 @@ export async function getCustomFilters(entityType: string) {
     .from(customFilters)
     .where(and(eq(customFilters.entityType, entityType), eq(customFilters.ownerId, actor.userId)))
     .orderBy(desc(customFilters.isPinned), desc(customFilters.createdAt));
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  criteria: string;
+  isPublic: boolean;
+  isPinned: boolean;
+  /** Whether the person looking owns it: only the owner shares, pins, renames or deletes. */
+  mine: boolean;
+}
+
+/**
+ * The views a person can use on a list: their own, and the ones colleagues shared (§4.5).
+ * Pinned first — a pinned view is a chip above the list, for its owner and, when shared,
+ * for everybody.
+ */
+export async function getSavedViews(entityType: string): Promise<SavedView[]> {
+  const actor = await requireCapability("record:read");
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(customFilters)
+    .where(
+      and(
+        eq(customFilters.entityType, entityType),
+        or(eq(customFilters.ownerId, actor.userId), eq(customFilters.isPublic, true)),
+      ),
+    )
+    .orderBy(desc(customFilters.isPinned), asc(customFilters.name));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    criteria: r.criteria,
+    isPublic: Boolean(r.isPublic),
+    isPinned: Boolean(r.isPinned),
+    mine: r.ownerId === actor.userId,
+  }));
 }
 
 export async function getPublicFilters(entityType: string) {
@@ -140,7 +178,10 @@ export async function togglePinFilter(id: string, isPinned: boolean) {
     .update(customFilters)
     .set({ isPinned })
     .where(and(eq(customFilters.id, id), eq(customFilters.ownerId, actor.userId)));
+  // Every list with views, not only the leads: a pinned contact view stayed off the bar.
   revalidatePath(`/dashboard/leads`);
+  revalidatePath(`/dashboard/contacts`);
+  revalidatePath(`/dashboard/companies`);
 }
 
 // --- FILTER PRESETS (System defaults) ---

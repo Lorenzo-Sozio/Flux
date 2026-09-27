@@ -19,12 +19,53 @@ import { toast } from "sonner";
  * Registration is production-only: in development the worker would serve a
  * stale shell against a dev server that has already rebuilt it, and the
  * resulting confusion costs more than the feature is worth locally.
+ *
+ * ⚠️ Not registering is not enough: in development an existing worker is
+ * *removed*. One left behind by a production run on the same origin
+ * (`next start` on localhost:3000) keeps serving `/_next/static/` from its cache
+ * — safe in production, where those names are content hashes, and wrong in
+ * development, where a chunk keeps its name while its contents change. The page
+ * then boots on modules the dev server no longer has, and fails with "the module
+ * factory is not available" in a component nobody touched.
  */
+function removeDevelopmentWorkers() {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  const controlled = Boolean(navigator.serviceWorker.controller);
+  Promise.all([
+    navigator.serviceWorker
+      .getRegistrations()
+      .then((registrations) => Promise.all(registrations.map((r) => r.unregister()))),
+    typeof caches === "undefined"
+      ? Promise.resolve()
+      : caches
+          .keys()
+          .then((keys) => Promise.all(keys.filter((k) => k.startsWith("flux-")).map((k) => caches.delete(k)))),
+  ])
+    .then(() => {
+      // Still controlled means this very page came through the old worker: load
+      // it once more, from the network. The flag stops a loop if unregistering
+      // did not take.
+      if (!controlled) return;
+      try {
+        if (sessionStorage.getItem("flux-sw-removed")) return;
+        sessionStorage.setItem("flux-sw-removed", "1");
+      } catch {
+        return;
+      }
+      window.location.reload();
+    })
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: development convenience only
+    .catch(() => {});
+}
+
 export function ServiceWorkerRegistrar() {
   const t = useTranslations("pwa");
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    if (process.env.NODE_ENV !== "production") {
+      removeDevelopmentWorkers();
+      return;
+    }
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     let cancelled = false;

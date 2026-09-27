@@ -2,25 +2,24 @@ import { redirect } from "next/navigation";
 
 import { getWorkloadMatrix } from "@/actions/workload";
 import { auth } from "@/auth";
-import { LOGIN_PATH } from "@/lib/page-guard";
+import { LOGIN_PATH, requirePageFeature } from "@/lib/page-guard";
+import { addDaysToDate, toWallDate } from "@/lib/wall-clock";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { WorkloadClient } from "./_components/workload-client";
 
 export default async function WorkloadPage() {
   const session = await auth();
   if (!session?.user?.id) redirect(LOGIN_PATH);
+  await requirePageFeature("projects", "/dashboard/tasks");
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  // This week's Monday and the Friday after next, as calendar days on the workspace's
+  // clock — the server's is UTC on Workers (src/lib/workload-allocation.ts).
+  const today = toWallDate(new Date(), await getWorkspaceTimeZone());
+  const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
+  const monday = addDaysToDate(today, dow === 0 ? -6 : 1 - dow);
 
-  // Snap to Monday of current week
-  const dow = today.getDay();
-  const monday = new Date(today.getTime() + (dow === 0 ? -6 : 1 - dow) * 86400000);
+  const matrix = await getWorkloadMatrix(monday, addDaysToDate(monday, 13));
 
-  // Default: 2 weeks (current + next)
-  const endDate = new Date(monday.getTime() + 13 * 86400000);
-
-  const matrix = await getWorkloadMatrix(monday, endDate);
-
-  return <WorkloadClient matrix={matrix} startDate={monday} endDate={endDate} />;
+  return <WorkloadClient matrix={matrix} start={monday} />;
 }

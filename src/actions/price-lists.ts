@@ -9,6 +9,7 @@ import { companies, priceListItems, priceLists, products } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { MAX_ADJUSTMENT, MIN_ADJUSTMENT, type PriceRules } from "@/lib/price-list";
+import { loadCompanyPriceRules, loadPriceRules } from "@/lib/price-rules-load";
 import { getDb } from "@/lib/tenant-context";
 
 /**
@@ -141,41 +142,14 @@ export async function getPriceListsForSelect(keepId?: string | null) {
  */
 export async function getPriceRules(id: string): Promise<PriceRules | null> {
   await requireCapability("record:read");
-  const db = await getDb();
-  const [list] = await db
-    .select({
-      id: priceLists.id,
-      name: priceLists.name,
-      adjustmentPercent: priceLists.adjustmentPercent,
-      isActive: priceLists.isActive,
-    })
-    .from(priceLists)
-    .where(eq(priceLists.id, id));
-  // ⚠️⚠️ A retired list prices nothing. Without this, turning a list off stopped it
-  // being offered to new customers and went on quoting the customers already on it —
-  // which is the one thing switching it off was meant to stop, and nothing said so.
-  if (!list || !list.isActive) return null;
-
-  const items = await db
-    .select({ productId: priceListItems.productId, unitPrice: priceListItems.unitPrice })
-    .from(priceListItems)
-    .where(eq(priceListItems.priceListId, id));
-
-  const overrides: Record<string, number> = {};
-  for (const item of items) overrides[item.productId] = Number(item.unitPrice);
-  return { id: list.id, name: list.name, adjustmentPercent: Number(list.adjustmentPercent), overrides };
+  // The same reading the API makes (src/lib/price-rules-load.ts): one list, one price.
+  return loadPriceRules(await getDb(), id);
 }
 
 /** The list a customer is on, for a form that starts from the company. */
 export async function getCompanyPriceRules(companyId: string): Promise<PriceRules | null> {
   await requireCapability("record:read");
-  const db = await getDb();
-  const [company] = await db
-    .select({ priceListId: companies.priceListId })
-    .from(companies)
-    .where(eq(companies.id, companyId));
-  if (!company?.priceListId) return null;
-  return getPriceRules(company.priceListId);
+  return loadCompanyPriceRules(await getDb(), companyId);
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────

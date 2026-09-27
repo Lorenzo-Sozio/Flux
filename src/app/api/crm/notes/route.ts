@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
@@ -15,6 +15,9 @@ import { decryptDbUrl } from "@/lib/tenant-db";
  * record it, and two literals that have to agree are one literal too many.
  */
 const ENDPOINT = "/api/crm/notes";
+
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "activities", access: "write" } as const;
 
 /**
  * Write down, on the person's own timeline, something an integration did.
@@ -31,10 +34,9 @@ const ENDPOINT = "/api/crm/notes";
  * could not: the note is the only trace, and a lost trace is invisible by definition.
  */
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -116,7 +118,10 @@ export async function POST(req: NextRequest) {
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -169,7 +174,7 @@ export async function POST(req: NextRequest) {
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

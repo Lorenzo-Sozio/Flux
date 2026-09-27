@@ -1,0 +1,92 @@
+[
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️⚠️ la casella del consenso non spuntata vale come firma",
+    "find": "  if (body.consent !== true) return null;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️ un nome senza lettere (\"123\") vale come firmatario",
+    "find": "  if (name.length < 3 || name.length > 120 || !/\\p{L}/u.test(name)) return null;",
+    "replace": "  if (name.length < 3 || name.length > 120) return null;"
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️⚠️ la firma non è condizionata allo stato: due firme in parallelo firmano due volte, e un preventivo già deciso si firma di nuovo",
+    "find": "    .where(and(eq(quotes.id, quoteId), inArray(quotes.status, SIGNABLE)))",
+    "replace": "    .where(eq(quotes.id, quoteId))"
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️ chi perde la corsa lascia il proprio PDF nel bucket",
+    "find": "    if (pdfKey && kept) await kept.delete(pdfKey).catch(() => undefined);\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "una bozza si firma",
+    "find": "  if (!SIGNABLE.includes(q.status)) return { ok: false, reason: \"not_actionable\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️⚠️ il testo del consenso registrato è sempre italiano, qualunque lingua abbia letto il cliente",
+    "find": "  const consent = consentText(documentLanguage(q.company), q.quoteNumber);",
+    "replace": "  const consent = consentText(\"it\", q.quoteNumber);"
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️⚠️ l'impronta registrata non è quella dei byte conservati",
+    "find": "  const sha256 = contentHash(bytes);",
+    "replace": "  const sha256 = contentHash(new TextEncoder().encode(q.quoteNumber));"
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️⚠️ un PDF firmato alterato nello storage viene servito come originale",
+    "find": "  if (contentHash(bytes) !== quote.signedPdfSha256) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/quote-signature.ts",
+    "description": "⚠️ senza storage la firma fallisce invece di reggersi sul record e sull'impronta",
+    "find": "    console.error(\"[quote-signature] signed PDF not kept\", err);\n    pdfKey = null;",
+    "replace": "    throw err;"
+  },
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️⚠️ accettare non richiede la firma: un clic basta",
+    "find": "    if (!signature) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️ l'IP della firma è il primo di x-forwarded-for, che scrive il client",
+    "find": "      { name: signature.name, ip, userAgent, workspaceName: tenant.name },",
+    "replace": "      { name: signature.name, ip: headersList.get(\"x-forwarded-for\")?.split(\",\")[0]?.trim() ?? null, userAgent, workspaceName: tenant.name },"
+  },
+  {
+    "file": "src/lib/quote-public.ts",
+    "description": "⚠️⚠️ chi ha il link vede l'IP e il browser di chi ha firmato",
+    "find": "    signedAt: q.signedAt,\n",
+    "replace": "    signedAt: q.signedAt,\n    signedIp: q.signedIp,\n    signedUserAgent: q.signedUserAgent,\n"
+  },
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️⚠️ un rifiuto arrivato insieme a una firma sovrascrive il preventivo accettato e firmato",
+    "find": "      .where(and(eq(quotes.id, quote.id), inArray(quotes.status, OPEN_QUOTE)))\n      .returning({ id: quotes.id });",
+    "replace": "      .where(eq(quotes.id, quote.id))\n      .returning({ id: quotes.id });"
+  },
+  {
+    "file": "src/lib/quote-public.ts",
+    "description": "⚠️ una visualizzazione arrivata dopo la firma riporta il preventivo accettato a «visto»",
+    "find": "      .where(and(eq(quotes.id, quote.id), eq(quotes.status, \"sent\")))",
+    "replace": "      .where(eq(quotes.id, quote.id))"
+  },
+  {
+    "file": "src/lib/quote-public.ts",
+    "description": "⚠️⚠️ la nota interna di chi ha respinto l'approvazione arriva a chiunque abbia il link",
+    "find": "    notes: q.notes,\n",
+    "replace": "    notes: q.notes,\n    approvalNote: q.approvalNote,\n"
+  }
+]

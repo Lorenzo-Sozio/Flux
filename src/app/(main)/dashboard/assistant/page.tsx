@@ -69,11 +69,13 @@ export default async function AssistantActivityPage() {
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Two figures side by side on a phone and the date under them: three
+              full-width cards of one number each were a screen and a half. */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>{t("rowsTitle")}</CardDescription>
-                <CardTitle className="text-4xl tabular-nums">{totaleRighe}</CardTitle>
+                <CardTitle className="text-3xl tabular-nums sm:text-4xl">{totaleRighe}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-sm">{t("rowsHint", { month: mese, kinds: voci.length })}</p>
@@ -83,14 +85,14 @@ export default async function AssistantActivityPage() {
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>{t("requestsTitle")}</CardDescription>
-                <CardTitle className="text-4xl tabular-nums">{totaleRichieste}</CardTitle>
+                <CardTitle className="text-3xl tabular-nums sm:text-4xl">{totaleRichieste}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground text-sm">{t("requestsHint")}</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="max-sm:col-span-2">
               <CardHeader className="pb-2">
                 <CardDescription>{t("lastTitle")}</CardDescription>
                 <CardTitle className="text-2xl">

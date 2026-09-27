@@ -9,6 +9,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { authConfig } from "./auth.config";
 import { platformDb } from "./db";
 import { accounts, sessions, tenantMembers, users, verificationTokens } from "./db/schema";
+import { announceAccountWithoutWorkspace } from "./lib/platform-staff";
 
 type Role = "admin" | "editor" | "viewer" | "owner";
 
@@ -87,6 +88,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
+  events: {
+    // Fires when the adapter creates a user — a first sign-in with Google. Email sign-up
+    // writes the row itself and announces from registerAction. Either way the account has no
+    // workspace yet, and the staff who create workspaces must hear about it.
+    async createUser({ user }) {
+      if (user.email) await announceAccountWithoutWorkspace({ name: user.name ?? null, email: user.email });
+    },
+  },
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       // Initial login: load tenant memberships and auto-select if single tenant
@@ -117,6 +126,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.activeTenantId = membership.tenantId;
           token.tenantRole = membership.role;
           token.tenantRoleCheckedAt = Date.now();
+        }
+      }
+
+      // The profile page changed the person's name: read it again from the account. Only a
+      // signal travels from the browser, never the value — the token takes what is stored.
+      if (trigger === "update" && session?.refreshProfile && token.id) {
+        try {
+          const [account] = await platformDb
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, token.id as string));
+          if (account) token.name = account.name;
+        } catch {
+          // The old name stays until the next sign-in; nothing is lost.
         }
       }
 

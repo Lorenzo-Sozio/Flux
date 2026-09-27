@@ -43,6 +43,7 @@ function formatAmount(cents: number, currency: string) {
 
 export function InvoiceList({ invoices }: InvoiceListProps) {
   const t = useTranslations("settings.billing");
+  const tc = useTranslations("common");
 
   if (invoices.length === 0) {
     return (
@@ -83,23 +84,27 @@ export function InvoiceList({ invoices }: InvoiceListProps) {
             });
 
             return (
-              <div key={inv.id} className="flex items-center justify-between py-3">
-                <div className="space-y-0.5">
-                  <p className="text-sm font-medium">
-                    {inv.number ?? inv.id}
-                    <Badge variant={badgeVariant} className="ml-2 text-xs">
+              <div key={inv.id} className="flex items-center justify-between gap-3 py-3">
+                {/* ⚠️ A draft invoice has no number and falls back to its Stripe id,
+                    28 characters with no space to break at. Without `min-w-0` and
+                    `truncate` that id set the row's width and pushed the amount and
+                    the download off the side of a phone. */}
+                <div className="min-w-0 space-y-0.5">
+                  <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                    <span className="min-w-0 truncate">{inv.number ?? inv.id}</span>
+                    <Badge variant={badgeVariant} className="text-xs">
                       {badgeLabel}
                     </Badge>
                   </p>
                   <p className="text-xs text-muted-foreground">{date}</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex shrink-0 items-center gap-3">
                   <span className="text-sm font-medium">
                     {formatAmount(inv.amountPaid || inv.amountDue, inv.currency)}
                   </span>
                   {inv.invoicePdf && (
                     <Button variant="ghost" size="icon" asChild>
-                      <a href={inv.invoicePdf} target="_blank" rel="noopener noreferrer">
+                      <a href={inv.invoicePdf} target="_blank" rel="noopener noreferrer" aria-label={tc("download")}>
                         <Download className="h-4 w-4" />
                       </a>
                     </Button>

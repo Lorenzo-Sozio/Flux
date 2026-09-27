@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import {
@@ -21,6 +21,7 @@ import {
   tickets,
 } from "@/db/schema";
 import { DOCUMENT_PARENT_TYPES, type EntityType, entityHref } from "@/lib/entities";
+import { fold, matchesText as matches } from "@/lib/text-match";
 
 /**
  * How each kind of record is searched. One function per entity in
@@ -54,7 +55,7 @@ export interface SearchTerms {
 export const PER_ENTITY = 5;
 
 const fullName = (first: AnyPgColumn, last: AnyPgColumn, like: string) =>
-  sql`lower(coalesce(${first}, '') || ' ' || coalesce(${last}, '')) LIKE lower(${like})`;
+  sql`${fold(sql`coalesce(${first}, '') || ' ' || coalesce(${last}, '')`)} LIKE ${fold(like)}`;
 
 const phone = (col: AnyPgColumn, phoneLike: string | null) =>
   phoneLike ? sql`regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g') LIKE ${phoneLike}` : undefined;
@@ -77,11 +78,11 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       .from(leads)
       .where(
         or(
-          ilike(leads.firstName, like),
-          ilike(leads.lastName, like),
+          matches(leads.firstName, like),
+          matches(leads.lastName, like),
           fullName(leads.firstName, leads.lastName, like),
-          ilike(leads.email, like),
-          ilike(leads.companyName, like),
+          matches(leads.email, like),
+          matches(leads.companyName, like),
           phone(leads.phone, phoneLike),
           phone(leads.mobile, phoneLike),
         ),
@@ -120,10 +121,12 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       .leftJoin(companies, eq(companies.id, contacts.companyId))
       .where(
         or(
-          ilike(contacts.firstName, like),
-          ilike(contacts.lastName, like),
+          matches(contacts.firstName, like),
+          matches(contacts.lastName, like),
           fullName(contacts.firstName, contacts.lastName, like),
-          ilike(contacts.email, like),
+          matches(contacts.email, like),
+          // By the company they work for: "Rossi" finds the people at Rossi Srl too.
+          matches(companies.name, like),
           phone(contacts.phone, phoneLike),
           phone(contacts.mobile, phoneLike),
         ),
@@ -145,11 +148,11 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       .from(companies)
       .where(
         or(
-          ilike(companies.name, like),
-          ilike(companies.industry, like),
-          ilike(companies.vatNumber, like),
-          ilike(companies.fiscalCode, like),
-          ilike(companies.mainEmail, like),
+          matches(companies.name, like),
+          matches(companies.industry, like),
+          matches(companies.vatNumber, like),
+          matches(companies.fiscalCode, like),
+          matches(companies.mainEmail, like),
           phone(companies.mainPhone, phoneLike),
         ),
       )
@@ -176,7 +179,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(deals)
       .leftJoin(companies, eq(companies.id, deals.companyId))
-      .where(or(ilike(deals.name, like), ilike(companies.name, like)))
+      .where(or(matches(deals.name, like), matches(companies.name, like)))
       .orderBy(desc(deals.updatedAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -203,7 +206,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: products.id, name: products.name, sku: products.sku, category: products.category })
       .from(products)
-      .where(or(ilike(products.name, like), ilike(products.sku, like), ilike(products.category, like)))
+      .where(or(matches(products.name, like), matches(products.sku, like), matches(products.category, like)))
       .orderBy(products.name)
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; sku: string | null; category: string | null }) => ({
@@ -229,7 +232,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
         adjustmentPercent: priceLists.adjustmentPercent,
       })
       .from(priceLists)
-      .where(or(ilike(priceLists.name, like), ilike(priceLists.description, like)))
+      .where(or(matches(priceLists.name, like), matches(priceLists.description, like)))
       .orderBy(priceLists.name)
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; description: string | null; adjustmentPercent: string }) => {
@@ -256,7 +259,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(quotes)
       .leftJoin(companies, eq(companies.id, quotes.companyId))
-      .where(or(ilike(quotes.quoteNumber, like), ilike(companies.name, like)))
+      .where(or(matches(quotes.quoteNumber, like), matches(companies.name, like)))
       .orderBy(desc(quotes.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -284,7 +287,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(orders)
       .leftJoin(companies, eq(companies.id, orders.companyId))
-      .where(or(ilike(orders.orderNumber, like), ilike(companies.name, like)))
+      .where(or(matches(orders.orderNumber, like), matches(companies.name, like)))
       .orderBy(desc(orders.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -312,7 +315,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(contracts)
       .leftJoin(companies, eq(companies.id, contracts.companyId))
-      .where(or(ilike(contracts.title, like), ilike(companies.name, like)))
+      .where(or(matches(contracts.title, like), matches(companies.name, like)))
       .orderBy(desc(contracts.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -335,7 +338,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: tickets.id, number: tickets.ticketNumber, subject: tickets.subject, status: tickets.status })
       .from(tickets)
-      .where(or(ilike(tickets.subject, like), ilike(tickets.ticketNumber, like)))
+      .where(or(matches(tickets.subject, like), matches(tickets.ticketNumber, like)))
       .orderBy(desc(tickets.createdAt))
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; number: string; subject: string; status: string }) => ({
@@ -352,7 +355,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: tasks.id, title: tasks.title, status: tasks.status, due: tasks.dueDate })
       .from(tasks)
-      .where(or(ilike(tasks.title, like), ilike(tasks.description, like)))
+      .where(or(matches(tasks.title, like), matches(tasks.description, like)))
       .orderBy(desc(tasks.createdAt))
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; title: string; status: string; due: Date | null }) => ({
@@ -375,7 +378,11 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(appointments)
       .where(
-        or(ilike(appointments.title, like), ilike(appointments.location, like), ilike(appointments.description, like)),
+        or(
+          matches(appointments.title, like),
+          matches(appointments.location, like),
+          matches(appointments.description, like),
+        ),
       )
       .orderBy(desc(appointments.startAt))
       .limit(PER_ENTITY);
@@ -392,7 +399,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: marketingCampaigns.id, name: marketingCampaigns.name, status: marketingCampaigns.status })
       .from(marketingCampaigns)
-      .where(or(ilike(marketingCampaigns.name, like), ilike(marketingCampaigns.description, like)))
+      .where(or(matches(marketingCampaigns.name, like), matches(marketingCampaigns.description, like)))
       .orderBy(desc(marketingCampaigns.createdAt))
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; status: string }) => ({
@@ -409,7 +416,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: emailSequences.id, name: emailSequences.name, description: emailSequences.description })
       .from(emailSequences)
-      .where(or(ilike(emailSequences.name, like), ilike(emailSequences.description, like)))
+      .where(or(matches(emailSequences.name, like), matches(emailSequences.description, like)))
       .orderBy(desc(emailSequences.createdAt))
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; description: string | null }) => ({
@@ -425,7 +432,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: emailTemplates.id, name: emailTemplates.name, subject: emailTemplates.subject })
       .from(emailTemplates)
-      .where(or(ilike(emailTemplates.name, like), ilike(emailTemplates.subject, like)))
+      .where(or(matches(emailTemplates.name, like), matches(emailTemplates.subject, like)))
       .orderBy(emailTemplates.name)
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; subject: string }) => ({
@@ -446,7 +453,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
         entityId: documents.entityId,
       })
       .from(documents)
-      .where(ilike(documents.name, like))
+      .where(matches(documents.name, like))
       .orderBy(desc(documents.createdAt))
       .limit(PER_ENTITY);
     // A document is opened on the record it belongs to; one attached to nothing
@@ -470,7 +477,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
 async function searchInvoices(db: Db, { like }: SearchTerms, documentType: "TD01" | "TD04"): Promise<SearchHit[]> {
   const where: SQL | undefined = and(
     eq(invoices.documentType, documentType),
-    or(ilike(invoices.documentNumber, like), ilike(companies.name, like), ilike(invoices.notes, like)),
+    or(matches(invoices.documentNumber, like), matches(companies.name, like), matches(invoices.notes, like)),
   );
   const rows = await db
     .select({

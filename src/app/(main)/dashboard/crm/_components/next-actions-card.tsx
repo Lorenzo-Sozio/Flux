@@ -1,21 +1,41 @@
 "use client";
 
+import { useState, useTransition } from "react";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import {
   AlarmClock,
   AlertTriangle,
-  ArrowRight,
+  CalendarPlus,
+  CalendarX2,
   CheckCircle2,
   Clock,
   FileWarning,
+  ListStart,
+  MoreHorizontal,
+  Reply,
+  ShoppingCart,
   Snowflake,
   TrendingDown,
   UserX,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
 
+import { snoozeNextActionAction } from "@/actions/next-actions";
+import { type FollowUpTarget, PlanFollowUpDialog } from "@/components/crm/plan-follow-up-dialog";
+import { TaskOutcomeDialog } from "@/components/crm/task-outcome-dialog";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { NextAction, NextActionKind } from "@/lib/next-actions";
 
 /**
@@ -66,7 +86,28 @@ const PRESENTATION: Record<NextActionKind, { key: string; icon: React.ReactNode;
     icon: <Snowflake className="h-4 w-4" />,
     tone: "text-sky-600 bg-sky-50 dark:bg-sky-950/40 dark:text-sky-400",
   },
+  deal_no_next_step: {
+    key: "dealNoNextStep",
+    icon: <CalendarX2 className="h-4 w-4" />,
+    tone: "text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400",
+  },
+  reply_due: {
+    key: "replyDue",
+    icon: <Reply className="h-4 w-4" />,
+    tone: "text-rose-600 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-400",
+  },
+  quote_to_order: {
+    key: "quoteToOrder",
+    icon: <ShoppingCart className="h-4 w-4" />,
+    tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400",
+  },
 };
+
+const SNOOZES = [
+  { days: 1, key: "snoozeTomorrow" },
+  { days: 3, key: "snooze3" },
+  { days: 7, key: "snoozeWeek" },
+] as const;
 
 /**
  * The work list.
@@ -75,14 +116,53 @@ const PRESENTATION: Record<NextActionKind, { key: string; icon: React.ReactNode;
  * (audit rilievo S-02), which is the question a person actually opens the CRM
  * with on a Monday morning.
  */
-export function NextActionsCard({ actions, failed = false }: { actions: NextAction[]; failed?: boolean }) {
+export function NextActionsCard({
+  actions: initial,
+  failed = false,
+  canWrite = false,
+}: {
+  actions: NextAction[];
+  failed?: boolean;
+  /** Planning a follow-up writes a task: not offered to a viewer. Snoozing is personal. */
+  canWrite?: boolean;
+}) {
   const t = useTranslations("nextActions");
+  const router = useRouter();
+  const [actions, setActions] = useState(initial);
+  const [planning, setPlanning] = useState<{ action: NextAction; target: FollowUpTarget } | null>(null);
+  const [replying, setReplying] = useState<NextAction | null>(null);
+  const [, startTransition] = useTransition();
+
+  // ⚠️ Worked from where it is: each row can be planned, answered or put aside without
+  // opening the record, which was the only thing the list used to allow.
+  const drop = (a: NextAction) => setActions((prev) => prev.filter((x) => !(x.kind === a.kind && x.id === a.id)));
+  const snooze = (a: NextAction, days: number) =>
+    startTransition(async () => {
+      try {
+        await snoozeNextActionAction(a.kind, a.id, days);
+        drop(a);
+        toast.success(t("snoozed", { days }));
+      } catch {
+        toast.error(t("actionFailed"));
+      }
+    });
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{t("title")}</CardTitle>
-        <CardDescription>{actions.length === 0 ? t("nothing") : t("count", { n: actions.length })}</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
+        <div className="min-w-0 space-y-1.5">
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription>{actions.length === 0 ? t("nothing") : t("count", { n: actions.length })}</CardDescription>
+        </div>
+        {/* One at a time, with the number to call and the outcome form (§3.3). */}
+        {actions.length > 0 && (
+          <Button asChild size="sm" variant="outline" className="shrink-0">
+            <Link href="/dashboard/queue">
+              <ListStart className="size-4 sm:mr-1.5" aria-hidden />
+              <span className="max-sm:sr-only">{t("startQueue")}</span>
+            </Link>
+          </Button>
+        )}
       </CardHeader>
 
       <CardContent className="pt-0">
@@ -103,11 +183,12 @@ export function NextActionsCard({ actions, failed = false }: { actions: NextActi
           <ul className="divide-y">
             {actions.map((a) => {
               const p = PRESENTATION[a.kind];
+              const followUp = a.followUp;
               return (
-                <li key={`${a.entity}-${a.id}-${a.kind}`}>
+                <li key={`${a.entity}-${a.id}-${a.kind}`} className="-mx-2 flex items-start gap-1">
                   <Link
                     href={a.href}
-                    className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/60"
+                    className="flex min-w-0 flex-1 items-start gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/60"
                   >
                     <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${p.tone}`}>
                       {p.icon}
@@ -118,14 +199,74 @@ export function NextActionsCard({ actions, failed = false }: { actions: NextActi
                         {t(p.key)} · {t(a.detailKey, { n: a.detailValue })}
                       </span>
                     </span>
-                    <ArrowRight className="mt-1.5 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                   </Link>
+                  {/* Always drawn: a phone has no hover to reveal it. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="mt-1.5 size-9 shrink-0 sm:size-8"
+                        aria-label={t("rowActions", { title: a.title })}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {a.taskId && canWrite && (
+                        <DropdownMenuItem onSelect={() => setReplying(a)}>
+                          <CheckCircle2 className="size-4" aria-hidden />
+                          {t("replied")}
+                        </DropdownMenuItem>
+                      )}
+                      {followUp && canWrite && (
+                        <DropdownMenuItem onSelect={() => setPlanning({ action: a, target: followUp })}>
+                          <CalendarPlus className="size-4" aria-hidden />
+                          {t("planFollowUp")}
+                        </DropdownMenuItem>
+                      )}
+                      {((a.taskId && canWrite) || (followUp && canWrite)) && <DropdownMenuSeparator />}
+                      {SNOOZES.map(({ days, key }) => (
+                        <DropdownMenuItem key={days} onSelect={() => snooze(a, days)}>
+                          <Clock className="size-4" aria-hidden />
+                          {t(key)}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </li>
               );
             })}
           </ul>
         )}
       </CardContent>
+      {planning && (
+        <PlanFollowUpDialog
+          target={planning.target}
+          title={planning.action.title}
+          open
+          onOpenChange={(v) => {
+            if (!v) setPlanning(null);
+          }}
+          onPlanned={() => {
+            // A deal with a step planned is no longer "nothing planned"; the other rows are
+            // for the server to reconsider.
+            if (planning.action.kind === "deal_no_next_step") drop(planning.action);
+            router.refresh();
+          }}
+        />
+      )}
+      {replying?.taskId && (
+        <TaskOutcomeDialog
+          task={{ id: replying.taskId, title: replying.title, type: "email" }}
+          open
+          onOpenChange={(v) => {
+            if (!v) setReplying(null);
+          }}
+          revalidate="/dashboard/crm"
+          onCompleted={() => drop(replying)}
+        />
+      )}
     </Card>
   );
 }

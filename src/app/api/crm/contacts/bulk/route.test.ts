@@ -43,14 +43,16 @@ vi.mock("@/lib/billing/usage", () => ({
   checkAndTrackApiCall: async () => undefined,
   EntitlementError: class extends Error {},
 }));
-vi.mock("@/actions/webhooks", () => ({
+vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: async () => undefined,
   // No webhook configured, so the route must not dispatch at all. The count of
   // statements below would otherwise include one lookup per row again.
   hasActiveWebhook: async () => false,
 }));
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: { via: "apikey", userId: null, role: "editor", tenantId: "t1", scopes: null },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://fake" }));

@@ -39,6 +39,7 @@ function fmtSize(bytes: number | null) {
 
 export function DocumentManager({ entityType, entityId }: Props) {
   const t = useTranslations("documents");
+  const tc = useTranslations("common");
   const format = useFormatter();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,8 +119,8 @@ export function DocumentManager({ entityType, entityId }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-sm">
-          <span className="flex items-center gap-2">
+        <CardTitle className="flex items-center justify-between gap-2 text-sm">
+          <span className="flex min-w-0 items-center gap-2">
             <Paperclip className="h-4 w-4" />
             {t("manager.title")}
             {docs.length > 0 && <Badge variant="secondary">{docs.length}</Badge>}
@@ -178,14 +179,16 @@ export function DocumentManager({ entityType, entityId }: Props) {
                   href={doc.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-foreground"
+                  aria-label={tc("open")}
+                  className="inline-flex shrink-0 items-center justify-center text-muted-foreground hover:text-foreground max-sm:size-9"
                 >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <button
                   type="button"
                   onClick={() => handleDelete(doc.id, doc.name)}
-                  className="text-muted-foreground hover:text-destructive"
+                  aria-label={tc("delete")}
+                  className="inline-flex shrink-0 items-center justify-center text-muted-foreground hover:text-destructive max-sm:size-9"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>

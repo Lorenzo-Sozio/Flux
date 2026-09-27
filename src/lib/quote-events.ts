@@ -1,8 +1,9 @@
-import { dispatchWebhook, type WebhookDispatchDb } from "@/actions/webhooks";
 import type { quotes } from "@/db/schema";
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { contactReach } from "@/lib/contact-reach";
+import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
+import { dispatchWebhook, type WebhookDispatchDb } from "@/lib/webhook-dispatch";
 
 /**
  * The workspace these events belong to.
@@ -109,4 +110,29 @@ export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor
     { via: "user", actor },
     explicitDb,
   ).catch((e) => console.error("[quotes] quote.sent not dispatched", e));
+}
+
+/**
+ * The customer opened, accepted or declined the quote from its public page: the owner is
+ * told, on the bell and by push (§7.1).
+ *
+ * ⚠️⚠️ The acceptance used to reach an integration and nobody else: the person who sent the
+ * quote found out by opening it, if they opened it. Called inside `runWithTenant` by the
+ * public route, which has no session; never throws, because the customer's answer is
+ * already recorded and must not be reported to them as a failure.
+ */
+export async function tellQuoteOwner(
+  quote: Pick<typeof quotes.$inferSelect, "id" | "quoteNumber" | "ownerId">,
+  event: "viewed" | "accepted" | "declined",
+  reason?: string | null,
+): Promise<void> {
+  if (!quote.ownerId) return;
+  const key = event === "viewed" ? "quoteViewed" : event === "accepted" ? "quoteAccepted" : "quoteDeclined";
+  await notify({
+    userId: quote.ownerId,
+    type: `quote_${event}`,
+    key,
+    params: { number: quote.quoteNumber, hasReason: reason ? "yes" : "no", reason: reason ?? "" },
+    link: `/dashboard/sales/quotes/${quote.id}`,
+  }).catch((err) => console.error(`[quotes] owner not told the quote was ${event}`, err));
 }

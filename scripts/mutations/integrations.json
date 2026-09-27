@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/app/api/crm/webhooks/[id]/route.ts",
+    "description": "⚠️⚠️ una chiave spegne il webhook che un amministratore ha configurato: l'integrazione tace e nessuno sa perché",
+    "find": "        isNull(webhooks.ownerId),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/webhooks/route.ts",
+    "description": "⚠️ una chiave crea iscrizioni senza limite: ogni contatto salvato diventa cento consegne",
+    "find": "  if (n >= MAX_API_SUBSCRIPTIONS) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/webhooks/route.ts",
+    "description": "⚠️ un'iscrizione salva nomi di eventi che non esistono",
+    "find": "  const events = cleanSubscription(body.events);",
+    "replace": "  const events = Array.isArray(body.events) ? (body.events as string[]) : [];"
+  },
+  {
+    "file": "src/lib/webhook-events.ts",
+    "description": "⚠️ qualunque stringa diventa un evento a cui iscriversi",
+    "find": "    (e): e is string => typeof e === \"string\" && (e === ALL_EVENTS || isWebhookEvent(e) || RULE_EVENT.test(e)),",
+    "replace": "    (e): e is string => typeof e === \"string\","
+  },
+  {
+    "file": "src/lib/api-docs/to-openapi.ts",
+    "description": "⚠️ il documento OpenAPI non dice più quale permesso serve",
+    "find": "    ...(endpoint.scope ? { \"x-scope\": endpoint.scope } : {}),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-public-page.ts",
+    "description": "ogni ricarica della pagina del cliente manda di nuovo ticket.rated",
+    "find": "  if (result.changed) {",
+    "replace": "  if (true) {"
+  }
+]

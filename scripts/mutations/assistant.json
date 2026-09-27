@@ -1,0 +1,122 @@
+[
+  {
+    "file": "src/lib/consent-events.ts",
+    "description": "⚠️⚠️ una disiscrizione dal link di un'email non porta l'indirizzo da cui è arrivata: chi non ha la persona in Flux non sa a chi smettere di scrivere",
+    "find": "  const email = optOut.email?.trim().toLowerCase() || first((r) => r.email);",
+    "replace": "  const email = first((r) => r.email);"
+  },
+  {
+    "file": "src/lib/consent-events.ts",
+    "description": "un evento senza alcun recapito parte lo stesso: il ricevente non può farci niente",
+    "find": "  if (!email && !phone && !mobile) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "⚠️⚠️ un opt-out ricevuto dall'API non arriva alle altre integrazioni: continuano a scrivere a chi ha chiesto di smettere",
+    "find": "  await announceOptOut(\n    db,",
+    "replace": "  void (\n    db,"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ il consenso tolto dalla scheda del contatto non viene annunciato",
+    "find": "    if (previous?.marketingConsent === true && updatedContact.marketingConsent === false) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/app/api/unsubscribe/route.ts",
+    "description": "⚠️⚠️ la disiscrizione da una campagna non viene annunciata",
+    "find": "    await announceOptOut(\n      db,",
+    "replace": "    void (\n      db,"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ una sequenza scrive anche a chi segue l'assistente: la stessa persona riceve i solleciti due volte",
+    "find": "  if (r.withAssistant) return \"with_assistant\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ il lead preso dall'assistente dopo l'iscrizione non ferma la sequenza",
+    "find": "      withAssistant: Boolean(row.assistantSince),",
+    "replace": "      withAssistant: false,"
+  },
+  {
+    "file": "src/lib/assistant-handling.ts",
+    "description": "il segno non dice quale assistente segue la persona",
+    "find": "          assistantName: name,\n",
+    "replace": "          assistantName: null,\n"
+  },
+  {
+    "file": "src/app/api/crm/assistant/route.ts",
+    "description": "la scheda non dice più da chi è seguita la persona, solo «API»",
+    "find": "authResult.key?.name ?? \"API\"",
+    "replace": "\"API\""
+  },
+  {
+    "file": "src/lib/campaign-send.ts",
+    "description": "⚠️⚠️ una campagna a tutti i contatti scrive anche a chi segue l'assistente",
+    "find": "      : and(eq(contacts.marketingConsent, true), notWithAssistant.contacts);",
+    "replace": "      : eq(contacts.marketingConsent, true);"
+  },
+  {
+    "file": "src/lib/api-read-route.ts",
+    "description": "⚠️⚠️ il prezzo del cliente ignora il suo listino: l'assistente propone il prezzo di catalogo e il preventivo ne dirà un altro",
+    "find": "      const priced = priceProduct(String(p.id), p.price as number, rules);",
+    "replace": "      const priced = priceProduct(String(p.id), p.price as number, null);"
+  },
+  {
+    "file": "src/lib/api-read-route.ts",
+    "description": "un'azienda inesistente passa per un cliente senza listino",
+    "find": "    if (!company) return NextResponse.json({ error: \"No company with that id\", field: \"companyId\" }, { status: 400 });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-read.ts",
+    "description": "⚠️ ogni fase si dice aperta: un'integrazione chiude una trattativa spostandola in «Vinta» senza saperlo",
+    "find": "        kind: isWon ? \"won\" : isLost ? \"lost\" : \"open\",",
+    "replace": "        kind: \"open\","
+  },
+  {
+    "file": "src/lib/api-scopes.ts",
+    "description": "⚠️⚠️ le chiavi di prima dei permessi ricevono l'iscrizione agli eventi: una chiave che non poteva leggere riceve ogni contatto creato",
+    "find": "  [\"contacts\", \"leads\", \"companies\", \"deals\", \"orders\", \"activities\", \"custom_fields\", \"privacy\"] as const",
+    "replace": "  [\"contacts\", \"leads\", \"companies\", \"deals\", \"orders\", \"activities\", \"custom_fields\", \"privacy\", \"webhooks\"] as const"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "⚠️⚠️ la bozza ignora il listino del cliente: l'assistente propone il prezzo di catalogo a chi ha un prezzo concordato",
+    "find": "      unitPrice: priceFor(p.id, p.price, rules),",
+    "replace": "      unitPrice: priceFor(p.id, p.price, null),"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "⚠️⚠️ una riga senza prodotto passa: il prezzo lo inventa il modello",
+    "find": "    if (!productId) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "⚠️ un prodotto ritirato finisce in un preventivo",
+    "find": "    .filter(({ l }) => !byId.get(l.productId)?.isActive)",
+    "replace": "    .filter(({ l }) => !byId.get(l.productId))"
+  },
+  {
+    "file": "src/lib/quote-draft.ts",
+    "description": "⚠️⚠️ la bozza nasce già inviata: nessuna persona l'ha guardata prima che arrivasse al cliente",
+    "find": "    status: \"draft\",",
+    "replace": "    status: \"sent\","
+  },
+  {
+    "file": "src/app/api/crm/quotes/route.ts",
+    "description": "⚠️ il titolare della trattativa non sa che c'è una bozza da guardare",
+    "find": "      if (result.ownerId) {",
+    "replace": "      if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/quotes/route.ts",
+    "description": "⚠️ una richiesta ripetuta crea una seconda bozza",
+    "find": "  if (idempotency.kind === \"replay\") {\n    return NextResponse.json(idempotency.body, {\n      status: idempotency.status ?? 200,\n      headers: { \"Idempotent-Replay\": \"true\" },\n    });\n  }",
+    "replace": ""
+  }
+]

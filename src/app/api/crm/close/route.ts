@@ -1,15 +1,17 @@
-import { after, type NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { eq, inArray } from "drizzle-orm";
 
-import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { deals } from "@/db/schema";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
+import { recordFieldChanges } from "@/lib/field-history";
 import { getTenantById } from "@/lib/get-tenant";
+import { closingStageFor } from "@/lib/pipelines";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
 /**
@@ -54,11 +56,13 @@ const LASCIA_APERTO = "RAGGIUNTO";
  */
 const ENDPOINT = "/api/crm/close";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "deals", access: "write" } as const;
+
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -141,8 +145,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No deal to close for that contact point" }, { status: 404 });
   }
 
-  const suoi: { id: string; status: string; name: string }[] = await db
-    .select({ id: deals.id, status: deals.status, name: deals.name })
+  const suoi: { id: string; status: string; name: string; stageId: string | null }[] = await db
+    .select({ id: deals.id, status: deals.status, name: deals.name, stageId: deals.stageId })
     .from(deals)
     .where(inArray(deals.contactId, person.contactIds));
 
@@ -158,31 +162,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No deal to close for that contact point" }, { status: 404 });
   }
 
+  // ⚠️⚠️ Into the losing column, as the dashboard does (V1.3): a deal marked lost and left in
+  // "Proposal" is on the board as open work and in the report as lost, at once. And the
+  // stage it was lost at is kept, which is what win/loss reads "lost where" from.
   const chiuseAt = new Date();
   const chiusi: string[] = [];
   for (const affare of aperti) {
+    // Its own pipeline's lost column (src/lib/pipelines.ts).
+    const lostStage = await closingStageFor(db, affare.stageId, "lost");
     const [dopo] = await db
       .update(deals)
       .set({
         status: "lost",
         closedAt: chiuseAt,
         lostReason: CHIUDONO[outcome],
+        lostAtStageId: affare.stageId,
+        ...(lostStage ? { stageId: lostStage.id } : {}),
         updatedAt: chiuseAt,
       })
       .where(eq(deals.id, affare.id))
       .returning();
     chiusi.push(affare.id);
+    // The history the timeline and the stage figures read (src/lib/stage-history.ts). By
+    // nobody in particular: a machine closed it, and `api_write_log` says which key.
+    await recordFieldChanges(db, "deal", affare.id, affare, dopo, null);
     // After the response, like every other write that runs the rules: a deal moving to
     // "lost" is a change like any other, and whoever watches for it must hear.
-    after(() =>
-      runAutomations({
-        entityType: "deal",
-        entityId: affare.id,
-        event: "onUpdate",
-        oldData: affare as Record<string, unknown>,
-        newData: dopo as Record<string, unknown>,
-      }),
-    );
+    runRulesAfterApiWrite(tenant.id, {
+      entityType: "deal",
+      entityId: affare.id,
+      event: "onUpdate",
+      oldData: affare as Record<string, unknown>,
+      newData: dopo as Record<string, unknown>,
+    });
   }
 
   // One deal is the usual case and is worth naming; several are one request that closed

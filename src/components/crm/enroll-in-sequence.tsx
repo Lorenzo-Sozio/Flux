@@ -73,7 +73,7 @@ export function EnrollInSequence({ entity, recordId }: { entity: "lead" | "conta
                     <div className="min-w-0">
                       <Link
                         href={`/dashboard/marketing/sequences/${e.sequenceId}`}
-                        className="font-medium hover:underline"
+                        className="break-words font-medium hover:underline"
                       >
                         {e.name}
                       </Link>

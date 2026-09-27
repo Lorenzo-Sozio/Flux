@@ -13,15 +13,28 @@ interface ForecastData {
   bestCase: number;
   committed: number;
   currentMonthTarget: number;
+  currentMonthCommitted: number;
+  wonThisMonth: number;
   byOwner: { name: string; dealCount: number; weighted: number }[];
 }
 
-export function ForecastKPI({ totalWeighted, bestCase, committed, currentMonthTarget }: Omit<ForecastData, "byOwner">) {
+export function ForecastKPI({
+  totalWeighted,
+  bestCase,
+  committed,
+  currentMonthTarget,
+  currentMonthCommitted,
+  wonThisMonth,
+}: Omit<ForecastData, "byOwner">) {
+  // This month only: won already, plus committed to close this month.
+  const onCourse = wonThisMonth + currentMonthCommitted;
   const t = useTranslations("pipeline.forecast");
   const { formatAmount } = useCurrency();
 
+  // Four across only from lg. From sm it used to be four, and a quarter of a
+  // tablet cannot hold a seven-figure amount at this size: the card clips it.
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -67,12 +80,16 @@ export function ForecastKPI({ totalWeighted, bestCase, committed, currentMonthTa
           </CardHeader>
           <CardContent>
             <div
-              className={`text-2xl font-bold ${committed >= currentMonthTarget ? "text-green-600" : "text-amber-600"}`}
+              className={`text-2xl font-bold ${onCourse >= currentMonthTarget ? "text-green-600" : "text-amber-600"}`}
             >
-              {Math.round((committed / currentMonthTarget) * 100)}%
+              {Math.round((onCourse / currentMonthTarget) * 100)}%
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {t("vsTargetDesc", { amount: formatAmount(currentMonthTarget, { noDecimals: true }) })}
+              {t("vsTargetDesc", {
+                won: formatAmount(wonThisMonth, { noDecimals: true }),
+                committed: formatAmount(currentMonthCommitted, { noDecimals: true }),
+                amount: formatAmount(currentMonthTarget, { noDecimals: true }),
+              })}
             </p>
           </CardContent>
         </Card>
@@ -128,5 +145,48 @@ export function ForecastOwnerTable({ byOwner }: { byOwner: ForecastData["byOwner
         </tbody>
       </table>
     </div>
+  );
+}
+
+type Outside = { count: number; weighted: number; total: number };
+
+/**
+ * The open deals the forecast leaves out, as work to do.
+ *
+ * ⚠️ They were computed and never shown: a deal with no close date, or with a date already
+ * past, disappeared from the forecast without a trace. One needs a date, the other needs a
+ * decision — and neither gets one while nobody can see it.
+ */
+export function ForecastOutside({ unscheduled, overdue }: { unscheduled: Outside; overdue: Outside }) {
+  const t = useTranslations("pipeline.forecast");
+  const { formatAmount } = useCurrency();
+  if (unscheduled.count === 0 && overdue.count === 0) return null;
+  return (
+    <Card className="border-amber-300 dark:border-amber-800">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">{t("outsideTitle")}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-1 text-sm">
+        {overdue.count > 0 && (
+          <p>
+            {t("outsideOverdue", { count: overdue.count, amount: formatAmount(overdue.total, { noDecimals: true }) })}
+          </p>
+        )}
+        {unscheduled.count > 0 && (
+          <p>
+            {t("outsideUnscheduled", {
+              count: unscheduled.count,
+              amount: formatAmount(unscheduled.total, { noDecimals: true }),
+            })}
+          </p>
+        )}
+        <p className="text-muted-foreground text-xs">
+          {t("outsideHint")}{" "}
+          <Link href="/dashboard/pipeline" className="underline hover:text-foreground">
+            {t("outsideOpenBoard")}
+          </Link>
+        </p>
+      </CardContent>
+    </Card>
   );
 }

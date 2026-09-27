@@ -1,6 +1,8 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { PriceSourceBadge } from "@/components/crm/price-list-note";
@@ -14,6 +16,7 @@ import type { invoiceTotals } from "@/lib/fatturapa/totals";
 import { NATURE_CODES } from "@/lib/invoice-rules";
 import { type PriceRules, priceFor } from "@/lib/price-list";
 import { STAMP_DUTY_AMOUNT } from "@/lib/stamp-duty";
+import { cn } from "@/lib/utils";
 
 import { blankLine, type CatalogueProduct, type EditableLine, num } from "./invoice-lines";
 
@@ -26,6 +29,7 @@ type Totals = ReturnType<typeof invoiceTotals>;
 
 const NO_NATURE = "none";
 const OFF_CATALOGUE = "__custom__";
+const NUMERIC_FIELDS = ["quantity", "unitPrice", "discountPercent", "taxPercent"] as const;
 
 export function InvoiceLinesTable({
   lines,
@@ -55,6 +59,11 @@ export function InvoiceLinesTable({
   priceRules?: PriceRules | null;
 }) {
   const t = useTranslations("invoices");
+  const tLine = useTranslations("orders.form");
+  // On a phone one line is open for editing at a time; the others are summary
+  // rows. Keyed by the line's own key, so removing a line above does not open
+  // a different one.
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const put = (i: number, patch: Partial<EditableLine>) =>
     onChange(lines.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const pick = (i: number, value: string) => {
@@ -76,9 +85,177 @@ export function InvoiceLinesTable({
       ]
     : [];
 
+  /** The Natura control, or its code when there is nothing to choose. Shared by the table and the cards. */
+  const natureField = (l: EditableLine, i: number) =>
+    editable && num(l.taxPercent) === 0 ? (
+      <Select value={l.nature || NO_NATURE} onValueChange={(v) => put(i, { nature: v === NO_NATURE ? "" : v })}>
+        <SelectTrigger aria-label={t("nature")} className="h-9 w-full text-xs">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NO_NATURE}>{t("chooseNature")}</SelectItem>
+          {Object.entries(NATURE_CODES).map(([code, label]) => (
+            <SelectItem key={code} value={code}>
+              {code} — {label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    ) : (
+      <span className="font-mono text-xs">{l.nature || "—"}</span>
+    );
+
+  const numericLabel = (f: (typeof NUMERIC_FIELDS)[number]) =>
+    t(f === "discountPercent" ? "discount" : f === "taxPercent" ? "vat" : f);
+
   return (
     <>
-      <div className="overflow-x-auto">
+      {/*
+        ⚠️ Below `md` a line is a card, not a row. Nine columns of inputs scrolled
+        sideways inside a phone meant typing a price with the description off one
+        edge and the net off the other. The card carries the same controls, bound
+        to the same `put`, so the two layouts cannot disagree about a line — only
+        about where its fields are drawn.
+      */}
+      <ul className="space-y-3 p-3 md:hidden">
+        {lines.map((l, i) => (
+          <li key={l.key} className="rounded-lg border bg-muted/20 p-3">
+            {/* ⚠️ Editable, a line is a summary row that opens: six inputs a line,
+                open for every line, made a three-line invoice longer than the
+                screen three times over. */}
+            <div className={cn("flex items-center justify-between gap-2", (!editable || openKey === l.key) && "mb-3")}>
+              {editable ? (
+                <button
+                  type="button"
+                  onClick={() => setOpenKey(openKey === l.key ? null : l.key)}
+                  aria-expanded={openKey === l.key}
+                  className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center gap-0.5 text-left"
+                >
+                  <span className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs">
+                    {tLine("line", { number: i + 1 })}
+                    <ChevronDown
+                      className={cn("size-3.5 transition-transform", openKey === l.key && "rotate-180")}
+                      aria-hidden
+                    />
+                  </span>
+                  {openKey !== l.key && (
+                    <span className="max-w-full truncate font-medium text-sm">
+                      {l.description || t("descriptionPlaceholder")}
+                    </span>
+                  )}
+                  {openKey !== l.key && (
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {l.quantity} × {l.unitPrice} · {t("vat")} {l.taxPercent}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <span className="font-medium text-muted-foreground text-xs">{tLine("line", { number: i + 1 })}</span>
+              )}
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="font-semibold text-sm tabular-nums">{money(totals.details[i]?.total ?? 0)}</span>
+                {editable && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="-my-1 h-9 w-9 text-muted-foreground hover:text-destructive"
+                    aria-label={t("removeLine")}
+                    onClick={() => onChange(lines.filter((_, j) => j !== i))}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {editable ? (
+              <div className={cn("grid grid-cols-2 gap-x-3 gap-y-3", openKey !== l.key && "hidden")}>
+                {products && (
+                  <div className="col-span-2 space-y-1.5">
+                    <p className="font-medium text-xs">{t("product")}</p>
+                    <SearchableSelect
+                      options={productOptions}
+                      value={l.productId ?? OFF_CATALOGUE}
+                      onChange={(v) => pick(i, v)}
+                      placeholder={t("offCatalogue")}
+                      searchPlaceholder={t("searchProduct")}
+                      emptyText={t("noProducts")}
+                    />
+                  </div>
+                )}
+                <div className="col-span-2 space-y-1.5">
+                  <p className="font-medium text-xs">{t("description")}</p>
+                  <Input
+                    aria-label={t("description")}
+                    value={l.description}
+                    placeholder={t("descriptionPlaceholder")}
+                    onChange={(e) => put(i, { description: e.target.value })}
+                  />
+                </div>
+                {NUMERIC_FIELDS.map((f) => (
+                  <div key={f} className="min-w-0 space-y-1.5">
+                    <p className="font-medium text-xs">{numericLabel(f)}</p>
+                    <Input
+                      aria-label={numericLabel(f)}
+                      inputMode="decimal"
+                      className="text-right tabular-nums"
+                      value={l[f]}
+                      onChange={(e) => put(i, { [f]: e.target.value })}
+                    />
+                    {f === "unitPrice" && (
+                      <PriceSourceBadge
+                        source={listPriceSource(
+                          priceRules,
+                          products?.find((p) => p.id === l.productId),
+                          l.unitPrice,
+                        )}
+                        listName={priceRules?.name}
+                      />
+                    )}
+                  </div>
+                ))}
+                {num(l.taxPercent) === 0 && (
+                  <div className="col-span-2 space-y-1.5">
+                    <p className="font-medium text-xs">{t("nature")}</p>
+                    {natureField(l, i)}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <p className="break-words text-sm">{l.description}</p>
+                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground text-xs tabular-nums">
+                  <span>
+                    {l.quantity} × {l.unitPrice}
+                  </span>
+                  {num(l.discountPercent) !== 0 && (
+                    <span>
+                      {t("discount")} {l.discountPercent}
+                    </span>
+                  )}
+                  <span>
+                    {t("vat")} {l.taxPercent}
+                  </span>
+                  {l.nature && <span className="font-mono">{l.nature}</span>}
+                </p>
+              </>
+            )}
+          </li>
+        ))}
+        {rechargeLine && (
+          <li className="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 p-3 text-muted-foreground text-sm">
+            <div className="min-w-0">
+              <p className="break-words">{t("stampLine")}</p>
+              <p className="mt-0.5 text-[11px]">
+                {t("stampLineAuto")} · <span className="font-mono">N1</span>
+              </p>
+            </div>
+            <span className="shrink-0 tabular-nums">{money(STAMP_DUTY_AMOUNT)}</span>
+          </li>
+        )}
+      </ul>
+
+      <div className="hidden overflow-x-auto md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -120,7 +297,7 @@ export function InvoiceLinesTable({
                     l.description
                   )}
                 </TableCell>
-                {(["quantity", "unitPrice", "discountPercent", "taxPercent"] as const).map((f) => (
+                {NUMERIC_FIELDS.map((f) => (
                   <TableCell key={f} className="text-right tabular-nums">
                     {f === "unitPrice" && (
                       <PriceSourceBadge
@@ -135,7 +312,7 @@ export function InvoiceLinesTable({
                     )}
                     {editable ? (
                       <Input
-                        aria-label={t(f === "discountPercent" ? "discount" : f === "taxPercent" ? "vat" : f)}
+                        aria-label={numericLabel(f)}
                         inputMode="decimal"
                         className="text-right"
                         value={l[f]}
@@ -146,28 +323,7 @@ export function InvoiceLinesTable({
                     )}
                   </TableCell>
                 ))}
-                <TableCell>
-                  {editable && num(l.taxPercent) === 0 ? (
-                    <Select
-                      value={l.nature || NO_NATURE}
-                      onValueChange={(v) => put(i, { nature: v === NO_NATURE ? "" : v })}
-                    >
-                      <SelectTrigger aria-label={t("nature")} className="h-9 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={NO_NATURE}>{t("chooseNature")}</SelectItem>
-                        {Object.entries(NATURE_CODES).map(([code, label]) => (
-                          <SelectItem key={code} value={code}>
-                            {code} — {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="font-mono text-xs">{l.nature || "—"}</span>
-                  )}
-                </TableCell>
+                <TableCell>{natureField(l, i)}</TableCell>
                 <TableCell className="text-right tabular-nums">{money(totals.details[i]?.total ?? 0)}</TableCell>
                 {editable && (
                   <TableCell>
@@ -206,13 +362,17 @@ export function InvoiceLinesTable({
         </Table>
       </div>
       {editable && (
-        <div className="p-3">
+        <div className="p-3 pt-0 md:pt-3">
           <Button
             type="button"
             variant="outline"
             size="sm"
-            className="gap-1"
-            onClick={() => onChange([...lines, blankLine()])}
+            className="w-full gap-1 md:w-auto"
+            onClick={() => {
+              const line = blankLine();
+              onChange([...lines, line]);
+              setOpenKey(line.key);
+            }}
           >
             <Plus className="h-3.5 w-3.5" /> {t("addLine")}
           </Button>

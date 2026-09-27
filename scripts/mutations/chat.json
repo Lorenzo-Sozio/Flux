@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/chat-send.ts",
+    "description": "⚠️⚠️ una conversazione silenziata torna a far suonare la campanella a ogni messaggio",
+    "find": "  const plain = others.filter((o) => !mentionedSet.has(o.userId) && !isMuted(o.mutedUntil)).map((o) => o.userId);",
+    "replace": "  const plain = others.filter((o) => !mentionedSet.has(o.userId)).map((o) => o.userId);"
+  },
+  {
+    "file": "src/actions/chat-internal.ts",
+    "description": "⚠️⚠️ qualunque membro torna a poter cancellare un gruppo per tutti",
+    "find": "  if (conv?.type !== \"direct\") throw new Error(\"A group is left, not deleted\");",
+    "replace": "  void conv;"
+  },
+  {
+    "file": "src/actions/chat-internal.ts",
+    "description": "⚠️ leggere la conversazione non risponde più alla sua notifica: campanella e badge non concordano",
+    "find": "    .set({ isRead: true })",
+    "replace": "    .set({ isRead: false })"
+  },
+  {
+    "file": "src/actions/chat-internal.ts",
+    "description": "⚠️ il selettore torna a proporre anche chi ha lasciato il workspace",
+    "find": "  return members ? rows.filter((u) => members.has(u.id)) : rows;",
+    "replace": "  return rows;"
+  },
+  {
+    "file": "src/actions/chat-internal.ts",
+    "description": "⚠️ si torna a poter aprire una conversazione con chi non è membro del workspace",
+    "find": "  if (members && ids.some((id) => !members.has(id))) throw new Error(\"Not a member of this workspace\");",
+    "replace": "  void members;"
+  },
+  {
+    "file": "src/lib/chat-send.ts",
+    "description": "⚠️⚠️ una menzione torna a raggiungere chiunque, anche fuori dalla conversazione",
+    "find": "  const mentioned = [...new Set(options.mentionIds ?? [])].filter((id) => inConversation.has(id));",
+    "replace": "  const mentioned = [...new Set(options.mentionIds ?? [])];"
+  },
+  {
+    "file": "src/lib/chat-send.ts",
+    "description": "⚠️ una menzione arriva come un messaggio qualunque, e non supera più il silenzioso",
+    "find": "          type: \"chat_mention\",",
+    "replace": "          type: \"chat_message\","
+  },
+  {
+    "file": "src/app/api/chat/attachments/[id]/route.ts",
+    "description": "⚠️⚠️ un allegato della chat si apre per chiunque nel workspace, anche per chi ha lasciato il gruppo",
+    "find": "        eq(dmConversationMembers.userId, session.user.id),",
+    "replace": "        eq(dmConversationMembers.userId, dmConversationMembers.userId),"
+  },
+  {
+    "file": "src/app/api/chat/messages/route.ts",
+    "description": "⚠️ un invio rifiutato lascia il file nell'archivio, pagato e irraggiungibile",
+    "find": "    await storage.delete(storageKey).catch(() => undefined);",
+    "replace": "    void storage;"
+  },
+  {
+    "file": "src/actions/chat-internal.ts",
+    "description": "⚠️ cancellare una conversazione lascia i suoi file nell'archivio",
+    "find": "    await Promise.all(files.map((f) => storage.delete(f.key).catch(() => undefined)));",
+    "replace": "    void storage;"
+  }
+]

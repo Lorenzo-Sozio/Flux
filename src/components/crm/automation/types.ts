@@ -33,7 +33,8 @@ export function ruleFormMessageKey(message: string | undefined): RuleFormMessage
 // ─── Entities & Events ────────────────────────────────────────────────────────
 
 export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket", "order"] as const;
-export const TRIGGER_EVENTS = ["onCreate", "onUpdate", "onSLABreach"] as const;
+// `onSchedule`: checked every morning, for every record, when its conditions hold (§8.1).
+export const TRIGGER_EVENTS = ["onCreate", "onUpdate", "onSLABreach", "onSchedule"] as const;
 
 export type TargetEntity = (typeof TARGET_ENTITIES)[number];
 export type TriggerEvent = (typeof TRIGGER_EVENTS)[number];
@@ -54,6 +55,10 @@ export const CONDITION_OPERATORS = [
   "changed", // field changed at all (old !== new)
   "changed_to", // field changed to a specific value
   "changed_from", // field changed from a specific value
+  // Relative to now (§8.1): src/lib/rule-conditions.ts
+  "date_in_past", // e.g. the close date has passed
+  "date_within_days", // within the next N days
+  "older_than_days", // more than N days ago
 ] as const;
 
 export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
@@ -297,6 +302,8 @@ export interface RuleContext {
   oldData: Record<string, unknown>;
   newData: Record<string, unknown>;
   currentUserId?: string;
+  /** Only these rules: the daily run has already decided which rules apply to the record. */
+  ruleIds?: string[];
 }
 
 // ─── Field registry — what fields are exposed per entity ─────────────────────
@@ -304,7 +311,7 @@ export interface RuleContext {
 //  Used by the RuleBuilder UI to render field selectors and correct
 //  operator lists. Keep in sync with the actual DB columns.
 
-export type FieldType = "text" | "number" | "enum" | "boolean";
+export type FieldType = "text" | "number" | "enum" | "boolean" | "date";
 
 export interface FieldDef {
   key: string; // matches the Drizzle column camelCase name
@@ -329,7 +336,13 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
         { value: "lost", label: "Lost" },
       ],
     },
-    { key: "stageId", label: "Stage (ID)", type: "text" },
+    // ⚠️ By name, from the workspace's own stages and people (the builder fills the options):
+    // "a deal enters Proposal → create a task" could not be built with a stage id to type.
+    { key: "stageId", label: "Stage", type: "enum", options: [] },
+    { key: "ownerId", label: "Owner", type: "enum", options: [] },
+    { key: "expectedCloseDate", label: "Expected close date", type: "date" },
+    // Worked out for the daily scheduled run (src/lib/scheduled-rules.ts), not stored.
+    { key: "idleDays", label: "Days without activity", type: "number" },
     { key: "notes", label: "Notes", type: "text" },
   ],
   lead: [
@@ -463,4 +476,5 @@ export const OPERATORS_BY_TYPE: Record<FieldType, ConditionOperator[]> = {
   ],
   enum: ["equals", "not_equals", "changed", "changed_to", "changed_from"],
   boolean: ["equals", "not_equals", "changed"],
+  date: ["date_in_past", "date_within_days", "older_than_days", "is_empty", "is_not_empty", "changed"],
 };

@@ -12,10 +12,12 @@ export default async function CampaignsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Wrapping, not shrinking: on a phone the button drops under the title
+          instead of pushing past the edge of the screen. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2 font-bold text-2xl">
-            <TargetIcon className="h-6 w-6 text-primary" />
+            <TargetIcon className="h-6 w-6 shrink-0 text-primary" />
             {t("title")}
           </h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>

@@ -67,6 +67,13 @@ export const CAPABILITIES = {
   "record:delete": "editor",
   "record:import": "editor",
   "record:export": "viewer",
+  /**
+   * Acting on a record that is somebody else's — sending a colleague's quote, deleting
+   * it, answering on a ticket nobody gave you. Eleven call sites wrote this as
+   * `tenantRole !== "admin"`, and four of them left `owner` out, so the person who owns
+   * the workspace could not send a quote their own salesperson had drafted.
+   */
+  "record:manageAny": "admin",
 
   // Sales documents
   "quote:write": "editor",
@@ -101,6 +108,9 @@ export const CAPABILITIES = {
   "customField:manage": "admin",
   "webhook:manage": "admin",
   "emailSettings:manage": "admin",
+  // Exporting everything about a person, or erasing them (GDPR art. 15, 17, 20). Admin: the
+  // export is the whole of somebody's data in one file, and erasure cannot be undone.
+  "privacy:manage": "admin",
   "automation:manage": "admin",
   "target:manage": "admin",
   "territory:manage": "admin",
@@ -111,6 +121,9 @@ export const CAPABILITIES = {
   "group:manage": "admin",
   "billing:read": "admin",
   "billing:manage": "owner",
+  // Setting commission rates, approving a month, and seeing everyone's commissions. What
+  // a colleague earns is not a record of the workspace: without this, a person sees their own.
+  "commission:manage": "admin",
 } as const satisfies Record<string, TenantRole>;
 
 export type Capability = keyof typeof CAPABILITIES;

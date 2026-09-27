@@ -32,6 +32,7 @@ import { toast } from "sonner";
 
 import { deleteTask, updateTaskStatus } from "@/actions/tasks";
 import { TaskModal } from "@/components/crm/task-modal";
+import { TaskOutcomeDialog } from "@/components/crm/task-outcome-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -54,6 +55,7 @@ import { NewTaskDialog } from "./new-task-dialog";
 type Task = {
   id: string;
   title: string;
+  type?: string;
   description: string | null;
   dueDate: Date | null;
   startDate?: Date | null;
@@ -167,7 +169,7 @@ function entityLink(
       href: `/dashboard/companies/${task.companyId}`,
       icon: Building2,
     };
-  if (task.dealId) return { label: t("dialog.linkDeal"), href: `/dashboard/pipeline`, icon: Kanban };
+  if (task.dealId) return { label: t("dialog.linkDeal"), href: `/dashboard/pipeline/${task.dealId}`, icon: Kanban };
   return null;
 }
 
@@ -239,7 +241,8 @@ function TaskCard({
             <button
               type="button"
               onClick={() => onToggle(task)}
-              className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary"
+              aria-label={done ? t("markAsTodo") : t("markAsDone")}
+              className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary max-md:-m-3 max-md:p-3"
             >
               {done ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <Circle className="h-3.5 w-3.5" />}
             </button>
@@ -304,8 +307,10 @@ function TaskCard({
           </div>
 
           <div className="flex items-center justify-between pl-5">
-            <span className="text-[10px] text-muted-foreground">{task.assigneeName ?? task.ownerName ?? ""}</span>
-            <div className="flex items-center gap-0.5">
+            <span className="min-w-0 truncate text-[10px] text-muted-foreground">
+              {task.assigneeName ?? task.ownerName ?? ""}
+            </span>
+            <div className="flex shrink-0 items-center gap-0.5">
               <TaskModal
                 task={task}
                 users={users}
@@ -318,7 +323,8 @@ function TaskCard({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 hover:text-destructive"
+                className="h-6 w-6 hover:text-destructive max-md:size-9"
+                aria-label={t("deleteTask")}
                 onClick={() => onDelete(task.id)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -385,10 +391,19 @@ export function TasksClient({
   initialOpenTaskId,
 }: Props) {
   const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const locale = useLocale();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
+  // ⚠️ Taken from the server again whenever it sends a new list. The list was copied into
+  // state once, so `router.refresh()` after creating a task — or after planning the next
+  // step — fetched the new row and never showed it until the page was reloaded.
+  const [fromServer, setFromServer] = useState(initialTasks);
+  if (fromServer !== initialTasks) {
+    setFromServer(initialTasks);
+    setTasks(initialTasks);
+  }
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
 
@@ -439,11 +454,17 @@ export function TasksClient({
       return s;
     });
 
+  // Completing one task asks "how did it go?"; reopening one asks nothing. Bulk
+  // completion stays a plain tick: nobody reports on twelve calls in one gesture.
+  const [asking, setAsking] = useState<Task | null>(null);
   const handleToggleStatus = (task: Task) => {
-    const newStatus = task.status === "done" ? "todo" : "done";
+    if (task.status !== "done") {
+      setAsking(task);
+      return;
+    }
     startTransition(async () => {
-      await updateTaskStatus(task.id, newStatus);
-      setTasks((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, status: newStatus } : tk)));
+      await updateTaskStatus(task.id, "todo");
+      setTasks((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, status: "todo" } : tk)));
     });
   };
 
@@ -644,8 +665,11 @@ export function TasksClient({
           className="h-8 w-full sm:w-48"
         />
 
+        {/* Status and priority share a row on a phone: four full-width rows of
+            filters pushed the first task below the fold. The assignee keeps a
+            row of its own, for the reason above. */}
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="h-8 w-full text-xs sm:w-32">
+          <SelectTrigger className="h-8 w-[calc(50%-0.25rem)] text-xs sm:w-32">
             <Filter className="mr-1 h-3 w-3" />
             <SelectValue />
           </SelectTrigger>
@@ -658,7 +682,7 @@ export function TasksClient({
         </Select>
 
         <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="h-8 w-full text-xs sm:w-32">
+          <SelectTrigger className="h-8 w-[calc(50%-0.25rem)] text-xs sm:w-32">
             <SelectValue placeholder={t("allPriorities")} />
           </SelectTrigger>
           <SelectContent>
@@ -687,7 +711,7 @@ export function TasksClient({
         </Select>
 
         {selected.size > 0 && (
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-muted-foreground text-xs">{t("selectedCount", { count: selected.size })}</span>
             <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={handleBulkComplete}>
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -709,7 +733,15 @@ export function TasksClient({
       {/* ── Board view ──────────────────────────────────────────────────────── */}
       {viewMode === "board" && (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/*
+            ⚠️ Below `md` the three columns are side by side and scroll, not
+            stacked. Stacked, moving a card from "to do" to "done" meant dragging
+            it past every card in between — a whole screen or more — on a surface
+            that is also the page's scroll. At 85vw the edge of the next column
+            shows, which is what says there is one; the scroller bleeds to the
+            screen edge so a column is not framed by the page padding twice.
+          */}
+          <div className="scrollbar-slim -mx-4 flex snap-x snap-mandatory scroll-px-4 gap-4 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:snap-none md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0">
             {BOARD_COLUMN_IDS.map((colId) => {
               const colLabel = t(
                 `statuses.${colId === "in_progress" ? "inProgress" : colId === "todo" ? "todo" : "done"}`,
@@ -734,7 +766,10 @@ export function TasksClient({
               }
 
               return (
-                <div key={colId} className="flex flex-col gap-2">
+                <div
+                  key={colId}
+                  className="flex w-[85vw] max-w-80 shrink-0 snap-start flex-col gap-2 md:w-auto md:max-w-none"
+                >
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
                       <span className={cn("rounded-full px-2 py-0.5 font-semibold text-xs", colColor)}>{colLabel}</span>
@@ -861,8 +896,9 @@ export function TasksClient({
                             <button
                               type="button"
                               onClick={() => handleToggleStatus(task)}
-                              className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary"
+                              className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-primary max-md:-m-2.5 max-md:p-2.5"
                               title={done ? t("markAsTodo") : t("markAsDone")}
+                              aria-label={done ? t("markAsTodo") : t("markAsDone")}
                             >
                               {done ? (
                                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -870,11 +906,11 @@ export function TasksClient({
                                 <Circle className="h-4 w-4" />
                               )}
                             </button>
-                            <div className="min-w-0">
+                            <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <p
                                   className={cn(
-                                    "font-medium leading-snug",
+                                    "min-w-0 break-words font-medium leading-snug",
                                     done && "text-muted-foreground line-through",
                                   )}
                                 >
@@ -1009,7 +1045,7 @@ export function TasksClient({
                           )}
                         </td>
 
-                        <td className="px-3 py-2.5">
+                        <td className="px-3 py-2.5 max-sm:pl-0">
                           <div className="flex items-center gap-1">
                             <TaskModal
                               task={task}
@@ -1025,7 +1061,12 @@ export function TasksClient({
                             />
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 max-md:size-9"
+                                  aria-label={tc("actions")}
+                                >
                                   <ChevronDown className="h-3.5 w-3.5" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -1056,6 +1097,21 @@ export function TasksClient({
             {t("showingCount", { filtered: filtered.length, total: tasks.length })}
           </p>
         </>
+      )}
+      {asking && (
+        <TaskOutcomeDialog
+          task={asking}
+          open
+          onOpenChange={(v) => {
+            if (!v) setAsking(null);
+          }}
+          revalidate="/dashboard/tasks"
+          onCompleted={() => {
+            setTasks((prev) => prev.map((tk) => (tk.id === asking.id ? { ...tk, status: "done" } : tk)));
+            // The next step, if one was planned, is a new row only the server has.
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

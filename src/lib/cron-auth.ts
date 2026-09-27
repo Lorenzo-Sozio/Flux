@@ -21,7 +21,9 @@ export function verifyCronRequest(req: Request): NextResponse | null {
     const a = Buffer.from(provided);
     const b = Buffer.from(secret);
     authorized = a.length === b.length && timingSafeEqual(a, b);
-  } catch {}
+  } catch {
+    // Anything unreadable leaves `authorized` false: fail closed.
+  }
 
   if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️⚠️ il cancello non guarda gli ambiti: una chiave creata per scrivere lead dal sito legge tutti i clienti e cancella chi vuole",
+    "find": "  if (who.scopes && !grants(who.scopes, need)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️⚠️ la chiave di prima degli ambiti diventa onnipotente: con l'arrivo della lettura ogni vecchia chiave legge l'intero database",
+    "find": "        return { via: \"apikey\", userId: null, role: \"editor\", tenantId: tenant.id, scopes: WRITE_ALL, key: LEGACY_KEY };",
+    "replace": "        return { via: \"apikey\", userId: null, role: \"editor\", tenantId: tenant.id, scopes: null, key: LEGACY_KEY };"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️⚠️ una chiave con ambiti ignora l'intestazione che nomina un altro workspace",
+    "find": "      if (claimed && claimed !== tenant.id) return null;\n      return {\n        via: \"apikey\",",
+    "replace": "      return {\n        via: \"apikey\","
+  },
+  {
+    "file": "src/lib/api-keys.ts",
+    "description": "⚠️⚠️ una chiave revocata continua ad aprire",
+    "find": "    .where(and(eq(apiKeys.hash, hashKey(key)), isNull(apiKeys.revokedAt)))",
+    "replace": "    .where(eq(apiKeys.hash, hashKey(key)))"
+  },
+  {
+    "file": "src/lib/api-keys.ts",
+    "description": "⚠️ qualunque cosa dopo il workspace passa per un segreto",
+    "find": "  return WORKSPACE_ID.test(workspaceId) && SECRET.test(secret) ? workspaceId : null;",
+    "replace": "  return WORKSPACE_ID.test(workspaceId) ? workspaceId : null;"
+  },
+  {
+    "file": "src/lib/api-scopes.ts",
+    "description": "⚠️⚠️ un ambito inventato — un asterisco — viene salvato sulla chiave",
+    "find": "  return ALL_SCOPES.filter((s) => wanted.has(s));",
+    "replace": "  return [...wanted];"
+  },
+  {
+    "file": "src/lib/api-scopes.ts",
+    "description": "⚠️ la schermata offre la lettura di cose che l'API non sa leggere",
+    "find": "  ...(READABLE.includes(entity) ? [scopeName({ entity, access: \"read\" })] : []),",
+    "replace": "  scopeName({ entity, access: \"read\" }),"
+  },
+  {
+    "file": "src/lib/api-read.ts",
+    "description": "⚠️⚠️ i record con la stessa data di modifica si perdono tra una pagina e l'altra",
+    "find": "    conditions.push(or(gt(t.updatedAt, at), and(eq(t.updatedAt, at), gt(t.id, query.after.id))));",
+    "replace": "    conditions.push(gt(t.updatedAt, at));"
+  },
+  {
+    "file": "src/lib/api-read.ts",
+    "description": "⚠️⚠️ il cursore nasce da una data JavaScript: millisecondi contro microsecondi, pagine ripetute",
+    "find": "    nextCursor: more && last ? encodeCursor(String(last._at), String(last.id)) : null,",
+    "replace": "    nextCursor: more && last ? encodeCursor(String(last.updatedAt), String(last.id)) : null,"
+  },
+  {
+    "file": "src/lib/api-read.ts",
+    "description": "una pagina può chiedere diecimila record in una volta",
+    "find": "    if (!Number.isInteger(limit) || limit < 1 || limit > LIST_MAX) {",
+    "replace": "    if (!Number.isInteger(limit) || limit < 1) {"
+  },
+  {
+    "file": "src/app/api/crm/erasure/route.ts",
+    "description": "⚠️⚠️ la cancellazione GDPR chiede solo di poter scrivere contatti",
+    "find": "const SCOPE = { entity: \"privacy\", access: \"write\" } as const;",
+    "replace": "const SCOPE = { entity: \"contacts\", access: \"write\" } as const;"
+  }
+]

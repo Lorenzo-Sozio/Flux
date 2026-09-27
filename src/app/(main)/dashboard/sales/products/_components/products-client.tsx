@@ -14,6 +14,7 @@ import { z } from "zod";
 import { createProduct, deleteProduct, toggleProductActive, updateProduct } from "@/actions/products";
 import { EmptyState } from "@/components/crm/empty-state";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -265,6 +266,7 @@ interface Props {
 export function ProductsClient({ page, stats, filter }: Props) {
   const t = useTranslations("products");
   const te = useTranslations("emptyStates");
+  const tc = useTranslations("common");
   const { formatAmount } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
@@ -398,112 +400,182 @@ export function ProductsClient({ page, stats, filter }: Props) {
         searchPlaceholder={t("searchPlaceholder")}
       />
 
-      {/* Table */}
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
-              <th className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">{t("columns.sku")}</th>
-              <th className="hidden px-4 py-2.5 text-left font-medium lg:table-cell">{t("category")}</th>
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.price")}</th>
-              <th className="hidden px-4 py-2.5 text-left font-medium md:table-cell">{t("taxRate")} %</th>
-              <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
-              <th className="w-20 px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {products.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-0">
-                  {search || filter !== "all" ? (
-                    <EmptyState icon={Package} title={te("filteredTitle")} description={te("filteredDescription")} />
-                  ) : (
-                    <EmptyState
-                      icon={Package}
-                      title={te("products.title")}
-                      description={te("products.description")}
-                      action={
-                        <Button size="sm" onClick={handleOpenCreate}>
-                          {t("newProduct")}
-                        </Button>
-                      }
-                    />
-                  )}
-                </td>
-              </tr>
-            ) : (
-              products.map((product) => (
-                <tr key={product.id} className="group transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>{product.name}</p>
-                  </td>
-                  <td className="hidden px-4 py-3 sm:table-cell">
-                    {product.sku ? (
-                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{product.sku}</span>
-                    ) : (
-                      <span className="text-muted-foreground/40">—</span>
+      {/* List */}
+      {/* Below `md` the rows are cards: the table there showed name, price and the
+          toggle, and hid the edit and delete buttons behind a hover a phone does
+          not have. The table from `md` up is unchanged. */}
+      {products.length === 0 ? (
+        <div className="rounded-md border">
+          {search || filter !== "all" ? (
+            <EmptyState icon={Package} title={te("filteredTitle")} description={te("filteredDescription")} />
+          ) : (
+            <EmptyState
+              icon={Package}
+              title={te("products.title")}
+              description={te("products.description")}
+              action={
+                <Button size="sm" onClick={handleOpenCreate}>
+                  {t("newProduct")}
+                </Button>
+              }
+            />
+          )}
+        </div>
+      ) : (
+        <ResponsiveRecordList
+          cards={
+            <RecordCards
+              items={products.map((product) => ({
+                id: product.id,
+                title: <span className={cn(!product.isActive && "text-muted-foreground")}>{product.name}</span>,
+                subtitle: [product.sku, product.category].filter(Boolean).join(" · ") || undefined,
+                badge: (
+                  <span className="font-semibold text-sm tabular-nums">
+                    {formatPrice(product.price)}
+                    {product.unit && (
+                      <span className="ml-1 font-normal text-muted-foreground text-xs">/ {product.unit}</span>
                     )}
-                  </td>
-                  <td className="hidden px-4 py-3 lg:table-cell">
-                    {product.category ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary text-xs">
-                        {product.category}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/40">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>
-                      <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span>
-                      {product.unit && <span className="ml-1 text-muted-foreground text-xs">/ {product.unit}</span>}
-                    </div>
-                  </td>
-                  <td className="hidden px-4 py-3 md:table-cell">
-                    <span className="text-sm tabular-nums">
-                      {parseFloat(product.taxPercent ?? "0") > 0 ? (
-                        `${parseFloat(product.taxPercent ?? "0")}%`
-                      ) : (
-                        <span className="text-muted-foreground/40">—</span>
-                      )}
+                  </span>
+                ),
+                meta:
+                  parseFloat(product.taxPercent ?? "0") > 0 ? (
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {t("taxRate")} {parseFloat(product.taxPercent ?? "0")}%
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <button
-                      type="button"
+                  ) : undefined,
+                actions: (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9"
                       onClick={() => handleToggleActive(product)}
-                      className="inline-flex items-center justify-center"
-                      title={product.isActive ? t("deactivate") : t("activate")}
+                      aria-label={product.isActive ? t("deactivate") : t("activate")}
                     >
                       {product.isActive ? (
                         <ToggleRight className="h-5 w-5 text-emerald-500" />
                       ) : (
                         <ToggleLeft className="h-5 w-5 text-muted-foreground" />
                       )}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(product)}>
-                        <Pencil className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteTarget(product)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9"
+                      onClick={() => handleOpenEdit(product)}
+                      aria-label={tc("edit")}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-9 text-destructive hover:text-destructive"
+                      onClick={() => setDeleteTarget(product)}
+                      aria-label={tc("delete")}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </>
+                ),
+              }))}
+            />
+          }
+          table={
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
+                    <th className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">{t("columns.sku")}</th>
+                    <th className="hidden px-4 py-2.5 text-left font-medium lg:table-cell">{t("category")}</th>
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.price")}</th>
+                    <th className="hidden px-4 py-2.5 text-left font-medium md:table-cell">{t("taxRate")} %</th>
+                    <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
+                    <th className="w-20 px-4 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {products.map((product) => (
+                    <tr key={product.id} className="group transition-colors hover:bg-muted/30">
+                      <td className="px-4 py-3">
+                        <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>
+                          {product.name}
+                        </p>
+                      </td>
+                      <td className="hidden px-4 py-3 sm:table-cell">
+                        {product.sku ? (
+                          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{product.sku}</span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+                      <td className="hidden px-4 py-3 lg:table-cell">
+                        {product.category ? (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary text-xs">
+                            {product.category}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground/40">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span>
+                          {product.unit && <span className="ml-1 text-muted-foreground text-xs">/ {product.unit}</span>}
+                        </div>
+                      </td>
+                      <td className="hidden px-4 py-3 md:table-cell">
+                        <span className="text-sm tabular-nums">
+                          {parseFloat(product.taxPercent ?? "0") > 0 ? (
+                            `${parseFloat(product.taxPercent ?? "0")}%`
+                          ) : (
+                            <span className="text-muted-foreground/40">—</span>
+                          )}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(product)}
+                          className="inline-flex items-center justify-center"
+                          title={product.isActive ? t("deactivate") : t("activate")}
+                        >
+                          {product.isActive ? (
+                            <ToggleRight className="h-5 w-5 text-emerald-500" />
+                          ) : (
+                            <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleOpenEdit(product)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => setDeleteTarget(product)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      )}
 
       {/* Create / Edit dialog */}
       <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editing} onSaved={handleSaved} />

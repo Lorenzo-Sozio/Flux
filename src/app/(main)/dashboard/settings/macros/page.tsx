@@ -16,7 +16,7 @@ export default async function MacrosPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="min-w-0">
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>

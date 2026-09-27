@@ -214,8 +214,8 @@ export function DocumentPanel({ entityType, entityId }: Props) {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-3">
-        <CardTitle className="flex items-center gap-2 text-base">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <CardTitle className="flex min-w-0 items-center gap-2 text-base">
           <Paperclip className="h-4 w-4" />
           {t("title")}
           {docs.length > 0 && (
@@ -284,7 +284,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
             {docs.map((doc) => (
               <li
                 key={doc.id}
-                className="flex items-center gap-2.5 rounded-md border bg-card px-3 py-2 text-sm transition-colors hover:bg-muted/30"
+                className="flex items-center gap-1 rounded-md border bg-card py-1 pr-1 pl-3 text-sm transition-colors hover:bg-muted/30 sm:gap-2.5 sm:px-3 sm:py-2"
               >
                 <FileIcon mime={doc.mimeType} />
                 <div className="min-w-0 flex-1">
@@ -304,7 +304,8 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                     target="_blank"
                     rel="noopener noreferrer"
                     title={t("panel.openPdf")}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label={t("panel.openPdf")}
+                    className="flex size-9 shrink-0 sm:size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <Eye className="h-3.5 w-3.5" />
@@ -315,7 +316,8 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                   href={`/api/documents/${doc.id}`}
                   download={doc.name}
                   title={tc("download")}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  aria-label={tc("download")}
+                  className="flex size-9 shrink-0 sm:size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -323,9 +325,10 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                 <button
                   type="button"
                   title={tc("delete")}
+                  aria-label={tc("delete")}
                   disabled={deletingId === doc.id}
                   onClick={() => handleDelete(doc)}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+                  className="flex size-9 shrink-0 sm:size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
                 >
                   {deletingId === doc.id ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />

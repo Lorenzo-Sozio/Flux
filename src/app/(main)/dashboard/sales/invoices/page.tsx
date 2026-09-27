@@ -5,6 +5,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 
 import { getInvoices, getStampDutySummary } from "@/actions/invoices";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -83,45 +84,83 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
               {page.total === 0 && !listParams.search && status === "all" ? t("empty") : t("noMatches")}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("number")}</TableHead>
-                  <TableHead>{t("date")}</TableHead>
-                  <TableHead>{t("customer")}</TableHead>
-                  <TableHead>{t("type")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
-                  <TableHead className="text-right">{t("total")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {page.rows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-mono">
-                      <Link href={`/dashboard/sales/invoices/${r.id}`} className="hover:underline">
-                        {r.documentNumber ?? t("draftNumber")}
-                      </Link>
-                    </TableCell>
-                    <TableCell className="tabular-nums">{r.issueDate ?? "—"}</TableCell>
-                    <TableCell>{r.companyName ?? "—"}</TableCell>
-                    <TableCell>{t(`types.${r.documentType as "TD01" | "TD04"}`)}</TableCell>
-                    <TableCell>
-                      <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
-                        {t(`statuses.${r.status as "draft" | "issued"}`)}
-                      </Badge>
-                      {Number(r.creditedAmount) > 0 && (
-                        <Badge variant="outline" className="ml-1">
-                          {Number(r.creditedAmount) >= Number(r.total)
-                            ? t("credit.fullyCredited")
-                            : t("credit.partlyCredited")}
+            <ResponsiveRecordList
+              cards={
+                // Six columns on a phone is a sideways scroll with the number on
+                // one edge and the total on the other. The same rows, as cards.
+                <RecordCards
+                  className="p-2"
+                  items={page.rows.map((r) => ({
+                    id: r.id,
+                    href: `/dashboard/sales/invoices/${r.id}`,
+                    title: <span className="font-mono">{r.documentNumber ?? t("draftNumber")}</span>,
+                    subtitle: r.companyName ?? undefined,
+                    badge: <span className="font-semibold text-sm tabular-nums">{money(r.total, r.currency)}</span>,
+                    meta: (
+                      <>
+                        <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
+                          {t(`statuses.${r.status as "draft" | "issued"}`)}
                         </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{money(r.total, r.currency)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                        {Number(r.creditedAmount) > 0 && (
+                          <Badge variant="outline">
+                            {Number(r.creditedAmount) >= Number(r.total)
+                              ? t("credit.fullyCredited")
+                              : t("credit.partlyCredited")}
+                          </Badge>
+                        )}
+                        <span className="text-muted-foreground text-xs">
+                          {t(`types.${r.documentType as "TD01" | "TD04"}`)}
+                        </span>
+                        {r.issueDate && (
+                          <span className="text-muted-foreground text-xs tabular-nums">{r.issueDate}</span>
+                        )}
+                      </>
+                    ),
+                  }))}
+                />
+              }
+              table={
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t("number")}</TableHead>
+                      <TableHead>{t("date")}</TableHead>
+                      <TableHead>{t("customer")}</TableHead>
+                      <TableHead>{t("type")}</TableHead>
+                      <TableHead>{t("status")}</TableHead>
+                      <TableHead className="text-right">{t("total")}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {page.rows.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell className="font-mono">
+                          <Link href={`/dashboard/sales/invoices/${r.id}`} className="hover:underline">
+                            {r.documentNumber ?? t("draftNumber")}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="tabular-nums">{r.issueDate ?? "—"}</TableCell>
+                        <TableCell>{r.companyName ?? "—"}</TableCell>
+                        <TableCell>{t(`types.${r.documentType as "TD01" | "TD04"}`)}</TableCell>
+                        <TableCell>
+                          <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
+                            {t(`statuses.${r.status as "draft" | "issued"}`)}
+                          </Badge>
+                          {Number(r.creditedAmount) > 0 && (
+                            <Badge variant="outline" className="ml-1">
+                              {Number(r.creditedAmount) >= Number(r.total)
+                                ? t("credit.fullyCredited")
+                                : t("credit.partlyCredited")}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{money(r.total, r.currency)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              }
+            />
           )}
         </CardContent>
       </Card>

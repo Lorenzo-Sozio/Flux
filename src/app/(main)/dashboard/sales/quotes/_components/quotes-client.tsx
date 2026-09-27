@@ -88,7 +88,11 @@ function QuoteRowMenu({
         <Button
           variant="ghost"
           size="sm"
-          className={cn("h-7 w-7 p-0", !alwaysVisible && "opacity-0 transition-opacity group-hover:opacity-100")}
+          className={cn(
+            "p-0",
+            // On a card it is the only way into the row's actions, so it gets a thumb-sized target.
+            alwaysVisible ? "h-9 w-9" : "h-7 w-7 opacity-0 transition-opacity group-hover:opacity-100",
+          )}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
@@ -227,14 +231,14 @@ export function QuotesClient({
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("list.statTotal")}
                 </p>
                 <p className="mt-1 font-bold text-2xl">{stats.total}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 sm:flex">
                 <FileText className="h-5 w-5 text-slate-600" />
               </div>
             </div>
@@ -243,14 +247,14 @@ export function QuotesClient({
 
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("statuses.sent")}
                 </p>
                 <p className="mt-1 font-bold text-2xl text-blue-600">{stats.sent}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 sm:flex">
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -259,14 +263,14 @@ export function QuotesClient({
 
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("statuses.accepted")}
                 </p>
                 <p className="mt-1 font-bold text-2xl text-green-600">{stats.accepted}</p>
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 sm:flex">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
               </div>
             </div>
@@ -275,8 +279,8 @@ export function QuotesClient({
 
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-5 pb-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("list.statValue")}
                 </p>
@@ -288,13 +292,13 @@ export function QuotesClient({
                   <p className="mt-1 font-bold text-2xl">—</p>
                 ) : (
                   stats.totals.map((sum) => (
-                    <p key={sum.currency} className="mt-1 font-bold text-2xl tabular-nums">
+                    <p key={sum.currency} className="mt-1 break-words font-bold text-2xl tabular-nums">
                       {formatMoney(sum.amount, sum.currency, { noDecimals: true })}
                     </p>
                   ))
                 )}
               </div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-50 sm:flex">
                 <TrendingUp className="h-5 w-5 text-violet-600" />
               </div>
             </div>
@@ -323,6 +327,7 @@ export function QuotesClient({
                   <SelectItem value="all">{tc("all")}</SelectItem>
                   <SelectItem value="draft">{t("statuses.draft")}</SelectItem>
                   <SelectItem value="pending_approval">{t("statuses.pending_approval")}</SelectItem>
+                  <SelectItem value="awaiting">{t("statuses.awaiting")}</SelectItem>
                   <SelectItem value="sent">{t("statuses.sent")}</SelectItem>
                   <SelectItem value="viewed">{t("statuses.viewed")}</SelectItem>
                   <SelectItem value="accepted">{t("statuses.accepted")}</SelectItem>

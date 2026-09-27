@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ la revisione lascia il preventivo vecchio ancora accettabile",
+    "find": "    db.update(quotes).set({ status: \"superseded\", updatedAt: now }).where(eq(quotes.id, quoteId)),",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "la revisione non avanza di versione",
+    "find": "      version,\n",
+    "replace": "      version: quote.version,\n"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️ la revisione riusa il link pubblico del preventivo superato",
+    "find": "    publicToken: _token,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️ il motivo del rifiuto sentito al telefono si perde",
+    "find": "      if (validated.declineReason?.trim()) updateData.declineReason = validated.declineReason.trim();",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-status.ts",
+    "description": "⚠️⚠️ gli sconti di riga tornano a passare senza approvazione",
+    "find": "  if (policy.maxDiscountPercent > 0 && lineDiscount > policy.maxDiscountPercent) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/workspace-preferences.ts",
+    "description": "⚠️ la soglia scritta in Generale viene ignorata",
+    "find": "    return value ? cleanApprovalPolicy({ ...fallback, ...value }) : fallback;",
+    "replace": "    return fallback;"
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️⚠️ il titolare non viene avvisato quando il cliente risponde",
+    "find": "  if (!quote.ownerId) return;",
+    "replace": "  return;"
+  },
+  {
+    "file": "src/lib/quote-status.ts",
+    "description": "un preventivo superato si può ancora inviare",
+    "find": "  superseded: [],\n};",
+    "replace": "  superseded: [\"sent\"],\n};"
+  }
+]

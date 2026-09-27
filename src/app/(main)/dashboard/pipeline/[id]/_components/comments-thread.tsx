@@ -34,6 +34,7 @@ interface CommentRowProps {
 
 function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, onAction }: CommentRowProps) {
   const t = useTranslations("pipeline.comments");
+  const tc = useTranslations("common");
   const format = useFormatter();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
@@ -91,8 +92,8 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
         <AvatarFallback>{getInitials(comment.userName ?? "")}</AvatarFallback>
       </Avatar>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="font-medium text-sm">{comment.userName ?? "Unknown"}</span>
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className="min-w-0 break-words font-medium text-sm">{comment.userName ?? t("unknownUser")}</span>
           <span className="text-muted-foreground text-xs">{format.relativeTime(new Date(comment.createdAt))}</span>
           {comment.editedAt && <span className="text-muted-foreground text-xs italic">{t("edited")}</span>}
         </div>
@@ -102,7 +103,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             <Textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[60px] text-sm"
+              className="min-h-[60px] md:text-sm"
               autoFocus
             />
             <div className="flex gap-2">
@@ -122,7 +123,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             </div>
           </div>
         ) : (
-          <p className="mt-0.5 whitespace-pre-wrap text-sm">{comment.content}</p>
+          <p className="mt-0.5 whitespace-pre-wrap break-words text-sm">{comment.content}</p>
         )}
 
         {!editing && (
@@ -130,7 +131,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 px-1.5 text-muted-foreground text-xs"
+              className="h-6 px-1.5 text-muted-foreground text-xs max-md:h-9 max-md:px-2.5"
               onClick={() => setReplying(!replying)}
             >
               <CornerDownRight className="mr-1 h-3 w-3" />
@@ -140,8 +141,9 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-1.5 text-muted-foreground text-xs"
+                className="h-6 px-1.5 text-muted-foreground text-xs max-md:h-9 max-md:px-2.5"
                 onClick={() => setEditing(true)}
+                aria-label={tc("edit")}
               >
                 <Pencil className="h-3 w-3" />
               </Button>
@@ -150,8 +152,9 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-1.5 text-muted-foreground text-xs hover:text-destructive"
+                className="h-6 px-1.5 text-muted-foreground text-xs hover:text-destructive max-md:h-9 max-md:px-2.5"
                 onClick={handleDelete}
+                aria-label={tc("delete")}
                 disabled={deleteLoading}
               >
                 <Trash2 className="h-3 w-3" />
@@ -166,7 +169,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder={t("replyPlaceholder")}
-              className="min-h-[60px] text-sm"
+              className="min-h-[60px] md:text-sm"
               autoFocus
             />
             <div className="flex gap-2">
@@ -241,12 +244,12 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
           <MessageSquare className="h-4 w-4 text-primary" />
         </div>
-        <div className="flex-1 space-y-2">
+        <div className="min-w-0 flex-1 space-y-2">
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder={t("placeholder")}
-            className="min-h-[72px] resize-none text-sm"
+            className="min-h-[72px] resize-none md:text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit();
             }}

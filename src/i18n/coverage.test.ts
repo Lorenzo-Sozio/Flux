@@ -25,13 +25,16 @@ function run(script: string): { code: number; output: string } {
 }
 
 describe("translated screens", () => {
+  // Each reads every component and both message files in a child process: seconds on a
+  // quiet machine, and past the default five under a full parallel run, where it used to
+  // fail as a timeout that looked like a missing key.
   it("have no text typed straight into a component", () => {
     const { code, output } = run("scripts/i18n-audit.mjs");
     expect(code, output).toBe(0);
-  });
+  }, 60_000);
 
   it("ask only for keys that exist in both languages", () => {
     const { code, output } = run("scripts/i18n-keys-check.mjs");
     expect(code, output).toBe(0);
-  });
+  }, 60_000);
 });

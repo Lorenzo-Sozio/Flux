@@ -36,7 +36,9 @@ vi.mock("next/server", async () => {
   return { ...vero, after: (fn: () => unknown) => fn() };
 });
 vi.mock("@/lib/api-import-auth", () => ({
-  authenticateApiRequest: async () => ({ via: "apikey", userId: null, role: "editor", tenantId: "t1" }),
+  gateApiRequest: async () => ({
+    auth: { via: "apikey", userId: null, role: "editor", tenantId: "t1", scopes: null },
+  }),
 }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));

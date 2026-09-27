@@ -1,6 +1,7 @@
 import "server-only";
 
 import { notifications } from "@/db/schema";
+import { composeNotification, type NotificationKey, type NotificationParams } from "@/lib/notification-text";
 import { announce } from "@/lib/push-send";
 import { getDb } from "@/lib/tenant-context";
 
@@ -25,21 +26,41 @@ import { getDb } from "@/lib/tenant-context";
  * client component a build error rather than a leak.
  */
 
-export interface NotificationInput {
+interface Addressed {
   userId: string;
   type: string;
-  title: string;
-  message?: string;
   link?: string;
+}
+
+/**
+ * Either text a person wrote — an automation's own "send a notification" — or a
+ * `notificationTexts` key and its values, which is how everything the product says itself
+ * is written, so the bell can say it in the reader's language (src/lib/notification-text.ts).
+ */
+export type NotificationInput = Addressed &
+  (
+    | { title: string; message?: string; key?: never; params?: never }
+    | { key: NotificationKey; params?: NotificationParams; title?: never; message?: never }
+  );
+
+async function toRow(n: NotificationInput) {
+  const base = { userId: n.userId, type: n.type, link: n.link };
+  if (n.key) {
+    const params = n.params ?? {};
+    const text = await composeNotification(n.key, params);
+    return { ...base, ...text, titleKey: n.key, params };
+  }
+  return { ...base, title: n.title, message: n.message };
 }
 
 /** Writes one notification and, if the person asked for it, pushes it. */
 export async function notify(data: NotificationInput): Promise<void> {
   const db = await getDb();
-  await db.insert(notifications).values(data);
+  const row = await toRow(data);
+  await db.insert(notifications).values(row);
   // The row is the record; this is the doorbell. It happens after the response
   // and cannot fail this call — see src/lib/push-send.ts.
-  announce(db, [data]);
+  announce(db, [row]);
 }
 
 /**
@@ -52,6 +73,7 @@ export async function notify(data: NotificationInput): Promise<void> {
 export async function notifyMany(rows: NotificationInput[]): Promise<void> {
   if (rows.length === 0) return;
   const db = await getDb();
-  await db.insert(notifications).values(rows);
-  announce(db, rows);
+  const written = await Promise.all(rows.map(toRow));
+  await db.insert(notifications).values(written);
+  announce(db, written);
 }

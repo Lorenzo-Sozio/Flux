@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/metrics.ts",
+    "description": "⚠️⚠️ le vincite tornano a essere datate dall'ultimo salvataggio: una vittoria di marzo risalvata a settembre conta a settembre",
+    "find": "    ...(from ? [gte(deals.closedAt, from)] : []),\n    ...(to ? [lte(deals.closedAt, to)] : []),",
+    "replace": "    ...(from ? [gte(deals.updatedAt, from)] : []),\n    ...(to ? [lte(deals.updatedAt, to)] : []),"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️⚠️ il valore vinto torna a sommare trattative e ordini: la stessa vendita due volte",
+    "find": "    totalRevenue: Number(dealsWon.revenue),",
+    "replace": "    totalRevenue: Number(dealsWon.revenue) + Number(ordersCompleted.revenue),"
+  },
+  {
+    "file": "src/lib/metrics.ts",
+    "description": "⚠️ il tasso di vincita dice 0% quando non si è chiuso niente",
+    "find": "  return decided > 0 ? Math.round((won / decided) * 100) : null;",
+    "replace": "  return decided > 0 ? Math.round((won / decided) * 100) : 0;"
+  },
+  {
+    "file": "src/lib/metrics.ts",
+    "description": "⚠️⚠️ un ordine in valuta estera senza cambio noto torna a essere sommato come se fossero euro",
+    "find": "  else cast(${orders.totalAmount} as numeric) * (select cast(q.eur_rate as numeric) from ${quotes} q where q.id = ${orders.quoteId})",
+    "replace": "  else cast(${orders.totalAmount} as numeric) * coalesce((select cast(q.eur_rate as numeric) from ${quotes} q where q.id = ${orders.quoteId}), 1)"
+  },
+  {
+    "file": "src/lib/ticket-states.ts",
+    "description": "⚠️ un ticket appena arrivato torna a non contare come aperto",
+    "find": "  return !(CLOSED_TICKET_STATUSES as readonly string[]).includes(status);",
+    "replace": "  return status !== \"new\" && !(CLOSED_TICKET_STATUSES as readonly string[]).includes(status);"
+  },
+  {
+    "file": "src/actions/finance.ts",
+    "description": "⚠️ la pipeline ponderata di Finanza torna a pesare zero le trattative senza probabilità propria",
+    "find": "  const probability = sql<number>`coalesce(${deals.probability}, ${pipelineStages.defaultProbability}, 0)`;",
+    "replace": "  const probability = sql<number>`coalesce(${deals.probability}, 0)`;"
+  },
+  {
+    "file": "src/actions/reports.ts",
+    "description": "⚠️⚠️ il mese di una vittoria torna a essere quello UTC: le 00:30 del primo ottobre a Roma finiscono in settembre",
+    "find": "  const closedMonth = sql<string>`to_char(${deals.closedAt} at time zone 'UTC' at time zone ${timeZone}, 'YYYY-MM')`;",
+    "replace": "  const closedMonth = sql<string>`to_char(${deals.closedAt}, 'YYYY-MM')`;"
+  },
+  {
+    "file": "src/lib/workspace-day.ts",
+    "description": "⚠️⚠️ «oggi» torna a essere il giorno del server (UTC sui Worker)",
+    "find": "  const day = toWallDate(now, timeZone);",
+    "replace": "  const day = now.toISOString().slice(0, 10);"
+  }
+]

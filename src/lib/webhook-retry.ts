@@ -34,6 +34,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { webhookLogs, webhooks } from "@/db/schema";
 import { BACKOFF_MS, MAX_ATTEMPTS, UNSIGNABLE_PREFIX } from "@/lib/webhook-envelope";
+import { readWebhookResponse } from "@/lib/webhook-response";
 import { validateWebhookUrl } from "@/lib/webhook-validator";
 
 export interface RetryOutcome {
@@ -147,7 +148,7 @@ export async function riprova(
         event: riga.event,
         payload: body,
         statusCode: res.status,
-        response: await res.text().catch(() => ""),
+        response: await readWebhookResponse(res),
         success: res.ok,
       });
       if (res.ok) outcome.delivered += 1;

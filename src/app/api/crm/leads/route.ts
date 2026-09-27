@@ -2,25 +2,19 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { eq, sql } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { leads } from "@/db/schema";
+import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
-import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { gateApiRequest } from "@/lib/api-import-auth";
 import { buildLeadPayload, digitsForMatching, parseOnDuplicate, validateLeadInput } from "@/lib/api-import-validators";
+import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-/**
- * ⚠️ Every event leaving this route declares that a **machine** caused it.
- *
- * That is the line which stops the echo at its source: an integration writes a lead here,
- * this CRM emits `lead.created`, and the integration receives it. Without knowing the
- * change is its own it reacts to itself — and does not stop.
- */
-const API_ORIGIN = { via: "api" as const, actor: null };
+import { dispatchWebhook } from "@/lib/webhook-dispatch";
+import { apiOrigin } from "@/lib/webhook-envelope";
 
 /**
  * The route's own name, written once: the idempotency ledger and the write log both
@@ -28,11 +22,27 @@ const API_ORIGIN = { via: "api" as const, actor: null };
  */
 const ENDPOINT = "/api/crm/leads";
 
+/** What a key must hold to call this (src/lib/api-scopes.ts). */
+const SCOPE = { entity: "leads", access: "write" } as const;
+const READ_SCOPE = { entity: "leads", access: "read" } as const;
+
+/**
+ * A page of leads, oldest change first; `updatedSince` and `cursor` to reconcile
+ * (src/lib/api-read.ts). Nothing is written, so nothing is logged.
+ */
+export async function GET(req: NextRequest) {
+  const gate = await gateApiRequest(req, READ_SCOPE);
+  if (gate.response) return gate.response;
+  return listResponse(req, gate.auth, "leads");
+}
+
 export async function POST(req: NextRequest) {
-  const authResult = await authenticateApiRequest(req);
-  if (!authResult) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const gate = await gateApiRequest(req, SCOPE);
+  if (gate.response) return gate.response;
+  const authResult = gate.auth;
+  // Marks every event this request causes as written by the API, and by which key: an
+  // integration drops its own writes by that, and still hears everyone else's.
+  const API_ORIGIN = apiOrigin(authResult);
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -80,7 +90,10 @@ export async function POST(req: NextRequest) {
   // on. A key makes that retry safe. No key, and nothing changes.
   const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
-    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+    return NextResponse.json(idempotency.body, {
+      status: idempotency.status ?? 200,
+      headers: { "Idempotent-Replay": "true" },
+    });
   }
   if (idempotency.kind === "in-flight") {
     return NextResponse.json(
@@ -119,7 +132,9 @@ export async function POST(req: NextRequest) {
           : null;
 
       if (criterio) {
-        const [existing] = await db.select({ id: leads.id }).from(leads).where(criterio);
+        // The whole row, not just its id: it is what the rules compare against when this
+        // becomes an update. Same statement, same cost.
+        const [existing] = await db.select().from(leads).where(criterio);
 
         if (existing) {
           if (onDuplicate === "error") {
@@ -140,6 +155,13 @@ export async function POST(req: NextRequest) {
               .where(eq(leads.id, existing.id))
               .returning();
             dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);
+            runRulesAfterApiWrite(tenant.id, {
+              entityType: "lead",
+              entityId: updated.id,
+              event: "onUpdate",
+              oldData: existing as Record<string, unknown>,
+              newData: updated as Record<string, unknown>,
+            });
             await logApiWrite(db, authResult, { entity: "lead", endpoint: ENDPOINT, recordId: updated.id });
             return NextResponse.json({ status: "updated", id: updated.id, data: updated });
           }
@@ -154,6 +176,17 @@ export async function POST(req: NextRequest) {
 
       const [created] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning();
       dispatchWebhook("lead.created", { lead: created }, API_ORIGIN, db);
+      // ⚠️ The rules a lead typed into the dashboard runs — round-robin owner, sequence
+      // enrolment, the owner's notification. Without this a lead filed by an assistant
+      // arrived with no owner and nobody was told. Only here and in the single routes: see
+      // runRulesAfterApiWrite for why an import in bulk runs none.
+      runRulesAfterApiWrite(tenant.id, {
+        entityType: "lead",
+        entityId: created.id,
+        event: "onCreate",
+        oldData: {},
+        newData: created as Record<string, unknown>,
+      });
       await logApiWrite(db, authResult, { entity: "lead", endpoint: ENDPOINT, recordId: created.id });
 
       return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
@@ -165,7 +198,7 @@ export async function POST(req: NextRequest) {
 
   if (response.ok) {
     try {
-      await remember(db, idempotency, await response.clone().json());
+      await remember(db, idempotency, await response.clone().json(), undefined, response.status);
     } catch {
       // An answer we cannot read back is an answer we cannot replay. The
       // import happened; leaving the key held would only refuse the retry.

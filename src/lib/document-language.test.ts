@@ -108,14 +108,16 @@ describe("where the customer's language reaches", () => {
   const read = (p: string) => readFileSync(p, "utf8").split("\r\n").join("\n");
 
   it("⚠️⚠️ the quote PDF, its print view, the public page and the email all take it", () => {
-    expect(read("src/app/api/quotes/[id]/pdf/route.ts")).toContain("documentLanguage(q.company)");
+    // The PDF is built in one place for the download and the signature (src/lib/quote-pdf-load.ts).
+    expect(read("src/lib/quote-pdf-load.ts")).toContain("documentLanguage(q.company)");
+    expect(read("src/app/api/quotes/[id]/pdf/route.ts")).toContain("buildQuotePdf(db, q, workspaceName)");
     expect(read("src/app/api/quotes/[id]/route.ts")).toContain("documentLanguage(q.company)");
-    expect(read("src/app/api/quotes/public/route.ts")).toContain("language: documentLanguage(quote.company)");
+    expect(read("src/lib/quote-public.ts")).toContain("language: documentLanguage(quote.company)");
     expect(read("src/actions/quotes.ts")).toContain("const lang = documentLanguage(quote.company);");
   });
 
   it("⚠️⚠️ the public quote API sends only the company fields the page shows", () => {
-    const src = read("src/app/api/quotes/public/route.ts");
+    const src = read("src/lib/quote-public.ts");
     expect(src, "the whole company record is sent again").not.toMatch(/^\s*company: true,/m);
     expect(src).toContain("company: { columns: { name: true, country: true, language: true, vatNumber: true } }");
   });
