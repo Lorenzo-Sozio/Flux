@@ -613,6 +613,13 @@ install can leave it out — and the Worker bundle then fails at its last step w
 `Could not resolve "pg-cloudflare"`, after a Next build that succeeded. Declaring it
 outright fixes that.
 
+⚠️⚠️ **Installed is not enough: it must also be traced whole.** Next copies into
+`.open-next` only the files its tracer resolves, under Node's conditions — and there
+`pg-cloudflare` exports `dist/empty.js`. The Worker bundle resolves it under `workerd`, to
+`dist/index.js`, which was not there: the same error, with "The module ./dist/index.js
+was not found on the file system", on 27 September 2026. `outputFileTracingIncludes` in
+[next.config.mjs](next.config.mjs) copies the whole package.
+
 ⚠️⚠️ **Do not replace it with a stub.** That was tried, on 23 September 2026, to make
 the resolution independent of npm's flags — and it deployed, and every query in
 production started throwing: the Worker really does use it to reach Railway. The two

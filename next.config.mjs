@@ -27,8 +27,11 @@ const securityHeaders = [
 const nextConfig = {
   serverExternalPackages: ["drizzle-kit"],
   // Include tenant migration SQL files in the production bundle so migrate() can read them at runtime.
+  // pg-cloudflare: Next traces it under Node's conditions, which resolve to dist/empty.js only;
+  // the Worker bundle resolves it under "workerd" to dist/index.js / esm/index.mjs, which the
+  // trace never copied into .open-next — "Could not resolve pg-cloudflare" at deploy.
   outputFileTracingIncludes: {
-    "/**": ["./src/db/migrations-tenant/**/*"],
+    "/**": ["./src/db/migrations-tenant/**/*", "./node_modules/pg-cloudflare/**/*"],
   },
   reactCompiler: true,
   compiler: {
