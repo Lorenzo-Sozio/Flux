@@ -155,9 +155,26 @@
   // ⚠️ Una configurazione per database, e i binding sono statici: un nuovo workspace
   // richiede `wrangler hyperdrive create` e un deploy. È il costo di questa scelta,
   // scritto qui perché nessuno lo scopra il giorno del primo cliente.
+  //
+  // ⚠️⚠️ `localConnectionString` is a placeholder and must stay one — never a real
+  // credential, this file is committed. `opennextjs-cloudflare deploy` (which a plain
+  // `wrangler deploy` re-dispatches to) starts a local emulator just to read the
+  // Worker's variables, and wrangler refuses to start one for a Hyperdrive binding
+  // with no local database: every Workers Builds deploy failed with "no local
+  // hyperdrive connection string" on 27 September 2026. It is used only locally, never
+  // uploaded, and `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>` (in
+  // `.dev.vars`) takes precedence over it. A new binding needs one too.
   "hyperdrive": [
-    { "binding": "HYPERDRIVE_PLATFORM", "id": "3f97155992724eb5967c8e9d3acdda1a" },
-    { "binding": "HYPERDRIVE_FLUX_DEMO", "id": "d34f1735315a41d59650ab42002d6f18" }
+    {
+      "binding": "HYPERDRIVE_PLATFORM",
+      "id": "3f97155992724eb5967c8e9d3acdda1a",
+      "localConnectionString": "postgres://flux:flux@127.0.0.1:5432/flux_platform"
+    },
+    {
+      "binding": "HYPERDRIVE_FLUX_DEMO",
+      "id": "d34f1735315a41d59650ab42002d6f18",
+      "localConnectionString": "postgres://flux:flux@127.0.0.1:5432/flux_demo"
+    }
   ],
 
   "triggers": {

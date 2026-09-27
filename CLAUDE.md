@@ -672,9 +672,14 @@ Three ways this failed silently, all of them fixed in [src/db/index.ts](src/db/i
   (a `WeakMap` on the execution context) on Workers, and to the connection string
   everywhere else.
 
-⚠️ `npm run cf:preview` and `cf:deploy` need `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>`
-set, or wrangler refuses to start: it wants a local database to emulate each binding.
-They are in `.dev.vars`, which is not committed.
+⚠️⚠️ **Every Hyperdrive binding carries a placeholder `localConnectionString`** in
+wrangler.jsonc. Wrangler refuses to start its local emulator for a binding with no local
+database, and `opennextjs-cloudflare deploy` — which a plain `wrangler deploy` re-dispatches
+to — starts one just to read the Worker's variables. On Workers Builds there is no
+`.dev.vars`, so every deploy failed with "no local hyperdrive connection string" (27 September
+2026). The placeholder is never uploaded and never a real credential; a new binding needs one.
+To emulate against a real database, set `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>`
+in `.dev.vars` (not committed), which takes precedence.
 
 ### Tenant migrations are embedded, not read from disk
 
