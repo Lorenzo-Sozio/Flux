@@ -1,7 +1,8 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { after } from "next/server";
 
-import { and, eq, sum } from "drizzle-orm";
+import { and, count, eq, inArray, isNull, or, sum } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
@@ -41,11 +42,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { deals, salesTargets } from "@/db/schema";
+import { deals, leads, salesTargets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { getEntitlements } from "@/lib/billing/licensing";
 import type { PlanModule } from "@/lib/billing/plans-config";
 import { countOpenDealsWithoutNextStep } from "@/lib/deal-signals";
+import { encodeFilter, type FilterNode } from "@/lib/filter-types";
+import { HOME_VIEW_COOKIE, resolveHomeView } from "@/lib/home-view";
 import { closedBetween } from "@/lib/metrics";
 import { rememberLocale } from "@/lib/morning-digest";
 import { showOnboarding } from "@/lib/onboarding";
@@ -57,6 +60,7 @@ import { monthStart as workspaceMonthStart } from "@/lib/workspace-day";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { AgendaWidget } from "./_components/agenda-widget";
+import { HomeViewToggle } from "./_components/home-view-toggle";
 import { MonthTargetCard } from "./_components/month-target-card";
 import { NextActionsCard } from "./_components/next-actions-card";
 import { OnboardingCard } from "./_components/onboarding-card";
@@ -100,6 +104,32 @@ function formatToday(d: Date, locale: string) {
  */
 const KPI_VALUE = "break-words font-bold text-xl tabular-nums sm:text-2xl";
 
+/** An active lead: new or being contacted — the company's count and the personal one alike. */
+const ACTIVE_LEAD_STATUSES = ["new", "contacting"];
+const ACTIVE_LEAD = inArray(leads.status, ACTIVE_LEAD_STATUSES);
+
+/**
+ * The leads list, filtered to what the figure counts: the active leads — and with a person,
+ * only theirs or nobody's ("Leads to work"). A figure that cannot be opened cannot be checked.
+ */
+function activeLeadsHref(userId?: string): string {
+  const conditions: FilterNode[] = [
+    { id: "status", type: "condition", field: "status", operator: "in", value: ACTIVE_LEAD_STATUSES },
+  ];
+  if (userId) {
+    conditions.push({
+      id: "owner",
+      type: "group",
+      logic: "OR",
+      conditions: [
+        { id: "mine", type: "condition", field: "ownerId", operator: "in", value: [userId] },
+        { id: "nobody", type: "condition", field: "ownerId", operator: "is_empty", value: null },
+      ],
+    });
+  }
+  return `/dashboard/leads?filter=${encodeURIComponent(encodeFilter({ version: 1, logic: "AND", conditions }))}`;
+}
+
 function Kpi({
   href,
   accent,
@@ -136,10 +166,6 @@ export default async function CRMPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  // ⚠️ "Me" by default: the day's numbers, the work list and the agenda are this person's.
-  // The workspace's figures — which the home used to open on, mixed in with the personal
-  // ones — are one tap away, under "Team" (§3.4).
-  const view = (await searchParams).view === "team" ? "team" : "me";
   const db = await getDb();
   const t = await getTranslations("crm");
   const tc = await getTranslations("common");
@@ -147,6 +173,14 @@ export default async function CRMPage({
   const locale = await getLocale();
   const actor = await getActor();
   const userId = actor?.userId;
+  // Two halves, never mixed on one screen (§3.4): "me" — the day's numbers, the work list and
+  // the agenda, all this person's — and "company", the state of the business. The address
+  // wins, then this browser's last choice, then the role (src/lib/home-view.ts).
+  const view = resolveHomeView(
+    (await searchParams).view,
+    (await cookies()).get(HOME_VIEW_COOKIE)?.value,
+    can(actor, "record:manageAny"),
+  );
   const userName = actor?.name?.split(" ")[0] ?? tc("there");
   const now = new Date();
   // The month on the workspace's clock: a deal won at 00:30 on the first, Rome time, is
@@ -157,23 +191,21 @@ export default async function CRMPage({
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
 
-  const [
-    stats,
-    rawLeads,
-    topDeals,
-    recentActivities,
-    myTarget,
-    wonThisMonth,
-    nextActions,
-    today,
-    recurring,
-    onboarding,
-  ] = await Promise.all([
-    getDashboardStats(),
-    getRecentLeads(5),
-    getTopDeals(5),
-    getRecentActivities(10),
+  // The company's figures are a dozen statements; they are read only when that half is shown.
+  // Every home visit used to pay for them and then throw them away on "me".
+  const companyData =
+    view === "company"
+      ? Promise.all([
+          getDashboardStats(),
+          getRecentLeads(5),
+          getTopDeals(5),
+          getRecentActivities(10),
+          // Contracts are optional; a failure here reads as none rather than taking the page down.
+          getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
+        ])
+      : null;
 
+  const [myTarget, wonThisMonth, myLeads, nextActions, today, onboarding, bareDeals, modules] = await Promise.all([
     // Current month target for this user
     userId
       ? db
@@ -194,6 +226,17 @@ export default async function CRMPage({
           .then((rows) => parseFloat(rows[0]?.total ?? "0"))
       : Promise.resolve(0 as number),
 
+    // The leads this person should be working: new or being contacted, theirs or nobody's
+    // yet. An unassigned lead is everybody's queue, so it counts for everybody.
+    userId
+      ? db
+          .select({ n: count() })
+          .from(leads)
+          .where(and(ACTIVE_LEAD, or(eq(leads.ownerId, userId), isNull(leads.ownerId))))
+          .then((rows) => Number(rows[0]?.n ?? 0))
+          .catch(() => 0)
+      : Promise.resolve(0),
+
     // What needs doing, rather than what exists (audit rilievo S-02). Failing to
     // build the work list must not take the whole dashboard down with it: an
     // empty list reads as "nothing waiting", which is the safe way to be wrong.
@@ -204,20 +247,30 @@ export default async function CRMPage({
     // same list, and two copies of it would have drifted apart within a month.
     getTodayView(),
 
-    // Contracts are optional; a failure here reads as none rather than taking the page down.
-    getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
-
     // The first-run steps, for whoever manages the workspace. Never the reason the page fails.
     getOnboarding().catch(() => null),
+
+    // The first of the three numbers of one's own. Never the reason the page fails.
+    userId ? countOpenDealsWithoutNextStep(db, userId).catch(() => 0) : Promise.resolve(0),
+
+    // Cards for a module the plan does not include are left out, as in the menu.
+    getCurrentTenantId().then((tenantId) =>
+      tenantId
+        ? getEntitlements(tenantId).then(
+            (e) => e.enabledModules,
+            () => undefined,
+          )
+        : undefined,
+    ),
   ]);
 
   const agendaItems = today.agenda;
+  // Started before the personal reads, so the two run side by side; absent on "me".
+  const [stats, rawLeads, topDeals, recentActivities, recurring] = (companyData ? await companyData : []) as
+    | Awaited<NonNullable<typeof companyData>>
+    | [];
 
-  // Cards for a module the plan does not include are left out, as in the menu.
-  const tenantId = await getCurrentTenantId();
-  const modules = tenantId ? (await getEntitlements(tenantId).catch(() => null))?.enabledModules : undefined;
   const inPlan = (module: PlanModule) => !modules || modules.includes(module);
-  const bareDeals = userId ? await countOpenDealsWithoutNextStep(db, userId).catch(() => 0) : 0;
 
   // The language of the morning digest is the one this person reads the product in; an
   // email at six has no request to learn it from. After the response, and one statement.
@@ -262,22 +315,11 @@ export default async function CRMPage({
           </h1>
           <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
         </div>
-        <nav aria-label={t("viewLabel")} className="flex shrink-0 rounded-md border p-0.5">
-          {(["me", "team"] as const).map((v) => (
-            <Link
-              key={v}
-              href={v === "me" ? "/dashboard/crm" : "/dashboard/crm?view=team"}
-              aria-current={view === v ? "page" : undefined}
-              className={`rounded px-3 py-1 text-sm ${view === v ? "bg-muted font-medium" : "text-muted-foreground"}`}
-            >
-              {t(v === "me" ? "viewMe" : "viewTeam")}
-            </Link>
-          ))}
-        </nav>
+        <HomeViewToggle view={view} label={t("viewLabel")} labels={{ me: t("viewMe"), company: t("viewCompany") }} />
       </div>
 
-      {/* ── Three numbers of one's own ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* ── Four numbers of one's own ──────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           // The deals it adds up: mine, won, closed this month on the workspace's clock.
           href={
@@ -323,6 +365,15 @@ export default async function CRMPage({
         >
           <div className={KPI_VALUE}>{agendaItems.length}</div>
           <p className="mt-1 text-muted-foreground text-xs">{t("myTodayDesc")}</p>
+        </Kpi>
+        <Kpi
+          href={activeLeadsHref(userId)}
+          accent="border-l-violet-500"
+          title={t("myLeads")}
+          icon={<UsersIcon className="h-4 w-4 shrink-0 text-violet-500" />}
+        >
+          <div className={KPI_VALUE}>{myLeads}</div>
+          <p className="mt-1 text-muted-foreground text-xs">{t("myLeadsDesc")}</p>
         </Kpi>
       </div>
 
@@ -422,7 +473,7 @@ export default async function CRMPage({
         )}
       </div>
 
-      {view === "team" && (
+      {view === "company" && stats && recurring && topDeals && recentActivities && recentLeads && (
         <>
           {/* ── Metric Cards ─────────────────────────────────────────────── */}
           {/* Two across on a phone. Each card is a label and a number; one per row
@@ -441,7 +492,7 @@ export default async function CRMPage({
               <p className="mt-1 text-muted-foreground text-xs">{t("pipelineValueDesc")}</p>
             </Kpi>
             <Kpi
-              href="/dashboard/leads"
+              href={activeLeadsHref()}
               accent="border-l-green-500"
               title={t("activeLeads")}
               icon={<UsersIcon className="h-4 w-4 shrink-0 text-green-500" />}

@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/actions/marketing.ts",
+    "description": "⚠️⚠️ il design del modello torna a essere scartato al salvataggio: riaperto, mostra l'email di esempio e un nuovo salvataggio sovrascrive quella vera",
+    "find": "  design: z.string().max(1_000_000).nullable().optional(),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-builder.ts",
+    "description": "⚠️⚠️ un modello scritto in HTML si riapre come due documenti uno dentro l'altro invece che come la sua email",
+    "find": "    html = (inner ? inner[1] : body).trim();",
+    "replace": "    html = body.trim();"
+  },
+  {
+    "file": "src/lib/email-builder.ts",
+    "description": "⚠️ un design con blocchi sconosciuti si apre con blocchi che l'editor non sa disegnare",
+    "find": "        BLOCK_TYPES.includes(b.type) &&",
+    "replace": "        true &&"
+  },
+  {
+    "file": "src/lib/email-builder.ts",
+    "description": "⚠️ il testo del link di disiscrizione entra nell'HTML dell'email senza escape",
+    "find": "text-decoration:underline;\">${esc(unsubscribeLabel(p))}</a></p>`",
+    "replace": "text-decoration:underline;\">${unsubscribeLabel(p)}</a></p>`"
+  }
+]

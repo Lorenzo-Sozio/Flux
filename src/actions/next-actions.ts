@@ -40,29 +40,135 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   const now = Date.now();
   const mine = actor.userId;
 
+  const lastActivity = lastActivityByDeal(db, new Date(now));
+  const nextStep = nextStepByDeal(db, new Date(now));
+
+  const leadCutoff = new Date(now - THRESHOLDS.leadUntouchedDays * DAY_MS);
+  const quietCutoff = new Date(now - THRESHOLDS.customerQuietDays * DAY_MS);
+  const companyLastActivity = db
+    .select({
+      companyId: activities.companyId,
+      last: sql<Date>`max(${activities.createdAt})`.as("company_last"),
+    })
+    .from(activities)
+    .where(isNotNull(activities.companyId))
+    .groupBy(activities.companyId)
+    .as("company_last_activity");
+
+  // Seven independent reads, started together: they used to run one after another, and the
+  // home page waited for all seven in turn before it could draw its first card.
+  const [liveTickets, liveQuotes, openDeals, coldLeads, quietCustomers, replies, snoozes] = await Promise.all([
+    db
+      .select({
+        id: tickets.id,
+        ticketNumber: tickets.ticketNumber,
+        subject: tickets.subject,
+        createdAt: tickets.createdAt,
+        slaDeadlineAt: tickets.slaDeadlineAt,
+        slaBreachedAt: tickets.slaBreachedAt,
+      })
+      .from(tickets)
+      .where(
+        and(
+          notInArray(tickets.status, OPEN_TICKET_STATES),
+          isNotNull(tickets.slaDeadlineAt),
+          or(eq(tickets.assigneeId, mine), eq(tickets.ownerId, mine)),
+        ),
+      )
+      .orderBy(tickets.slaDeadlineAt)
+      .limit(50),
+    db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        status: quotes.status,
+        sentAt: quotes.sentAt,
+        viewedAt: quotes.viewedAt,
+        expiresAt: quotes.expiresAt,
+        totalAmount: quotes.totalAmount,
+        acceptedAt: quotes.acceptedAt,
+        dealId: quotes.dealId,
+      })
+      .from(quotes)
+      .where(and(inArray(quotes.status, ["sent", "viewed", "accepted"]), eq(quotes.ownerId, mine)))
+      .orderBy(desc(quotes.sentAt))
+      .limit(50),
+    db
+      .select({
+        id: deals.id,
+        name: deals.name,
+        createdAt: deals.createdAt,
+        expectedCloseDate: deals.expectedCloseDate,
+        lastTouched: lastActivity.at,
+        steps: nextStep.n,
+      })
+      .from(deals)
+      .leftJoin(lastActivity, eq(lastActivity.dealId, deals.id))
+      .leftJoin(nextStep, eq(nextStep.dealId, deals.id))
+      .where(and(eq(deals.status, "open"), eq(deals.ownerId, mine)))
+      .limit(100),
+    db
+      .select({
+        id: leads.id,
+        firstName: leads.firstName,
+        lastName: leads.lastName,
+        companyName: leads.companyName,
+        createdAt: leads.createdAt,
+        leadScore: leads.leadScore,
+      })
+      .from(leads)
+      .leftJoin(activities, eq(activities.leadId, leads.id))
+      .where(
+        and(
+          eq(leads.isConverted, false),
+          notInArray(leads.status, ["unqualified"]),
+          lt(leads.createdAt, leadCutoff),
+          eq(leads.ownerId, mine),
+          isNull(activities.id),
+        ),
+      )
+      .limit(30),
+    db
+      .select({ id: companies.id, name: companies.name, last: companyLastActivity.last })
+      .from(companies)
+      .leftJoin(companyLastActivity, eq(companyLastActivity.companyId, companies.id))
+      .where(
+        and(
+          eq(companies.status, "active"),
+          eq(companies.ownerId, mine),
+          or(isNull(companyLastActivity.last), lte(companyLastActivity.last, quietCutoff)),
+        ),
+      )
+      .limit(30),
+    db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        createdAt: tasks.createdAt,
+        contactId: tasks.contactId,
+        leadId: tasks.leadId,
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.assigneeId, mine),
+          ne(tasks.status, "done"),
+          eq(tasks.type, "email"),
+          like(tasks.title, `${REPLY_TASK_PREFIX}%`),
+        ),
+      )
+      .limit(30),
+    // What this person put aside, until the day they chose.
+    db
+      .select({ kind: nextActionSnoozes.kind, entityId: nextActionSnoozes.entityId, until: nextActionSnoozes.until })
+      .from(nextActionSnoozes)
+      .where(and(eq(nextActionSnoozes.userId, mine), gt(nextActionSnoozes.until, new Date(now))))
+      .catch(() => []),
+  ]);
+
   const found: NextAction[] = [];
 
   // ── Tickets about to miss, or already missing, their promise ────────────────
-  const liveTickets = await db
-    .select({
-      id: tickets.id,
-      ticketNumber: tickets.ticketNumber,
-      subject: tickets.subject,
-      createdAt: tickets.createdAt,
-      slaDeadlineAt: tickets.slaDeadlineAt,
-      slaBreachedAt: tickets.slaBreachedAt,
-    })
-    .from(tickets)
-    .where(
-      and(
-        notInArray(tickets.status, OPEN_TICKET_STATES),
-        isNotNull(tickets.slaDeadlineAt),
-        or(eq(tickets.assigneeId, mine), eq(tickets.ownerId, mine)),
-      ),
-    )
-    .orderBy(tickets.slaDeadlineAt)
-    .limit(50);
-
   for (const t of liveTickets) {
     if (!t.slaDeadlineAt) continue;
     const left = slaRemainingFraction(t.createdAt, t.slaDeadlineAt, now);
@@ -95,22 +201,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   }
 
   // ── Quotes: about to expire, or sent and never opened ───────────────────────
-  const liveQuotes = await db
-    .select({
-      id: quotes.id,
-      quoteNumber: quotes.quoteNumber,
-      status: quotes.status,
-      sentAt: quotes.sentAt,
-      viewedAt: quotes.viewedAt,
-      expiresAt: quotes.expiresAt,
-      totalAmount: quotes.totalAmount,
-      acceptedAt: quotes.acceptedAt,
-      dealId: quotes.dealId,
-    })
-    .from(quotes)
-    .where(and(inArray(quotes.status, ["sent", "viewed", "accepted"]), eq(quotes.ownerId, mine)))
-    .orderBy(desc(quotes.sentAt))
-    .limit(50);
 
   for (const q of liveQuotes) {
     const followUp = { entity: "deal" as const, id: q.dealId };
@@ -174,24 +264,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   // "Touched" means an activity happened, not that the row was written: re-saving a
   // deal to fix a typo is not contact with the customer, and neither is a meeting
   // booked for next week. The board reads the same definition (src/lib/deal-signals.ts).
-  const lastActivity = lastActivityByDeal(db, new Date(now));
-  const nextStep = nextStepByDeal(db, new Date(now));
-
-  const openDeals = await db
-    .select({
-      id: deals.id,
-      name: deals.name,
-      createdAt: deals.createdAt,
-      expectedCloseDate: deals.expectedCloseDate,
-      lastTouched: lastActivity.at,
-      steps: nextStep.n,
-    })
-    .from(deals)
-    .leftJoin(lastActivity, eq(lastActivity.dealId, deals.id))
-    .leftJoin(nextStep, eq(nextStep.dealId, deals.id))
-    .where(and(eq(deals.status, "open"), eq(deals.ownerId, mine)))
-    .limit(100);
-
   for (const d of openDeals) {
     if (d.expectedCloseDate && d.expectedCloseDate.getTime() < now) {
       const late = daysBetween(d.expectedCloseDate, now);
@@ -246,28 +318,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   }
 
   // ── Leads nobody has answered ──────────────────────────────────────────────
-  const leadCutoff = new Date(now - THRESHOLDS.leadUntouchedDays * DAY_MS);
-  const coldLeads = await db
-    .select({
-      id: leads.id,
-      firstName: leads.firstName,
-      lastName: leads.lastName,
-      companyName: leads.companyName,
-      createdAt: leads.createdAt,
-      leadScore: leads.leadScore,
-    })
-    .from(leads)
-    .leftJoin(activities, eq(activities.leadId, leads.id))
-    .where(
-      and(
-        eq(leads.isConverted, false),
-        notInArray(leads.status, ["unqualified"]),
-        lt(leads.createdAt, leadCutoff),
-        eq(leads.ownerId, mine),
-        isNull(activities.id),
-      ),
-    )
-    .limit(30);
 
   for (const l of coldLeads) {
     const quiet = daysBetween(l.createdAt, now);
@@ -286,29 +336,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   }
 
   // ── Customers who have gone quiet ──────────────────────────────────────────
-  const quietCutoff = new Date(now - THRESHOLDS.customerQuietDays * DAY_MS);
-  const companyLastActivity = db
-    .select({
-      companyId: activities.companyId,
-      last: sql<Date>`max(${activities.createdAt})`.as("company_last"),
-    })
-    .from(activities)
-    .where(isNotNull(activities.companyId))
-    .groupBy(activities.companyId)
-    .as("company_last_activity");
-
-  const quietCustomers = await db
-    .select({ id: companies.id, name: companies.name, last: companyLastActivity.last })
-    .from(companies)
-    .leftJoin(companyLastActivity, eq(companyLastActivity.companyId, companies.id))
-    .where(
-      and(
-        eq(companies.status, "active"),
-        eq(companies.ownerId, mine),
-        or(isNull(companyLastActivity.last), lte(companyLastActivity.last, quietCutoff)),
-      ),
-    )
-    .limit(30);
 
   for (const c of quietCustomers) {
     // A customer with no activity at all is a record, not a lapse: it says nothing
@@ -329,24 +356,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   }
 
   // ── Replies owed: a customer wrote to their owner (src/lib/inbound-sales-reply.ts) ──
-  const replies = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      createdAt: tasks.createdAt,
-      contactId: tasks.contactId,
-      leadId: tasks.leadId,
-    })
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.assigneeId, mine),
-        ne(tasks.status, "done"),
-        eq(tasks.type, "email"),
-        like(tasks.title, `${REPLY_TASK_PREFIX}%`),
-      ),
-    )
-    .limit(30);
   for (const r of replies) {
     const waiting = daysBetween(r.createdAt, now);
     found.push({
@@ -365,13 +374,6 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
       taskId: r.id,
     });
   }
-
-  // What this person put aside, until the day they chose.
-  const snoozes = await db
-    .select({ kind: nextActionSnoozes.kind, entityId: nextActionSnoozes.entityId, until: nextActionSnoozes.until })
-    .from(nextActionSnoozes)
-    .where(and(eq(nextActionSnoozes.userId, mine), gt(nextActionSnoozes.until, new Date(now))))
-    .catch(() => []);
 
   return buildWorkList(withoutSnoozed(found, snoozes, now), limit);
 }

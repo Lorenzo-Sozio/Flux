@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getNotificationsAction } from "@/actions/auth";
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
@@ -21,14 +21,16 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
-import { tenantMembers, tenants, users } from "@/db/schema";
+import { tenantMembers } from "@/db/schema";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { ENTITIES, entityInPlan } from "@/lib/entities";
+import { getTenantById } from "@/lib/get-tenant";
 import { can, normalizeTenantRole } from "@/lib/permissions";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
 import { readWorkspaceFeatures } from "@/lib/workspace-features";
+import { mirrorUser } from "@/lib/workspace-user-mirror";
 import { computeNavAccess } from "@/navigation/sidebar/filter-nav";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
@@ -54,44 +56,40 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
     redirect("/select-tenant");
   }
 
-  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.id, activeTenantId));
+  // The workspace and the membership are independent reads: side by side, not in turn.
+  // The workspace row comes through the registry's cache, as `getDb()` reads it anyway.
+  const [tenant, member] = await Promise.all([
+    getTenantById(activeTenantId),
+    platformDb
+      .select()
+      .from(tenantMembers)
+      .where(and(eq(tenantMembers.tenantId, activeTenantId), eq(tenantMembers.userId, session.user.id)))
+      .then((rows) => rows[0]),
+  ]);
 
   if (!tenant) redirect("/select-tenant");
-
-  const [member] = await platformDb
-    .select()
-    .from(tenantMembers)
-    .where(and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, session.user.id)));
-
   if (!member) redirect("/select-tenant");
 
-  // Upsert the user into the tenant DB so tenant-side FK constraints work.
-  // Fast no-op on subsequent visits (onConflictDoUpdate is idempotent).
   const db = await getDb();
   const uid = session.user.id;
   const uname = session.user.name ?? "";
   const uemail = session.user.email ?? "";
   const urole = member.role;
 
-  // Remove any stale row created with the same email but a wrong platform ID.
-  // This can happen when a previous invitation acceptance bug inserted the user
-  // directly into the tenant DB instead of the platform DB, generating a mismatch.
-  if (uemail) {
-    await db.delete(users).where(and(eq(users.email, uemail), ne(users.id, uid)));
-  }
-
-  await db
-    .insert(users)
-    .values({ id: uid, name: uname, email: uemail, role: urole })
-    .onConflictDoUpdate({ target: users.id, set: { name: uname, role: urole } });
-  // ─────────────────────────────────────────────────────────────────────────────
-
-  // The sidebar is built from the membership role read above — the authoritative
-  // one — rather than the platform staff field the pages used to consult.
-  const entitlements = await getTenantEntitlements().catch(() => null);
-  // The optional parts the workspace uses — the menu drops the rest, and the chat widget,
-  // which polls from every open tab, is not mounted at all when chat is off.
-  const features = await readWorkspaceFeatures(db);
+  // Everything the frame needs, at once: the person's row in the workspace, the plan, the
+  // optional parts, the bell and the sidebar's preferences. Each used to wait for the last.
+  const [, entitlements, features, userNotifications, variant, collapsible] = await Promise.all([
+    mirrorUser(db, tenant.id, { id: uid, name: uname, email: uemail, role: urole }),
+    // The sidebar is built from the membership role read above — the authoritative
+    // one — rather than the platform staff field the pages used to consult.
+    getTenantEntitlements().catch(() => null),
+    // The optional parts the workspace uses — the menu drops the rest, and the chat widget,
+    // which polls from every open tab, is not mounted at all when chat is off.
+    readWorkspaceFeatures(db),
+    getNotificationsAction(),
+    getPreference("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),
+    getPreference("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, "icon"),
+  ]);
   // Strings only. Sending the filtered menu itself carried each entry's `icon`,
   // a React component, which cannot cross into a Client Component — and took every
   // dashboard page down with it.
@@ -114,12 +112,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   ).map((e) => e.type);
 
   const cookieStore = await cookies();
-  const userNotifications = session?.user?.id ? await getNotificationsAction() : [];
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
-  const [variant, collapsible] = await Promise.all([
-    getPreference("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),
-    getPreference("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, "icon"),
-  ]);
 
   return (
     <WorkspaceScopeProvider scope={tenant.id}>

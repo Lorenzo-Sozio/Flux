@@ -5,8 +5,7 @@ import { getTranslations } from "next-intl/server";
 
 import { EmailBuilder } from "@/components/email-builder";
 import { emailTemplates } from "@/db/schema";
-import type { EmailDesign } from "@/lib/email-builder";
-import { blockTextDefaults, emptyDesign } from "@/lib/email-builder";
+import { blockTextDefaults, designFromBody, emptyDesign, parseDesign } from "@/lib/email-builder";
 import { getDb } from "@/lib/tenant-context";
 
 interface Props {
@@ -29,22 +28,20 @@ export default async function EmailEditorPage({ searchParams }: Props) {
 
   if (!template) return notFound();
 
-  let design: EmailDesign | undefined;
-  try {
-    if ((template as any).design) {
-      design = JSON.parse((template as any).design) as EmailDesign;
-    }
-  } catch {
-    design = undefined;
-  }
+  // ⚠️ The saved blocks, or else the HTML that is really sent — never the placeholder
+  // email. Opening a template without a design on the placeholder is how a save used
+  // to replace somebody's email with "Your heading here".
+  const saved = parseDesign(template.design);
+  const design = saved ?? designFromBody(template.body, template.isHtml);
 
   return (
     <EmailBuilder
       templateId={template.id}
       initialName={template.name}
       initialSubject={template.subject}
-      initialCategory={(template as any).category ?? "general"}
-      initialDesign={design ?? emptyDesign(blockText)}
+      initialCategory={template.category}
+      initialDesign={design}
+      fromHtml={!saved}
     />
   );
 }

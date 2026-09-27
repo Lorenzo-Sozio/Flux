@@ -27,7 +27,8 @@ export type DateOperator =
   | "this_month"
   | "this_year";
 
-export type EnumOperator = "in" | "not_in";
+// "is_empty" on a choice is "none chosen" — an owner nobody has, the unassigned leads.
+export type EnumOperator = "in" | "not_in" | "is_empty" | "is_not_empty";
 export type BoolOperator = "is_true" | "is_false";
 
 export type FilterOperator = TextOperator | NumberOperator | DateOperator | EnumOperator | BoolOperator;
@@ -111,6 +112,8 @@ export const DATE_OPERATORS: { value: DateOperator; label: string }[] = [
 export const ENUM_OPERATORS: { value: EnumOperator; label: string }[] = [
   { value: "in", label: "Is one of" },
   { value: "not_in", label: "Is not one of" },
+  { value: "is_empty", label: "Is empty" },
+  { value: "is_not_empty", label: "Is not empty" },
 ];
 
 export const BOOL_OPERATORS: { value: BoolOperator; label: string }[] = [

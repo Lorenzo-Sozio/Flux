@@ -726,6 +726,9 @@ export const emailTemplates = pgTable("email_template", {
   isHtml: boolean("is_html").default(true).notNull(), // true = HTML, false = plain text
   category: text("category").default("general").notNull(), // general, welcome, followup, promotional, transactional
   previewText: text("preview_text"), // Short preview of email (for email clients)
+  // The email builder's blocks as JSON (src/lib/email-builder.ts); null for a template
+  // written as HTML. `body` is what is sent; this is what the builder reopens.
+  design: text("design"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   isPublic: boolean("is_public").default(false), // Share with team
   tags: text("tags").array().default([]), // e.g., ["sales", "onboarding", "q2-2026"]

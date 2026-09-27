@@ -638,13 +638,17 @@ export function ChatWidget({ userId }: { userId: string }) {
         sequence, draft invoice) marks it `data-bottom-bar`: the bubble steps
         aside on a phone and rises above the bar on a desktop, where it sat on
         the Save button itself.
+
+        A full-screen editor (the email builder) marks itself
+        `data-fullscreen-editor`, and the bubble is not drawn at all: it sat on
+        the inspector on a desktop and on the editor's own tab bar on a phone.
       */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? tc("close") : t("widget.openChat")}
         aria-expanded={open}
-        className="fixed right-4 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95 max-md:[body:has([data-bottom-composer])_&]:hidden max-md:[body:has([data-bottom-bar])_&]:hidden md:right-5 md:bottom-5 md:z-50 md:[body:has([data-bottom-bar])_&]:bottom-24"
+        className="fixed right-4 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95 max-md:[body:has([data-bottom-composer])_&]:hidden max-md:[body:has([data-bottom-bar])_&]:hidden md:right-5 md:bottom-5 md:z-50 md:[body:has([data-bottom-bar])_&]:bottom-24 [body:has([data-fullscreen-editor])_&]:hidden"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
         {!open && unreadTotal > 0 && (

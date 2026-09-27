@@ -953,6 +953,10 @@
     "newAppointmentAt": "Nuovo appuntamento alle {time}",
     "newAppointmentOn": "Nuovo appuntamento in questo giorno",
     "list": "Elenco",
+    "grid": "Griglia",
+    "dayLayoutLabel": "Come mostrare il giorno",
+    "free": "Libero",
+    "nowAt": "Adesso · {time}",
     "listEmpty": "Nulla nei prossimi {days} giorni.",
     "dragHint": "Trascina un appuntamento per spostarlo, o il suo bordo inferiore per cambiarne la durata. Clicca uno spazio vuoto per aggiungerne uno.",
     "newAllDayOn": "Nuovo appuntamento di tutto il giorno in questa data",
@@ -1490,7 +1494,7 @@
     "openTickets": "Ticket Aperti",
     "overdueLabel": "{count} Scadute",
     "overview": "Panoramica",
-    "pendingTasks": "Attività in Sospeso",
+    "pendingTasks": "Attività in sospeso di tutti",
     "pipelineValue": "Valore Pipeline",
     "pipelineValueDesc": "Valore totale delle trattative aperte",
     "probPercent": "{prob}% prob.",
@@ -1573,14 +1577,16 @@
     },
     "viewLabel": "Di chi sono i numeri",
     "viewMe": "Io",
-    "viewTeam": "Squadra",
+    "viewCompany": "Azienda",
     "myWon": "Vinto nel mese",
     "myWonOf": "su un obiettivo di",
     "myWonNoTarget": "Nessun obiettivo per questo mese",
     "myBareDeals": "Trattative senza passo successivo",
     "myBareDealsDesc": "Tue trattative aperte senza niente in programma",
     "myToday": "Oggi",
-    "myTodayDesc": "Attività, chiamate e incontri in agenda"
+    "myTodayDesc": "Attività, chiamate e incontri in agenda",
+    "myLeads": "Lead da lavorare",
+    "myLeadsDesc": "Tuoi o non assegnati, nuovi o in contatto"
   },
   "currency": {
     "switchCurrency": "Cambia valuta",
@@ -1805,7 +1811,9 @@
       },
       "enum": {
         "in": "È uno di",
-        "not_in": "Non è uno di"
+        "not_in": "Non è uno di",
+        "is_empty": "È vuoto",
+        "is_not_empty": "Non è vuoto"
       },
       "boolean": {
         "is_true": "È vero",
@@ -2513,6 +2521,7 @@
         "rightBackground": "Sfondo destro",
         "gap": "Spazio tra colonne (px)",
         "showUnsubscribe": "Mostra disiscrizione",
+        "unsubscribeLabel": "Testo del link di disiscrizione",
         "backgroundColor": "Colore di sfondo",
         "contentWidth": "Larghezza contenuto (px)",
         "fontFamily": "Carattere",
@@ -2522,7 +2531,8 @@
         "properties": "Proprietà: {block}",
         "insertVariable": "Inserisci variabile",
         "copyHint": "Clicca per copiare, poi incolla nei campi di testo qui sopra.",
-        "empty": "Seleziona un blocco nell'area di lavoro per modificarne le proprietà."
+        "empty": "Seleziona un blocco nell'area di lavoro per modificarne le proprietà.",
+        "emptyMobile": "Nessun blocco selezionato. Tocca un blocco nell'email per modificarlo."
       },
       "copied": "Copiato {variable}",
       "globalSettings": "Impostazioni generali",
@@ -2545,13 +2555,35 @@
       "emailPreview": "Anteprima email",
       "emptyCanvas": "Clicca un blocco nel pannello a sinistra per aggiungerlo",
       "duplicate": "Duplica",
+      "tabs": {
+        "label": "Sezioni dell'editor",
+        "email": "Email",
+        "add": "Aggiungi",
+        "edit": "Modifica",
+        "settings": "Dettagli"
+      },
+      "moveUp": "Sposta su",
+      "moveDown": "Sposta giù",
+      "editBlock": "Modifica il blocco",
+      "preview": "Anteprima",
+      "leaveTitle": "Uscire senza salvare?",
+      "leaveBody": "Le modifiche a questo modello non sono state salvate e andranno perse.",
+      "leaveConfirm": "Esci senza salvare",
+      "stay": "Continua a modificare",
+      "fromHtmlNotice": "Questo modello è stato scritto in HTML, quindi si apre come un unico blocco HTML: l'email resta esattamente quella inviata. Puoi aggiungere blocchi sopra o sotto.",
+      "templateDetails": "Dettagli del modello",
+      "untitled": "Nuovo modello",
+      "category": "Categoria",
+      "sizeHint": "Oltre 80 KB Gmail taglia l'email e mostra «Messaggio troncato».",
+      "sizeLabel": "Dimensione dell'email: {kb} KB",
       "defaults": {
         "heading": "Il tuo titolo qui",
         "text": "Scrivi qui il tuo messaggio. Usa il <strong>grassetto</strong> o il <em>corsivo</em> per mettere in evidenza i punti chiave.",
         "button": "Clicca qui",
         "leftColumn": "Contenuto della colonna sinistra",
         "rightColumn": "Contenuto della colonna destra",
-        "footer": "© {year} Nome azienda. Tutti i diritti riservati."
+        "footer": "© {year} Nome azienda. Tutti i diritti riservati.",
+        "unsubscribe": "Annulla l'iscrizione"
       }
     }
   },

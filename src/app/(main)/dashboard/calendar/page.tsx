@@ -1,3 +1,6 @@
+import type { ReactNode } from "react";
+
+import { cookies } from "next/headers";
 import Link from "next/link";
 
 import {
@@ -45,6 +48,7 @@ import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
 import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
 import { WeekCurrentTimeLine } from "@/components/crm/week-current-time-line";
 import { Button } from "@/components/ui/button";
+import { DAY_LAYOUT_COOKIE, type DayLayout, resolveDayLayout } from "@/lib/calendar-day-layout";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { toWallValue, wallDiffMinutes } from "@/lib/wall-clock";
@@ -56,6 +60,7 @@ import { AppointmentLink } from "./_components/appointment-link";
 import { DayMovablePill, type DragInfo, TimedEventBlock } from "./_components/calendar-drag";
 import { CalendarFilterMenu } from "./_components/calendar-filter-menu";
 import { CalendarSlotLayer, NewOnDayButton } from "./_components/calendar-slot-layer";
+import { DayLayoutToggle } from "./_components/day-layout-toggle";
 import { GridAutoScroll } from "./_components/grid-auto-scroll";
 import { SubscribeDialog } from "./_components/subscribe-dialog";
 import { SwipeNav } from "./_components/swipe-nav";
@@ -73,6 +78,8 @@ type View = (typeof VIEWS)[number];
 
 /** How many days the list view covers from its first one. */
 const LIST_DAYS = 30;
+/** Free time shorter than this is not worth a row of its own in the day's list. */
+const FREE_GAP_MIN = 60;
 
 // ─── Event type helpers ───────────────────────────────────────────────────────
 
@@ -235,15 +242,33 @@ export default async function CalendarPage({
     appointment?: string;
     occurrence?: string;
     filter?: string;
+    layout?: string;
   }>;
 }) {
   const [
-    { view: viewParam, date: dateParam, appointment: appointmentId, occurrence: occurrenceParam, filter: filterParam },
+    {
+      view: viewParam,
+      date: dateParam,
+      appointment: appointmentId,
+      occurrence: occurrenceParam,
+      filter: filterParam,
+      layout: layoutParam,
+    },
     t,
     session,
     timeZone,
     locale,
-  ] = await Promise.all([searchParams, getTranslations("calendar"), auth(), getWorkspaceTimeZone(), getLocale()]);
+    cookieStore,
+  ] = await Promise.all([
+    searchParams,
+    getTranslations("calendar"),
+    auth(),
+    getWorkspaceTimeZone(),
+    getLocale(),
+    cookies(),
+  ]);
+  // The day view as a list or as the hour grid (src/lib/calendar-day-layout.ts).
+  const dayLayout = resolveDayLayout(layoutParam, cookieStore.get(DAY_LAYOUT_COOKIE)?.value);
   const dfLocale = locale === "it" ? itLocale : enUS;
   // ⚠️ The workspace role, never the platform one.
   const tenantRole = session?.user?.tenantRole ?? null;
@@ -576,11 +601,14 @@ export default async function CalendarPage({
     dayHref,
     prevHref,
     nextHref,
+    extra,
   }: {
     selected: Date | null;
     dayHref: (day: Date) => string;
     prevHref: string;
     nextHref: string;
+    /** Beside the headline: the day view's list/grid switch. */
+    extra?: ReactNode;
   }) => {
     const anchor = selected ?? baseDate;
     const days = eachDayOfInterval({
@@ -600,11 +628,14 @@ export default async function CalendarPage({
               ? `${isSameDay(selected, today) ? `${t("today")} · ` : ""}${format(headline, "EEEE d MMMM", { locale: dfLocale })}`
               : format(headline, "LLLL yyyy", { locale: dfLocale })}
           </p>
-          {!showingToday && (
-            <Link href={dayHref(today)} className="shrink-0 rounded-md px-2 py-1 font-medium text-primary text-sm">
-              {t("today")}
-            </Link>
-          )}
+          <div className="flex shrink-0 items-center gap-1">
+            {!showingToday && (
+              <Link href={dayHref(today)} className="shrink-0 rounded-md px-2 py-1 font-medium text-primary text-sm">
+                {t("today")}
+              </Link>
+            )}
+            {extra}
+          </div>
         </div>
         <div className="flex items-center">
           <Link
@@ -1077,7 +1108,8 @@ export default async function CalendarPage({
   };
 
   // ── VIEW: Agenda (Day Timeline) ──────────────────────────────────────────────
-  const renderAgenda = () => {
+  /** `phoneOnly`: drawn inside a wrapper that exists below md only — the default week on a phone. */
+  const renderAgenda = ({ phoneOnly = false }: { phoneOnly?: boolean } = {}) => {
     const dayStr = baseDateStr;
     const allDayEvents = events.filter((e) => e.allDayEvent && spansDay(e, baseDate));
     const layoutEvents = layOut(
@@ -1095,6 +1127,82 @@ export default async function CalendarPage({
     const nextAgendaUrl = calUrl("agenda", format(addDays(baseDate, 1), "yyyy-MM-dd"), currentFilter);
     const isAgendaToday = isSameDay(baseDate, today);
 
+    /**
+     * The day read as a list: all-day items first, then the timed ones in order, the free
+     * time between them named when it is an hour or more, and — today — where now falls.
+     * The whole of an ordinary day fits on a phone's screen; the grid needed 960px for it.
+     */
+    const renderDayList = () => {
+      const timed = [...layoutEvents].sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+      if (allDayEvents.length === 0 && timed.length === 0) {
+        return (
+          <div className="flex flex-col items-center justify-center gap-2 py-12 text-muted-foreground">
+            <CalendarDays className="h-10 w-10 opacity-20" />
+            <p className="text-sm">{t("noEventsThisDay")}</p>
+            {canWrite && <AppointmentDialog timeZone={timeZone} defaultDate={`${dayStr}T09:00`} />}
+          </div>
+        );
+      }
+      const hhmm = (min: number) =>
+        `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+      const nowMin = isAgendaToday ? today.getHours() * 60 + today.getMinutes() : null;
+      const rows: ReactNode[] = allDayEvents.map((ev) => renderRow(ev, baseDate));
+      const nowRow = () => (
+        <li
+          key="now"
+          className="flex items-center gap-2 px-4 py-1"
+          aria-label={t("nowAt", { time: hhmm(nowMin ?? 0) })}
+        >
+          <span className="size-2 shrink-0 rounded-full bg-red-500" aria-hidden />
+          <span className="h-px flex-1 bg-red-500/60" aria-hidden />
+          <span className="font-medium text-red-600 text-xs tabular-nums dark:text-red-400">
+            {t("nowAt", { time: hhmm(nowMin ?? 0) })}
+          </span>
+        </li>
+      );
+      let busyUntil: number | null = null;
+      let nowPlaced = nowMin === null || timed.length === 0;
+      for (const seg of timed) {
+        if (busyUntil !== null && seg.startMin - busyUntil >= FREE_GAP_MIN) {
+          rows.push(
+            <li
+              key={`free-${busyUntil}`}
+              className="flex items-center gap-3 bg-muted/30 px-4 py-1.5 text-muted-foreground text-xs"
+            >
+              <span className="w-[5.5rem] shrink-0 tabular-nums">
+                {hhmm(busyUntil)} – {hhmm(seg.startMin)}
+              </span>
+              <span>{t("free")}</span>
+            </li>,
+          );
+        }
+        if (!nowPlaced && nowMin !== null && seg.startMin > nowMin) {
+          rows.push(nowRow());
+          nowPlaced = true;
+        }
+        rows.push(renderRow(seg.event, baseDate));
+        busyUntil = Math.max(busyUntil ?? 0, seg.endMin);
+      }
+      if (!nowPlaced) rows.push(nowRow());
+      return <ul className="divide-y">{rows}</ul>;
+    };
+
+    // List or grid: chosen, or — nobody having chosen — the list below md and the grid above,
+    // both drawn and CSS picking (src/lib/calendar-day-layout.ts).
+    const showList = dayLayout !== "grid";
+    // Nobody chose and only a phone will see this: the grid would be drawn for md up inside a
+    // wrapper hidden from md up — markup nobody can ever see.
+    const showGrid = dayLayout === "grid" || (dayLayout === null && !phoneOnly);
+    const layoutHref = (v: DayLayout) => `${dayUrl(baseDate)}&layout=${v}`;
+    const layoutToggle = (
+      <DayLayoutToggle
+        layout={dayLayout}
+        hrefs={{ list: layoutHref("list"), grid: layoutHref("grid") }}
+        labels={{ list: t("list"), grid: t("grid") }}
+        label={t("dayLayoutLabel")}
+      />
+    );
+
     return (
       <div className="space-y-2">
         {renderWeekStrip({
@@ -1102,6 +1210,7 @@ export default async function CalendarPage({
           dayHref: dayUrl,
           prevHref: dayUrl(subWeeks(baseDate, 1)),
           nextHref: dayUrl(addWeeks(baseDate, 1)),
+          extra: layoutToggle,
         })}
 
         {/* Overdue section */}
@@ -1127,6 +1236,7 @@ export default async function CalendarPage({
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <div className="mr-2">{layoutToggle}</div>
               <Link
                 href={prevAgendaUrl}
                 aria-label={t("previousPeriod")}
@@ -1147,11 +1257,14 @@ export default async function CalendarPage({
             </div>
           </div>
 
-          {/* All-day strip */}
-          {(allDayEvents.length > 0 || canWrite) && (
+          {/* All-day strip — the grid's; the list carries all-day items as its first rows. */}
+          {showGrid && (allDayEvents.length > 0 || canWrite) && (
             <div
               data-cal-day={dayStr}
-              className="group flex items-start gap-3 border-b bg-blue-50/60 px-4 py-2 dark:bg-blue-950/20"
+              className={cn(
+                "group items-start gap-3 border-b bg-blue-50/60 px-4 py-2 dark:bg-blue-950/20",
+                showList ? "hidden md:flex" : "flex",
+              )}
             >
               <div className="w-12 shrink-0 pt-1 text-right font-medium text-[10px] text-muted-foreground uppercase tracking-wider">
                 {t("allDay")}
@@ -1171,63 +1284,71 @@ export default async function CalendarPage({
           {/* ⚠️ On a phone the page scrolls and the grid does not: a scroll area
               inside a scrolling page is two things a thumb has to tell apart.
               From md up the grid keeps its own, with the header in view. */}
-          <div
-            data-cal-scroll=""
-            className="relative flex md:max-h-[calc(100dvh-290px)] md:min-h-[400px] md:overflow-y-auto"
-          >
-            <GridAutoScroll
-              offsetPx={(openingHour(layoutEvents, isAgendaToday) - HOUR_START) * HOUR_HEIGHT - HOUR_HEIGHT / 2}
-              pageFallback
-              // The sticky week strip, which the hour must land under.
-              stickyOffset={112}
-            />
-            {/* Time labels */}
-            <div className="relative w-14 shrink-0 select-none border-r" style={{ height: `${TOTAL_HEIGHT}px` }}>
-              {hourLabels(HOURS, HOUR_START, HOUR_HEIGHT)}
-            </div>
-
-            {/* Events area */}
-            <div data-cal-day={dayStr} className="relative flex-1" style={{ height: `${TOTAL_HEIGHT}px` }}>
-              {hourLines(HOURS, HOUR_START, HOUR_HEIGHT)}
-
-              {canWrite && (
-                <CalendarSlotLayer day={dayStr} hourStart={HOUR_START} hourEnd={HOUR_END} hourHeight={HOUR_HEIGHT} />
+          {showGrid && (
+            <div
+              data-cal-scroll=""
+              className={cn(
+                "relative md:max-h-[calc(100dvh-290px)] md:min-h-[400px] md:overflow-y-auto",
+                showList ? "hidden md:flex" : "flex",
               )}
+            >
+              <GridAutoScroll
+                offsetPx={(openingHour(layoutEvents, isAgendaToday) - HOUR_START) * HOUR_HEIGHT - HOUR_HEIGHT / 2}
+                // Only where the grid is what a phone shows: hidden, it has no position to measure.
+                pageFallback={dayLayout === "grid"}
+                // The sticky week strip, which the hour must land under.
+                stickyOffset={112}
+              />
+              {/* Time labels */}
+              <div className="relative w-14 shrink-0 select-none border-r" style={{ height: `${TOTAL_HEIGHT}px` }}>
+                {hourLabels(HOURS, HOUR_START, HOUR_HEIGHT)}
+              </div>
 
-              {isAgendaToday && (
-                <WeekCurrentTimeLine
-                  hourStart={HOUR_START}
-                  hourEnd={HOUR_END}
-                  hourHeight={HOUR_HEIGHT}
-                  timeZone={timeZone}
-                />
-              )}
+              {/* Events area */}
+              <div data-cal-day={dayStr} className="relative flex-1" style={{ height: `${TOTAL_HEIGHT}px` }}>
+                {hourLines(HOURS, HOUR_START, HOUR_HEIGHT)}
 
-              {/* Empty state. The slots behind it stay clickable; only its
+                {canWrite && (
+                  <CalendarSlotLayer day={dayStr} hourStart={HOUR_START} hourEnd={HOUR_END} hourHeight={HOUR_HEIGHT} />
+                )}
+
+                {isAgendaToday && (
+                  <WeekCurrentTimeLine
+                    hourStart={HOUR_START}
+                    hourEnd={HOUR_END}
+                    hourHeight={HOUR_HEIGHT}
+                    timeZone={timeZone}
+                  />
+                )}
+
+                {/* Empty state. The slots behind it stay clickable; only its
                   own button takes a click. */}
-              {layoutEvents.length === 0 && allDayEvents.length === 0 && (
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                  <CalendarDays className="h-10 w-10 opacity-20" />
-                  <p className="text-sm">{t("noEventsThisDay")}</p>
-                  {canWrite && (
-                    <div className="pointer-events-auto">
-                      <AppointmentDialog timeZone={timeZone} defaultDate={`${dayStr}T09:00`} />
-                    </div>
-                  )}
-                </div>
-              )}
+                {layoutEvents.length === 0 && allDayEvents.length === 0 && (
+                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                    <CalendarDays className="h-10 w-10 opacity-20" />
+                    <p className="text-sm">{t("noEventsThisDay")}</p>
+                    {canWrite && (
+                      <div className="pointer-events-auto">
+                        <AppointmentDialog timeZone={timeZone} defaultDate={`${dayStr}T09:00`} />
+                      </div>
+                    )}
+                  </div>
+                )}
 
-              {layoutEvents.map((s) =>
-                renderBlock(s, {
-                  hourStart: HOUR_START,
-                  hourEnd: HOUR_END,
-                  hourHeight: HOUR_HEIGHT,
-                  minHeight: 28,
-                  variant: "agenda",
-                }),
-              )}
+                {layoutEvents.map((s) =>
+                  renderBlock(s, {
+                    hourStart: HOUR_START,
+                    hourEnd: HOUR_END,
+                    hourHeight: HOUR_HEIGHT,
+                    minHeight: 28,
+                    variant: "agenda",
+                  }),
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {showList && <div className={cn(showGrid && "md:hidden")}>{renderDayList()}</div>}
         </div>
       </div>
     );
@@ -1481,7 +1602,7 @@ export default async function CalendarPage({
           {currentView === "week" &&
             (weekIsADefault ? (
               <>
-                <div className="md:hidden">{renderAgenda()}</div>
+                <div className="md:hidden">{renderAgenda({ phoneOnly: true })}</div>
                 <div className="hidden md:block">{renderWeek()}</div>
               </>
             ) : (

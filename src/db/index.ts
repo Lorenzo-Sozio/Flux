@@ -110,7 +110,7 @@ function throughHyperdrive(url: string, preferred?: string): string | null {
 function connect<S extends Record<string, unknown>>(
   url: string,
   schema: S,
-  options: { viaHyperdrive?: boolean } = {},
+  options: { viaHyperdrive?: boolean; connections?: number } = {},
 ): AppDatabase<S> {
   if (isNeonUrl(url)) return drizzleNeon(neon(url), { schema });
 
@@ -122,10 +122,20 @@ function connect<S extends Record<string, unknown>>(
     ssl: options.viaHyperdrive ? false : sslFor(url),
     // Small on purpose: a serverless instance holds a pool per isolate, and a managed
     // Postgres counts every one of them against the same limit.
-    // ⚠️ One connection per request on Workers, where the pool cannot outlive the
-    // invocation anyway; a handful elsewhere, where it can.
-    max: options.viaHyperdrive ? 1 : 5,
-    idleTimeoutMillis: 30_000,
+    //
+    // ⚠️⚠️ On Workers the pool lives for one request, and its size is how many queries of
+    // that request run at once. It was one: every `Promise.all` on the dashboard queued
+    // its statements on a single socket, and the home page waited for some thirty round
+    // trips back to back — about a second of its time. Hyperdrive holds the real pool to
+    // the database, so more sockets here cost the database nothing.
+    //
+    // ⚠️⚠️ But a Worker invocation may hold **six** open connections — sockets and
+    // fetch() alike — and the seventh waits until one closes. Platform 2 + workspace 3
+    // leaves one for fetch; `connections` says which, and an idle socket is closed
+    // after a second, so a job opening one workspace after another does not sit on
+    // sockets it no longer uses while the next workspace waits for one.
+    max: options.viaHyperdrive ? (options.connections ?? 1) : 5,
+    idleTimeoutMillis: options.viaHyperdrive ? 1_000 : 30_000,
     connectionTimeoutMillis: 10_000,
   });
   const db = drizzlePg(pool, { schema });
@@ -167,6 +177,10 @@ function cacheFor(url: string): Map<string, unknown> {
   return byUrl;
 }
 
+/** Sockets per request through Hyperdrive: see `max` in `connect`. Five of the six a Worker has. */
+const PLATFORM_CONNECTIONS = 2;
+const WORKSPACE_CONNECTIONS = 3;
+
 function instanceFor<S extends Record<string, unknown>>(
   url: string,
   schema: S,
@@ -177,7 +191,10 @@ function instanceFor<S extends Record<string, unknown>>(
   const cache = cacheFor(effective);
   let db = cache.get(effective) as AppDatabase<S> | undefined;
   if (!db) {
-    db = connect(effective, schema, { viaHyperdrive: pooled !== null });
+    db = connect(effective, schema, {
+      viaHyperdrive: pooled !== null,
+      connections: preferredBinding === "HYPERDRIVE_PLATFORM" ? PLATFORM_CONNECTIONS : WORKSPACE_CONNECTIONS,
+    });
     cache.set(effective, db);
   }
   return db;

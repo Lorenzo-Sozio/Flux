@@ -70,7 +70,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
     try {
       if (template) {
-        await updateEmailTemplate(template.id, formData);
+        // The HTML was edited by hand, so a design saved by the builder no longer
+        // describes it: dropped, or the builder would reopen the old email.
+        await updateEmailTemplate(template.id, { ...formData, design: null });
         toast.success(t("updated"));
       } else {
         await createEmailTemplate(formData);

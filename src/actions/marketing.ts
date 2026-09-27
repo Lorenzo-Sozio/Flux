@@ -29,6 +29,10 @@ const EmailTemplateCreateSchema = z.object({
   // Accept any string; the DB column has no constraint, so we keep validation loose.
   category: z.string().max(64).default("general"),
   previewText: z.string().max(255).optional(),
+  // ⚠️ The builder's blocks. Left out of this schema, zod dropped them on every save,
+  // and the builder reopened each template as its placeholder email. Null for a
+  // template written as HTML, whose body no design describes.
+  design: z.string().max(1_000_000).nullable().optional(),
   ownerId: z.string().optional(),
   isPublic: z.boolean().default(false),
   tags: z.array(z.string().max(64)).max(20).default([]),

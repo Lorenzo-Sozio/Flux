@@ -534,6 +534,9 @@ function buildDate(col: any, op: FilterOperator, val: string | [string, string] 
 }
 
 function buildEnum(col: any, op: FilterOperator, val: string[]): SQL | undefined {
+  // No value to check: "none chosen" is NULL, and an empty string from an old import counts too.
+  if (op === "is_empty") return sql`(${col} IS NULL OR ${col} = '')`;
+  if (op === "is_not_empty") return sql`(${col} IS NOT NULL AND ${col} != '')`;
   if (!val || val.length === 0) return undefined;
   switch (op) {
     case "in":

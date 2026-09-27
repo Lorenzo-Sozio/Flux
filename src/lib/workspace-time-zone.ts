@@ -1,17 +1,16 @@
 import "server-only";
 
+import { cache } from "react";
+
 import { businessCalendar } from "@/db/schema";
 import { FALLBACK_CALENDAR } from "@/lib/business-calendar";
-import { getDb } from "@/lib/tenant-context";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 
 /**
- * The time zone the workspace keeps its hours in: the one set on its business
- * calendar, or the default before anybody has set one.
- *
- * ⚠️ The server's own zone is not an answer. On Workers it is UTC, so a page that
- * lays out a day with `getHours()` draws a ten o'clock meeting in Rome at eight.
+ * Once per request and workspace: the home page asked three times — the page, its agenda
+ * and its figures. The workspace is the key, not decoration: `getDb()` answers for it.
  */
-export async function getWorkspaceTimeZone(): Promise<string> {
+const readTimeZoneFor = cache(async (_workspaceId: string | null): Promise<string> => {
   try {
     const db = await getDb();
     const [row] = await db.select({ timeZone: businessCalendar.timeZone }).from(businessCalendar).limit(1);
@@ -19,6 +18,22 @@ export async function getWorkspaceTimeZone(): Promise<string> {
   } catch {
     return FALLBACK_CALENDAR.timeZone;
   }
+});
+
+/**
+ * The time zone the workspace keeps its hours in: the one set on its business
+ * calendar, or the default before anybody has set one.
+ *
+ * ⚠️ The server's own zone is not an answer. On Workers it is UTC, so a page that
+ * lays out a day with `getHours()` draws a ten o'clock meeting in Rome at eight.
+ *
+ * ⚠️ Remembered per workspace, never per request alone: inside `runWithTenant` a job moves
+ * from one workspace to the next within one request, and a zone remembered without its
+ * workspace would be the first one's for all of them. `getCurrentTenantId()` answers with
+ * the job's workspace there.
+ */
+export async function getWorkspaceTimeZone(): Promise<string> {
+  return readTimeZoneFor(await getCurrentTenantId());
 }
 
 /**

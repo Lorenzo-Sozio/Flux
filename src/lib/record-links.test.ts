@@ -48,6 +48,11 @@ function linksIn(source: string, file: string): Link[] {
 }
 
 /** Whether anything under the route folder reads `param` from the query string. */
+/** What `parseListParams` reads, taken from its source so the list cannot drift. */
+const LIST_PARAMS = [...readFileSync(join(SRC, "lib", "pagination.ts"), "utf8").matchAll(/\bone\("(\w+)"\)/g)].map(
+  (m) => m[1],
+);
+
 function routeReads(path: string, param: string): boolean {
   const dir = join(DASHBOARD, ...path.split("/"));
   if (!existsSync(dir)) return false;
@@ -57,7 +62,14 @@ function routeReads(path: string, param: string): boolean {
     new RegExp(`searchParams[\\s\\S]{0,200}\\b${param}\\??:`),
     // The awaited params read by name (the pipeline board's `params.owners`).
     new RegExp(`\\bparams\\.${param}\\b`),
+    // Read straight off the awaited promise: `(await searchParams).view`.
+    new RegExp(`\\(await searchParams\\)\\.${param}\\b`),
   ];
+  // A list page hands its parameters to `parseListParams` (src/lib/pagination.ts), which
+  // reads these; the page itself never names them.
+  if (LIST_PARAMS.includes(param) && files(dir).some((f) => /\bparseListParams\(/.test(readFileSync(f, "utf8")))) {
+    return true;
+  }
   return files(dir).some((f) => {
     const text = readFileSync(f, "utf8");
     return reads.some((r) => r.test(text));

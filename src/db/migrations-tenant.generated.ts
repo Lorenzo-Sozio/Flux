@@ -779,4 +779,12 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "contact" ADD COLUMN IF NOT EXISTS "assistant_key_id" text;\n',
     ],
   },
+  {
+    tag: "0056_the_design_is_kept",
+    folderMillis: 1792800000000,
+    hash: "5070ac8e22d083477f813080742b14978f963df156bd35cc4394042e853bce68",
+    sql: [
+      '-- The email builder\'s blocks, kept beside the HTML they compile to.\n--\n-- The builder always sent its design with a save, and nothing kept it: the action\'s\n-- schema dropped the field and the table had no column for it. So a template reopened\n-- in the builder showed the placeholder email, and saving it replaced the real one.\n-- Templates saved before this column have none, and open as the HTML they are.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "email_template" ADD COLUMN IF NOT EXISTS "design" text;\n',
+    ],
+  },
 ];

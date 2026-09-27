@@ -26,7 +26,11 @@ export interface OverdueTaskItem {
 export function CalendarOverdueSection({ tasks: initialTasks }: { tasks: OverdueTaskItem[] }) {
   const t = useTranslations("calendar");
   const [tasks, setTasks] = useState(initialTasks);
-  const [open, setOpen] = useState(true);
+  // null until somebody presses the header: open from md up, folded on a phone, decided by
+  // CSS so the first paint is right. On a phone the list sat between the week strip and the
+  // day, pushing today's appointments below the fold — and the header already has a count.
+  const [open, setOpen] = useState<boolean | null>(null);
+  const toggle = () => setOpen((v) => !(v ?? window.matchMedia("(min-width: 768px)").matches));
   const [completing, setCompleting] = useState<Set<string>>(new Set());
 
   // Completing asks "how did it go?" first; the row fades out once it has been answered.
@@ -64,7 +68,8 @@ export function CalendarOverdueSection({ tasks: initialTasks }: { tasks: Overdue
         {/* Collapsible header */}
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={toggle}
+          aria-expanded={open ?? undefined}
           className="w-full flex items-center justify-between px-4 py-3 bg-red-50 dark:bg-red-950/20 border-b border-red-200 dark:border-red-900/40 hover:bg-red-100 dark:hover:bg-red-950/30 transition-colors"
         >
           <div className="flex items-center gap-2">
@@ -75,13 +80,17 @@ export function CalendarOverdueSection({ tasks: initialTasks }: { tasks: Overdue
             </Badge>
           </div>
           <ChevronDown
-            className={cn("h-4 w-4 text-red-400 transition-transform duration-200", !open && "-rotate-90")}
+            className={cn(
+              "h-4 w-4 text-red-400 transition-transform duration-200",
+              open === false && "-rotate-90",
+              open === null && "max-md:-rotate-90",
+            )}
           />
         </button>
 
         {/* Task list */}
-        {open && (
-          <div className="divide-y divide-red-100/60 dark:divide-red-900/20">
+        {open !== false && (
+          <div className={cn("divide-y divide-red-100/60 dark:divide-red-900/20", open === null && "max-md:hidden")}>
             {tasks.map((task) => {
               const daysLate = Math.max(1, differenceInDays(new Date(), new Date(task.date)));
               const isCompleting = completing.has(task.id);

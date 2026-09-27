@@ -9,7 +9,7 @@ import {
   AlignLeft,
   ArrowLeft,
   ChevronDown,
-  ChevronRight,
+  ChevronUp,
   Code2,
   Columns,
   Copy,
@@ -23,9 +23,11 @@ import {
   Minus,
   Monitor,
   MousePointer,
+  Pencil,
   Plus,
   RotateCcw,
   Save,
+  Settings2,
   Smartphone,
   Trash2,
   Type,
@@ -34,11 +36,22 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   type Block,
@@ -60,9 +73,16 @@ import {
   type SpacerProps,
   type TextProps,
   type TwoColumnProps,
+  unsubscribeLabel,
   VARIABLES,
 } from "@/lib/email-builder";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+import { cn } from "@/lib/utils";
+
+/** Text placed into the preview's HTML, which the sanitiser would not escape. */
+function escapeText(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
 
 // ─── Block palette config ─────────────────────────────────────────────────────
 
@@ -244,7 +264,7 @@ function BlockPreview({ block }: { block: Block }) {
             __html: sanitizeEmailHtml(
               p.html +
                 (p.showUnsubscribe
-                  ? '<p style="margin:8px 0 0 0;"><a href="#" style="color:inherit;">Unsubscribe</a></p>'
+                  ? `<p style="margin:8px 0 0 0;"><a href="#" style="color:inherit;">${escapeText(unsubscribeLabel(p))}</a></p>`
                   : ""),
             ),
           }}
@@ -295,9 +315,13 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
         type="color"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-7 w-10 rounded cursor-pointer border border-input p-0.5"
+        className="h-8 w-10 cursor-pointer rounded border border-input p-0.5 md:h-7"
       />
-      <Input value={value} onChange={(e) => onChange(e.target.value)} className="h-7 text-xs font-mono flex-1" />
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 flex-1 font-mono md:h-7 md:text-xs"
+      />
     </div>
   );
 }
@@ -340,13 +364,17 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           return (
             <>
               <Row label={t("fields.text")}>
-                <Input value={hp.text} onChange={(e) => set({ text: e.target.value } as any)} className="h-8 text-sm" />
+                <Input
+                  value={hp.text}
+                  onChange={(e) => set({ text: e.target.value } as any)}
+                  className="h-8 md:text-sm"
+                />
               </Row>
               <Row label={t("fields.level")}>
                 <select
                   value={hp.level}
                   onChange={(e) => set({ level: e.target.value } as any)}
-                  className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
+                  className="h-8 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm"
                 >
                   <option value="h1">{t("levels.h1")}</option>
                   <option value="h2">{t("levels.h2")}</option>
@@ -367,7 +395,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={hp.paddingTop}
                   onChange={(e) => set({ paddingTop: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingBottom")}>
@@ -375,7 +403,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={hp.paddingBottom}
                   onChange={(e) => set({ paddingBottom: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -391,7 +419,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Textarea
                   value={tp.html}
                   onChange={(e) => set({ html: e.target.value } as any)}
-                  className="text-xs font-mono min-h-[120px] resize-y"
+                  className="min-h-[120px] resize-y font-mono md:text-xs"
                 />
               </Row>
               <Row label={t("fields.alignment")}>
@@ -408,7 +436,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={tp.fontSize}
                   onChange={(e) => set({ fontSize: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.lineHeight")}>
@@ -417,7 +445,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   step="0.1"
                   value={tp.lineHeight}
                   onChange={(e) => set({ lineHeight: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingTop")}>
@@ -425,7 +453,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={tp.paddingTop}
                   onChange={(e) => set({ paddingTop: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingBottom")}>
@@ -433,7 +461,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={tp.paddingBottom}
                   onChange={(e) => set({ paddingBottom: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -449,18 +477,22 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Input
                   value={ip.src}
                   onChange={(e) => set({ src: e.target.value } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                   placeholder="https://…"
                 />
               </Row>
               <Row label={t("fields.altText")}>
-                <Input value={ip.alt} onChange={(e) => set({ alt: e.target.value } as any)} className="h-8 text-sm" />
+                <Input
+                  value={ip.alt}
+                  onChange={(e) => set({ alt: e.target.value } as any)}
+                  className="h-8 md:text-sm"
+                />
               </Row>
               <Row label={t("fields.link")}>
                 <Input
                   value={ip.href}
                   onChange={(e) => set({ href: e.target.value } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                   placeholder="https://…"
                 />
               </Row>
@@ -471,7 +503,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   max={100}
                   value={ip.width}
                   onChange={(e) => set({ width: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.alignment")}>
@@ -485,7 +517,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={ip.paddingTop}
                   onChange={(e) => set({ paddingTop: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingBottom")}>
@@ -493,7 +525,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={ip.paddingBottom}
                   onChange={(e) => set({ paddingBottom: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -509,14 +541,14 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Input
                   value={bp.label}
                   onChange={(e) => set({ label: e.target.value } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.link")}>
                 <Input
                   value={bp.href}
                   onChange={(e) => set({ href: e.target.value } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                   placeholder="https://…"
                 />
               </Row>
@@ -537,7 +569,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={bp.borderRadius}
                   onChange={(e) => set({ borderRadius: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.fontSize")}>
@@ -545,7 +577,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={bp.fontSize}
                   onChange={(e) => set({ fontSize: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingH")}>
@@ -553,7 +585,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={bp.paddingH}
                   onChange={(e) => set({ paddingH: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingV")}>
@@ -561,7 +593,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={bp.paddingV}
                   onChange={(e) => set({ paddingV: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -585,7 +617,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   min={1}
                   value={dp.thickness}
                   onChange={(e) => set({ thickness: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingTop")}>
@@ -593,7 +625,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={dp.paddingTop}
                   onChange={(e) => set({ paddingTop: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.paddingBottom")}>
@@ -601,7 +633,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={dp.paddingBottom}
                   onChange={(e) => set({ paddingBottom: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -619,7 +651,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   min={4}
                   value={sp.height}
                   onChange={(e) => set({ height: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.background")}>
@@ -638,14 +670,14 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Textarea
                   value={tp.leftHtml}
                   onChange={(e) => set({ leftHtml: e.target.value } as any)}
-                  className="text-xs font-mono min-h-[80px] resize-y"
+                  className="min-h-[80px] resize-y font-mono md:text-xs"
                 />
               </Row>
               <Row label={t("fields.rightContent")}>
                 <Textarea
                   value={tp.rightHtml}
                   onChange={(e) => set({ rightHtml: e.target.value } as any)}
-                  className="text-xs font-mono min-h-[80px] resize-y"
+                  className="min-h-[80px] resize-y font-mono md:text-xs"
                 />
               </Row>
               <Row label={t("fields.leftBackground")}>
@@ -662,7 +694,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={tp.gap}
                   onChange={(e) => set({ gap: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
             </>
@@ -678,7 +710,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Textarea
                   value={fp.html}
                   onChange={(e) => set({ html: e.target.value } as any)}
-                  className="text-xs font-mono min-h-[80px] resize-y"
+                  className="min-h-[80px] resize-y font-mono md:text-xs"
                 />
               </Row>
               <Row label={t("fields.background")}>
@@ -692,20 +724,26 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   type="number"
                   value={fp.fontSize}
                   onChange={(e) => set({ fontSize: Number(e.target.value) } as any)}
-                  className="h-8 text-sm"
+                  className="h-8 md:text-sm"
                 />
               </Row>
               <Row label={t("fields.showUnsubscribe")}>
-                <button
-                  type="button"
-                  onClick={() => set({ showUnsubscribe: !fp.showUnsubscribe } as any)}
-                  className={`h-8 w-12 rounded-full transition-colors relative ${fp.showUnsubscribe ? "bg-primary" : "bg-muted"}`}
-                >
-                  <span
-                    className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${fp.showUnsubscribe ? "translate-x-5" : "translate-x-1"}`}
-                  />
-                </button>
+                <Switch
+                  checked={fp.showUnsubscribe}
+                  onCheckedChange={(v) => set({ showUnsubscribe: v } as any)}
+                  aria-label={t("fields.showUnsubscribe")}
+                />
               </Row>
+              {fp.showUnsubscribe && (
+                <Row label={t("fields.unsubscribeLabel")}>
+                  <Input
+                    value={fp.unsubscribeLabel ?? ""}
+                    placeholder={unsubscribeLabel(fp)}
+                    onChange={(e) => set({ unsubscribeLabel: e.target.value } as any)}
+                    className="h-8 md:text-sm"
+                  />
+                </Row>
+              )}
             </>
           );
         })()}
@@ -719,7 +757,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                 <Textarea
                   value={hp.html}
                   onChange={(e) => set({ html: e.target.value } as any)}
-                  className="text-xs font-mono min-h-[200px] resize-y"
+                  className="min-h-[200px] resize-y font-mono md:text-xs"
                   placeholder="<table>…</table>"
                 />
               </Row>
@@ -790,7 +828,7 @@ function SettingsInspector({ settings, onChange }: { settings: EmailSettings; on
         <select
           value={settings.fontFamily}
           onChange={(e) => set({ fontFamily: e.target.value })}
-          className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
+          className="h-8 w-full rounded-md border border-input bg-background px-3 text-base md:text-sm"
         >
           <option value="Arial, Helvetica, sans-serif">{t("settings.arialRecommended")}</option>
           <option value="Georgia, 'Times New Roman', serif">Georgia</option>
@@ -802,7 +840,7 @@ function SettingsInspector({ settings, onChange }: { settings: EmailSettings; on
         <Input
           value={settings.previewText}
           onChange={(e) => set({ previewText: e.target.value })}
-          className="h-8 text-sm"
+          className="h-8 md:text-sm"
           placeholder={t("settings.previewTextPlaceholder")}
         />
       </Row>
@@ -818,7 +856,14 @@ interface EmailBuilderProps {
   initialSubject?: string;
   initialDesign?: EmailDesign;
   initialCategory?: string;
+  /** The template had no saved design and opens as its HTML, in one block. */
+  fromHtml?: boolean;
 }
+
+type MobilePanel = "email" | "add" | "edit" | "settings";
+
+/** How long a run of edits to one field counts as one step to undo. */
+const COALESCE_MS = 1500;
 
 export function EmailBuilder({
   templateId,
@@ -826,48 +871,106 @@ export function EmailBuilder({
   initialSubject = "",
   initialDesign,
   initialCategory = "general",
+  fromHtml = false,
 }: EmailBuilderProps) {
   const t = useTranslations("marketing.emailBuilder");
   const tm = useTranslations("marketing");
   const tc = useTranslations("common");
   const router = useRouter();
-  const [design, setDesign] = useState<EmailDesign>(() => initialDesign ?? emptyDesign(blockTextDefaults(t)));
+  const [start] = useState<EmailDesign>(() => initialDesign ?? emptyDesign(blockTextDefaults(t)));
+  const [design, setDesign] = useState<EmailDesign>(start);
+  // The design as of the last change, for the history: read here rather than inside a
+  // state updater, which React may run twice and which must not set other state.
+  const designRef = useRef(design);
+  designRef.current = design;
   const [selectedId, setSelectedId] = useState<string | "settings" | null>("settings");
   const [preview, setPreview] = useState<"desktop" | "mobile" | null>(null);
   const [name, setName] = useState(initialName);
   const [subject, setSubject] = useState(initialSubject);
   const [category, setCategory] = useState(initialCategory);
   const [saving, setSaving] = useState(false);
+  // ⚠️ The designs *before* each change. It used to hold the design after it, so the
+  // first press of Undo put back what was already on screen and did nothing.
   const [history, setHistory] = useState<EmailDesign[]>([]);
+  const lastEdit = useRef<{ key: string; at: number } | null>(null);
+  const [panel, setPanel] = useState<MobilePanel>("email");
+  const [leaving, setLeaving] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // The name and subject are typed in the bar on a desktop and in the details panel on
+  // a phone: two fields each, and a failed save focuses the one on screen.
+  const fieldRefs = useRef<
+    Record<"bar" | "panel", { name: HTMLInputElement | null; subject: HTMLInputElement | null }>
+  >({
+    bar: { name: null, subject: null },
+    panel: { name: null, subject: null },
+  });
 
-  const pushHistory = useCallback((d: EmailDesign) => {
-    setHistory((h) => [...h.slice(-19), d]);
-    setDesign(d);
+  // What was loaded, to know whether anything would be lost by leaving.
+  const [savedState, setSavedState] = useState(() =>
+    JSON.stringify({ design: start, name: initialName, subject: initialSubject, category: initialCategory }),
+  );
+  const current = JSON.stringify({ design, name, subject, category });
+  const dirty = current !== savedState;
+
+  // A closed tab or a reload asks first while there is something unsaved.
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  /** A change that is one step of its own: adding, removing, moving a block. */
+  const commit = useCallback((next: EmailDesign) => {
+    lastEdit.current = null;
+    const prev = designRef.current;
+    setHistory((h) => [...h.slice(-29), prev]);
+    designRef.current = next;
+    setDesign(next);
+  }, []);
+
+  /**
+   * A change typed into a field. Keystrokes into the same field within a moment of
+   * each other are one step, or Undo would take a heading back one letter at a time.
+   */
+  const edit = useCallback((key: string, apply: (d: EmailDesign) => EmailDesign) => {
+    const now = Date.now();
+    const same = lastEdit.current?.key === key && now - lastEdit.current.at < COALESCE_MS;
+    lastEdit.current = { key, at: now };
+    const prev = designRef.current;
+    if (!same) setHistory((h) => [...h.slice(-29), prev]);
+    const next = apply(prev);
+    designRef.current = next;
+    setDesign(next);
   }, []);
 
   const undo = () => {
     if (history.length === 0) return;
+    lastEdit.current = null;
     const prev = history[history.length - 1];
-    setHistory((h) => h.slice(0, -1));
+    designRef.current = prev;
     setDesign(prev);
+    setHistory((h) => h.slice(0, -1));
   };
 
-  const updateBlock = useCallback((updated: Block) => {
-    setDesign((d) => ({
-      ...d,
-      blocks: d.blocks.map((b) => (b.id === updated.id ? updated : b)),
-    }));
-  }, []);
+  const updateBlock = useCallback(
+    (updated: Block) =>
+      edit(`block:${updated.id}`, (d) => ({ ...d, blocks: d.blocks.map((b) => (b.id === updated.id ? updated : b)) })),
+    [edit],
+  );
+
+  const updateSettings = useCallback((s: EmailSettings) => edit("settings", (d) => ({ ...d, settings: s })), [edit]);
 
   const addBlock = (type: BlockType) => {
     const block = newBlock(type, blockTextDefaults(t));
-    pushHistory({ ...design, blocks: [...design.blocks, block] });
+    commit({ ...design, blocks: [...design.blocks, block] });
     setSelectedId(block.id);
+    // On a phone the new block is filled in straight away: that is why it was added.
+    setPanel("edit");
   };
 
   const deleteBlock = (id: string) => {
-    pushHistory({ ...design, blocks: design.blocks.filter((b) => b.id !== id) });
+    commit({ ...design, blocks: design.blocks.filter((b) => b.id !== id) });
     setSelectedId(null);
   };
 
@@ -877,41 +980,68 @@ export function EmailBuilder({
     const clone = { ...design.blocks[idx], id: Math.random().toString(36).slice(2, 9) };
     const next = [...design.blocks];
     next.splice(idx + 1, 0, clone);
-    pushHistory({ ...design, blocks: next });
+    commit({ ...design, blocks: next });
     setSelectedId(clone.id);
   };
 
+  /** One place up or down: the move a finger makes without a drag, and a keyboard too. */
+  const moveBlock = (id: string, by: -1 | 1) => {
+    const idx = design.blocks.findIndex((b) => b.id === id);
+    const to = idx + by;
+    if (idx < 0 || to < 0 || to >= design.blocks.length) return;
+    const blocks = [...design.blocks];
+    const [moved] = blocks.splice(idx, 1);
+    blocks.splice(to, 0, moved);
+    commit({ ...design, blocks });
+  };
+
   const onDragEnd = (result: DropResult) => {
-    if (!result.destination) return;
+    if (!result.destination || result.destination.index === result.source.index) return;
     const blocks = [...design.blocks];
     const [moved] = blocks.splice(result.source.index, 1);
     blocks.splice(result.destination.index, 0, moved);
-    pushHistory({ ...design, blocks });
+    commit({ ...design, blocks });
   };
-
-  // Live preview update
-  useEffect(() => {
-    if (preview && iframeRef.current) {
-      const html = compileToHtml(design, subject);
-      const doc = iframeRef.current.contentDocument;
-      if (doc) {
-        doc.open();
-        doc.write(html);
-        doc.close();
-      }
-    }
-  }, [preview, design, subject]);
 
   const html = compileToHtml(design, subject);
   const sizeInfo = estimateHtmlSize(html);
 
+  // Live preview. ⚠️ Sized to the email, not to a fixed 600px: a long email was cut off
+  // at the bottom of the frame, and a short one sat in a tall empty box.
+  useEffect(() => {
+    const frame = iframeRef.current;
+    if (!preview || !frame) return;
+    const doc = frame.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const fit = () => {
+      // The body's height, not the document's: the document is at least as tall as
+      // the frame, so measuring it could only ever grow the frame, never shrink it.
+      frame.style.height = `${Math.max(200, doc.body?.scrollHeight ?? 0)}px`;
+    };
+    fit();
+    // Images arrive after the write and change the height again.
+    for (const img of Array.from(doc.images)) img.addEventListener("load", fit, { once: true });
+  }, [preview, html]);
+
+  const leave = () => router.push("/dashboard/marketing/templates");
+
   const handleSave = async () => {
-    if (!name.trim()) {
-      toast.error(t("nameRequired"));
-      return;
-    }
-    if (!subject.trim()) {
-      toast.error(t("subjectRequired"));
+    // A missing name or subject is shown where it is typed. On a phone that field is
+    // in the details panel, so that is where the save goes.
+    if (!name.trim() || !subject.trim()) {
+      toast.error(name.trim() ? t("subjectRequired") : t("nameRequired"));
+      setPanel("settings");
+      setSelectedId("settings");
+      const field = name.trim() ? "subject" : "name";
+      requestAnimationFrame(() => {
+        const { bar, panel } = fieldRefs.current;
+        // Whichever is laid out: a field inside a hidden panel has no offsetParent.
+        const target = [bar[field], panel[field]].find((el) => el && el.offsetParent !== null);
+        target?.focus();
+      });
       return;
     }
     setSaving(true);
@@ -932,7 +1062,9 @@ export function EmailBuilder({
         await createEmailTemplate(payload);
         toast.success(tm("templates.createSuccess"));
       }
-      router.push("/dashboard/marketing/templates");
+      // Saved: nothing is lost by leaving now, so leaving does not ask.
+      setSavedState(current);
+      leave();
     } catch {
       toast.error(t("saveFailed"));
     } finally {
@@ -942,60 +1074,317 @@ export function EmailBuilder({
 
   const selectedBlock = design.blocks.find((b) => b.id === selectedId);
 
+  const detailsFields = (layout: "bar" | "panel") => (
+    <>
+      <Input
+        ref={(el) => {
+          fieldRefs.current[layout].name = el;
+        }}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={t("namePlaceholder")}
+        aria-label={t("namePlaceholder")}
+        className={cn("min-w-0 font-medium", layout === "bar" ? "h-8 max-w-48 text-sm" : "h-11")}
+      />
+      <Input
+        ref={(el) => {
+          fieldRefs.current[layout].subject = el;
+        }}
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        placeholder={t("subjectPlaceholder")}
+        aria-label={t("subjectPlaceholder")}
+        className={cn("min-w-0", layout === "bar" ? "h-8 max-w-72 text-sm" : "h-11")}
+      />
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        aria-label={t("category")}
+        className={cn(
+          "shrink-0 rounded-md border border-input bg-background px-2",
+          layout === "bar" ? "h-8 text-xs" : "h-11 w-full text-base",
+        )}
+      >
+        {["general", "welcome", "followup", "promotional", "transactional"].map((c) => (
+          <option key={c} value={c}>
+            {tm(`templateCategories.${c}`)}
+          </option>
+        ))}
+      </select>
+    </>
+  );
+
+  const palette = (
+    <div className="p-3">
+      <p className="mb-2 font-semibold text-[10px] text-muted-foreground uppercase tracking-wide">{t("addBlock")}</p>
+      <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-1">
+        {PALETTE.map((item) => (
+          <button
+            type="button"
+            key={item.type}
+            onClick={() => addBlock(item.type)}
+            className="group flex w-full items-center gap-2.5 rounded-md p-2 text-left transition-colors hover:bg-primary/10 hover:text-primary max-lg:min-h-12"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded border bg-background group-hover:border-primary/30">
+              {item.icon}
+            </span>
+            <div className="min-w-0">
+              <p className="font-medium text-xs leading-tight max-lg:text-sm">{t(`blocks.${item.type}.label`)}</p>
+              <p className="mt-0.5 text-[10px] text-muted-foreground leading-snug max-lg:text-xs">
+                {t(`blocks.${item.type}.desc`)}
+              </p>
+            </div>
+          </button>
+        ))}
+      </div>
+
+      <Separator className="my-3 max-lg:hidden" />
+      <p className="mb-2 font-semibold text-[10px] text-muted-foreground uppercase tracking-wide max-lg:hidden">
+        {t("design")}
+      </p>
+      <button
+        type="button"
+        onClick={() => setSelectedId("settings")}
+        className={cn(
+          "flex w-full items-center gap-2 rounded-md p-2 text-left font-medium text-xs transition-colors max-lg:hidden",
+          selectedId === "settings" ? "bg-primary text-primary-foreground" : "hover:bg-muted",
+        )}
+      >
+        <LayoutTemplate className="h-4 w-4 shrink-0" />
+        {t("globalSettings")}
+      </button>
+    </div>
+  );
+
+  const canvas = preview ? (
+    <div className="flex flex-1 flex-col items-center overflow-y-auto bg-muted/40 p-3 lg:p-6">
+      <p className="mb-4 text-muted-foreground text-xs">
+        {preview === "mobile" ? t("mobilePreview") : t("desktopPreview")}
+      </p>
+      {/* No wider than the screen it is on: a 600px frame on a 375px phone was cut off. */}
+      <div
+        className="max-w-full overflow-hidden rounded bg-white shadow-xl"
+        style={{ width: preview === "mobile" ? 375 : 600 }}
+      >
+        <iframe
+          ref={iframeRef}
+          style={{ width: "100%", height: 600, border: "none", display: "block" }}
+          title={t("emailPreview")}
+          sandbox="allow-same-origin"
+        />
+      </div>
+    </div>
+  ) : (
+    <div className="flex-1 overflow-y-auto bg-muted/40 p-3 lg:p-6">
+      {fromHtml && (
+        <p className="mx-auto mb-3 max-w-[640px] rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 text-xs dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100">
+          {t("fromHtmlNotice")}
+        </p>
+      )}
+      <div
+        className="mx-auto shadow-xl"
+        style={{ maxWidth: design.settings.contentWidth, backgroundColor: design.settings.backgroundColor }}
+      >
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="blocks">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps}>
+                {design.blocks.length === 0 && (
+                  <div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground text-sm">
+                    <Plus className="h-8 w-8 opacity-30" />
+                    {t("emptyCanvas")}
+                  </div>
+                )}
+                {design.blocks.map((block, index) => {
+                  const selected = selectedId === block.id;
+                  const control =
+                    "flex size-9 items-center justify-center rounded border bg-background hover:bg-muted disabled:opacity-40 lg:size-6";
+                  return (
+                    <Draggable key={block.id} draggableId={block.id} index={index}>
+                      {(drag, snapshot) => (
+                        // biome-ignore lint/a11y/useSemanticElements: a <button> may neither contain the buttons this block already has nor carry the drag props
+                        <div
+                          ref={drag.innerRef}
+                          {...drag.draggableProps}
+                          className={cn(
+                            "group relative cursor-pointer border-2 transition-colors",
+                            selected ? "border-primary" : "border-transparent hover:border-primary/30",
+                            snapshot.isDragging && "opacity-80 shadow-2xl",
+                          )}
+                          // Selecting a block is the canvas's primary action and it
+                          // was mouse-only. It cannot become a <button> — it carries
+                          // the drag props and contains its own controls — so it gets
+                          // the role, the focus and the keys a button would have.
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={selected}
+                          aria-label={t(`blocks.${block.type}.label`)}
+                          onClick={() => setSelectedId(block.id)}
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter" && event.key !== " ") return;
+                            event.preventDefault();
+                            setSelectedId(block.id);
+                          }}
+                        >
+                          <BlockPreview block={block} />
+
+                          {/* The block's controls. On a desktop they float over its corner,
+                              revealed by hover. Below lg only the selected block has them,
+                              in a row of their own under it: shown on every block (a
+                              touchscreen has no hover, and globals.css reveals hover
+                              controls there) they covered the email being written. */}
+                          <div
+                            className={cn(
+                              "flex items-center gap-0.5 p-1 transition-opacity",
+                              "lg:absolute lg:top-0 lg:right-0",
+                              "max-lg:justify-end max-lg:gap-1 max-lg:border-primary/20 max-lg:border-t max-lg:bg-primary/5",
+                              selected ? "lg:opacity-100" : "max-lg:hidden lg:opacity-0 lg:group-hover:opacity-100",
+                            )}
+                          >
+                            {/* biome-ignore lint/a11y/noStaticElementInteractions: dragHandleProps supplies the role and the tabIndex; these handlers only stop propagation */}
+                            <div
+                              {...drag.dragHandleProps}
+                              className="flex size-9 cursor-grab items-center justify-center rounded bg-primary text-primary-foreground active:cursor-grabbing max-lg:hidden lg:size-6"
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            >
+                              <GripVertical className="h-3.5 w-3.5" />
+                            </div>
+                            <button
+                              type="button"
+                              className={control}
+                              disabled={index === 0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveBlock(block.id, -1);
+                              }}
+                              title={t("moveUp")}
+                              aria-label={t("moveUp")}
+                            >
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              className={control}
+                              disabled={index === design.blocks.length - 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveBlock(block.id, 1);
+                              }}
+                              title={t("moveDown")}
+                              aria-label={t("moveDown")}
+                            >
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(control, "lg:hidden")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedId(block.id);
+                                setPanel("edit");
+                              }}
+                              title={t("editBlock")}
+                              aria-label={t("editBlock")}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              className={control}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                duplicateBlock(block.id);
+                              }}
+                              title={t("duplicate")}
+                              aria-label={t("duplicate")}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(control, "hover:bg-destructive hover:text-destructive-foreground")}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteBlock(block.id);
+                              }}
+                              title={tc("delete")}
+                              aria-label={tc("delete")}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+
+                          {selected && (
+                            <div className="absolute top-0 left-0 bg-primary px-1.5 py-0.5 font-semibold text-[10px] text-primary-foreground leading-none">
+                              {t(`blocks.${block.type}.label`)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </Draggable>
+                  );
+                })}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      </div>
+    </div>
+  );
+
+  const inspector =
+    selectedId === "settings" ? (
+      <SettingsInspector settings={design.settings} onChange={updateSettings} />
+    ) : selectedBlock ? (
+      <BlockInspector block={selectedBlock} onChange={updateBlock} />
+    ) : (
+      <div className="mt-8 p-4 text-center text-muted-foreground text-sm">
+        <p>{t("inspector.empty")}</p>
+      </div>
+    );
+
+  const MOBILE_TABS: { key: MobilePanel; icon: React.ReactNode; label: string }[] = [
+    { key: "email", icon: <Mail className="size-5" />, label: t("tabs.email") },
+    { key: "add", icon: <Plus className="size-5" />, label: t("tabs.add") },
+    { key: "edit", icon: <Pencil className="size-5" />, label: t("tabs.edit") },
+    { key: "settings", icon: <Settings2 className="size-5" />, label: t("tabs.settings") },
+  ];
+
   return (
-    <div className="h-dvh flex flex-col bg-background overflow-hidden">
+    // `data-fullscreen-editor`: the chat bubble steps aside (chat-widget.tsx), since it
+    // would sit on the inspector and, on a phone, on this editor's own tab bar.
+    <div data-fullscreen-editor="" className="flex h-dvh flex-col overflow-hidden bg-background">
       {/* ── Top bar ── */}
-      {/* ⚠️ On a phone the back button, three fields and five controls came to
-          some 330px of fixed width in a 343px row. Below sm the fields take a
-          line of their own under the controls, and the preview buttons keep
-          only their icons. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 border-b bg-card shrink-0 sm:flex-nowrap sm:px-4">
+      {/* ⚠️ Below lg the fields leave the bar: three inputs beside five controls were
+          ~50px each on a phone ("Nome mode…"). They live in the details panel there,
+          and the bar keeps the name as a title, undo, preview and save. */}
+      <div className="flex shrink-0 items-center gap-2 border-b bg-card px-2 py-2 sm:px-4 lg:gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 sm:size-8"
-          onClick={() => router.push("/dashboard/marketing/templates")}
+          className="size-9 shrink-0 lg:size-8"
+          onClick={() => (dirty ? setLeaving(true) : leave())}
           aria-label={tc("back")}
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div className="order-last flex min-w-0 basis-full items-center gap-2 sm:order-none sm:flex-1 sm:basis-auto sm:gap-3">
-          <Input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder={t("namePlaceholder")}
-            className="h-8 min-w-0 text-sm max-w-48 font-medium"
-          />
-          <Input
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            placeholder={t("subjectPlaceholder")}
-            className="h-8 min-w-0 text-sm max-w-72"
-          />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="h-8 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
-          >
-            {["general", "welcome", "followup", "promotional", "transactional"].map((c) => (
-              <option key={c} value={c} className="capitalize">
-                {tm(`templateCategories.${c}`)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <p className="min-w-0 flex-1 truncate font-semibold text-sm lg:hidden">{name.trim() || t("untitled")}</p>
+        <div className="flex min-w-0 flex-1 items-center gap-3 max-lg:hidden">{detailsFields("bar")}</div>
 
-        <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          {/* Size indicator */}
-          <Badge variant={sizeInfo.warning ? "destructive" : "secondary"} className="text-[10px] font-mono">
+        <div className="flex shrink-0 items-center gap-1 lg:gap-1.5">
+          <Badge
+            variant={sizeInfo.warning ? "destructive" : "secondary"}
+            className="font-mono text-[10px] max-sm:hidden"
+            title={t("sizeHint")}
+          >
             {sizeInfo.kb} KB
           </Badge>
-
-          {/* Undo */}
           <Button
             variant="ghost"
             size="icon"
-            className="size-9 sm:size-8"
+            className="size-9 lg:size-8"
             onClick={undo}
             disabled={history.length === 0}
             title={t("undo")}
@@ -1003,32 +1392,46 @@ export function EmailBuilder({
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
-
-          {/* Preview */}
+          {/* On a phone one preview, the phone's: a 600px desktop frame is not
+              something a 375px screen can show. */}
+          <Button
+            variant={preview ? "default" : "outline"}
+            size="icon"
+            className="size-9 lg:hidden"
+            onClick={() => {
+              setPreview(preview ? null : "mobile");
+              setPanel("email");
+            }}
+            aria-label={t("preview")}
+            aria-pressed={preview !== null}
+            title={t("preview")}
+          >
+            {preview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
           <Button
             variant={preview === "desktop" ? "default" : "outline"}
             size="sm"
-            className="h-8 gap-1 text-xs"
+            className="h-8 gap-1 text-xs max-lg:hidden"
             onClick={() => setPreview(preview === "desktop" ? null : "desktop")}
             aria-label={t("desktop")}
             aria-pressed={preview === "desktop"}
           >
             <Monitor className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t("desktop")}</span>
+            {t("desktop")}
           </Button>
           <Button
             variant={preview === "mobile" ? "default" : "outline"}
             size="sm"
-            className="h-8 gap-1 text-xs"
+            className="h-8 gap-1 text-xs max-lg:hidden"
             onClick={() => setPreview(preview === "mobile" ? null : "mobile")}
             aria-label={t("mobile")}
             aria-pressed={preview === "mobile"}
           >
             <Smartphone className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{t("mobile")}</span>
+            {t("mobile")}
           </Button>
 
-          <Button size="sm" className="h-8 gap-1 text-xs" onClick={handleSave} disabled={saving}>
+          <Button size="sm" className="h-9 gap-1 text-xs lg:h-8" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             {tc("save")}
           </Button>
@@ -1036,188 +1439,102 @@ export function EmailBuilder({
       </div>
 
       {/* ── Main area ── */}
-      {/* ⚠️ Three columns of 208, flexible and 256 pixels is a layout for a
-          desktop. Below lg they stack and the page scrolls — canvas first,
-          because that is what is being looked at, then the palette and the
-          inspector under it. Not delightful on a phone, but usable, which is
-          more than three columns sharing 343px manage. */}
-      <div className="flex flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
-        {/* ── Left: Block palette ── */}
-        <div className="order-2 w-full shrink-0 overflow-y-auto border-t bg-muted/30 lg:order-none lg:w-52 lg:border-t-0 lg:border-r">
-          <div className="p-3">
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">
-              {t("addBlock")}
-            </p>
-            <div className="space-y-1">
-              {PALETTE.map((item) => (
-                <button
-                  type="button"
-                  key={item.type}
-                  onClick={() => addBlock(item.type)}
-                  className="w-full flex items-center gap-2.5 p-2 rounded-md text-left hover:bg-primary/10 hover:text-primary transition-colors group"
-                >
-                  <span className="h-7 w-7 rounded flex items-center justify-center bg-background border group-hover:border-primary/30 shrink-0">
-                    {item.icon}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium leading-none">{t(`blocks.${item.type}.label`)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">
-                      {t(`blocks.${item.type}.desc`)}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <Separator className="my-3" />
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">
-              {t("design")}
-            </p>
-            <button
-              type="button"
-              onClick={() => setSelectedId("settings")}
-              className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs font-medium transition-colors ${selectedId === "settings" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
-            >
-              <LayoutTemplate className="h-4 w-4 shrink-0" />
-              {t("globalSettings")}
-            </button>
-          </div>
+      {/* ⚠️ lg and up: palette, canvas and inspector side by side. Below lg one of
+          four panels at a time behind a tab bar — the email, add a block, edit the
+          selected one, the details — instead of the three stacked in one scroll, where
+          the canvas collapsed to a strip under the palette. Every field is controlled,
+          so the phone's copy of the inspector and the desktop's share one state. */}
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <div
+          className={cn(
+            "shrink-0 overflow-y-auto bg-muted/30 lg:w-52 lg:border-r",
+            panel === "add" ? "max-lg:flex-1" : "max-lg:hidden",
+          )}
+        >
+          {palette}
         </div>
 
-        {/* ── Center: Canvas or Preview ── */}
-        {preview ? (
-          <div className="order-1 flex flex-1 flex-col items-center overflow-y-auto bg-muted/40 p-4 lg:order-none lg:p-6">
-            <p className="text-xs text-muted-foreground mb-4">
-              {preview === "mobile" ? t("mobilePreview") : t("desktopPreview")}
-            </p>
-            <div
-              className="shadow-xl rounded overflow-hidden bg-white"
-              style={{ width: preview === "mobile" ? 375 : 600 }}
-            >
-              <iframe
-                ref={iframeRef}
-                style={{ width: "100%", height: 600, border: "none", display: "block" }}
-                title={t("emailPreview")}
-                sandbox="allow-same-origin"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex-1 bg-muted/40 overflow-y-auto p-6">
-            <div
-              className="mx-auto shadow-xl"
-              style={{ maxWidth: design.settings.contentWidth, backgroundColor: design.settings.backgroundColor }}
-            >
-              <DragDropContext onDragEnd={onDragEnd}>
-                <Droppable droppableId="blocks">
-                  {(provided) => (
-                    <div ref={provided.innerRef} {...provided.droppableProps}>
-                      {design.blocks.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-sm gap-2">
-                          <Plus className="h-8 w-8 opacity-30" />
-                          {t("emptyCanvas")}
-                        </div>
-                      )}
-                      {design.blocks.map((block, index) => (
-                        <Draggable key={block.id} draggableId={block.id} index={index}>
-                          {(drag, snapshot) => (
-                            // biome-ignore lint/a11y/useSemanticElements: a <button> may neither contain the buttons this block already has nor carry the drag props
-                            <div
-                              ref={drag.innerRef}
-                              {...drag.draggableProps}
-                              className={`relative group cursor-pointer border-2 transition-colors ${
-                                selectedId === block.id
-                                  ? "border-primary"
-                                  : "border-transparent hover:border-primary/30"
-                              } ${snapshot.isDragging ? "opacity-80 shadow-2xl" : ""}`}
-                              // Selecting a block is the canvas's primary action and it
-                              // was mouse-only. It cannot become a <button> — it carries
-                              // the drag props and contains its own controls — so it gets
-                              // the role, the focus and the keys a button would have.
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => setSelectedId(block.id)}
-                              onKeyDown={(event) => {
-                                if (event.key !== "Enter" && event.key !== " ") return;
-                                event.preventDefault();
-                                setSelectedId(block.id);
-                              }}
-                            >
-                              {/* Block preview */}
-                              <BlockPreview block={block} />
+        <div className={cn("flex min-h-0 flex-1 flex-col", panel !== "email" && "max-lg:hidden")}>{canvas}</div>
 
-                              {/* Controls overlay */}
-                              <div
-                                className={`absolute top-0 right-0 flex items-center gap-0.5 p-1 transition-opacity ${selectedId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                              >
-                                {/* biome-ignore lint/a11y/noStaticElementInteractions: dragHandleProps supplies the role and the tabIndex; these handlers only stop propagation */}
-                                <div
-                                  {...drag.dragHandleProps}
-                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-primary text-primary-foreground cursor-grab active:cursor-grabbing"
-                                  // The handle only stops the click reaching the block
-                                  // behind it; the library supplies its own role, focus
-                                  // and drag keys through dragHandleProps.
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                >
-                                  <GripVertical className="h-3.5 w-3.5" />
-                                </div>
-                                <button
-                                  type="button"
-                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-background border hover:bg-muted"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    duplicateBlock(block.id);
-                                  }}
-                                  title={t("duplicate")}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </button>
-                                <button
-                                  type="button"
-                                  className="size-9 sm:size-6 flex items-center justify-center rounded bg-background border hover:bg-destructive hover:text-destructive-foreground"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteBlock(block.id);
-                                  }}
-                                  title={tc("delete")}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-
-                              {/* Type label */}
-                              {selectedId === block.id && (
-                                <div className="absolute top-0 left-0 bg-primary text-primary-foreground text-[10px] font-semibold px-1.5 py-0.5 leading-none">
-                                  {t(`blocks.${block.type}.label`)}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              </DragDropContext>
-            </div>
-          </div>
-        )}
-
-        {/* ── Right: Inspector ── */}
-        <div className="order-3 w-full shrink-0 overflow-y-auto border-t bg-card lg:order-none lg:w-64 lg:border-t-0 lg:border-l">
-          {selectedId === "settings" ? (
-            <SettingsInspector settings={design.settings} onChange={(s) => setDesign((d) => ({ ...d, settings: s }))} />
-          ) : selectedBlock ? (
-            <BlockInspector block={selectedBlock} onChange={updateBlock} />
-          ) : (
-            <div className="p-4 text-sm text-muted-foreground text-center mt-8">
-              <p>{t("inspector.empty")}</p>
-            </div>
+        <div
+          className={cn(
+            "shrink-0 overflow-y-auto bg-card lg:w-64 lg:border-l",
+            panel === "edit" || panel === "settings" ? "max-lg:flex-1" : "max-lg:hidden",
           )}
+        >
+          {/* A desktop's inspector: the selected block, or the global settings. */}
+          <div className="max-lg:hidden">{inspector}</div>
+
+          {/* A phone's two panels here. The details come first in theirs: a template
+              cannot be saved without a name and a subject. "Edit" is always a block;
+              the global settings have their own tab. */}
+          <div className="lg:hidden">
+            {panel === "settings" && (
+              <>
+                <div className="space-y-3 border-b p-4">
+                  <p className="border-b pb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+                    {t("templateDetails")}
+                  </p>
+                  {detailsFields("panel")}
+                  <p className="text-muted-foreground text-xs">
+                    {t("sizeLabel", { kb: sizeInfo.kb })}
+                    {sizeInfo.warning && ` · ${t("sizeHint")}`}
+                  </p>
+                </div>
+                <SettingsInspector settings={design.settings} onChange={updateSettings} />
+              </>
+            )}
+            {panel === "edit" &&
+              (selectedBlock ? (
+                <BlockInspector block={selectedBlock} onChange={updateBlock} />
+              ) : (
+                <div className="mt-8 p-4 text-center text-muted-foreground text-sm">
+                  <p>{t("inspector.emptyMobile")}</p>
+                  <Button variant="outline" className="mt-4 h-11" onClick={() => setPanel("email")}>
+                    {t("tabs.email")}
+                  </Button>
+                </div>
+              ))}
+          </div>
         </div>
       </div>
+
+      {/* ── Phone and tablet: the four panels ── */}
+      <nav aria-label={t("tabs.label")} className="grid shrink-0 grid-cols-4 border-t bg-card lg:hidden">
+        {MOBILE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            aria-current={panel === tab.key ? "page" : undefined}
+            onClick={() => {
+              setPanel(tab.key);
+              if (tab.key === "settings") setSelectedId("settings");
+            }}
+            className={cn(
+              "flex min-h-14 flex-col items-center justify-center gap-0.5 font-medium text-[11px] transition-colors",
+              panel === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <AlertDialog open={leaving} onOpenChange={setLeaving}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("leaveTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("leaveBody")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("stay")}</AlertDialogCancel>
+            <AlertDialogAction onClick={leave} className="bg-destructive text-white hover:bg-destructive/90">
+              {t("leaveConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

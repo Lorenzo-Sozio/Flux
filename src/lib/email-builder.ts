@@ -100,6 +100,11 @@ export interface FooterProps {
   textColor: string;
   fontSize: number;
   showUnsubscribe: boolean;
+  /**
+   * The words of the unsubscribe link, in the language the email is written in.
+   * Absent from designs saved before it existed, which read "Unsubscribe".
+   */
+  unsubscribeLabel?: string;
 }
 
 export interface HtmlProps {
@@ -160,6 +165,7 @@ export interface BlockTextDefaults {
   leftColumnHtml: string;
   rightColumnHtml: string;
   footerHtml: string;
+  unsubscribeLabel: string;
 }
 
 export const DEFAULT_BLOCK_TEXT: BlockTextDefaults = {
@@ -169,6 +175,7 @@ export const DEFAULT_BLOCK_TEXT: BlockTextDefaults = {
   leftColumnHtml: "<p style='margin:0;'>Left column content</p>",
   rightColumnHtml: "<p style='margin:0;'>Right column content</p>",
   footerHtml: "<p>© 2025 Company Name. All rights reserved.</p>",
+  unsubscribeLabel: "Unsubscribe",
 };
 
 /** What `blockTextDefaults` needs from a next-intl translator scoped to marketing.emailBuilder. */
@@ -193,6 +200,7 @@ export function blockTextDefaults(t: BlockTextTranslator, year = new Date().getF
     leftColumnHtml: tight(t("defaults.leftColumn")),
     rightColumnHtml: tight(t("defaults.rightColumn")),
     footerHtml: p(t("defaults.footer", { year })),
+    unsubscribeLabel: t("defaults.unsubscribe"),
   };
 }
 
@@ -272,6 +280,7 @@ export function defaultProps(type: BlockType, text: BlockTextDefaults = DEFAULT_
         textColor: "#9ca3af",
         fontSize: 12,
         showUnsubscribe: true,
+        unsubscribeLabel: text.unsubscribeLabel,
       } as FooterProps;
     case "html":
       return {
@@ -286,6 +295,73 @@ export function newBlock(type: BlockType, text?: BlockTextDefaults): Block {
     id: Math.random().toString(36).slice(2, 9),
     type,
     props: defaultProps(type, text),
+  };
+}
+
+/** The unsubscribe link's words, for designs saved before they could be chosen. */
+export function unsubscribeLabel(p: FooterProps): string {
+  return p.unsubscribeLabel?.trim() || DEFAULT_BLOCK_TEXT.unsubscribeLabel;
+}
+
+const BLOCK_TYPES: readonly BlockType[] = [
+  "heading",
+  "text",
+  "image",
+  "button",
+  "divider",
+  "spacer",
+  "two_column",
+  "footer",
+  "html",
+];
+
+/**
+ * A saved design, if the JSON is one; null otherwise. What the database holds was
+ * written by this code, but a template can be older than a field or edited elsewhere,
+ * and a design that does not parse must open as its HTML, never as an empty email.
+ */
+export function parseDesign(json: string | null | undefined): EmailDesign | null {
+  if (!json) return null;
+  try {
+    const raw = JSON.parse(json) as Partial<EmailDesign>;
+    if (!raw || !Array.isArray(raw.blocks) || typeof raw.settings !== "object" || raw.settings === null) return null;
+    const blocks = raw.blocks.filter(
+      (b): b is Block =>
+        !!b &&
+        typeof b.id === "string" &&
+        BLOCK_TYPES.includes(b.type) &&
+        typeof b.props === "object" &&
+        b.props !== null,
+    );
+    return { version: 1, settings: { ...DEFAULT_SETTINGS, ...raw.settings }, blocks };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A design for a template that has none: written as HTML, or saved before designs
+ * were kept. ⚠️ Its body becomes one HTML block, so the builder shows the email that
+ * is really sent and a save sends it again unchanged — opening it on the placeholder
+ * email would replace the real one the moment somebody pressed Save.
+ */
+export function designFromBody(body: string, isHtml: boolean): EmailDesign {
+  let html: string;
+  if (isHtml) {
+    // A whole document keeps only what is inside <body>: the builder wraps its blocks
+    // in a document of its own, and two nested documents are not an email.
+    const inner = /<body[^>]*>([\s\S]*)<\/body>/i.exec(body);
+    html = (inner ? inner[1] : body).trim();
+  } else {
+    html = body
+      .split(/\n{2,}/)
+      .map((para) => `<p>${esc(para).replace(/\n/g, "<br />")}</p>`)
+      .join("\n");
+  }
+  return {
+    version: 1,
+    settings: { ...DEFAULT_SETTINGS },
+    blocks: [{ id: Math.random().toString(36).slice(2, 9), type: "html", props: { html, backgroundColor: "#ffffff" } }],
   };
 }
 
@@ -409,7 +485,7 @@ function compileBlock(block: Block, fontFamily: string): string {
     case "footer": {
       const p = props as FooterProps;
       const unsub = p.showUnsubscribe
-        ? `<p style="margin:8px 0 0 0;"><a href="{{link_unsubscribe}}" style="color:${p.textColor};text-decoration:underline;">Unsubscribe</a></p>`
+        ? `<p style="margin:8px 0 0 0;"><a href="{{link_unsubscribe}}" style="color:${p.textColor};text-decoration:underline;">${esc(unsubscribeLabel(p))}</a></p>`
         : "";
       return `
 <tr>

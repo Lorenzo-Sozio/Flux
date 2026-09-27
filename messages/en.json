@@ -953,6 +953,10 @@
     "newAppointmentAt": "New appointment at {time}",
     "newAppointmentOn": "New appointment on this day",
     "list": "List",
+    "grid": "Grid",
+    "dayLayoutLabel": "How to show the day",
+    "free": "Free",
+    "nowAt": "Now · {time}",
     "listEmpty": "Nothing in the next {days} days.",
     "dragHint": "Drag an appointment to move it, or its lower edge to change its length. Click an empty slot to add one.",
     "newAllDayOn": "New all-day appointment on this day",
@@ -1490,7 +1494,7 @@
     "openTickets": "Open Tickets",
     "overdueLabel": "{count} Overdue",
     "overview": "Overview",
-    "pendingTasks": "Pending Tasks",
+    "pendingTasks": "Everyone's pending tasks",
     "pipelineValue": "Pipeline Value",
     "pipelineValueDesc": "Total value of open deals",
     "probPercent": "{prob}% prob.",
@@ -1573,14 +1577,16 @@
     },
     "viewLabel": "Whose numbers",
     "viewMe": "Me",
-    "viewTeam": "Team",
+    "viewCompany": "Company",
     "myWon": "Won this month",
     "myWonOf": "of a target of",
     "myWonNoTarget": "No target set for this month",
     "myBareDeals": "Deals with no next step",
     "myBareDealsDesc": "Open deals of yours with nothing planned",
     "myToday": "Today",
-    "myTodayDesc": "Tasks, calls and meetings on your agenda"
+    "myTodayDesc": "Tasks, calls and meetings on your agenda",
+    "myLeads": "Leads to work",
+    "myLeadsDesc": "Yours or unassigned, new or in contact"
   },
   "currency": {
     "switchCurrency": "Switch currency",
@@ -1805,7 +1811,9 @@
       },
       "enum": {
         "in": "Is one of",
-        "not_in": "Is not one of"
+        "not_in": "Is not one of",
+        "is_empty": "Is empty",
+        "is_not_empty": "Is not empty"
       },
       "boolean": {
         "is_true": "Is true",
@@ -2513,6 +2521,7 @@
         "rightBackground": "Right Background",
         "gap": "Gap (px)",
         "showUnsubscribe": "Show Unsubscribe",
+        "unsubscribeLabel": "Unsubscribe link text",
         "backgroundColor": "Background Color",
         "contentWidth": "Content Width (px)",
         "fontFamily": "Font Family",
@@ -2522,7 +2531,8 @@
         "properties": "{block} Properties",
         "insertVariable": "Insert Variable",
         "copyHint": "Click to copy, then paste in text fields above.",
-        "empty": "Select a block on the canvas to edit its properties."
+        "empty": "Select a block on the canvas to edit its properties.",
+        "emptyMobile": "No block selected. Tap a block in the email to edit it."
       },
       "copied": "Copied {variable}",
       "globalSettings": "Global Settings",
@@ -2545,13 +2555,35 @@
       "emailPreview": "Email preview",
       "emptyCanvas": "Click a block in the left panel to add it",
       "duplicate": "Duplicate",
+      "tabs": {
+        "label": "Editor sections",
+        "email": "Email",
+        "add": "Add",
+        "edit": "Edit",
+        "settings": "Details"
+      },
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "editBlock": "Edit the block",
+      "preview": "Preview",
+      "leaveTitle": "Leave without saving?",
+      "leaveBody": "The changes to this template have not been saved and will be lost.",
+      "leaveConfirm": "Leave without saving",
+      "stay": "Keep editing",
+      "fromHtmlNotice": "This template was written in HTML, so it opens as a single HTML block: the email stays exactly as it is sent. You can add blocks above or below it.",
+      "templateDetails": "Template details",
+      "untitled": "New template",
+      "category": "Category",
+      "sizeHint": "Above 80 KB Gmail clips the email and shows “Message clipped”.",
+      "sizeLabel": "Email size: {kb} KB",
       "defaults": {
         "heading": "Your Heading Here",
         "text": "Write your message here. Use <strong>bold</strong> or <em>italic</em> to highlight key points.",
         "button": "Click Here",
         "leftColumn": "Left column content",
         "rightColumn": "Right column content",
-        "footer": "© {year} Company Name. All rights reserved."
+        "footer": "© {year} Company Name. All rights reserved.",
+        "unsubscribe": "Unsubscribe"
       }
     }
   },

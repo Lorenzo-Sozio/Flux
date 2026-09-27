@@ -672,6 +672,14 @@ Three ways this failed silently, all of them fixed in [src/db/index.ts](src/db/i
   (a `WeakMap` on the execution context) on Workers, and to the connection string
   everywhere else.
 
+⚠️⚠️ **The pool's size is how many queries of a request run at once.** It was one, so every
+`Promise.all` on the dashboard queued on a single socket and the home page waited for about
+thirty round trips in a row (27 September 2026: ~1 s of a 1.1–1.5 s response, 150–450 ms of
+it CPU). It is 2 for the registry and 3 for a workspace — five of the **six** connections a
+Worker invocation may hold, sockets and `fetch()` together; the seventh waits until one
+closes, so an idle socket is closed after a second. Raise either and the sum must stay under
+six.
+
 ⚠️⚠️ **Every Hyperdrive binding carries a placeholder `localConnectionString`** in
 wrangler.jsonc. Wrangler refuses to start its local emulator for a binding with no local
 database, and `opennextjs-cloudflare deploy` — which a plain `wrangler deploy` re-dispatches
@@ -760,7 +768,11 @@ scrolling). On a phone the day view carries a sticky week strip (a dot per busy
 day; a tap picks the day), a sideways swipe walks days, weeks or months
 ([swipe-nav.tsx](src/app/(main)/dashboard/calendar/_components/swipe-nav.tsx) — never
 taken from a vertical scroll or from anything that scrolls sideways itself), and
-the week is read as a list day by day instead of seven 116px columns.
+the week is read as a list day by day instead of seven 116px columns. The day itself is a
+**list** on a phone — all-day first, then in order, free hours named, a "now" line today —
+and the hour grid from md up; "List | Grid" switches and is remembered per browser
+([calendar-day-layout.ts](src/lib/calendar-day-layout.ts)). ⚠️ The grid at 64px an hour is
+~960px whatever the day holds: two meetings were a screen and a half of scrolling.
 Actions in [src/actions/appointments.ts](src/actions/appointments.ts),
 migration `0029_the_reminder_rings_once` and `0030_again_and_all_day`.
 

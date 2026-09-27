@@ -77,88 +77,92 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
   // Empty set — user not found or group has no members
   if (filterIds !== null && filterIds.length === 0) return [];
 
-  // ── Tasks ────────────────────────────────────────────────────────────────────
-  const allTasks = await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      taskType: tasks.type,
-      dueDate: tasks.dueDate,
-      startDate: tasks.startDate,
-      allDay: tasks.allDay,
-      status: tasks.status,
-      priority: tasks.priority,
-      leadName: leads.firstName,
-      leadLastName: leads.lastName,
-      contactName: contacts.firstName,
-      contactLastName: contacts.lastName,
-      companyName: companies.name,
-      dealName: deals.name,
-      leadId: tasks.leadId,
-      contactId: tasks.contactId,
-      companyId: tasks.companyId,
-      dealId: tasks.dealId,
-    })
-    .from(tasks)
-    .leftJoin(leads, eq(tasks.leadId, leads.id))
-    .leftJoin(contacts, eq(tasks.contactId, contacts.id))
-    .leftJoin(companies, eq(tasks.companyId, companies.id))
-    .leftJoin(deals, eq(tasks.dealId, deals.id))
-    .where(
-      and(
-        isNotNull(tasks.dueDate),
-        range ? gte(tasks.dueDate, range.start) : undefined,
-        range ? lte(tasks.dueDate, range.end) : undefined,
-        filterIds
-          ? or(
-              inArray(tasks.ownerId, filterIds),
-              inArray(tasks.assigneeId, filterIds),
-              inArray(
-                tasks.id,
-                db
-                  .select({ taskId: taskAssignees.taskId })
-                  .from(taskAssignees)
-                  .where(inArray(taskAssignees.userId, filterIds)),
-              ),
-            )
-          : undefined,
+  // Tasks, activities and appointments are independent reads: started together, where they
+  // used to wait for one another.
+  const [allTasks, allActivities, formattedAppointments] = await Promise.all([
+    // ── Tasks ──────────────────────────────────────────────────────────────────
+    db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        taskType: tasks.type,
+        dueDate: tasks.dueDate,
+        startDate: tasks.startDate,
+        allDay: tasks.allDay,
+        status: tasks.status,
+        priority: tasks.priority,
+        leadName: leads.firstName,
+        leadLastName: leads.lastName,
+        contactName: contacts.firstName,
+        contactLastName: contacts.lastName,
+        companyName: companies.name,
+        dealName: deals.name,
+        leadId: tasks.leadId,
+        contactId: tasks.contactId,
+        companyId: tasks.companyId,
+        dealId: tasks.dealId,
+      })
+      .from(tasks)
+      .leftJoin(leads, eq(tasks.leadId, leads.id))
+      .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+      .leftJoin(companies, eq(tasks.companyId, companies.id))
+      .leftJoin(deals, eq(tasks.dealId, deals.id))
+      .where(
+        and(
+          isNotNull(tasks.dueDate),
+          range ? gte(tasks.dueDate, range.start) : undefined,
+          range ? lte(tasks.dueDate, range.end) : undefined,
+          filterIds
+            ? or(
+                inArray(tasks.ownerId, filterIds),
+                inArray(tasks.assigneeId, filterIds),
+                inArray(
+                  tasks.id,
+                  db
+                    .select({ taskId: taskAssignees.taskId })
+                    .from(taskAssignees)
+                    .where(inArray(taskAssignees.userId, filterIds)),
+                ),
+              )
+            : undefined,
+        ),
       ),
-    );
 
-  // ── Activities ────────────────────────────────────────────────────────────────
-  const allActivities = await db
-    .select({
-      id: activities.id,
-      title: activities.content,
-      date: activities.date,
-      type: activities.type,
-      leadName: leads.firstName,
-      leadLastName: leads.lastName,
-      contactName: contacts.firstName,
-      contactLastName: contacts.lastName,
-      companyName: companies.name,
-      dealName: deals.name,
-      leadId: activities.leadId,
-      contactId: activities.contactId,
-      companyId: activities.companyId,
-      dealId: activities.dealId,
-    })
-    .from(activities)
-    .leftJoin(leads, eq(activities.leadId, leads.id))
-    .leftJoin(contacts, eq(activities.contactId, contacts.id))
-    .leftJoin(companies, eq(activities.companyId, companies.id))
-    .leftJoin(deals, eq(activities.dealId, deals.id))
-    .where(
-      and(
-        or(eq(activities.type, "meeting"), eq(activities.type, "call")),
-        range ? gte(activities.date, range.start) : undefined,
-        range ? lte(activities.date, range.end) : undefined,
-        filterIds ? inArray(activities.ownerId, filterIds) : undefined,
+    // ── Activities ─────────────────────────────────────────────────────────────
+    db
+      .select({
+        id: activities.id,
+        title: activities.content,
+        date: activities.date,
+        type: activities.type,
+        leadName: leads.firstName,
+        leadLastName: leads.lastName,
+        contactName: contacts.firstName,
+        contactLastName: contacts.lastName,
+        companyName: companies.name,
+        dealName: deals.name,
+        leadId: activities.leadId,
+        contactId: activities.contactId,
+        companyId: activities.companyId,
+        dealId: activities.dealId,
+      })
+      .from(activities)
+      .leftJoin(leads, eq(activities.leadId, leads.id))
+      .leftJoin(contacts, eq(activities.contactId, contacts.id))
+      .leftJoin(companies, eq(activities.companyId, companies.id))
+      .leftJoin(deals, eq(activities.dealId, deals.id))
+      .where(
+        and(
+          or(eq(activities.type, "meeting"), eq(activities.type, "call")),
+          range ? gte(activities.date, range.start) : undefined,
+          range ? lte(activities.date, range.end) : undefined,
+          filterIds ? inArray(activities.ownerId, filterIds) : undefined,
+        ),
       ),
-    );
 
-  // ── Appointments ─────────────────────────────────────────────────────────────
-  const formattedAppointments = await getAppointmentCalendarEvents(filterIds, range);
+    // ── Appointments ───────────────────────────────────────────────────────────
+    getAppointmentCalendarEvents(filterIds, range),
+  ]);
 
   // ── Format ───────────────────────────────────────────────────────────────────
   const formattedTasks = allTasks
