@@ -857,6 +857,10 @@ export async function getAppointments(filterUserIds?: string[] | null, range?: {
       status: appointments.status,
       icalUid: appointments.icalUid,
       organizerId: appointments.organizerId,
+      // The colleagues invited, for the calendar's colour per person.
+      attendeeUserIds: sql<
+        string[]
+      >`coalesce((select array_agg(${appointmentAttendees.userId}) from ${appointmentAttendees} where ${appointmentAttendees.appointmentId} = ${appointments.id} and ${appointmentAttendees.userId} is not null), '{}')`,
       attendeeCount:
         sql<number>`(select count(*) from ${appointmentAttendees} where ${appointmentAttendees.appointmentId} = ${appointments.id} and ${appointmentAttendees.role} <> 'organizer')`.mapWith(
           Number,
@@ -1022,6 +1026,8 @@ export async function getAppointmentCalendarEvents(
         link: `/dashboard/calendar?appointment=${r.id}${o.occurrence ? `&occurrence=${encodeURIComponent(o.occurrence)}` : ""}`,
         location: r.location,
         conferenceLink: r.conferenceLink,
+        // Organiser first: when several people are shown, it wears the organiser's colour.
+        people: [r.organizerId, ...(r.attendeeUserIds ?? [])].filter((id): id is string => Boolean(id)),
       })),
     );
 }

@@ -1465,6 +1465,17 @@ export const notificationPreferences = pgTable("notification_preference", {
   digestSentOn: text("digest_sent_on"),
 });
 
+/**
+ * A person's own settings for the workspace (migration 0058): the dashboard the home
+ * opens on (src/lib/home-dashboards.ts). Per person, so the choice follows them from
+ * one device to another. The digest's language stays in notification_preference.
+ */
+export const userPreferences = pgTable("user_preference", {
+  userId: text("user_id").primaryKey(),
+  homeDashboard: text("home_dashboard"),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // --- CUSTOM FIELD DEFINITIONS ---
 export const customFieldDefinitions = pgTable("custom_field_definition", {
   id: text("id")

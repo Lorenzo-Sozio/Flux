@@ -810,6 +810,34 @@ appointment and the next occurrence of a series no longer match, and ring again 
 nothing to reset. `src/lib/appointment-reminders.test.ts` and
 `src/actions/appointments.test.ts` run both against PGlite.
 
+⚠️ **Whose calendar is one URL value**: `filter=all|mine|group|u:<id>,<id>`
+([src/lib/calendar-filter.ts](src/lib/calendar-filter.ts)), so every link the page builds
+carries it. The ids are only cleaned — each workspace has its own database and everybody
+sees all its records (D-D). With two people or more, each event's left edge takes the
+colour of the first chosen person involved in it (`people` on every event: owner and
+assignee, organiser and invited colleagues), and a key names them.
+
+### The home: one dashboard per kind of work
+
+`/dashboard/crm` opens on the dashboard the person chose at Profile → My dashboard
+(`user_preference.home_dashboard`, migration `0058_what_opens_first`), else the one for
+their role: sales, salesManager, admin, support, direction
+([src/lib/home-dashboards.ts](src/lib/home-dashboards.ts)). `?dashboard=` opens another for
+the visit; the old `?view=me|company` still maps to sales/direction.
+
+- ⚠️⚠️ **Each dashboard reads only its own figures.** The three newer ones return before
+  the personal and company reads ([src/lib/home-dashboard-data.ts](src/lib/home-dashboard-data.ts)).
+  Reading everything and showing a part is how the home cost thirty statements a visit.
+- ⚠️ Who may open which is decided in one place (`availableDashboards`), and a saved or
+  linked dashboard the person can no longer open falls back to the default. Administration
+  (money) needs `settings:manage` and the sales module.
+- Every figure links to the list it counts, and money from invoices stays in its currency.
+- ⚠️ The money dashboard opens with won this month, won ever, **collected** and **invoiced**
+  (`moneyHeadline`). Collected counts every recorded payment, including one on an order with
+  no invoice. Invoiced is the *taxable* amount of *issued* invoices, and a credit note
+  (TD04) subtracts. A draft is not revenue. `scripts/mutations/home-dashboards.json` breaks
+  each rule.
+
 ### Themes
 
 A theme is one CSS file in [src/styles/presets/](src/styles/presets/) (light and dark

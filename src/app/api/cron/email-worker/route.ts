@@ -19,6 +19,7 @@ import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
 import { claimDueJobs } from "@/lib/email-queue";
 import { type SyncBudget, syncBudget, syncMailboxes } from "@/lib/mail-sync";
+import { readLocale } from "@/lib/morning-digest";
 import { composeNotification } from "@/lib/notification-text";
 import { notify } from "@/lib/notify";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
@@ -26,6 +27,7 @@ import { advanceSequences, SEQUENCE_TOKEN_PREFIX } from "@/lib/sequence-runner";
 import type { TenantDb } from "@/lib/tenant-resolve";
 import { unsubscribeUrlFor } from "@/lib/unsubscribe-token";
 import { membersWith } from "@/lib/workspace-members";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 const BATCH_SIZE = Number.parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30", 10);
 
@@ -223,8 +225,10 @@ async function dispatchActivityReminders(db: TenantDb): Promise<number> {
 
     if (user.email) {
       // One recipient whose mail bounces must not stop the sweep for everyone else.
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
-      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
+      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link, {
+        locale: await readLocale(db, activity.ownerId).catch(() => null),
+        timeZone: await getWorkspaceTimeZone(),
+      }).catch(() => undefined);
     }
 
     remindersDispatched++;

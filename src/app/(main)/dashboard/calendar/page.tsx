@@ -41,7 +41,8 @@ import {
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { getAppointmentStart } from "@/actions/appointments";
-import { type CalendarFilter, getCalendarEvents, getExternalCalendar } from "@/actions/calendar";
+import { getCalendarEvents, getExternalCalendar } from "@/actions/calendar";
+import { getPipelineMembers } from "@/actions/pipeline-members";
 import { auth } from "@/auth";
 import { CalendarOverdueSection } from "@/components/crm/calendar-overdue-section";
 import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
@@ -49,6 +50,7 @@ import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
 import { WeekCurrentTimeLine } from "@/components/crm/week-current-time-line";
 import { Button } from "@/components/ui/button";
 import { DAY_LAYOUT_COOKIE, type DayLayout, resolveDayLayout } from "@/lib/calendar-day-layout";
+import { PERSON_STYLES, parseCalendarFilter, peopleOf, personIndexFor } from "@/lib/calendar-filter";
 import { can } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { toWallValue, wallDiffMinutes } from "@/lib/wall-clock";
@@ -58,7 +60,7 @@ import { AppointmentDetailSheet } from "./_components/appointment-detail-sheet";
 import { AppointmentDialog } from "./_components/appointment-dialog";
 import { AppointmentLink } from "./_components/appointment-link";
 import { DayMovablePill, type DragInfo, TimedEventBlock } from "./_components/calendar-drag";
-import { CalendarFilterMenu } from "./_components/calendar-filter-menu";
+import { CalendarPeopleFilter, CalendarPeopleLegend } from "./_components/calendar-people-filter";
 import { CalendarSlotLayer, NewOnDayButton } from "./_components/calendar-slot-layer";
 import { DayLayoutToggle } from "./_components/day-layout-toggle";
 import { GridAutoScroll } from "./_components/grid-auto-scroll";
@@ -288,7 +290,9 @@ export default async function CalendarPage({
    * second query. Ask for a view explicitly and you get it at every width.
    */
   const weekIsADefault = !viewParam && currentView === "week";
-  const currentFilter = (["all", "mine", "group"].includes(filterParam ?? "") ? filterParam : "all") as CalendarFilter;
+  // all · mine · group · u:<ids> — whose calendar (src/lib/calendar-filter.ts).
+  const currentFilter = parseCalendarFilter(filterParam);
+  const chosenPeople = peopleOf(currentFilter);
   // Everything below reads days and hours on the workspace's wall clock.
   const today = wallClock(new Date(), timeZone);
   // A link to an appointment without a date (search, a notification) opens the
@@ -340,7 +344,7 @@ export default async function CalendarPage({
   const rangeStart = subDays(fetchStart, 1);
   const rangeEnd = addDays(fetchEnd, 1);
 
-  const [crmEvents, external, tFeed, tApt] = await Promise.all([
+  const [crmEvents, external, tFeed, tApt, members] = await Promise.all([
     getCalendarEvents(currentFilter, { start: rangeStart, end: rangeEnd }),
     // Never blocks and never throws: a calendar that cannot be reached is shown
     // as empty **and said to be**, because a screen that looks free while
@@ -348,7 +352,11 @@ export default async function CalendarPage({
     getExternalCalendar({ from: rangeStart, to: rangeEnd }).catch(() => null),
     getTranslations("calendarFeed"),
     getTranslations("appointment"),
+    // The colleagues the people filter offers. A filter that cannot load them still
+    // offers everybody, me and my group; it does not take the calendar down.
+    getPipelineMembers().catch(() => []),
   ]);
+  const people = members.map((m) => ({ id: m.id, name: m.name, email: m.email, former: m.former }));
 
   const externalEvents: ExternalPill[] = (external?.events ?? []).map((e) => ({
     id: `external:${e.uid}:${e.start.getTime()}`,
@@ -413,12 +421,23 @@ export default async function CalendarPage({
   };
 
   const muted = (ev: CalendarEvent) => isAppointment(ev) && ev.status === "completed";
+
+  /**
+   * The colour of the person an event belongs to, when two people or more are on
+   * screen: its left edge, where the type's colour was. The fill keeps the type.
+   */
+  const accent = (ev: CalendarEvent) => {
+    const index = personIndexFor("people" in ev ? ev.people : [], chosenPeople);
+    return index === null ? null : PERSON_STYLES[index];
+  };
+  const pillOf = (ev: CalendarEvent) => cn(getTypeStyle(ev.type).pill, accent(ev)?.border);
   const recurringEvent = (ev: CalendarEvent) => isAppointment(ev) && ev.recurring;
 
   /** A pill for month cells, the all-day strip and the list: the right kind for each type. */
   const renderPill = (ev: CalendarEvent, day: Date, compact = false) => {
     const ts = getTypeStyle(ev.type);
-    if (ev.type === "task") return <CalendarTaskPill key={ev.id} event={ev} compact={compact} />;
+    if (ev.type === "task")
+      return <CalendarTaskPill key={ev.id} event={ev} compact={compact} accentClass={accent(ev)?.border} />;
     const timeLabel = ev.allDayEvent || !isSameDay(ev.at, day) || compact ? null : format(ev.at, "HH:mm");
     if (ev.type === "external") {
       const Icon = ts.icon;
@@ -440,7 +459,7 @@ export default async function CalendarPage({
         href={ev.link}
         title={ev.displayTitle}
         type={ev.type}
-        pillClass={ts.pill}
+        pillClass={pillOf(ev)}
         timeLabel={timeLabel}
         entityLabel={entityOf(ev)}
         muted={muted(ev)}
@@ -539,7 +558,7 @@ export default async function CalendarPage({
         href={ev.type === "external" ? null : ev.link}
         title={ev.displayTitle}
         type={ev.type}
-        pillClass={getTypeStyle(ev.type).pill}
+        pillClass={pillOf(ev)}
         timeLabel={segmentLabel(s)}
         entityLabel={entityOf(ev)}
         top={((clampedStart - grid.hourStart * 60) / 60) * grid.hourHeight}
@@ -706,7 +725,7 @@ export default async function CalendarPage({
     const inner = (
       <>
         <span className="w-[5.5rem] shrink-0 text-muted-foreground text-xs tabular-nums">{time}</span>
-        <span className={cn("size-2 shrink-0 rounded-full", ts.dot)} aria-hidden />
+        <span className={cn("size-2 shrink-0 rounded-full", accent(ev)?.dot ?? ts.dot)} aria-hidden />
         <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className={cn("block truncate font-medium text-sm", muted(ev) && "line-through opacity-60")}>
@@ -1470,15 +1489,7 @@ export default async function CalendarPage({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <div className="md:hidden">
-              <CalendarFilterMenu
-                label={t("filterLabel")}
-                options={(["all", "mine", "group"] as CalendarFilter[]).map((f) => ({
-                  value: f,
-                  label: { all: t("filterAll"), mine: t("filterMine"), group: t("filterGroup") }[f],
-                  href: calUrl(currentView, baseDateStr, f),
-                  active: currentFilter === f,
-                }))}
-              />
+              <CalendarPeopleFilter filter={currentFilter} people={people} meId={session?.user?.id ?? null} />
             </div>
             <SubscribeDialog />
             {canWrite && (
@@ -1529,29 +1540,10 @@ export default async function CalendarPage({
             })}
           </nav>
 
-          {/* Filter toggle */}
-          <nav aria-label={t("filterLabel")} className="hidden shrink-0 rounded-lg border bg-muted/40 p-0.5 md:flex">
-            {(["all", "mine", "group"] as CalendarFilter[]).map((f) => {
-              const LABELS: Record<CalendarFilter, string> = {
-                all: t("filterAll"),
-                mine: t("filterMine"),
-                group: t("filterGroup"),
-              };
-              const isActive = currentFilter === f;
-              return (
-                <Link
-                  key={f}
-                  href={calUrl(currentView, baseDateStr, f)}
-                  aria-current={isActive ? "true" : undefined}
-                  className={`flex min-h-9 items-center rounded-md px-3 py-1.5 font-medium text-xs transition-all ${
-                    isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {LABELS[f]}
-                </Link>
-              );
-            })}
-          </nav>
+          {/* Whose calendar: everybody, me, my group, or colleagues by name. */}
+          <div className="hidden md:block">
+            <CalendarPeopleFilter filter={currentFilter} people={people} meId={session?.user?.id ?? null} />
+          </div>
 
           {/* Navigation */}
           {/* The agenda walks its own days, so the week's range walker would be a
@@ -1592,6 +1584,7 @@ export default async function CalendarPage({
             </div>
           )}
         </div>
+        <CalendarPeopleLegend filter={currentFilter} people={people} />
         {canWrite && <p className="hidden text-muted-foreground/80 text-xs md:block">{t("dragHint")}</p>}
       </div>
 

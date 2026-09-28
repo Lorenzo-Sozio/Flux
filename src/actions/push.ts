@@ -3,10 +3,12 @@
 import { revalidatePath } from "next/cache";
 
 import { and, eq, inArray } from "drizzle-orm";
+import { getLocale } from "next-intl/server";
 
 import { auth } from "@/auth";
 import { notificationPreferences, pushSubscriptions } from "@/db/schema";
 import { serverT } from "@/lib/i18n-server";
+import { rememberLocale } from "@/lib/morning-digest";
 import { devicesOf, subscriptionsFor, touch, vapidKeys } from "@/lib/push-send";
 import { isPushType, type PushType, parseOverrides, resolveAll, serialiseOverrides } from "@/lib/push-types";
 import { getDb } from "@/lib/tenant-context";
@@ -116,6 +118,10 @@ export async function savePushSubscription(input: {
         userAgent: input.userAgent?.slice(0, 300) ?? null,
       },
     });
+
+  // The language this device's pushes are written in (src/lib/push-send.ts). Remembered
+  // from the home page too, but a person may turn notifications on without passing there.
+  await rememberLocale(db, userId, await getLocale()).catch(() => undefined);
 
   revalidatePath(SETTINGS_PATH);
   return { success: true };

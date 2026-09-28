@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import Link from "next/link";
 import { after } from "next/server";
 
@@ -31,6 +30,7 @@ import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
 import { getNextActions } from "@/actions/next-actions";
 import { getOnboarding } from "@/actions/onboarding";
+import { getHomeDashboardSetting } from "@/actions/preferences";
 import { getTodayView } from "@/actions/today";
 import { Money } from "@/components/crm/money";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
@@ -48,7 +48,7 @@ import { getEntitlements } from "@/lib/billing/licensing";
 import type { PlanModule } from "@/lib/billing/plans-config";
 import { countOpenDealsWithoutNextStep } from "@/lib/deal-signals";
 import { encodeFilter, type FilterNode } from "@/lib/filter-types";
-import { HOME_VIEW_COOKIE, resolveHomeView } from "@/lib/home-view";
+import { resolveHomeDashboard } from "@/lib/home-dashboards";
 import { closedBetween } from "@/lib/metrics";
 import { rememberLocale } from "@/lib/morning-digest";
 import { showOnboarding } from "@/lib/onboarding";
@@ -60,8 +60,11 @@ import { monthStart as workspaceMonthStart } from "@/lib/workspace-day";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { AgendaWidget } from "./_components/agenda-widget";
-import { HomeViewToggle } from "./_components/home-view-toggle";
-import { MonthTargetCard } from "./_components/month-target-card";
+import { DashboardSwitcher } from "./_components/dashboard-switcher";
+import { DeskDashboard } from "./_components/desk-dashboard";
+import { KPI_VALUE, Kpi } from "./_components/kpi";
+import { ManagerDashboard } from "./_components/manager-dashboard";
+import { MoneyDashboard } from "./_components/money-dashboard";
 import { NextActionsCard } from "./_components/next-actions-card";
 import { OnboardingCard } from "./_components/onboarding-card";
 
@@ -96,14 +99,6 @@ function formatToday(d: Date, locale: string) {
   return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 }
 
-/**
- * ⚠️ Two across on a phone leaves ~120px of content per card, and "€1.234.567"
- * in `text-2xl` is wider than that: it went past the card's edge rather than
- * wrapping, because a number has nowhere to break. Smaller below `sm`, and
- * `break-words` for the MRR card, which joins one figure per currency.
- */
-const KPI_VALUE = "break-words font-bold text-xl tabular-nums sm:text-2xl";
-
 /** An active lead: new or being contacted — the company's count and the personal one alike. */
 const ACTIVE_LEAD_STATUSES = ["new", "contacting"];
 const ACTIVE_LEAD = inArray(leads.status, ACTIVE_LEAD_STATUSES);
@@ -130,35 +125,6 @@ function activeLeadsHref(userId?: string): string {
   return `/dashboard/leads?filter=${encodeURIComponent(encodeFilter({ version: 1, logic: "AND", conditions }))}`;
 }
 
-function Kpi({
-  href,
-  accent,
-  title,
-  icon,
-  children,
-}: {
-  href: string;
-  accent: string;
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link href={href} className="group min-w-0">
-      {/* h-full: two cards side by side on a phone with different heights read as a mistake. */}
-      <Card
-        className={`h-full cursor-pointer gap-3 border-l-4 py-4 shadow-sm transition-shadow group-hover:shadow-md sm:gap-6 sm:py-6 ${accent}`}
-      >
-        <CardHeader className="flex flex-row items-center justify-between gap-2 px-4 pb-2 sm:px-6">
-          <CardTitle className="min-w-0 font-medium text-muted-foreground text-sm">{title}</CardTitle>
-          {icon}
-        </CardHeader>
-        <CardContent className="px-4 sm:px-6">{children}</CardContent>
-      </Card>
-    </Link>
-  );
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CRMPage({
@@ -173,14 +139,25 @@ export default async function CRMPage({
   const locale = await getLocale();
   const actor = await getActor();
   const userId = actor?.userId;
-  // Two halves, never mixed on one screen (§3.4): "me" — the day's numbers, the work list and
-  // the agenda, all this person's — and "company", the state of the business. The address
-  // wins, then this browser's last choice, then the role (src/lib/home-view.ts).
-  const view = resolveHomeView(
-    (await searchParams).view,
-    (await cookies()).get(HOME_VIEW_COOKIE)?.value,
-    can(actor, "record:manageAny"),
+  const params = await searchParams;
+  // Which dashboard (src/lib/home-dashboards.ts): the address wins, then the person's own
+  // choice in their Profile, then the role. A setting that cannot be read is no choice
+  // made — the default for the role — never a home page that does not load.
+  const setting = await getHomeDashboardSetting().catch(() => null);
+  const dashboard = resolveHomeDashboard(
+    { fromUrl: params.dashboard ?? params.view, saved: setting?.saved },
+    setting?.access ?? {
+      readsReports: false,
+      managesSettings: false,
+      managesEveryRecord: can(actor, "record:manageAny"),
+      hasSales: false,
+      hasSupport: false,
+    },
   );
+  // Commerciale and Direzione are the two halves this page has always had, never mixed on
+  // one screen (§3.4): "me" — the day's numbers, the work list and the agenda, all this
+  // person's — and "company", the state of the business.
+  const view = dashboard === "direction" ? "company" : "me";
   const userName = actor?.name?.split(" ")[0] ?? tc("there");
   const now = new Date();
   // The month on the workspace's clock: a deal won at 00:30 on the first, Rome time, is
@@ -188,6 +165,44 @@ export default async function CRMPage({
   const timeZone = await getWorkspaceTimeZone();
   const currentPeriod = toWallDate(now, timeZone).slice(0, 7);
   const monthStart = workspaceMonthStart(now, timeZone);
+
+  const header = (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">
+          {t(now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening", {
+            name: userName,
+          })}{" "}
+          👋
+        </h1>
+        <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
+      </div>
+      <DashboardSwitcher current={dashboard} available={setting?.available ?? ["sales", "direction"]} />
+    </div>
+  );
+
+  // The language of the morning digest is the one this person reads the product in; an
+  // email at six has no request to learn it from. After the response, and one statement.
+  if (userId) {
+    after(() => rememberLocale(db, userId, locale).catch(() => undefined));
+  }
+
+  // ⚠️ The other three dashboards (team, money, desk) read only their own figures: the personal and company
+  // reads below would be paid for and thrown away (src/lib/home-dashboard-data.ts).
+  if (dashboard === "salesManager" || dashboard === "admin" || dashboard === "support") {
+    return (
+      <div className="flex flex-col gap-6 md:gap-8">
+        {header}
+        {dashboard === "salesManager" ? (
+          <ManagerDashboard />
+        ) : dashboard === "admin" ? (
+          <MoneyDashboard />
+        ) : (
+          <DeskDashboard />
+        )}
+      </div>
+    );
+  }
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
 
@@ -205,34 +220,37 @@ export default async function CRMPage({
         ])
       : null;
 
+  // The four numbers of one's own are Commerciale's; Direzione does not read them, and
+  // the month-target card that showed one's own target on the business's page is gone.
+  const mine = view === "me" ? userId : undefined;
   const [myTarget, wonThisMonth, myLeads, nextActions, today, onboarding, bareDeals, modules] = await Promise.all([
     // Current month target for this user
-    userId
+    mine
       ? db
           .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
           .from(salesTargets)
-          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+          .where(and(eq(salesTargets.userId, mine), eq(salesTargets.period, currentPeriod)))
           .limit(1)
           .then((rows) => rows[0] ?? null)
       : Promise.resolve(null),
 
     // Won deals this month for this user
-    userId
+    mine
       ? db
           .select({ total: sum(deals.amount) })
           .from(deals)
           // Dated by when it closed: `updatedAt` moved an old win into this month on any re-save.
-          .where(and(closedBetween("won", monthStart), eq(deals.ownerId, userId)))
+          .where(and(closedBetween("won", monthStart), eq(deals.ownerId, mine)))
           .then((rows) => parseFloat(rows[0]?.total ?? "0"))
       : Promise.resolve(0 as number),
 
     // The leads this person should be working: new or being contacted, theirs or nobody's
     // yet. An unassigned lead is everybody's queue, so it counts for everybody.
-    userId
+    mine
       ? db
           .select({ n: count() })
           .from(leads)
-          .where(and(ACTIVE_LEAD, or(eq(leads.ownerId, userId), isNull(leads.ownerId))))
+          .where(and(ACTIVE_LEAD, or(eq(leads.ownerId, mine), isNull(leads.ownerId))))
           .then((rows) => Number(rows[0]?.n ?? 0))
           .catch(() => 0)
       : Promise.resolve(0),
@@ -251,7 +269,7 @@ export default async function CRMPage({
     getOnboarding().catch(() => null),
 
     // The first of the three numbers of one's own. Never the reason the page fails.
-    userId ? countOpenDealsWithoutNextStep(db, userId).catch(() => 0) : Promise.resolve(0),
+    mine ? countOpenDealsWithoutNextStep(db, mine).catch(() => 0) : Promise.resolve(0),
 
     // Cards for a module the plan does not include are left out, as in the menu.
     getCurrentTenantId().then((tenantId) =>
@@ -271,12 +289,6 @@ export default async function CRMPage({
     | [];
 
   const inPlan = (module: PlanModule) => !modules || modules.includes(module);
-
-  // The language of the morning digest is the one this person reads the product in; an
-  // email at six has no request to learn it from. After the response, and one statement.
-  if (userId) {
-    after(() => rememberLocale(db, userId, locale).catch(() => undefined));
-  }
 
   // The same list the page used to fetch for itself, ordered by when each ticket
   // stops being on time rather than by when it was last touched — which is the
@@ -301,81 +313,198 @@ export default async function CRMPage({
       children can take part in the ordering on their own.
     */
     <div className="flex flex-col gap-6 md:gap-8">
-      {/* ── Greeting + date ─────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">
-            {t(
-              now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening",
-              {
-                name: userName,
-              },
-            )}{" "}
-            👋
-          </h1>
-          <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
-        </div>
-        <HomeViewToggle view={view} label={t("viewLabel")} labels={{ me: t("viewMe"), company: t("viewCompany") }} />
-      </div>
+      {header}
 
-      {/* ── Four numbers of one's own ──────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi
-          // The deals it adds up: mine, won, closed this month on the workspace's clock.
-          href={
-            userId
-              ? `/dashboard/pipeline?owners=${userId}&status=won&closed=${currentPeriod}&pipeline=all`
-              : "/dashboard/pipeline/targets"
-          }
-          accent="border-l-emerald-500"
-          title={t("myWon")}
-          icon={<TrophyIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
-        >
-          <div className={KPI_VALUE}>
-            <Money value={wonThisMonth} />
-          </div>
-          <p className="mt-1 text-muted-foreground text-xs">
-            {myTarget ? (
-              <>
-                {t("myWonOf")} <Money value={Number(myTarget.targetAmount)} />
-              </>
-            ) : (
-              t("myWonNoTarget")
-            )}
-          </p>
-        </Kpi>
-        <Kpi
-          href={userId ? `/dashboard/pipeline?owners=${userId}` : "/dashboard/pipeline"}
-          accent={bareDeals > 0 ? "border-l-red-500" : "border-l-slate-300"}
-          title={t("myBareDeals")}
-          icon={
-            <CalendarX2Icon
-              className={`h-4 w-4 shrink-0 ${bareDeals > 0 ? "text-red-500" : "text-muted-foreground"}`}
-            />
-          }
-        >
-          <div className={KPI_VALUE}>{bareDeals}</div>
-          <p className="mt-1 text-muted-foreground text-xs">{t("myBareDealsDesc")}</p>
-        </Kpi>
-        <Kpi
-          href="/dashboard/calendar"
-          accent="border-l-blue-500"
-          title={t("myToday")}
-          icon={<CalendarDaysIcon className="h-4 w-4 shrink-0 text-blue-500" />}
-        >
-          <div className={KPI_VALUE}>{agendaItems.length}</div>
-          <p className="mt-1 text-muted-foreground text-xs">{t("myTodayDesc")}</p>
-        </Kpi>
-        <Kpi
-          href={activeLeadsHref(userId)}
-          accent="border-l-violet-500"
-          title={t("myLeads")}
-          icon={<UsersIcon className="h-4 w-4 shrink-0 text-violet-500" />}
-        >
-          <div className={KPI_VALUE}>{myLeads}</div>
-          <p className="mt-1 text-muted-foreground text-xs">{t("myLeadsDesc")}</p>
-        </Kpi>
-      </div>
+      {/* ── Direzione: the state of the business comes first ──────────── */}
+      {/* ⚠️ Not the four personal numbers below with the company's under them: the
+          person who opens this dashboard opens it for the business, and a first row
+          of their own won deals read as the company's (§3.4). Two across on a phone:
+          each card is a label and a number, and one per row made the dashboard six
+          screens long before the first chart. */}
+      {view === "company" && stats && recurring && (
+        <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-4">
+          <Kpi
+            // Everybody's open deals, which is what it sums: the board alone opens on one's own.
+            href="/dashboard/pipeline?owners=all&status=open&pipeline=all"
+            accent="border-l-blue-500"
+            title={t("pipelineValue")}
+            icon={<TrendingUpIcon className="h-4 w-4 shrink-0 text-blue-500" />}
+          >
+            <div className={KPI_VALUE}>
+              <Money value={stats.totalDealValue} />
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("pipelineValueDesc")}</p>
+          </Kpi>
+          <Kpi
+            href={activeLeadsHref()}
+            accent="border-l-green-500"
+            title={t("activeLeads")}
+            icon={<UsersIcon className="h-4 w-4 shrink-0 text-green-500" />}
+          >
+            <div className={KPI_VALUE}>{stats.activeLeadsCount}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("activeLeadsDesc")}</p>
+          </Kpi>
+          <Kpi
+            href="/dashboard/leads"
+            accent="border-l-orange-500"
+            title={t("conversionRate")}
+            icon={<TargetIcon className="h-4 w-4 shrink-0 text-orange-500" />}
+          >
+            <div className={KPI_VALUE}>
+              {/* In the reader's number format: "0.0%" is an English decimal on an Italian page. */}
+              {new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
+                style: "percent",
+                maximumFractionDigits: 1,
+              }).format(Number(stats.conversionRate) / 100)}
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("conversionRateDesc")}</p>
+          </Kpi>
+          <Kpi
+            href="/dashboard/tasks"
+            accent="border-l-red-500"
+            title={t("pendingTasks")}
+            icon={<AlertCircle className="h-4 w-4 shrink-0 text-red-500" />}
+          >
+            <div className={KPI_VALUE}>{stats.todayTasks + stats.overdueTasks}</div>
+            <div className="mt-1 flex flex-wrap gap-x-2">
+              <span className="font-bold text-[10px] text-red-600 uppercase">
+                {t("overdueLabel", { count: stats.overdueTasks })}
+              </span>
+              <span className="text-[10px] text-muted-foreground uppercase">
+                {t("todayLabel", { count: stats.todayTasks })}
+              </span>
+            </div>
+          </Kpi>
+          {inPlan("sales") && (
+            <>
+              <Kpi
+                href="/dashboard/sales/quotes?status=awaiting"
+                accent="border-l-violet-500"
+                title={t("quotesPipeline")}
+                icon={<FileTextIcon className="h-4 w-4 shrink-0 text-violet-500" />}
+              >
+                <div className={KPI_VALUE}>
+                  <Money value={stats.quotesPipelineValue} />
+                </div>
+                <div className="mt-1 flex flex-wrap gap-x-2">
+                  <span className="text-[10px] text-muted-foreground uppercase">
+                    {t("openQuotesCount", { count: stats.quotesOpenCount })}
+                  </span>
+                </div>
+              </Kpi>
+              <Kpi
+                href="/dashboard/sales/contracts"
+                accent="border-l-emerald-500"
+                title={t("contracts_mrr")}
+                icon={<RepeatIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
+              >
+                <div className={KPI_VALUE}>
+                  {(recurring.mrr.length ? recurring.mrr : [{ currency: "EUR", amount: 0 }])
+                    .map((m) =>
+                      new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
+                        style: "currency",
+                        currency: m.currency,
+                        maximumFractionDigits: 0,
+                        useGrouping: "always",
+                      }).format(m.amount),
+                    )
+                    .join(" · ")}
+                </div>
+                <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
+              </Kpi>
+              <Kpi
+                href="/dashboard/sales/contracts?view=renewal_due"
+                accent="border-l-yellow-500"
+                title={t("contracts_renewalsDue")}
+                icon={<ScrollTextIcon className="h-4 w-4 shrink-0 text-yellow-500" />}
+              >
+                <div className={KPI_VALUE}>{recurring.renewalsDue}</div>
+                <p className="mt-1 text-muted-foreground text-xs">{t("contracts_renewalsDueDesc")}</p>
+              </Kpi>
+            </>
+          )}
+          {inPlan("support") && (
+            <Kpi
+              href="/dashboard/support/tickets"
+              accent="border-l-amber-500"
+              title={t("openTickets")}
+              icon={<HeadphonesIcon className="h-4 w-4 shrink-0 text-amber-500" />}
+            >
+              <div className={KPI_VALUE}>{stats.openTicketsCount}</div>
+              <div className="mt-1 flex flex-wrap gap-x-2">
+                {stats.urgentTicketsCount > 0 ? (
+                  <span className="font-bold text-[10px] text-red-600 uppercase">
+                    {t("urgentLabel", { count: stats.urgentTicketsCount })}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground uppercase">{t("noUrgentTickets")}</span>
+                )}
+              </div>
+            </Kpi>
+          )}
+        </div>
+      )}
+
+      {/* ── Commerciale: four numbers of one's own ─────────────────────── */}
+      {view === "me" && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi
+            // The deals it adds up: mine, won, closed this month on the workspace's clock.
+            href={
+              userId
+                ? `/dashboard/pipeline?owners=${userId}&status=won&closed=${currentPeriod}&pipeline=all`
+                : "/dashboard/pipeline/targets"
+            }
+            accent="border-l-emerald-500"
+            title={t("myWon")}
+            icon={<TrophyIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
+          >
+            <div className={KPI_VALUE}>
+              <Money value={wonThisMonth} />
+            </div>
+            <p className="mt-1 text-muted-foreground text-xs">
+              {myTarget ? (
+                <>
+                  {t("myWonOf")} <Money value={Number(myTarget.targetAmount)} />
+                </>
+              ) : (
+                t("myWonNoTarget")
+              )}
+            </p>
+          </Kpi>
+          <Kpi
+            href={userId ? `/dashboard/pipeline?owners=${userId}` : "/dashboard/pipeline"}
+            accent={bareDeals > 0 ? "border-l-red-500" : "border-l-slate-300"}
+            title={t("myBareDeals")}
+            icon={
+              <CalendarX2Icon
+                className={`h-4 w-4 shrink-0 ${bareDeals > 0 ? "text-red-500" : "text-muted-foreground"}`}
+              />
+            }
+          >
+            <div className={KPI_VALUE}>{bareDeals}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("myBareDealsDesc")}</p>
+          </Kpi>
+          <Kpi
+            href="/dashboard/calendar"
+            accent="border-l-blue-500"
+            title={t("myToday")}
+            icon={<CalendarDaysIcon className="h-4 w-4 shrink-0 text-blue-500" />}
+          >
+            <div className={KPI_VALUE}>{agendaItems.length}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("myTodayDesc")}</p>
+          </Kpi>
+          <Kpi
+            href={activeLeadsHref(userId)}
+            accent="border-l-violet-500"
+            title={t("myLeads")}
+            icon={<UsersIcon className="h-4 w-4 shrink-0 text-violet-500" />}
+          >
+            <div className={KPI_VALUE}>{myLeads}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("myLeadsDesc")}</p>
+          </Kpi>
+        </div>
+      )}
 
       {/* ── What needs doing ─────────────────────────────────────────── */}
       {/*
@@ -410,7 +539,9 @@ export default async function CRMPage({
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="flex min-w-0 items-center gap-2 text-base">
                   <Headphones className="h-4 w-4 text-muted-foreground" />
-                  {t("assignedTickets")}
+                  {/* The list is the whole queue for whoever can see every user (src/actions/today.ts),
+                      and was titled "assigned" all the same: unassigned tickets under that name. */}
+                  {can(actor, "user:read") ? t("ticketQueue") : t("assignedTickets")}
                   {myTickets.length > 0 && (
                     <span className="rounded-full bg-muted px-2 py-0.5 font-normal text-muted-foreground text-xs">
                       {myTickets.length}
@@ -475,136 +606,6 @@ export default async function CRMPage({
 
       {view === "company" && stats && recurring && topDeals && recentActivities && recentLeads && (
         <>
-          {/* ── Metric Cards ─────────────────────────────────────────────── */}
-          {/* Two across on a phone. Each card is a label and a number; one per row
-          made the dashboard six screens long before the first chart. */}
-          <div className="grid grid-cols-2 gap-3 max-md:order-2 md:gap-6 lg:grid-cols-4">
-            <Kpi
-              // Everybody's open deals, which is what it sums: the board alone opens on one's own.
-              href="/dashboard/pipeline?owners=all&status=open&pipeline=all"
-              accent="border-l-blue-500"
-              title={t("pipelineValue")}
-              icon={<TrendingUpIcon className="h-4 w-4 shrink-0 text-blue-500" />}
-            >
-              <div className={KPI_VALUE}>
-                <Money value={stats.totalDealValue} />
-              </div>
-              <p className="mt-1 text-muted-foreground text-xs">{t("pipelineValueDesc")}</p>
-            </Kpi>
-            <Kpi
-              href={activeLeadsHref()}
-              accent="border-l-green-500"
-              title={t("activeLeads")}
-              icon={<UsersIcon className="h-4 w-4 shrink-0 text-green-500" />}
-            >
-              <div className={KPI_VALUE}>{stats.activeLeadsCount}</div>
-              <p className="mt-1 text-muted-foreground text-xs">{t("activeLeadsDesc")}</p>
-            </Kpi>
-            <Kpi
-              href="/dashboard/leads"
-              accent="border-l-orange-500"
-              title={t("conversionRate")}
-              icon={<TargetIcon className="h-4 w-4 shrink-0 text-orange-500" />}
-            >
-              <div className={KPI_VALUE}>{stats.conversionRate}%</div>
-              <p className="mt-1 text-muted-foreground text-xs">{t("conversionRateDesc")}</p>
-            </Kpi>
-            <Kpi
-              href="/dashboard/tasks"
-              accent="border-l-red-500"
-              title={t("pendingTasks")}
-              icon={<AlertCircle className="h-4 w-4 shrink-0 text-red-500" />}
-            >
-              <div className={KPI_VALUE}>{stats.todayTasks + stats.overdueTasks}</div>
-              <div className="mt-1 flex flex-wrap gap-x-2">
-                <span className="font-bold text-[10px] text-red-600 uppercase">
-                  {t("overdueLabel", { count: stats.overdueTasks })}
-                </span>
-                <span className="text-[10px] text-muted-foreground uppercase">
-                  {t("todayLabel", { count: stats.todayTasks })}
-                </span>
-              </div>
-            </Kpi>
-            {inPlan("sales") && (
-              <>
-                <Kpi
-                  href="/dashboard/sales/quotes?status=awaiting"
-                  accent="border-l-violet-500"
-                  title={t("quotesPipeline")}
-                  icon={<FileTextIcon className="h-4 w-4 shrink-0 text-violet-500" />}
-                >
-                  <div className={KPI_VALUE}>
-                    <Money value={stats.quotesPipelineValue} />
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-x-2">
-                    <span className="text-[10px] text-muted-foreground uppercase">
-                      {t("openQuotesCount", { count: stats.quotesOpenCount })}
-                    </span>
-                  </div>
-                </Kpi>
-                <Kpi
-                  href="/dashboard/sales/contracts"
-                  accent="border-l-emerald-500"
-                  title={t("contracts_mrr")}
-                  icon={<RepeatIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
-                >
-                  <div className={KPI_VALUE}>
-                    {(recurring.mrr.length ? recurring.mrr : [{ currency: "EUR", amount: 0 }])
-                      .map((m) =>
-                        new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
-                          style: "currency",
-                          currency: m.currency,
-                          maximumFractionDigits: 0,
-                          useGrouping: "always",
-                        }).format(m.amount),
-                      )
-                      .join(" · ")}
-                  </div>
-                  <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
-                </Kpi>
-                <Kpi
-                  href="/dashboard/sales/contracts?view=renewal_due"
-                  accent="border-l-yellow-500"
-                  title={t("contracts_renewalsDue")}
-                  icon={<ScrollTextIcon className="h-4 w-4 shrink-0 text-yellow-500" />}
-                >
-                  <div className={KPI_VALUE}>{recurring.renewalsDue}</div>
-                  <p className="mt-1 text-muted-foreground text-xs">{t("contracts_renewalsDueDesc")}</p>
-                </Kpi>
-              </>
-            )}
-            {inPlan("support") && (
-              <Kpi
-                href="/dashboard/support/tickets"
-                accent="border-l-amber-500"
-                title={t("openTickets")}
-                icon={<HeadphonesIcon className="h-4 w-4 shrink-0 text-amber-500" />}
-              >
-                <div className={KPI_VALUE}>{stats.openTicketsCount}</div>
-                <div className="mt-1 flex flex-wrap gap-x-2">
-                  {stats.urgentTicketsCount > 0 ? (
-                    <span className="font-bold text-[10px] text-red-600 uppercase">
-                      {t("urgentLabel", { count: stats.urgentTicketsCount })}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground uppercase">{t("noUrgentTickets")}</span>
-                  )}
-                </div>
-              </Kpi>
-            )}
-          </div>
-
-          {/* ── Target mensile ───────────────────────────────────────────── */}
-          {(myTarget || wonThisMonth > 0) && (
-            <div className="max-md:order-5">
-              <MonthTargetCard
-                myTarget={myTarget}
-                wonThisMonth={wonThisMonth}
-                monthLabel={now.toLocaleDateString(locale, { month: "long", year: "numeric" })}
-              />
-            </div>
-          )}
-
           {/* ── Charts ───────────────────────────────────────────────────── */}
           <div className="min-w-0 max-md:order-5">
             <CRMCharts dealDistribution={stats.dealDistribution} leadsBySource={stats.leadsBySource} />

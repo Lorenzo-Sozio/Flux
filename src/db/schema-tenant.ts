@@ -155,6 +155,7 @@ export {
   userGroupsRelations,
   userInvitations,
   userInvitationsRelations,
+  userPreferences,
   // Auth / users
   users,
   verificationTokens,

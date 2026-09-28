@@ -268,3 +268,15 @@ export async function rememberLocale(db: AnyDb, userId: string, locale: string):
       setWhere: sql`${notificationPreferences.locale} is distinct from ${locale}`,
     });
 }
+
+/**
+ * The language a person reads the product in, as last remembered — for what is written to
+ * them with no request to learn it from: a push, a reminder email. Null when never seen.
+ */
+export async function readLocale(db: AnyDb, userId: string): Promise<"it" | "en" | null> {
+  const [row] = await db
+    .select({ locale: notificationPreferences.locale })
+    .from(notificationPreferences)
+    .where(eq(notificationPreferences.userId, userId));
+  return row?.locale === "it" || row?.locale === "en" ? row.locale : null;
+}

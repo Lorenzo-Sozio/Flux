@@ -18,6 +18,7 @@ import { sendDueAppointmentReminders } from "@/lib/appointment-reminders";
 import { loadBusinessCalendar } from "@/lib/business-calendar";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail } from "@/lib/email";
+import { readLocale } from "@/lib/morning-digest";
 import { composeNotification } from "@/lib/notification-text";
 import { notify } from "@/lib/notify";
 import { selectTasksDueToday } from "@/lib/tasks-due";
@@ -153,8 +154,10 @@ async function runForTenant(db: TenantDb) {
 
     if (user.email && activity.date) {
       // One recipient whose mail bounces must not stop the sweep for everyone else.
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
-      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
+      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link, {
+        locale: await readLocale(db, activity.ownerId).catch(() => null),
+        timeZone: await getWorkspaceTimeZone(),
+      }).catch(() => undefined);
     }
 
     activitiesNotified++;

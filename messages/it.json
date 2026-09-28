@@ -961,7 +961,24 @@
     "dragHint": "Trascina un appuntamento per spostarlo, o il suo bordo inferiore per cambiarne la durata. Clicca uno spazio vuoto per aggiungerne uno.",
     "newAllDayOn": "Nuovo appuntamento di tutto il giorno in questa data",
     "viewLabel": "Vista del calendario",
-    "filterLabel": "Di chi sono gli appuntamenti"
+    "filterLabel": "Di chi sono gli appuntamenti",
+    "people": {
+      "label": "Calendario di: {who}. Cambia",
+      "title": "Di chi vedere il calendario",
+      "hint": "Scegli uno o più colleghi: con due o più persone, ognuna ha il suo colore.",
+      "everybody": "Tutti",
+      "me": "Io",
+      "group": "Il mio gruppo",
+      "count": "{count, plural, one {# persona} other {# persone}}",
+      "colleagues": "Colleghi",
+      "search": "Cerca un collega…",
+      "you": "tu",
+      "former": "Non più nel workspace",
+      "none": "Nessun collega trovato.",
+      "unnamed": "Senza nome",
+      "reset": "Tutti",
+      "done": "Fatto"
+    }
   },
   "calendarFeed": {
     "subscribe": "Iscriviti",
@@ -1467,10 +1484,11 @@
     }
   },
   "crm": {
-    "activeLeads": "Lead Attivi",
+    "activeLeads": "Lead attivi",
     "activeLeadsDesc": "Nuovi o attualmente in contatto",
-    "assignedTickets": "Ticket assegnati",
-    "conversionRate": "Tasso di Conversione",
+    "assignedTickets": "Ticket assegnati a te",
+    "ticketQueue": "Ticket aperti del team",
+    "conversionRate": "Tasso di conversione",
     "conversionRateDesc": "Rapporto globale lead-cliente",
     "dealsByStage": "Trattative per Fase",
     "dealsByStageDesc": "Numero di opportunità attive per fase della pipeline",
@@ -1491,17 +1509,17 @@
     "noUrgentTickets": "Nessun ticket urgente",
     "openDeals": "Trattative Aperte",
     "openQuotesCount": "{count} in attesa del cliente",
-    "openTickets": "Ticket Aperti",
+    "openTickets": "Ticket aperti",
     "overdueLabel": "{count} Scadute",
     "overview": "Panoramica",
     "pendingTasks": "Attività in sospeso di tutti",
-    "pipelineValue": "Valore Pipeline",
+    "pipelineValue": "Valore della pipeline",
     "pipelineValueDesc": "Valore totale delle trattative aperte",
     "probPercent": "{prob}% prob.",
-    "quotesPipeline": "Pipeline Preventivi",
-    "recentActivity": "Attività Recente",
+    "quotesPipeline": "Preventivi in attesa",
+    "recentActivity": "Attività recenti",
     "recentDeals": "Trattative Recenti",
-    "recentLeads": "Lead Recenti",
+    "recentLeads": "Lead recenti",
     "revenue": "Fatturato",
     "revenueOverTime": "Fatturato nel Tempo",
     "subtitle": "Monitora le performance del tuo team e il funnel vendite in tempo reale.",
@@ -1509,7 +1527,7 @@
     "tasks": "Attività",
     "title": "Dashboard CRM",
     "todayLabel": "{count} Oggi",
-    "topDeals": "Trattative Principali",
+    "topDeals": "Trattative principali",
     "totalCompanies": "Totale Aziende",
     "totalContacts": "Totale Contatti",
     "totalLeads": "Totale Lead",
@@ -1586,7 +1604,103 @@
     "myToday": "Oggi",
     "myTodayDesc": "Attività, chiamate e incontri in agenda",
     "myLeads": "Lead da lavorare",
-    "myLeadsDesc": "Tuoi o non assegnati, nuovi o in contatto"
+    "myLeadsDesc": "Tuoi o non assegnati, nuovi o in contatto",
+    "dashboards": {
+      "label": "Dashboard",
+      "switchLabel": "Dashboard: {name}. Cambia",
+      "setDefault": "Scegli quella che si apre di default",
+      "sales": {
+        "name": "Commerciale",
+        "desc": "La tua giornata: i tuoi numeri, cosa fare, l'agenda."
+      },
+      "salesManager": {
+        "name": "Responsabile vendite",
+        "desc": "Il team questo mese: vinto sull'obiettivo, pipeline, chi è dove."
+      },
+      "admin": {
+        "name": "Amministrazione",
+        "desc": "Incassi e scadenze, fatture da emettere, ordini da fatturare, provvigioni."
+      },
+      "support": {
+        "name": "Assistenza",
+        "desc": "La coda del team: ticket aperti, SLA a rischio, soddisfazione."
+      },
+      "direction": {
+        "name": "Direzione",
+        "desc": "Lo stato dell'azienda: pipeline, lead, preventivi, contratti, ticket."
+      },
+      "manager": {
+        "won": "Vinto dal team questo mese",
+        "wonOf": "su un obiettivo di",
+        "noTarget": "Nessun obiettivo di team per questo mese",
+        "open": "Pipeline aperta del team",
+        "openDesc": "{count, plural, one {# trattativa aperta} other {# trattative aperte}}",
+        "bare": "Senza prossimo passo",
+        "bareDesc": "Trattative aperte del team senza nulla di pianificato",
+        "winRate": "Tasso di vincita del mese",
+        "winRateDesc": "{won} vinte · {lost} perse",
+        "noData": "Nessun dato",
+        "teamTitle": "Il team questo mese",
+        "teamDesc": "Vinto, obiettivo e pipeline aperta per commerciale",
+        "viewScorecard": "Scheda per commerciale",
+        "empty": "Nessuna trattativa vinta o aperta per il team questo mese.",
+        "rowOpen": "Aperto:",
+        "rowWinRate": "vince il {rate}%",
+        "rowAttainment": "{pct}% dell'obiettivo",
+        "rowNoTarget": "senza obiettivo",
+        "unassigned": "Trattative non assegnate"
+      },
+      "money": {
+        "outstanding": "Da incassare",
+        "outstandingDesc": "{count, plural, one {# fattura emessa non ancora saldata} other {# fatture emesse non ancora saldate}}",
+        "overdue": "Scaduto",
+        "overdueDesc": "Fatture oltre la data di scadenza",
+        "toInvoice": "Ordini da fatturare",
+        "toInvoiceDesc": "Ordini completati senza una fattura avviata",
+        "drafts": "Fatture in bozza",
+        "draftsDesc": "Scritte e non ancora emesse",
+        "commissions": "Provvigioni del mese",
+        "commissionsApproved": "Mese approvato",
+        "commissionsToApprove": "Da approvare",
+        "commissionsNone": "Nessuna provvigione maturata",
+        "renewals": "Rinnovi in scadenza",
+        "renewalsDesc": "Contratti da rinnovare a breve",
+        "overdueTitle": "Fatture scadute",
+        "overdueListDesc": "Le più in ritardo, con quanto resta da incassare",
+        "overdueDays": "{days, plural, one {scaduta da # giorno} other {scaduta da # giorni}}",
+        "noOverdue": "Nessuna fattura scaduta.",
+        "viewFinance": "Finanza",
+        "wonMonth": "Vinto del mese",
+        "wonAllTime": "Vinto da sempre",
+        "wonAllTimeDesc": "{count, plural, one {# trattativa vinta} other {# trattative vinte}}",
+        "collected": "Incassato del mese",
+        "invoiced": "Fatturato del mese",
+        "invoicedDesc": "Emesso, IVA esclusa",
+        "sinceYearStart": "Da inizio anno:"
+      },
+      "desk": {
+        "open": "Ticket aperti",
+        "openDesc": "Di tutto il team",
+        "unassigned": "Non assegnati",
+        "unassignedDesc": "Aperti e senza un agente",
+        "late": "In ritardo sullo SLA",
+        "lateDesc": "Aperti e oltre la scadenza promessa",
+        "dueSoon": "In scadenza",
+        "dueSoonDesc": "{hours, plural, one {Scadenza SLA entro un'ora} other {Scadenza SLA entro # ore}}",
+        "csat": "Soddisfazione",
+        "csatDesc": "Ultimi 30 giorni: {good} positive, {bad} negative",
+        "csatNone": "Nessuna valutazione negli ultimi 30 giorni",
+        "nextTitle": "I prossimi a scadere",
+        "nextDesc": "I ticket aperti del team più vicini alla scadenza SLA",
+        "noOpen": "Nessun ticket aperto.",
+        "nobody": "Non assegnato",
+        "mine": "Assegnati a te",
+        "mineDesc": "I tuoi ticket aperti",
+        "myTitle": "I tuoi ticket",
+        "myDesc": "I tuoi ticket aperti, dal più vicino alla scadenza SLA",
+        "myNone": "Nessun ticket aperto assegnato a te."
+      }
+    }
   },
   "currency": {
     "switchCurrency": "Cambia valuta",
@@ -8084,6 +8198,14 @@
       "message": "{preview}"
     }
   },
+  "activityReminderEmail": {
+    "subject": "{kind, select, call {Promemoria: chiamata oggi} meeting {Promemoria: riunione oggi} other {Promemoria: attività oggi}} — {description}",
+    "heading": "{kind, select, call {Promemoria chiamata} meeting {Promemoria riunione} other {Promemoria attività}}",
+    "intro": "{kind, select, call {Hai una chiamata in programma oggi.} meeting {Hai una riunione in programma oggi.} other {Hai un'attività in programma oggi.}}",
+    "topic": "Argomento",
+    "time": "Ora",
+    "open": "Apri nel CRM"
+  },
   "taskTypes": {
     "label": "Tipo",
     "call": "Chiamata",
@@ -8401,6 +8523,16 @@
         "error": "Non è stato possibile collegare la casella. Riprova.",
         "unavailable": "Il collegamento di una casella non è disponibile qui."
       }
+    },
+    "homeDashboard": {
+      "title": "La mia dashboard",
+      "desc": "Quale dashboard si apre quando entri nel CRM. Dalla home puoi comunque passare alle altre.",
+      "default": "Predefinita per il tuo ruolo ({name})",
+      "defaultDesc": "Segue il tuo ruolo nel workspace, anche se cambia.",
+      "hint": "La scelta vale per te, su ogni dispositivo.",
+      "open": "Apri la home",
+      "saved": "Dashboard salvata.",
+      "saveFailed": "Non è stato possibile salvare la dashboard."
     }
   },
   "planFollowUp": {

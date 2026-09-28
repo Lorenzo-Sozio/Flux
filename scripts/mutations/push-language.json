@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/lib/push-send.ts",
+    "description": "⚠️⚠️ every push goes out in the stored English, whatever the recipient reads",
+    "find": "    if (row.titleKey && locale && locale !== \"en\") {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/push-send.ts",
+    "description": "⚠️ the push is composed again, but in the default language",
+    "find": "        const text = await composeNotification(row.titleKey as NotificationKey, row.params ?? {}, locale);",
+    "replace": "        const text = await composeNotification(row.titleKey as NotificationKey, row.params ?? {});"
+  },
+  {
+    "file": "src/lib/notification-text.ts",
+    "description": "⚠️ asked for Italian, the texts are read from the English file",
+    "find": "    locale === \"it\"",
+    "replace": "    locale === \"xx\""
+  }
+]

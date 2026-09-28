@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/calendar-filter.ts",
+    "description": "⚠️ un indirizzo scritto a mano torna a mettere nella query del calendario qualunque cosa come id di una persona",
+    "find": "    .filter((s) => ID.test(s));",
+    "replace": "    .filter((s) => s.length > 0);"
+  },
+  {
+    "file": "src/lib/calendar-filter.ts",
+    "description": "⚠️ con una sola persona scelta gli eventi si colorano lo stesso, e il colore non distingue nessuno",
+    "find": "  if (!chosen || chosen.length < 2) return null;",
+    "replace": "  if (!chosen || chosen.length < 1) return null;"
+  }
+]

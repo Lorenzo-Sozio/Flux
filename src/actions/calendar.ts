@@ -20,15 +20,21 @@ import {
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability } from "@/lib/auth-guard";
 import { signCalendarFeedToken } from "@/lib/calendar-feed-token";
+import { type CalendarFilter, peopleOf } from "@/lib/calendar-filter";
 import { checkExternalCalendarUrl, fetchWithCheckedRedirects, type UrlRefusal } from "@/lib/external-calendar-url";
 import { type ExternalEvent, parseIcal } from "@/lib/ical-parse";
 import { getDb } from "@/lib/tenant-context";
 
-export type CalendarFilter = "all" | "mine" | "group";
+export type { CalendarFilter };
 
 async function resolveFilterUserIds(filter: CalendarFilter): Promise<string[] | null> {
   const db = await getDb();
   if (filter === "all") return null;
+
+  // The people chosen by name. An empty list here means the address named nobody
+  // readable, which is everybody, not nobody.
+  const people = peopleOf(filter);
+  if (people) return people.length > 0 ? people : null;
 
   const session = await auth();
   const userId = session?.user?.id;
@@ -101,6 +107,8 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
         contactId: tasks.contactId,
         companyId: tasks.companyId,
         dealId: tasks.dealId,
+        ownerId: tasks.ownerId,
+        assigneeId: tasks.assigneeId,
       })
       .from(tasks)
       .leftJoin(leads, eq(tasks.leadId, leads.id))
@@ -145,6 +153,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
         contactId: activities.contactId,
         companyId: activities.companyId,
         dealId: activities.dealId,
+        ownerId: activities.ownerId,
       })
       .from(activities)
       .leftJoin(leads, eq(activities.leadId, leads.id))
@@ -188,6 +197,8 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
             : t.companyName || t.dealName || "No Entity",
         link: `/dashboard/tasks?task=${t.id}`,
         leadId: t.leadId,
+        // Who it belongs to, for the colour it wears when several people are shown.
+        people: [t.ownerId, t.assigneeId].filter((id): id is string => Boolean(id)),
       };
     });
 
@@ -214,6 +225,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
             ? `/dashboard/pipeline/${a.dealId}`
             : "#",
       leadId: a.leadId,
+      people: a.ownerId ? [a.ownerId] : [],
     }));
 
   return [...formattedTasks, ...formattedActivities, ...formattedAppointments];

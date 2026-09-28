@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/home-dashboards.ts",
+    "description": "⚠️⚠️ la dashboard Amministrazione (incassi, fatture, provvigioni) torna aperta a chi non amministra il workspace",
+    "find": "    if (d === \"admin\") return access.managesSettings && access.hasSales;",
+    "replace": "    if (d === \"admin\") return access.hasSales;"
+  },
+  {
+    "file": "src/lib/home-dashboards.ts",
+    "description": "⚠️⚠️ una dashboard nell'indirizzo o salvata si apre anche a chi non la può aprire",
+    "find": "    if (candidate && allowed.includes(candidate)) return candidate;",
+    "replace": "    if (candidate) return candidate;"
+  },
+  {
+    "file": "src/lib/home-dashboard-data.ts",
+    "description": "⚠️ gli ordini da fatturare tornano a contare anche quelli già fatturati",
+    "find": "          notExists(db.select({ one: sql`1` }).from(invoices).where(eq(invoices.orderId, orders.id))),",
+    "replace": "          undefined,"
+  },
+  {
+    "file": "src/lib/home-dashboard-data.ts",
+    "description": "⚠️ un ticket segnato in ritardo sullo SLA smette di contare come tale se la scadenza è stata spostata",
+    "find": "  const lateNow = sql`(${tickets.slaBreachedAt} is not null or ${tickets.slaDeadlineAt} < ${now})`;",
+    "replace": "  const lateNow = sql`(${tickets.slaDeadlineAt} < ${now})`;"
+  },
+  {
+    "file": "src/lib/home-dashboard-data.ts",
+    "description": "⚠️⚠️ una nota di credito torna a sommarsi al fatturato invece di sottrarsi",
+    "find": "  const signed = sql`case when ${invoices.documentType} = 'TD04' then -${invoices.taxableAmount} else ${invoices.taxableAmount} end`;",
+    "replace": "  const signed = sql`${invoices.taxableAmount}`;"
+  },
+  {
+    "file": "src/lib/home-dashboard-data.ts",
+    "description": "⚠️⚠️ le fatture in bozza tornano a contare nel fatturato",
+    "find": "      .where(and(eq(invoices.status, \"issued\"), gte(invoices.issueDate, yearFirst)))",
+    "replace": "      .where(and(gte(invoices.issueDate, yearFirst)))"
+  },
+  {
+    "file": "src/lib/home-dashboard-data.ts",
+    "description": "⚠️ un pagamento registrato sull'ordine smette di contare come incassato, o finisce nella valuta sbagliata",
+    "find": "  const paidIn = sql<string>`coalesce(${invoices.currency}, ${orders.currency}, 'EUR')`;",
+    "replace": "  const paidIn = sql<string>`coalesce(${invoices.currency}, 'EUR')`;"
+  }
+]

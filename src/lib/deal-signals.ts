@@ -90,10 +90,13 @@ export function dealSignals(
   };
 }
 
-/** How many of one owner's open deals have nothing planned — the home's own number. */
+/**
+ * How many open deals have nothing planned: one owner's — the home's own number — or,
+ * with `null`, the whole team's (the sales manager's dashboard).
+ */
 export async function countOpenDealsWithoutNextStep(
   db: AnyDb,
-  ownerId: string,
+  ownerId: string | null,
   now: Date = new Date(),
 ): Promise<number> {
   const next = nextStepByDeal(db, now);
@@ -101,6 +104,8 @@ export async function countOpenDealsWithoutNextStep(
     .select({ n: sql<number>`count(*)::int` })
     .from(deals)
     .leftJoin(next, eq(next.dealId, deals.id))
-    .where(and(eq(deals.status, "open"), eq(deals.ownerId, ownerId), sql`${next.n} is null`));
+    .where(
+      and(eq(deals.status, "open"), ownerId === null ? undefined : eq(deals.ownerId, ownerId), sql`${next.n} is null`),
+    );
   return Number(row?.n ?? 0);
 }

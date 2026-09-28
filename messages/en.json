@@ -961,7 +961,24 @@
     "dragHint": "Drag an appointment to move it, or its lower edge to change its length. Click an empty slot to add one.",
     "newAllDayOn": "New all-day appointment on this day",
     "viewLabel": "Calendar view",
-    "filterLabel": "Whose appointments"
+    "filterLabel": "Whose appointments",
+    "people": {
+      "label": "Calendar of: {who}. Change",
+      "title": "Whose calendar to show",
+      "hint": "Choose one colleague or more: with two or more people, each has a colour.",
+      "everybody": "Everybody",
+      "me": "Me",
+      "group": "My group",
+      "count": "{count, plural, one {# person} other {# people}}",
+      "colleagues": "Colleagues",
+      "search": "Search a colleague…",
+      "you": "you",
+      "former": "No longer in the workspace",
+      "none": "No colleague found.",
+      "unnamed": "No name",
+      "reset": "Everybody",
+      "done": "Done"
+    }
   },
   "calendarFeed": {
     "subscribe": "Subscribe",
@@ -1469,7 +1486,8 @@
   "crm": {
     "activeLeads": "Active Leads",
     "activeLeadsDesc": "New or currently in contact",
-    "assignedTickets": "Assigned tickets",
+    "assignedTickets": "Tickets assigned to you",
+    "ticketQueue": "The team's open tickets",
     "conversionRate": "Conversion Rate",
     "conversionRateDesc": "Overall lead to customer ratio",
     "dealsByStage": "Deals by Stage",
@@ -1586,7 +1604,103 @@
     "myToday": "Today",
     "myTodayDesc": "Tasks, calls and meetings on your agenda",
     "myLeads": "Leads to work",
-    "myLeadsDesc": "Yours or unassigned, new or in contact"
+    "myLeadsDesc": "Yours or unassigned, new or in contact",
+    "dashboards": {
+      "label": "Dashboard",
+      "switchLabel": "Dashboard: {name}. Change",
+      "setDefault": "Choose the one that opens by default",
+      "sales": {
+        "name": "Sales",
+        "desc": "Your day: your numbers, what to do next, your agenda."
+      },
+      "salesManager": {
+        "name": "Sales manager",
+        "desc": "The team this month: won against target, pipeline, who is where."
+      },
+      "admin": {
+        "name": "Administration",
+        "desc": "What is owed and overdue, drafts, orders to invoice, commissions."
+      },
+      "support": {
+        "name": "Support",
+        "desc": "The team's queue: open tickets, SLAs at risk, satisfaction."
+      },
+      "direction": {
+        "name": "Management",
+        "desc": "The state of the business: pipeline, leads, quotes, contracts, tickets."
+      },
+      "manager": {
+        "won": "Won by the team this month",
+        "wonOf": "of a target of",
+        "noTarget": "No team target for this month",
+        "open": "Team's open pipeline",
+        "openDesc": "{count, plural, one {# open deal} other {# open deals}}",
+        "bare": "No next step",
+        "bareDesc": "The team's open deals with nothing planned",
+        "winRate": "Win rate this month",
+        "winRateDesc": "{won} won · {lost} lost",
+        "noData": "No data",
+        "teamTitle": "The team this month",
+        "teamDesc": "Won, target and open pipeline per salesperson",
+        "viewScorecard": "Scorecard",
+        "empty": "No won or open deals for the team this month.",
+        "rowOpen": "Open:",
+        "rowWinRate": "wins {rate}%",
+        "rowAttainment": "{pct}% of target",
+        "rowNoTarget": "no target",
+        "unassigned": "Unassigned deals"
+      },
+      "money": {
+        "outstanding": "Owed",
+        "outstandingDesc": "{count, plural, one {# issued invoice not yet settled} other {# issued invoices not yet settled}}",
+        "overdue": "Overdue",
+        "overdueDesc": "Invoices past their due date",
+        "toInvoice": "Orders to invoice",
+        "toInvoiceDesc": "Completed orders with no invoice started",
+        "drafts": "Draft invoices",
+        "draftsDesc": "Written and not issued yet",
+        "commissions": "Commissions this month",
+        "commissionsApproved": "Month approved",
+        "commissionsToApprove": "To approve",
+        "commissionsNone": "No commissions earned",
+        "renewals": "Renewals due",
+        "renewalsDesc": "Contracts to renew soon",
+        "overdueTitle": "Overdue invoices",
+        "overdueListDesc": "The latest, with what is left to collect",
+        "overdueDays": "{days, plural, one {# day overdue} other {# days overdue}}",
+        "noOverdue": "No overdue invoices.",
+        "viewFinance": "Finance",
+        "wonMonth": "Won this month",
+        "wonAllTime": "Won to date",
+        "wonAllTimeDesc": "{count, plural, one {# deal won} other {# deals won}}",
+        "collected": "Collected this month",
+        "invoiced": "Invoiced this month",
+        "invoicedDesc": "Issued, VAT excluded",
+        "sinceYearStart": "Year to date:"
+      },
+      "desk": {
+        "open": "Open tickets",
+        "openDesc": "The whole team's",
+        "unassigned": "Unassigned",
+        "unassignedDesc": "Open with no agent",
+        "late": "Late against the SLA",
+        "lateDesc": "Open and past the promised deadline",
+        "dueSoon": "Due soon",
+        "dueSoonDesc": "{hours, plural, one {SLA deadline within an hour} other {SLA deadline within # hours}}",
+        "csat": "Satisfaction",
+        "csatDesc": "Last 30 days: {good} good, {bad} bad",
+        "csatNone": "No ratings in the last 30 days",
+        "nextTitle": "Next to fall due",
+        "nextDesc": "The team's open tickets closest to their SLA deadline",
+        "noOpen": "No open tickets.",
+        "nobody": "Unassigned",
+        "mine": "Assigned to you",
+        "mineDesc": "Your open tickets",
+        "myTitle": "Your tickets",
+        "myDesc": "Your open tickets, nearest SLA deadline first",
+        "myNone": "No open tickets assigned to you."
+      }
+    }
   },
   "currency": {
     "switchCurrency": "Switch currency",
@@ -8079,6 +8193,14 @@
       "message": "{preview}"
     }
   },
+  "activityReminderEmail": {
+    "subject": "{kind, select, call {Reminder: call today} meeting {Reminder: meeting today} other {Reminder: activity today}} — {description}",
+    "heading": "{kind, select, call {Call reminder} meeting {Meeting reminder} other {Activity reminder}}",
+    "intro": "{kind, select, call {You have a call scheduled today.} meeting {You have a meeting scheduled today.} other {You have an activity scheduled today.}}",
+    "topic": "Topic",
+    "time": "Time",
+    "open": "View in CRM"
+  },
   "taskTypes": {
     "label": "Type",
     "call": "Call",
@@ -8396,6 +8518,16 @@
         "error": "The mailbox could not be connected. Try again.",
         "unavailable": "Connecting a mailbox is not available here."
       }
+    },
+    "homeDashboard": {
+      "title": "My dashboard",
+      "desc": "Which dashboard opens when you enter the CRM. From the home you can still switch to the others.",
+      "default": "Default for your role ({name})",
+      "defaultDesc": "Follows your role in the workspace, even when it changes.",
+      "hint": "The choice is yours, on every device.",
+      "open": "Open the home",
+      "saved": "Dashboard saved.",
+      "saveFailed": "The dashboard could not be saved."
     }
   },
   "planFollowUp": {

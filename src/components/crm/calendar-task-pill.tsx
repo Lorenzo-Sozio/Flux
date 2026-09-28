@@ -23,7 +23,16 @@ export interface CalendarTaskEvent {
   taskType?: string | null;
 }
 
-export function CalendarTaskPill({ event, compact = false }: { event: CalendarTaskEvent; compact?: boolean }) {
+export function CalendarTaskPill({
+  event,
+  compact = false,
+  accentClass,
+}: {
+  event: CalendarTaskEvent;
+  compact?: boolean;
+  /** The left edge in the colour of whose task it is, when several people are shown. */
+  accentClass?: string;
+}) {
   const t = useTranslations("calendar");
   const [done, setDone] = useState(event.status === "done");
   // Completing asks "how did it go?" (outcome, note, next step) before it counts as done.
@@ -65,6 +74,7 @@ export function CalendarTaskPill({ event, compact = false }: { event: CalendarTa
           className={cn(
             "flex items-center gap-1.5 rounded border-l-[3px] px-1.5 py-1 text-xs leading-tight hover:opacity-80 transition-opacity",
             PILL_STYLE,
+            accentClass,
             done && "opacity-40",
           )}
         >

@@ -6,6 +6,13 @@ import { eq, inArray } from "drizzle-orm";
 
 import { notificationPreferences, pushSubscriptions } from "@/db/schema";
 import { getAppUrlOrNull } from "@/lib/app-url";
+import {
+  composeNotification,
+  type NotificationKey,
+  type NotificationLocale,
+  type NotificationParams,
+  notificationLocale,
+} from "@/lib/notification-text";
 import { type PushPreferences, parseOverrides, shouldPush } from "@/lib/push-types";
 import type { getDb } from "@/lib/tenant-context";
 import { sendPush, type VapidKeys } from "@/lib/web-push";
@@ -80,20 +87,39 @@ function afterResponse(work: () => Promise<void>): void {
 /** A handle on one customer's database, as every caller here already holds. */
 type TenantDb = Awaited<ReturnType<typeof getDb>>;
 
+/** A written notification: its stored text, and the key and values it was composed from. */
+type Announced = {
+  userId: string;
+  type: string;
+  title: string;
+  message?: string | null;
+  link?: string | null;
+  titleKey?: string | null;
+  params?: NotificationParams | null;
+};
+
+/** What one person chose, and the language they read the product in. */
+type Recipient = PushPreferences & { locale: NotificationLocale | null };
+
 /** What one person chose, defaults filled in for anyone who never chose. */
-async function preferencesFor(db: TenantDb, userIds: string[]): Promise<Map<string, PushPreferences>> {
+async function preferencesFor(db: TenantDb, userIds: string[]): Promise<Map<string, Recipient>> {
   const rows = await db
     .select({
       userId: notificationPreferences.userId,
       pushEnabled: notificationPreferences.pushEnabled,
       overrides: notificationPreferences.overrides,
+      locale: notificationPreferences.locale,
     })
     .from(notificationPreferences)
     .where(inArray(notificationPreferences.userId, userIds));
 
-  const out = new Map<string, PushPreferences>();
+  const out = new Map<string, Recipient>();
   for (const row of rows) {
-    out.set(row.userId, { enabled: row.pushEnabled, overrides: parseOverrides(row.overrides) });
+    out.set(row.userId, {
+      enabled: row.pushEnabled,
+      overrides: parseOverrides(row.overrides),
+      locale: notificationLocale(row.locale),
+    });
   }
   return out;
 }
@@ -105,10 +131,7 @@ async function preferencesFor(db: TenantDb, userIds: string[]): Promise<Map<stri
  * the doorbell. Deduplicates the work per user, asks the preference table once,
  * and drops anything the person switched off before encrypting a single byte.
  */
-export function announce(
-  db: TenantDb,
-  rows: { userId: string; type: string; title: string; message?: string | null; link?: string | null }[],
-): void {
+export function announce(db: TenantDb, rows: Announced[]): void {
   if (rows.length === 0) return;
   const keys = vapidKeys();
   if (!keys) return;
@@ -127,13 +150,15 @@ export function announce(
 /** The part that actually talks to push services. Exported for the cron path. */
 export async function deliver(
   db: TenantDb,
-  rows: { userId: string; type: string; title: string; message?: string | null; link?: string | null }[],
+  rows: Announced[],
   keys: VapidKeys,
 ): Promise<{ sent: number; gone: number; failed: number }> {
   const userIds = [...new Set(rows.map((r) => r.userId))];
   const prefs = await preferencesFor(db, userIds);
 
-  const wanted = rows.filter((row) => shouldPush(row.type, prefs.get(row.userId) ?? { enabled: true, overrides: {} }));
+  const wanted = rows.filter((row) =>
+    shouldPush(row.type, prefs.get(row.userId) ?? { enabled: true, overrides: {}, locale: null }),
+  );
   if (wanted.length === 0) return { sent: 0, gone: 0, failed: 0 };
 
   const recipients = [...new Set(wanted.map((r) => r.userId))];
@@ -157,6 +182,23 @@ export async function deliver(
     byUser.set(device.userId, list);
   }
 
+  // ⚠️⚠️ In the recipient's language. The stored text is English — two jobs recognise a
+  // reminder already sent by it — and it was what every push carried, so an Italian office's
+  // phones rang in English while the bell beside them spoke Italian. A row the product
+  // composed (it has a key) is composed again here; text a person wrote goes as it is.
+  const textOf = async (row: Announced): Promise<{ title: string; body?: string }> => {
+    const locale = prefs.get(row.userId)?.locale;
+    if (row.titleKey && locale && locale !== "en") {
+      try {
+        const text = await composeNotification(row.titleKey as NotificationKey, row.params ?? {}, locale);
+        return { title: text.title, body: text.message || undefined };
+      } catch {
+        // The stored text is still a notification; a translation that fails is not a reason to drop it.
+      }
+    }
+    return { title: row.title, body: row.message ?? undefined };
+  };
+
   const dead: string[] = [];
   const alive: string[] = [];
   let sent = 0;
@@ -169,8 +211,7 @@ export async function deliver(
     wanted.flatMap((row) =>
       (byUser.get(row.userId) ?? []).map(async (device) => {
         const message: PushMessage = {
-          title: row.title,
-          body: row.message ?? undefined,
+          ...(await textOf(row)),
           link: row.link ?? undefined,
           // Two reminders about the same task replace each other rather than
           // filling the tray.

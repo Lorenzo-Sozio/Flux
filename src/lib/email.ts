@@ -3,6 +3,8 @@
  * Campaign email is handled separately via email-provider + marketing.ts.
  */
 
+import { createTranslator } from "next-intl";
+
 import { getAppUrl } from "@/lib/app-url";
 import { type DocumentLanguage, fill, INVOICE_TEXT } from "@/lib/document-language";
 import { getPlatformEmailConfig, sendEmail } from "@/lib/email-provider";
@@ -164,48 +166,63 @@ export async function sendVerificationEmail(email: string, token: string) {
 
 // ─── Activity Reminder ────────────────────────────────────────────────────────
 
+/**
+ * ⚠️ In the recipient's language and on the workspace's clock. It was English for everybody,
+ * and dated with the server's zone — UTC on Workers — so a call at ten in Rome was announced
+ * for eight. `locale` is what the person reads the product in (`readLocale`), English when
+ * never seen; `timeZone` is the workspace's.
+ */
 export async function sendActivityReminderEmail(
   to: string,
   activityType: string,
   description: string,
   scheduledAt: Date,
   link: string,
+  { locale, timeZone }: { locale?: "it" | "en" | null; timeZone?: string } = {},
 ) {
   if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
     console.log("[DEV] Activity reminder email to:", to);
     return;
   }
 
-  const dateStr = scheduledAt.toLocaleString(undefined, {
+  const lang = locale ?? "en";
+  const messages =
+    lang === "it" ? (await import("../../messages/it.json")).default : (await import("../../messages/en.json")).default;
+  const t = createTranslator({ locale: lang, messages, namespace: "activityReminderEmail" } as never) as unknown as (
+    key: string,
+    values?: Record<string, string>,
+  ) => string;
+  const kind = { kind: activityType === "call" || activityType === "meeting" ? activityType : "other" };
+
+  const dateStr = scheduledAt.toLocaleString(lang === "it" ? "it-IT" : "en-GB", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
-
-  const typeLabel = activityType === "call" ? "Call" : "Meeting";
 
   await sendEmail({
     to: sanitizeHeader(to),
-    subject: sanitizeHeader(`Reminder: ${typeLabel} today — ${description}`),
+    subject: sanitizeHeader(t("subject", { ...kind, description })),
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
-        <h2>${typeLabel} Reminder</h2>
-        <p>You have a ${typeLabel.toLowerCase()} scheduled today.</p>
+        <h2>${esc(t("heading", kind))}</h2>
+        <p>${esc(t("intro", kind))}</p>
         <table style="border-collapse:collapse;width:100%;margin:16px 0">
           <tr>
-            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Topic</td>
+            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">${esc(t("topic"))}</td>
             <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(description)}</td>
           </tr>
           <tr>
-            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Time</td>
-            <td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td>
+            <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">${esc(t("time"))}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(dateStr)}</td>
           </tr>
         </table>
         <a href="${appBase()}${link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
-          View in CRM
+          ${esc(t("open"))}
         </a>
       </div>`,
   });
