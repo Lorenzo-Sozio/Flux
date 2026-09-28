@@ -122,19 +122,19 @@
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️⚠️ una nota di credito rifiutata consuma comunque un numero",
-    "find": "      WHERE ${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit)\n",
-    "replace": ""
+    "find": "      WHERE (${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit))\n",
+    "replace": "      WHERE true\n"
   },
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️ lo storno si registra anche se la bozza non viene emessa",
-    "find": "        AND EXISTS (SELECT 1 FROM target)\n",
-    "replace": ""
+    "find": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n        AND EXISTS (SELECT 1 FROM target)\n",
+    "replace": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n"
   },
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️ si storna una fattura ancora in bozza o un'altra nota di credito",
-    "find": "        AND status = 'issued' AND document_type = 'TD01'\n",
+    "find": "        AND status = 'issued' AND document_type IN ('TD01', 'TD02')\n",
     "replace": ""
   },
   {
@@ -146,7 +146,7 @@
   {
     "file": "src/actions/invoices.ts",
     "description": "⚠️ la nota di credito riaddebita il bollo, cioè lo restituisce al cliente",
-    "find": "  const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);\n  const totals = totalsOf(final.lines, discount);",
-    "replace": "  const recharge = Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);\n  const totals = totalsOf(final.lines, discount);"
+    "find": "  const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge, deductions);\n  const totals = totalsOf(final.lines, discount);",
+    "replace": "  const recharge = Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge, deductions);\n  const totals = totalsOf(final.lines, discount);"
   }
 ]

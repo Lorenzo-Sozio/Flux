@@ -109,7 +109,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                           </Badge>
                         )}
                         <span className="text-muted-foreground text-xs">
-                          {t(`types.${r.documentType as "TD01" | "TD04"}`)}
+                          {t(`types.${r.documentType as "TD01" | "TD02" | "TD04"}`)}
                         </span>
                         {r.issueDate && (
                           <span className="text-muted-foreground text-xs tabular-nums">{r.issueDate}</span>
@@ -141,7 +141,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                         </TableCell>
                         <TableCell className="tabular-nums">{r.issueDate ?? "—"}</TableCell>
                         <TableCell>{r.companyName ?? "—"}</TableCell>
-                        <TableCell>{t(`types.${r.documentType as "TD01" | "TD04"}`)}</TableCell>
+                        <TableCell>{t(`types.${r.documentType as "TD01" | "TD02" | "TD04"}`)}</TableCell>
                         <TableCell>
                           <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
                             {t(`statuses.${r.status as "draft" | "issued"}`)}

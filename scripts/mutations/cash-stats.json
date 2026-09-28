@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/cash-stats.ts",
+    "description": "⚠️ senza fatture negli ultimi 90 giorni il DSO non è «nessuno» ma un numero inventato",
+    "find": "  if (!(invoiced > 0)) return null;",
+    "replace": "  if (false) return null;"
+  },
+  {
+    "file": "src/lib/cash-stats.ts",
+    "description": "⚠️⚠️ l'incassato raggruppa per mese UTC: un accredito del 1° settembre a Roma finisce in agosto",
+    "find": "      select currency, to_char(received_at at time zone 'UTC' at time zone ${tz}, 'YYYY-MM') as month, sum(amount) as amount",
+    "replace": "      select currency, to_char(received_at, 'YYYY-MM') as month, sum(amount) as amount"
+  },
+  {
+    "file": "src/lib/cash-stats.ts",
+    "description": "⚠️⚠️ il fatturato non toglie le note di credito",
+    "find": "             sum(case when document_type = 'TD04' then -total else total end) as amount",
+    "replace": "             sum(total) as amount"
+  },
+  {
+    "file": "src/lib/cash-stats.ts",
+    "description": "⚠️ la riscossione conta anche quanto pagato oltre il dovuto",
+    "find": "             sum(least(i.total - i.credited_amount, greatest(0, coalesce(p.paid, 0)))) as paid",
+    "replace": "             sum(greatest(0, coalesce(p.paid, 0))) as paid"
+  },
+  {
+    "file": "src/lib/cash-stats.ts",
+    "description": "⚠️⚠️ la riscossione conta anche le fatture non ancora scadute: sembra peggiore di quella che è",
+    "find": "        and coalesce(i.due_date, i.issue_date) < ${input.today}::date",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/customer-statement.ts",
+    "description": "⚠️ una fattura pagata il giorno stesso appare prima come credito del cliente",
+    "find": "  const order = (k: StatementKind) => (k === \"invoice\" || k === \"deposit_invoice\" ? 0 : k === \"credit_note\" ? 1 : 2);",
+    "replace": "  const order = (_k: StatementKind) => 0;"
+  },
+  {
+    "file": "src/lib/customer-statement.ts",
+    "description": "⚠️⚠️ l'estratto di un periodo parte da zero invece che dal saldo precedente",
+    "find": "          opening = balance;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/customer-statement.ts",
+    "description": "⚠️ l'estratto di un periodo include i movimenti successivi",
+    "find": "        if (input.to && m.date > input.to) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/load-outcome.ts",
+    "description": "⚠️ un piano senza il modulo viene mostrato come errore di caricamento",
+    "find": "    if (e?.name === \"EntitlementError\") return { ok: false, reason: \"plan\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/load-outcome.ts",
+    "description": "⚠️ un redirect di Next viene inghiottito come errore: la pagina non porta più al login",
+    "find": "    if (typeof e?.digest === \"string\" && e.digest.startsWith(\"NEXT_\")) throw err;",
+    "replace": ""
+  }
+]

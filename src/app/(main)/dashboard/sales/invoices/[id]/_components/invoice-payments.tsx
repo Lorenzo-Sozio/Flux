@@ -4,12 +4,14 @@ import { useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { BanknoteIcon, Loader2, Plus, Trash2 } from "lucide-react";
+import { BanknoteIcon, Loader2, Plus, Trash2, Undo2, WalletIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteInvoicePaymentAction, type getInvoicePayments, recordInvoicePaymentAction } from "@/actions/invoices";
+import { allocateCreditAction, recordRefundAction } from "@/actions/receipts";
 import { PAYMENT_TONE } from "@/app/(main)/dashboard/sales/orders/[id]/_components/order-tones";
+import { ReceiptEditDialog } from "@/components/crm/receipt-edit-dialog";
 import { StatusBadge } from "@/components/crm/record/record-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +30,10 @@ type Payments = NonNullable<Awaited<ReturnType<typeof getInvoicePayments>>>;
  * ⚠️ The rows and the balance come from the page, and every change refreshes it: the
  * receivables schedule on Finance reads the same rows, and a card with its own copy could
  * say "paid" while the schedule still chased the customer.
+ *
+ * I10: a payment carries the bank's reference and can be corrected; money the customer paid
+ * before and nothing has used (their credit) can pay this invoice in one click; money paid
+ * beyond what the invoice owes — a credit note after the payment — can be given back.
  */
 export function InvoicePaymentsCard({
   invoiceId,
@@ -50,7 +56,10 @@ export function InvoicePaymentsCard({
   const [amount, setAmount] = useState(balance.outstanding > 0 ? String(balance.outstanding) : "");
   const [paidAt, setPaidAt] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [method, setMethod] = useState("");
+  const [reference, setReference] = useState("");
+  const [refunding, setRefunding] = useState(false);
   const [pending, startTransition] = useTransition();
+  const credit = Math.round(data.credits.reduce((sum, c) => sum + c.left, 0) * 100) / 100;
 
   function add() {
     if (!isRecordablePayment(amount)) {
@@ -58,13 +67,48 @@ export function InvoicePaymentsCard({
       return;
     }
     startTransition(async () => {
-      const r = await recordInvoicePaymentAction(invoiceId, { amount, paidAt, method }).catch(() => null);
+      const r = await recordInvoicePaymentAction(invoiceId, { amount, paidAt, method, reference }).catch(() => null);
       if (!r?.ok) {
         toast.error(r?.error ?? t("recordFailed"));
         return;
       }
       setMethod("");
+      setReference("");
       setAdding(false);
+      router.refresh();
+    });
+  }
+
+  /** Spends the customer's credit on this invoice, oldest money first, up to what it owes. */
+  function spendCredit() {
+    startTransition(async () => {
+      let left = balance.outstanding;
+      for (const c of data.credits) {
+        if (left <= 0) break;
+        const share = Math.round(Math.min(left, c.left) * 100) / 100;
+        const r = await allocateCreditAction(c.id, invoiceId, share).catch(() => null);
+        if (!r?.ok) {
+          toast.error(r && !r.ok ? r.error : t("recordFailed"));
+          break;
+        }
+        left = Math.round((left - share) * 100) / 100;
+      }
+      router.refresh();
+    });
+  }
+
+  function refund() {
+    if (!isRecordablePayment(amount)) {
+      toast.error(t("amountInvalid"));
+      return;
+    }
+    startTransition(async () => {
+      const r = await recordRefundAction({ invoiceId, amount, paidAt, method, reference }).catch(() => null);
+      if (!r?.ok) {
+        toast.error(r && !r.ok ? r.error : t("recordFailed"));
+        return;
+      }
+      setRefunding(false);
       router.refresh();
     });
   }
@@ -111,8 +155,24 @@ export function InvoicePaymentsCard({
                   <p className="truncate text-muted-foreground text-xs">
                     {format.dateTime(new Date(p.paidAt), { dateStyle: "medium" })}
                     {p.method ? ` · ${p.method}` : ""}
+                    {p.reference ? ` · ${p.reference}` : ""}
+                    {p.receiptAmount && Number(p.receiptAmount) !== Number(p.amount)
+                      ? ` · ${ti("partOf", { amount: formatMoney(Math.abs(Number(p.receiptAmount)), currency) })}`
+                      : ""}
                   </p>
                 </div>
+                {canWrite && p.receiptId && (
+                  <ReceiptEditDialog
+                    receipt={{
+                      id: p.receiptId,
+                      amount: Math.abs(Number(p.receiptAmount ?? p.amount)),
+                      receivedAt: p.paidAt,
+                      method: p.method,
+                      reference: p.reference,
+                      note: p.note,
+                    }}
+                  />
+                )}
                 {canWrite && (
                   <Button
                     type="button"
@@ -131,6 +191,74 @@ export function InvoicePaymentsCard({
             ))}
           </ul>
         )}
+
+        {canWrite && credit > 0 && balance.outstanding > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-3 text-sm dark:border-emerald-900/50 dark:bg-emerald-950/20">
+            <span className="flex min-w-0 items-center gap-2">
+              <WalletIcon className="size-4 shrink-0 text-emerald-600" aria-hidden />
+              {ti("creditAvailable", { amount: formatMoney(credit, currency) })}
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={spendCredit} disabled={pending}>
+              {ti("useCredit", { amount: formatMoney(Math.min(credit, balance.outstanding), currency) })}
+            </Button>
+          </div>
+        )}
+
+        {canWrite &&
+          balance.outstanding < 0 &&
+          (refunding ? (
+            <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+              <p className="text-muted-foreground text-xs">{ti("refundHint")}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  step="0.01"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  aria-label={t("amount")}
+                  className="tabular-nums"
+                />
+                <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} aria-label={t("date")} />
+                <Input
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value)}
+                  placeholder={t("methodPlaceholder")}
+                  aria-label={t("method")}
+                />
+                <Input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder={t("referencePlaceholder")}
+                  aria-label={t("reference")}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setRefunding(false)} disabled={pending}>
+                  {t("cancel")}
+                </Button>
+                <Button type="button" onClick={refund} disabled={pending} className="gap-1.5">
+                  {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+                  {ti("recordRefund")}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-1.5"
+              onClick={() => {
+                setAmount(String(Math.abs(balance.outstanding)));
+                setRefunding(true);
+              }}
+              disabled={pending}
+            >
+              <Undo2 className="size-3.5" aria-hidden />{" "}
+              {ti("refund", { amount: formatMoney(Math.abs(balance.outstanding), currency) })}
+            </Button>
+          ))}
 
         {canWrite &&
           (adding ? (
@@ -163,16 +291,29 @@ export function InvoicePaymentsCard({
                   />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="invoice-payment-method" className="text-xs">
-                  {t("method")}
-                </Label>
-                <Input
-                  id="invoice-payment-method"
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  placeholder={t("methodPlaceholder")}
-                />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="invoice-payment-method" className="text-xs">
+                    {t("method")}
+                  </Label>
+                  <Input
+                    id="invoice-payment-method"
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    placeholder={t("methodPlaceholder")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="invoice-payment-reference" className="text-xs">
+                    {t("reference")}
+                  </Label>
+                  <Input
+                    id="invoice-payment-reference"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder={t("referencePlaceholder")}
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={() => setAdding(false)} disabled={pending}>

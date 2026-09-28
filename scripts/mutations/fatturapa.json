@@ -20,8 +20,8 @@
   {
     "file": "src/lib/fatturapa/totals.ts",
     "description": "⚠️ lo sconto viene calcolato anche sulla rivalsa del bollo",
-    "find": "  const discountAmount = round2(((subtotal - stamp) * (documentDiscountPercent ?? 0)) / 100);",
-    "replace": "  const discountAmount = round2((subtotal * (documentDiscountPercent ?? 0)) / 100);"
+    "find": "    if (!lines[i].isStampRecharge && !lines[i].isDeduction) g.own = round2(g.own + d.total);",
+    "replace": "    if (!lines[i].isDeduction) g.own = round2(g.own + d.total);"
   },
   {
     "file": "src/lib/fatturapa/totals.ts",

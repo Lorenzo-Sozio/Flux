@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/invoice-deposits.ts",
+    "description": "⚠️⚠️ la fattura d'acconto mette l'importo lordo come imponibile: l'IVA si paga due volte",
+    "find": "      unitPrice: round2(shares[i] / (1 + g.rate / 100)),",
+    "replace": "      unitPrice: round2(shares[i]),"
+  },
+  {
+    "file": "src/lib/invoice-deposits.ts",
+    "description": "⚠️ il saldo storna anche la rivalsa del bollo dell'acconto",
+    "find": "    const own = d.lines.filter((l) => !l.isStampRecharge);",
+    "replace": "    const own = d.lines;"
+  },
+  {
+    "file": "src/lib/invoice-deposits.ts",
+    "description": "⚠️⚠️ lo storno dell'acconto viene aggiunto invece che tolto",
+    "find": "        unitPrice: -g.taxable,",
+    "replace": "        unitPrice: g.taxable,"
+  },
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️ lo sconto del saldo si calcola al netto degli acconti, non sulle righe dell'ordine",
+    "find": "    if (!lines[i].isStampRecharge && !lines[i].isDeduction) g.own = round2(g.own + d.total);",
+    "replace": "    if (!lines[i].isStampRecharge) g.own = round2(g.own + d.total);"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️ un saldo con un'aliquota negativa dopo lo storno si può emettere: SDI lo scarta",
+    "find": "    deductions.length > 0 &&",
+    "replace": "    false &&"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ lo stesso acconto viene detratto da due saldi",
+    "find": "        AND deducted_in_invoice_id IS NULL\n        -- A deposit a credit note touched",
+    "replace": "        -- A deposit a credit note touched"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ il saldo prende il numero anche se un acconto non è stato detratto",
+    "find": "        AND (SELECT count(*) FROM deduct) = ${deducts.length}\n",
+    "replace": "\n"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ un acconto già detratto dal saldo si può anche stornare con nota di credito",
+    "find": "        AND deducted_in_invoice_id IS NULL\n        AND total - credited_amount",
+    "replace": "        AND total - credited_amount"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ un acconto toccato da una nota di credito viene detratto per intero",
+    "find": "        AND credited_amount = 0\n",
+    "replace": "\n"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ l'acconto pagato sull'ordine non arriva alla fattura d'acconto, e poi finisce sul saldo",
+    "find": "      where i.status = 'issued' and i.document_type in ('TD01', 'TD02') and i.order_id = ${orderId}",
+    "replace": "      where i.status = 'issued' and i.document_type in ('TD01') and i.order_id = ${orderId}"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️⚠️ la fattura d'acconto non è un credito verso il cliente: sparisce dallo scadenzario",
+    "find": "export const RECEIVABLE_TYPES: readonly string[] = [\"TD01\", \"TD02\"];",
+    "replace": "export const RECEIVABLE_TYPES: readonly string[] = [\"TD01\"];"
+  }
+]

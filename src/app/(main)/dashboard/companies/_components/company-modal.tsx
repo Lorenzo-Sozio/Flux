@@ -45,6 +45,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useDuplicateWatch } from "@/hooks/use-duplicate-watch";
 import { useMessageText } from "@/hooks/use-message-text";
 import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
+import { TERM_PRESET_KEYS } from "@/lib/payment-terms";
 
 import { MergeCompaniesModal } from "./merge-companies-modal";
 
@@ -58,6 +59,7 @@ type PriceListItem = LookupItem & { isActive?: boolean };
  * only way to take a customer off a list would be to never have put them on one.
  */
 const NO_PRICE_LIST = "__none__";
+const NO_TERMS = "__none__";
 
 const companySchema = z.object({
   name: z.string().min(1, "validation.crm.companyNameRequired"),
@@ -89,6 +91,7 @@ const companySchema = z.object({
   fiscalCode: z.string().optional(),
   pec: z.string().optional(),
   language: z.string().optional(),
+  paymentTerms: z.string().optional(),
   priceListId: z.string().optional().nullable(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
@@ -133,6 +136,7 @@ export function CompanyModal({
   priceLists?: PriceListItem[];
 }) {
   const t = useTranslations("companies");
+  const tT = useTranslations("invoices.terms");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
   const say = useMessageText();
@@ -200,6 +204,7 @@ export function CompanyModal({
       fiscalCode: company?.fiscalCode || "",
       pec: company?.pec || "",
       language: company?.language || "auto",
+      paymentTerms: company?.paymentTerms || NO_TERMS,
       priceListId: company?.priceListId ?? null,
     },
   });
@@ -264,6 +269,7 @@ export function CompanyModal({
         fiscalCode: company.fiscalCode || "",
         pec: company.pec || "",
         language: company.language || "auto",
+        paymentTerms: company.paymentTerms || NO_TERMS,
         priceListId: company.priceListId ?? null,
       });
     }
@@ -346,6 +352,7 @@ export function CompanyModal({
       companyCategoryId: data.companyCategoryId || null,
       companyTypeId: data.companyTypeId || null,
       language: data.language === "it" || data.language === "en" ? data.language : null,
+      paymentTerms: data.paymentTerms && data.paymentTerms !== NO_TERMS ? data.paymentTerms : null,
       // The empty option is a real answer — "catalogue prices" — so it is written
       // as null rather than left out of the payload for the column to keep.
       priceListId: data.priceListId === NO_PRICE_LIST ? null : data.priceListId || null,
@@ -648,6 +655,27 @@ export function CompanyModal({
                       )}
                     />
                     <p className="text-muted-foreground text-xs">{t("form.languageHint")}</p>
+                  </F>
+                  <F label={tT("customerDefault")}>
+                    <Controller
+                      control={control}
+                      name="paymentTerms"
+                      render={({ field }) => (
+                        <Select value={field.value || NO_TERMS} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_TERMS}>{tT("none")}</SelectItem>
+                            {TERM_PRESET_KEYS.map((k) => (
+                              <SelectItem key={k} value={k}>
+                                {tT(`presets.${k}`)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
                   </F>
                   {/* A plain select, not the creatable combobox the categories use:
                       a price list is a commercial decision made on its own screen,

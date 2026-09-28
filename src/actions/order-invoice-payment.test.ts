@@ -54,7 +54,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   events.length = 0;
-  for (const t of ["order_payment", "invoice", "order"]) await db.execute(sql.raw(`delete from "${t}"`));
+  for (const t of ["order_payment", "receipt", "invoice", "order"]) await db.execute(sql.raw(`delete from "${t}"`));
   await db.execute(
     sql`insert into "order" (id, order_number, status, total_amount) values ('o1', 'ORD-1', 'confirmed', '1000')`,
   );
@@ -71,12 +71,22 @@ describe("⚠️⚠️ a payment on an order and the order's invoice", () => {
     expect(events).toEqual([{ name: "invoice.paid", payload: { id: "only", paid: 1000, due: 1000 } }]);
   });
 
-  it("several issued invoices: nobody can say which, so it stays on the order", async () => {
+  it("⚠️⚠️ several issued invoices: it must say which — and then it pays that one", async () => {
+    // I10: it used to stay on the order, and both invoices then read unpaid for ever.
     await invoice("a");
     await invoice("b");
-    await recordOrderPayment("o1", { amount: 400 });
-    expect(await links()).toEqual([null]);
-    expect(events).toEqual([]);
+    await expect(recordOrderPayment("o1", { amount: 400 })).rejects.toThrow("paymentChooseInvoice");
+    expect(await links()).toEqual([]);
+    await recordOrderPayment("o1", { amount: 400, invoiceId: "b" });
+    expect(await links()).toEqual(["b"]);
+    // An invoice of another order is not one it can pay.
+    await db.execute(
+      sql`insert into "order" (id, order_number, status, total_amount) values ('o2', 'ORD-2', 'confirmed', '10')`,
+    );
+    await db.execute(
+      sql`insert into invoice (id, status, document_type, total, order_id) values ('other', 'issued', 'TD01', '10', 'o2')`,
+    );
+    await expect(recordOrderPayment("o1", { amount: 5, invoiceId: "other" })).rejects.toThrow("notFound");
   });
 
   it("no invoice yet: on the order, as before", async () => {

@@ -1,0 +1,86 @@
+[
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ lo stesso credito si spende due volte: il controllo dopo l'imputazione non rifiuta più nulla",
+    "find": "> abs(\"receipt\".\"amount\") then 0 else 1 end)`,",
+    "replace": "> abs(\"receipt\".\"amount\") then 1 else 1 end)`,"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ un bonifico paga più di quanto è arrivato",
+    "find": "  if (cents(parts.reduce((s, p) => s + p.amount, 0)) > cents(amount)) return { ok: false, reason: \"over_allocated\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ un bonifico di un cliente paga la fattura di un altro",
+    "find": "  if (customerIds.size > 1) return { ok: false, reason: \"other_customer\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ un credito in euro paga una fattura in dollari",
+    "find": "  if (receipt.currency !== doc.currency) return { ok: false, reason: \"mixed_currency\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ l'acconto di un ordine finisce sulla fattura di un altro ordine",
+    "find": "  if (!allocation.orderId || doc.orderId !== allocation.orderId) return { ok: false, reason: \"other_customer\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ cancellare un pagamento lascia l'incasso: l'incassato conta soldi mai arrivati",
+    "find": "  if (row.receiptId && Number(row.siblings) <= 1) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ correggere l'importo di un pagamento non corregge ciò che la fattura ha ricevuto",
+    "find": "  const whole = allocations.length === 1 && cents(Number(allocations[0].amount)) === cents(Number(receipt.amount));",
+    "replace": "  const whole = false;"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ si rimborsa su una fattura più di quanto è stato pagato in eccesso",
+    "find": "    if (cents(over) < cents(amount)) return { ok: false, reason: \"not_overpaid\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ si rimborsa un credito che il cliente non ha",
+    "find": "  if (cents(credit) < cents(amount)) return { ok: false, reason: \"no_credit\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ il credito del cliente somma le imputazioni invece di toglierle",
+    "find": "      credit: sql<string>`sum(${receipts.amount}) - coalesce(",
+    "replace": "      credit: sql<string>`sum(${receipts.amount}) + coalesce("
+  },
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "⚠️ un incasso con una data futura entra nell'incassato del mese",
+    "find": "  if (value > toWallDate(now, zone)) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/merge-children.ts",
+    "description": "⚠️⚠️ unendo due aziende, gli incassi e il credito restano sull'azienda cancellata",
+    "find": "  { table: receipts, field: \"companyId\" },",
+    "replace": ""
+  },
+  {
+    "file": "src/db/auto-migrate.ts",
+    "description": "⚠️⚠️ i pagamenti registrati dal codice vecchio dopo la migrazione 0059 restano senza incasso: l'incassato non li conta mai",
+    "find": "  if (target >= RECEIPTS_SINCE) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ la riparazione crea l'incasso ma non lo collega al pagamento",
+    "find": "    update order_payment set receipt_id = order_payment.id",
+    "replace": "    update order_payment set receipt_id = null"
+  }
+]

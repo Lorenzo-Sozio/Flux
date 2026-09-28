@@ -20,7 +20,7 @@
   {
     "file": "src/db/auto-migrate.ts",
     "description": "il controllo «gia' aggiornato» sparisce: la migrazione viene tentata a ogni processo anche quando non c'e' nulla da fare",
-    "find": "  if (lastApplied >= target) return;",
-    "replace": ""
+    "find": "  if (lastApplied < target) {",
+    "replace": "  if (true) {"
   }
 ]

@@ -196,6 +196,51 @@ const GROUPS: ApiGroup[] = [
         ],
       },
       {
+        id: "companies-statement",
+        method: "GET",
+        path: "/api/companies/{id}/statement",
+        summary: "Estratto conto del cliente come CSV",
+        description:
+          "Ogni fattura, fattura d'acconto e nota di credito emessa per l'azienda e ogni incasso o rimborso, in ordine di data, con il saldo dopo ciascuno, per valuta. `from` e `to` (AAAA-MM-GG) limitano il periodo; la prima riga di ogni valuta è il saldo iniziale. Intestazioni nella lingua di chi scarica; in italiano separatore `;` e virgola decimale. Richiede la capacità `record:export` e il modulo vendite.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "L'azienda.", example: "cmp_01JX" },
+          {
+            name: "from",
+            in: "query",
+            required: false,
+            type: "date",
+            description: "Primo giorno del periodo.",
+            example: "2026-01-01",
+          },
+          {
+            name: "to",
+            in: "query",
+            required: false,
+            type: "date",
+            description: "Ultimo giorno del periodo.",
+            example: "2026-12-31",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "CSV file",
+            example: `Data;Valuta;Movimento;Documento;Riferimento;Dare;Avere;Saldo
+2026-09-01;EUR;Fattura;12;;1220,00;;1220,00
+2026-09-15;EUR;Incasso;;CRO-1;;1220,00;0,00`,
+          },
+          { status: 400, description: "Data non in formato AAAA-MM-GG", example: "Bad date" },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+          {
+            status: 403,
+            description: "Senza la capacità `record:export` o senza il modulo vendite",
+            example: JSON.stringify({ error: "Forbidden" }, null, 2),
+          },
+          { status: 404, description: "Azienda inesistente", example: "Not found" },
+        ],
+      },
+      {
         id: "companies-import",
         method: "POST",
         path: "/api/companies/import",

@@ -20,6 +20,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createInvoice, type getNewInvoiceData, getOrderForInvoice, issueInvoiceAction } from "@/actions/invoices";
+import { PaymentTermsField } from "@/components/crm/payment-terms-field";
 import { PriceListNote } from "@/components/crm/price-list-note";
 import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { usePriceRules } from "@/components/crm/use-price-rules";
@@ -48,6 +49,7 @@ import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps } from "@/lib/fiscal-ids";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
+import { installmentsMatch, isPreset, type PaymentTerms } from "@/lib/payment-terms";
 import { priceFor } from "@/lib/price-list";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 import { cn } from "@/lib/utils";
@@ -100,6 +102,12 @@ export function NewInvoiceForm({
   const [discount, setDiscount] = useState(String(initialOrder?.discountPercent ?? 0));
   const [paymentMethod, setPaymentMethod] = useState("MP05");
   const [dueDate, setDueDate] = useState(addDays(today, 30));
+  // The customer's usual terms (I12), until somebody chooses otherwise on this form.
+  const termsOf = (id: string): PaymentTerms | null => {
+    const preset = data.companies.find((c) => c.id === id)?.paymentTerms;
+    return isPreset(preset) ? { preset } : null;
+  };
+  const [terms, setTerms] = useState<PaymentTerms | null>(() => termsOf(initialOrder?.companyId ?? ""));
   const [series, setSeries] = useState("");
   const [stampMode, setStampMode] = useState<StampMode>("auto");
   const [stampNote, setStampNote] = useState("");
@@ -159,7 +167,13 @@ export function NewInvoiceForm({
       text: `${t("customerLabel")}: ${tI(`fields.${g.field}` as "fields.vatNumber")} — ${tI(`problems.${g.problem}`)}`,
       href: company ? `/dashboard/companies/${company.id}` : undefined,
     })),
-    ...draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote }).map((p) => ({
+    ...[
+      ...draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote }),
+      // Installments written by hand add up to the total as it is now (I12).
+      ...(terms && "custom" in terms && !installmentsMatch(terms.custom, totals.total)
+        ? [{ kind: "installments_total" as const }]
+        : []),
+    ].map((p) => ({
       key: `d-${p.kind}-${"line" in p ? p.line : ""}`,
       text: t(`problems.${p.kind}`, { line: "line" in p ? p.line : 0 }),
       href: undefined,
@@ -182,7 +196,10 @@ export function NewInvoiceForm({
         return;
       }
       setOrderId(value);
-      if (loaded.companyId) setCompanyId(loaded.companyId);
+      if (loaded.companyId) {
+        setCompanyId(loaded.companyId);
+        setTerms(termsOf(loaded.companyId));
+      }
       setCurrency(loaded.currency);
       setDiscount(String(loaded.discountPercent));
       setLines(
@@ -209,6 +226,7 @@ export function NewInvoiceForm({
       stampDutyMode: stampMode,
       stampDutyNote: stampNote,
       paymentMethod,
+      paymentTerms: terms,
       notes,
       lines: draftLines,
     });
@@ -342,6 +360,7 @@ export function NewInvoiceForm({
                     value={companyId}
                     onChange={(v) => {
                       setCompanyId(v);
+                      setTerms(termsOf(v));
                       if (order && order.companyId !== v) setOrderId("");
                     }}
                     placeholder={tn("chooseCustomer")}
@@ -475,9 +494,22 @@ export function NewInvoiceForm({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="new-inv-due">{t("dueDate")}</Label>
-                <Input id="new-inv-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              {/* With terms, the due date comes from them at issue (I12). */}
+              {!terms && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="new-inv-due">{t("dueDate")}</Label>
+                  <Input id="new-inv-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+              )}
+              <div className="sm:col-span-2">
+                <PaymentTermsField
+                  id="new-inv-terms"
+                  terms={terms}
+                  onChange={setTerms}
+                  total={totals.total}
+                  today={today}
+                  money={money}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="new-inv-discount">{t("documentDiscount")}</Label>

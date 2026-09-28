@@ -7,8 +7,8 @@
  * changes what was due, the other what arrived. Both come off, each from its own column,
  * and the arithmetic is `paymentSummary` — the same one an order's page uses.
  *
- * ⚠️ **Only an issued invoice (TD01) is a receivable.** A draft is not a debt yet, and a
- * credit note is money going the other way.
+ * ⚠️ **Only an issued invoice or deposit invoice (TD01, TD02) is a receivable.** A draft is not
+ * a debt yet, and a credit note is money going the other way.
  *
  * ⚠️ **Due is the due date, or the issue date when none was set**: an invoice that names no
  * term is due on receipt, and one that could never be overdue would never be chased.
@@ -18,10 +18,13 @@
  * ⚠️ **Amounts are per currency.** An invoice in dollars and one in euros are not added up;
  * the schedule's totals are grouped by currency, like every total across documents.
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { companies, invoices, orderPayments } from "@/db/schema";
-import { type PaymentState, parsePaymentAmount, paymentSummary } from "@/lib/order-payment";
+import { companies, invoices, orderPayments, receipts } from "@/db/schema";
+import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
+import { type PaymentState, paymentSummary } from "@/lib/order-payment";
+import { type Installment, type InstallmentState, installmentStates } from "@/lib/payment-terms";
+import { recordReceipt } from "@/lib/receipts";
 
 import { AGING_BUCKETS, type AgingBucket, agingBucket } from "./receivables-aging";
 
@@ -55,6 +58,10 @@ export interface Receivable {
   outstanding: number;
   daysOverdue: number;
   bucket: AgingBucket;
+  /** Paid in parts (I12): each installment with what it still owes, the earliest paid first. */
+  installments: InstallmentState[] | null;
+  /** What is past due now: the whole outstanding, or only the installments whose day has come. */
+  overdueAmount: number;
 }
 
 export interface ReceivablesSchedule {
@@ -68,7 +75,10 @@ export interface ReceivablesSchedule {
  * Every issued invoice still owed something, the most overdue first. One statement, with
  * the payments summed per invoice inside it.
  */
-export async function receivables(db: AnyDb, input: { today: string }): Promise<ReceivablesSchedule> {
+export async function receivables(
+  db: AnyDb,
+  input: { today: string /** One customer's only: what a receipt from them can pay. */; companyId?: string },
+): Promise<ReceivablesSchedule> {
   const paidPerInvoice = db
     .select({
       invoiceId: orderPayments.invoiceId,
@@ -91,6 +101,7 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
     total: string;
     credited: string;
     paid: string | null;
+    installments: Installment[] | null;
   }[] = await db
     .select({
       id: invoices.id,
@@ -104,6 +115,7 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
       total: invoices.total,
       credited: invoices.creditedAmount,
       paid: paidPerInvoice.paid,
+      installments: invoices.installments,
     })
     .from(invoices)
     .leftJoin(paidPerInvoice, eq(paidPerInvoice.invoiceId, invoices.id))
@@ -111,7 +123,8 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
     .where(
       and(
         eq(invoices.status, "issued"),
-        eq(invoices.documentType, "TD01"),
+        inArray(invoices.documentType, [...RECEIVABLE_TYPES]),
+        input.companyId ? eq(invoices.companyId, input.companyId) : undefined,
         // A tenth of a cent is not a debt: the same threshold paymentSummary uses.
         sql`round(${invoices.total} - ${invoices.creditedAmount} - coalesce(${paidPerInvoice.paid}, 0), 2) > 0`,
       ),
@@ -120,8 +133,23 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
   const list: Receivable[] = rows
     .map((r) => {
       const balance = invoiceBalance(r.total, r.credited, [{ amount: r.paid }]);
-      const due = r.dueDate ?? r.issueDate ?? input.today;
+      const plan =
+        r.installments && r.installments.length > 1
+          ? installmentStates(r.installments, balance.due, balance.paid)
+          : null;
+      // Paid in parts, the invoice is as late as its first installment still owed.
+      const next = plan?.find((i) => i.outstanding > 0);
+      const due = next?.dueDate ?? r.dueDate ?? r.issueDate ?? input.today;
       const aging = agingBucket(due, input.today);
+      const overdueAmount = plan
+        ? Math.round(
+            plan
+              .filter((i) => agingBucket(i.dueDate, input.today).bucket !== "current")
+              .reduce((s, i) => s + i.outstanding, 0) * 100,
+          ) / 100
+        : aging.bucket === "current"
+          ? 0
+          : balance.outstanding;
       return {
         id: r.id,
         documentNumber: r.documentNumber,
@@ -136,6 +164,8 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
         paid: balance.paid,
         outstanding: balance.outstanding,
         ...aging,
+        installments: plan,
+        overdueAmount,
       };
     })
     .sort((a, b) => b.daysOverdue - a.daysOverdue || a.dueDate.localeCompare(b.dueDate));
@@ -148,9 +178,17 @@ export async function receivables(db: AnyDb, input: { today: string }): Promise<
       outstanding: 0,
       overdue: 0,
     };
-    t.buckets[r.bucket] = Math.round((t.buckets[r.bucket] + r.outstanding) * 100) / 100;
+    // Each installment in its own bucket: 300 due next month is not 90 days late because the
+    // first 300 was.
+    const parts = r.installments
+      ? r.installments.filter((i) => i.outstanding > 0).map((i) => ({ amount: i.outstanding, dueDate: i.dueDate }))
+      : [{ amount: r.outstanding, dueDate: r.dueDate }];
+    for (const part of parts) {
+      const { bucket } = agingBucket(part.dueDate, input.today);
+      t.buckets[bucket] = Math.round((t.buckets[bucket] + part.amount) * 100) / 100;
+      if (bucket !== "current") t.overdue = Math.round((t.overdue + part.amount) * 100) / 100;
+    }
     t.outstanding = Math.round((t.outstanding + r.outstanding) * 100) / 100;
-    if (r.bucket !== "current") t.overdue = Math.round((t.overdue + r.outstanding) * 100) / 100;
     byCurrency.set(r.currency, t);
   }
   return { today: input.today, invoices: list, totals: [...byCurrency.values()] };
@@ -175,47 +213,33 @@ export async function recordInvoicePayment(
     amount: unknown;
     paidAt?: Date;
     method?: string | null;
+    reference?: string | null;
     note?: string | null;
     by: string | null;
   },
 ): Promise<RecordPaymentResult> {
-  // One reading of the amount, for the check and for the write (src/lib/order-payment.ts).
-  const amount = parsePaymentAmount(input.amount);
-  if (amount === null) return { ok: false, reason: "invalid_amount" };
-  const [invoice] = await db
-    .select({
-      id: invoices.id,
-      status: invoices.status,
-      documentType: invoices.documentType,
-      orderId: invoices.orderId,
-      total: invoices.total,
-      credited: invoices.creditedAmount,
-    })
-    .from(invoices)
-    .where(eq(invoices.id, input.invoiceId));
-  if (!invoice) return { ok: false, reason: "not_found" };
-  if (invoice.status !== "issued" || invoice.documentType !== "TD01") return { ok: false, reason: "not_receivable" };
-
-  const paymentId = crypto.randomUUID();
-  await db.insert(orderPayments).values({
-    id: paymentId,
-    orderId: invoice.orderId,
-    invoiceId: invoice.id,
-    amount: String(amount),
-    paidAt: input.paidAt ?? new Date(),
-    method: input.method?.trim() || null,
-    note: input.note?.trim() || null,
-    recordedById: input.by,
+  // A receipt with one allocation, all of it to this invoice (src/lib/receipts.ts).
+  const result = await recordReceipt(db, {
+    amount: input.amount,
+    receivedAt: input.paidAt ?? new Date(),
+    method: input.method,
+    reference: input.reference,
+    note: input.note,
+    by: input.by,
+    allocations: [{ invoiceId: input.invoiceId, amount: input.amount }],
   });
-  const rows = await db
-    .select({ amount: orderPayments.amount })
-    .from(orderPayments)
-    .where(eq(orderPayments.invoiceId, invoice.id));
-  const balance = invoiceBalance(invoice.total, invoice.credited, rows);
-  const settled = balance.outstanding <= 0;
-  // Settled now, and not before this payment's amount arrived.
-  const becamePaid = settled && balance.outstanding + amount > 0;
-  return { ok: true, paymentId, balance, becamePaid };
+  if (!result.ok) {
+    const reason = result.reason === "invalid_allocation" ? "invalid_amount" : result.reason;
+    return { ok: false, reason: reason === "not_found" || reason === "invalid_amount" ? reason : "not_receivable" };
+  }
+  const balance = await balanceOf(db, input.invoiceId);
+  if (!balance) return { ok: false, reason: "not_found" };
+  return {
+    ok: true,
+    paymentId: result.allocationIds[0],
+    balance,
+    becamePaid: result.settled.some((x) => x.invoiceId === input.invoiceId),
+  };
 }
 
 /** The payments that name an invoice, newest first. */
@@ -226,6 +250,10 @@ export interface InvoicePayment {
   method: string | null;
   note: string | null;
   recordedById: string | null;
+  /** The money this is a share of (I10): its reference, and whether it paid other documents too. */
+  receiptId: string | null;
+  reference: string | null;
+  receiptAmount: string | null;
 }
 
 export async function invoicePayments(db: AnyDb, invoiceId: string): Promise<InvoicePayment[]> {
@@ -237,8 +265,12 @@ export async function invoicePayments(db: AnyDb, invoiceId: string): Promise<Inv
       method: orderPayments.method,
       note: orderPayments.note,
       recordedById: orderPayments.recordedById,
+      receiptId: orderPayments.receiptId,
+      reference: receipts.reference,
+      receiptAmount: receipts.amount,
     })
     .from(orderPayments)
+    .leftJoin(receipts, eq(receipts.id, orderPayments.receiptId))
     .where(eq(orderPayments.invoiceId, invoiceId))
     .orderBy(sql`${orderPayments.paidAt} desc`);
 }
@@ -255,7 +287,7 @@ export async function linkOrderPayments(db: AnyDb, orderId: string): Promise<num
     from (
       select i.order_id, min(i.id) as id
       from invoice i
-      where i.status = 'issued' and i.document_type = 'TD01' and i.order_id = ${orderId}
+      where i.status = 'issued' and i.document_type in ('TD01', 'TD02') and i.order_id = ${orderId}
       group by i.order_id
       having count(*) = 1
     ) only_one

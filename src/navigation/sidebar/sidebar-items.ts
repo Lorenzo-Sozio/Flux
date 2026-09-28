@@ -20,6 +20,7 @@ import {
   HelpCircle,
   Kanban,
   KeyRound,
+  Landmark,
   LifeBuoy,
   LineChart,
   ListOrdered,
@@ -319,6 +320,14 @@ export const sidebarItems: NavGroup[] = [
         icon: Banknote,
         module: "sales",
         need: "settings:manage",
+      },
+      // Bank reconciliation (I13): the statement beside what customers owe. Admin, like the page.
+      {
+        titleKey: "bank",
+        url: "/dashboard/sales/bank",
+        icon: Landmark,
+        module: "sales",
+        need: "bank:reconcile",
       },
       // ⚠️ Here rather than beside the orders, where it used to sit: it is not a sales
       // number. It says what the thing writing into this CRM has been doing — leads,

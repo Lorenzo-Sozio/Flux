@@ -35,7 +35,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
   // Only an issued invoice is owed anything; a credit note is money going the other way.
   const payments =
-    data.invoice.status === "issued" && data.invoice.documentType === "TD01" ? await getInvoicePayments(id) : null;
+    data.invoice.status === "issued" && ["TD01", "TD02"].includes(data.invoice.documentType)
+      ? await getInvoicePayments(id)
+      : null;
 
   // A draft has no number yet: the customer is what names it until it is issued.
   const visitType = data.invoice.documentType === "TD04" ? "creditNote" : "invoice";

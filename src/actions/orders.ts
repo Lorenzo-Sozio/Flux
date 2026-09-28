@@ -20,18 +20,21 @@ import {
   products,
   quoteItems,
   quotes,
+  receipts,
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { contactReach } from "@/lib/contact-reach";
 import { computeDocument } from "@/lib/document-totals";
 import { recordFieldChanges } from "@/lib/field-history";
+import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
 import { nextOrderNumber } from "@/lib/order-number";
 import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import type { OrderStatus } from "@/lib/order-status";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { closingStageFor } from "@/lib/pipelines";
-import { recordInvoicePayment } from "@/lib/receivables";
+import { linkAllocation, recordReceipt, removeAllocation, type Settled } from "@/lib/receipts";
+import { balanceOf } from "@/lib/receivables";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { dispatchWebhook } from "@/lib/webhook-dispatch";
@@ -786,7 +789,7 @@ export async function getOrdersByDeal(dealId: string) {
 
 // ─── Money that arrived ───────────────────────────────────────────────────────
 
-/** Every payment recorded against an order, newest first. */
+/** Every payment recorded against an order, newest first, with the invoice it paid. */
 export async function getOrderPayments(orderId: string) {
   await requireCapability("record:read");
   const db = await getDb();
@@ -798,11 +801,48 @@ export async function getOrderPayments(orderId: string) {
       method: orderPayments.method,
       note: orderPayments.note,
       recordedBy: users.name,
+      invoiceId: orderPayments.invoiceId,
+      invoiceNumber: invoices.documentNumber,
+      receiptId: orderPayments.receiptId,
+      reference: receipts.reference,
+      receiptAmount: receipts.amount,
     })
     .from(orderPayments)
     .leftJoin(users, eq(orderPayments.recordedById, users.id))
+    .leftJoin(invoices, eq(invoices.id, orderPayments.invoiceId))
+    .leftJoin(receipts, eq(receipts.id, orderPayments.receiptId))
     .where(eq(orderPayments.orderId, orderId))
     .orderBy(desc(orderPayments.paidAt));
+}
+
+/** The order's issued invoices, with what each still owes: what a payment on the order can pay. */
+export async function getOrderInvoicesToPay(orderId: string) {
+  await requireCapability("record:read");
+  const db = await getDb();
+  const rows = await tolerateUnmigrated(
+    "invoice payments",
+    () =>
+      db
+        .select({ id: invoices.id, number: invoices.documentNumber, currency: invoices.currency })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.orderId, orderId),
+            eq(invoices.status, "issued"),
+            inArray(invoices.documentType, [...RECEIVABLE_TYPES]),
+          ),
+        )
+        .orderBy(invoices.issueDate),
+    [] as { id: string; number: string | null; currency: string }[],
+  );
+  return Promise.all(
+    rows.map(async (r) => ({
+      id: r.id,
+      number: r.number,
+      currency: r.currency,
+      outstanding: (await balanceOf(db, r.id))?.outstanding ?? 0,
+    })),
+  );
 }
 
 /**
@@ -815,10 +855,15 @@ export async function getOrderPayments(orderId: string) {
  * Larger than the total is allowed. Deposits, rounding and a customer paying the
  * gross of something invoiced net all happen, and an order that says "overpaid" is
  * more useful than a form that says no.
+ *
+ * ⚠️⚠️ Which invoice it pays (I10): the one named; the order's only issued invoice when
+ * there is one; none when there is none yet — a deposit, which reaches the invoice when it
+ * is issued. With several issued invoices it must be said: it used to stay on the order, and
+ * every one of those invoices then read unpaid for ever.
  */
 export async function recordOrderPayment(
   orderId: string,
-  data: { amount: number; paidAt?: string; method?: string; note?: string },
+  data: { amount: number; paidAt?: string; method?: string; note?: string; reference?: string; invoiceId?: string },
 ) {
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
@@ -832,49 +877,73 @@ export async function recordOrderPayment(
   const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
   if (!order) throw new Error(t("notFound"));
 
-  // ⚠️ With exactly one issued invoice there is no doubt which one this money pays (I9, the
-  // same rule migration 0053 applied to the past): it is recorded against it, and the
-  // invoice's balance and the receivables schedule see it. With several, it stays on the
-  // order — guessing would mark the wrong invoice paid.
   const issued = await tolerateUnmigrated(
     "invoice payments",
     () =>
       db
         .select({ id: invoices.id })
         .from(invoices)
-        .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "issued"), eq(invoices.documentType, "TD01"))),
+        .where(
+          and(
+            eq(invoices.orderId, orderId),
+            eq(invoices.status, "issued"),
+            inArray(invoices.documentType, [...RECEIVABLE_TYPES]),
+          ),
+        ),
     [] as { id: string }[],
   );
-  if (issued.length === 1) {
-    const paid = await recordInvoicePayment(db, {
-      invoiceId: issued[0].id,
-      amount,
-      paidAt,
-      method: data.method,
-      note: data.note,
-      by: actor.userId,
-    });
-    if (paid.ok && paid.becamePaid) {
-      dispatchWebhook(
-        "invoice.paid",
-        { id: issued[0].id, paid: paid.balance.paid, due: paid.balance.due },
-        { via: "user", actor: actor.userId },
-      ).catch((err) => console.error("[orders] invoice.paid not dispatched", err));
-    }
-    revalidatePath(`/dashboard/sales/invoices/${issued[0].id}`);
-  } else {
-    await db.insert(orderPayments).values({
-      orderId,
-      amount: String(amount),
-      paidAt,
-      method: data.method?.trim() || null,
-      note: data.note?.trim() || null,
-      recordedById: actor.userId,
-    });
-  }
+  let invoiceId: string | null = null;
+  if (data.invoiceId) {
+    if (!issued.some((i) => i.id === data.invoiceId)) throw new Error(t("notFound"));
+    invoiceId = data.invoiceId;
+  } else if (issued.length === 1) invoiceId = issued[0].id;
+  else if (issued.length > 1) throw new Error(t("paymentChooseInvoice"));
+  if (invoiceId) await requireCapability("invoice:write");
 
+  const result = await recordReceipt(db, {
+    amount,
+    receivedAt: paidAt,
+    method: data.method,
+    reference: data.reference,
+    note: data.note,
+    by: actor.userId,
+    allocations: [invoiceId ? { invoiceId, amount } : { orderId, amount }],
+  });
+  if (!result.ok) throw new Error(t("paymentPositive"));
+  announcePaid(result.settled, actor.userId);
+
+  if (invoiceId) revalidatePath(`/dashboard/sales/invoices/${invoiceId}`);
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
   revalidatePath("/dashboard/sales/orders");
+  revalidatePath("/dashboard/sales/finance");
+  return { success: true };
+}
+
+/** `invoice.paid` for every invoice a write settled: the accounting system waits for it. */
+function announcePaid(settled: Settled[], actor: string) {
+  for (const s of settled) {
+    dispatchWebhook("invoice.paid", { id: s.invoiceId, paid: s.paid, due: s.due }, { via: "user", actor }).catch(
+      (err) => console.error("[orders] invoice.paid not dispatched", err),
+    );
+  }
+}
+
+/** A deposit that stayed on the order, given to one of the order's issued invoices (I10). */
+export async function linkOrderPaymentToInvoice(paymentId: string, invoiceId: string) {
+  const actor = await requireCapability("invoice:write");
+  await requireCapability("order:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const result = await linkAllocation(db, { allocationId: paymentId, invoiceId });
+  if (!result.ok) throw new Error((await getTranslations("validation.orders"))("notFound"));
+  announcePaid(result.settled, actor.userId);
+  const [row] = await db
+    .select({ orderId: orderPayments.orderId })
+    .from(orderPayments)
+    .where(eq(orderPayments.id, paymentId));
+  if (row?.orderId) revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
+  revalidatePath(`/dashboard/sales/invoices/${invoiceId}`);
+  revalidatePath("/dashboard/sales/finance");
   return { success: true };
 }
 
@@ -884,6 +953,11 @@ export async function recordOrderPayment(
  * Money recorded by mistake has to be removable by whoever can write the order:
  * the alternative is a second, negative payment, which makes the total say
  * something that never happened.
+ *
+ * ⚠️ A payment that paid an invoice changes what the invoice owes, so taking it back asks for
+ * the invoice's permission too (I10); from the order's page it used to need the order's only.
+ * The receipt goes with it when this was its only allocation; otherwise the share returns to
+ * the customer's credit.
  */
 export async function deleteOrderPayment(paymentId: string) {
   await requireCapability("order:write");
@@ -891,14 +965,17 @@ export async function deleteOrderPayment(paymentId: string) {
   const db = await getDb();
 
   const [row] = await db
-    .select({ orderId: orderPayments.orderId })
+    .select({ invoiceId: orderPayments.invoiceId })
     .from(orderPayments)
     .where(eq(orderPayments.id, paymentId));
   if (!row) return { success: true };
+  if (row.invoiceId) await requireCapability("invoice:write");
 
-  await db.delete(orderPayments).where(eq(orderPayments.id, paymentId));
-  revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
+  const removed = await removeAllocation(db, paymentId);
+  if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);
+  if (removed.invoiceId) revalidatePath(`/dashboard/sales/invoices/${removed.invoiceId}`);
   revalidatePath("/dashboard/sales/orders");
+  revalidatePath("/dashboard/sales/finance");
   return { success: true };
 }
 

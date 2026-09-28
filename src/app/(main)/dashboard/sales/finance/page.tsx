@@ -2,11 +2,13 @@ import Link from "next/link";
 
 import { getTranslations } from "next-intl/server";
 
-import { getFinanceDashboard } from "@/actions/finance";
+import { getCashStats, getFinanceDashboard } from "@/actions/finance";
 import { getReceivables } from "@/actions/invoices";
 import { Button } from "@/components/ui/button";
+import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { requirePageCapability } from "@/lib/page-guard";
 
+import { CashCard, CashError } from "./_components/cash-card";
 import { CashFlowOverview } from "./_components/cash-flow-overview";
 import { FinanceKPICards } from "./_components/finance-kpi-cards";
 import { ReceivablesCard } from "./_components/receivables-card";
@@ -18,12 +20,16 @@ export default async function FinancePage() {
   // the way of being told changes.
   await requirePageCapability("settings:manage", "/dashboard/sales/finance");
 
-  const [data, t, receivables] = await Promise.all([
+  const [data, t, cashOutcome, receivablesOutcome] = await Promise.all([
     getFinanceDashboard(),
     getTranslations("finance"),
-    // Without the sales module there are no invoices to chase: the card is simply absent.
-    getReceivables().catch(() => null),
+    // ⚠️ A figure that did not load is said to have failed, never shown as zero (I14). Without the
+    // sales module there are no invoices to chase: the cards are simply absent.
+    loadOutcome("finance cash", () => getCashStats()),
+    loadOutcome("finance receivables", () => getReceivables()),
   ]);
+  const cash = loadedValue(cashOutcome);
+  const receivables = loadedValue(receivablesOutcome);
 
   return (
     <div className="space-y-6">
@@ -41,10 +47,18 @@ export default async function FinancePage() {
         </Button>
       </div>
 
-      <FinanceKPICards data={data} />
+      {cash && <CashCard stats={cash} />}
+      {failed(cashOutcome) && <CashError text={t("cash.loadError")} />}
 
       {receivables && <ReceivablesCard schedule={JSON.parse(JSON.stringify(receivables))} />}
+      {failed(receivablesOutcome) && <CashError text={t("cash.receivablesError")} />}
 
+      {/* What was sold, under its own name: it used to be called revenue, and it is not cash. */}
+      <div className="pt-2">
+        <h2 className="font-semibold text-lg">{t("salesTitle")}</h2>
+        <p className="text-muted-foreground text-sm">{t("salesSubtitle")}</p>
+      </div>
+      <FinanceKPICards data={data} />
       <CashFlowOverview revenueTrend={data.revenueTrend} />
     </div>
   );

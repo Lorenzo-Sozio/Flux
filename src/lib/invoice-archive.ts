@@ -63,16 +63,33 @@ async function originalOf(db: Db, invoice: Invoice) {
   return row?.documentNumber && row.issueDate ? { documentNumber: row.documentNumber, issueDate: row.issueDate } : null;
 }
 
+/**
+ * The deposit invoices a balance invoice took off (I11), as the XML and the PDF cite them: those
+ * whose `deducted_in_invoice_id` names it — written by the statement that issued it.
+ */
+async function depositsTakenOffBy(db: Db, invoice: Invoice) {
+  if (invoice.documentType !== "TD01") return [];
+  const rows: { documentNumber: string | null; issueDate: string | null }[] = await db
+    .select({ documentNumber: invoices.documentNumber, issueDate: invoices.issueDate })
+    .from(invoices)
+    .where(eq(invoices.deductedInInvoiceId, invoice.id))
+    .orderBy(invoices.issueDate, invoices.number);
+  return rows.flatMap((r) =>
+    r.documentNumber && r.issueDate ? [{ documentNumber: r.documentNumber, issueDate: r.issueDate }] : [],
+  );
+}
+
 /** The XML document of an issued invoice, from its snapshots only. */
 export function xmlInputOf(
   invoice: Invoice,
   originalInvoice: { documentNumber: string; issueDate: string } | null,
+  depositInvoices: { documentNumber: string; issueDate: string }[] = [],
 ): XmlInvoice {
   if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {
     throw new Error("Only an issued invoice has files.");
   }
   return {
-    documentType: invoice.documentType as "TD01" | "TD04",
+    documentType: invoice.documentType as "TD01" | "TD02" | "TD04",
     documentNumber: invoice.documentNumber,
     issueDate: invoice.issueDate,
     currency: invoice.currency,
@@ -80,12 +97,14 @@ export function xmlInputOf(
     stampDuty: invoice.stampDuty,
     paymentMethod: invoice.paymentMethod,
     dueDate: invoice.dueDate,
+    installments: invoice.installments ?? null,
     notes: invoice.notes,
     issuer: (invoice.issuerSnapshot ?? {}) as XmlParty,
     customer: (invoice.customerSnapshot ?? {}) as XmlParty,
     lines: (invoice.linesSnapshot ?? []) as InvoiceLine[],
     transmissionId: transmissionIdFor(invoice.fiscalYear ?? 0, invoice.number ?? 0, invoice.series),
     originalInvoice,
+    depositInvoices,
   };
 }
 
@@ -95,6 +114,7 @@ export function pdfDataOf(input: XmlInvoice): InvoicePdfData {
     documentNumber: input.documentNumber,
     issueDate: input.issueDate,
     dueDate: input.dueDate ?? null,
+    installments: input.installments ?? null,
     currency: input.currency,
     paymentMethod: input.paymentMethod,
     notes: input.notes ?? null,
@@ -103,6 +123,7 @@ export function pdfDataOf(input: XmlInvoice): InvoicePdfData {
     customer: input.customer,
     totals: invoiceTotals(input.lines, input.discountPercent),
     originalInvoice: input.originalInvoice ?? null,
+    depositInvoices: input.depositInvoices ?? [],
     discountPercent: input.discountPercent,
     // Frozen in the customer snapshot at issue; read from the country for invoices issued before.
     lang: documentLanguage(input.customer as { language?: string | null; country?: string | null }),
@@ -114,7 +135,11 @@ export function fileNameOf(input: XmlInvoice, kind: ArchiveKind): string {
   if (kind === "xml") return fatturaPaFileName(input);
   const lang = documentLanguage(input.customer as { language?: string | null; country?: string | null });
   const tx = INVOICE_TEXT[lang];
-  const kindName = (input.documentType === "TD04" ? tx.creditNote : tx.invoice).replace(/\s+/g, "-");
+  const kindName = (
+    input.documentType === "TD04" ? tx.creditNote : input.documentType === "TD02" ? tx.depositInvoice : tx.invoice
+  )
+    .replace(/'/g, "")
+    .replace(/\s+/g, "-");
   return `${kindName}-${input.documentNumber.replace(/[^A-Za-z0-9-]/g, "-")}.pdf`;
 }
 
@@ -138,7 +163,7 @@ export async function archiveInvoice(db: Db, id: string, storage?: StorageDriver
   if (invoice.status !== "issued") return "not_issued";
   if (invoice.xmlKey && invoice.pdfKey) return "already";
 
-  const input = xmlInputOf(invoice, await originalOf(db, invoice));
+  const input = xmlInputOf(invoice, await originalOf(db, invoice), await depositsTakenOffBy(db, invoice));
   const [xml, pdf] = await Promise.all([buildFile(input, "xml"), buildFile(input, "pdf")]);
   const store = storage ?? (await getStorage());
   const xmlKey = archiveKey("xml");
@@ -179,7 +204,7 @@ export async function readInvoiceFile(
   kind: ArchiveKind,
   storage?: StorageDriver,
 ): Promise<{ bytes: Uint8Array; name: string; contentType: string; archived: boolean }> {
-  const input = xmlInputOf(invoice, await originalOf(db, invoice));
+  const input = xmlInputOf(invoice, await originalOf(db, invoice), await depositsTakenOffBy(db, invoice));
   const name = fileNameOf(input, kind);
   const key = kind === "xml" ? invoice.xmlKey : invoice.pdfKey;
   const expected = kind === "xml" ? invoice.xmlSha256 : invoice.pdfSha256;

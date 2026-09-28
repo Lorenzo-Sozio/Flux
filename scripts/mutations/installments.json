@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/lib/payment-terms.ts",
+    "description": "⚠️⚠️ «30 gg d.f.f.m.» conta trenta giorni invece dei mesi: la fattura del 31 gennaio scade il 31 marzo",
+    "find": "  return iso(new Date(Date.UTC(p[0], p[1] - 1 + months + 1, 0)));",
+    "replace": "  return iso(new Date(Date.UTC(p[0], p[1] - 1, p[2] + months * 30)));"
+  },
+  {
+    "file": "src/lib/payment-terms.ts",
+    "description": "⚠️⚠️ le rate non tornano al centesimo e ignorano le percentuali (30/70 diventa 50/50)",
+    "find": "    amount: amounts[i],",
+    "replace": "    amount: Math.round((total / steps.length) * 100) / 100,"
+  },
+  {
+    "file": "src/lib/payment-terms.ts",
+    "description": "⚠️ una rata a zero euro viene accettata",
+    "find": "    if (!Number.isFinite(amount) || Math.round(amount * 100) <= 0) return null;",
+    "replace": "    if (!Number.isFinite(amount)) return null;"
+  },
+  {
+    "file": "src/lib/payment-terms.ts",
+    "description": "⚠️⚠️ un pagamento salda l'ultima rata invece della prima",
+    "find": "  const sorted = [...installments].sort((a, b) => a.dueDate.localeCompare(b.dueDate));",
+    "replace": "  const sorted = [...installments].sort((a, b) => b.dueDate.localeCompare(a.dueDate));"
+  },
+  {
+    "file": "src/lib/payment-terms.ts",
+    "description": "⚠️ una nota di credito riduce la prima rata invece dell'ultima",
+    "find": "  for (let k = owed.length - 1; k >= 0 && cut > 0; k--) {",
+    "replace": "  for (let k = 0; k < owed.length && cut > 0; k++) {"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ le rate non vengono fissate all'emissione: la fattura emessa non sa più quando scade",
+    "find": "      installments = ${input.installments?.length ? JSON.stringify(input.installments) : null}::jsonb,",
+    "replace": "      installments = null,"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ con le rate la scadenza resta quella scritta sulla bozza, non l'ultima rata",
+    "find": "      due_date = coalesce(${input.installments?.length ? input.installments[input.installments.length - 1].dueDate : null}::date, invoice.due_date),",
+    "replace": "      due_date = invoice.due_date,"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ una fattura a rate va a SDI come pagamento unico (TP02) con tutto a una scadenza",
+    "find": "  const plan = inv.installments && inv.installments.length > 1 ? inv.installments : null;",
+    "replace": "  const plan = null as typeof inv.installments;"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️ una sola rata diventa TP01 (pagamento a rate) invece di TP02",
+    "find": "  const plan = inv.installments && inv.installments.length > 1 ? inv.installments : null;",
+    "replace": "  const plan = inv.installments && inv.installments.length >= 1 ? inv.installments : null;"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ una fattura a rate risulta in ritardo dalla prima rata anche quando è pagata",
+    "find": "      const next = plan?.find((i) => i.outstanding > 0);",
+    "replace": "      const next = plan?.[0];"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ lo scadenzario mette tutte le rate nella fascia della più vecchia",
+    "find": "      ? r.installments.filter((i) => i.outstanding > 0).map((i) => ({ amount: i.outstanding, dueDate: i.dueDate }))",
+    "replace": "      ? [{ amount: r.outstanding, dueDate: r.dueDate }]"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️ un bonifico pari alla prossima rata non viene riconosciuto",
+    "find": "  return inv.nextInstallment != null && cents(inv.nextInstallment) === amount && cents(inv.outstanding) > amount;",
+    "replace": "  return false;"
+  }
+]

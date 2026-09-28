@@ -23,6 +23,7 @@ import { Money } from "@/components/crm/money";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type CurrencyAmount, moneyFigures, moneyHeadline } from "@/lib/home-dashboard-data";
+import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { getDb } from "@/lib/tenant-context";
 import { toWallDate } from "@/lib/wall-clock";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
@@ -52,13 +53,25 @@ export async function MoneyDashboard() {
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const now = new Date();
   const thisMonth = toWallDate(now, timeZone).slice(0, 7);
-  const [headline, receivables, figures, commissions, recurring] = await Promise.all([
-    moneyHeadline(db, now, timeZone).catch(() => null),
-    getReceivables().catch(() => null),
-    moneyFigures(db).catch(() => ({ draftInvoices: 0, ordersToInvoice: 0 })),
-    getCommissions().catch(() => null),
-    getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
+  // ⚠️ A figure that did not load says so; it is never shown as zero (I14). "€ 0 overdue" from a
+  // database that did not answer read as good news.
+  const [headlineO, receivablesO, figuresO, commissionsO, recurringO] = await Promise.all([
+    loadOutcome("home money headline", () => moneyHeadline(db, now, timeZone)),
+    loadOutcome("home receivables", () => getReceivables()),
+    loadOutcome("home money figures", () => moneyFigures(db)),
+    loadOutcome("home commissions", () => getCommissions()),
+    loadOutcome("home recurring revenue", () => getRecurringRevenueSummary()),
   ]);
+  const headline = loadedValue(headlineO);
+  const receivables = loadedValue(receivablesO);
+  const figures = loadedValue(figuresO);
+  const commissions = loadedValue(commissionsO);
+  const recurring = loadedValue(recurringO);
+  const na = (
+    <span className="text-muted-foreground" title={t("unavailableHint")}>
+      {t("unavailable")}
+    </span>
+  );
 
   const totals = receivables?.totals ?? [];
   const perCurrency = (pick: (row: (typeof totals)[number]) => number) =>
@@ -86,33 +99,37 @@ export async function MoneyDashboard() {
           href={`/dashboard/pipeline?owners=all&status=won&closed=${thisMonth}&pipeline=all`}
           title={t("wonMonth")}
           icon={<TrophyIcon className="h-4 w-4 shrink-0 text-emerald-600" />}
-          value={<Money value={headline?.won.month ?? 0} />}
+          value={headline ? <Money value={headline.won.month} /> : na}
         >
-          {t("sinceYearStart")} <Money value={headline?.won.year ?? 0} />
+          {headline && (
+            <>
+              {t("sinceYearStart")} <Money value={headline.won.year} />
+            </>
+          )}
         </HeadlineKpi>
         <HeadlineKpi
           href="/dashboard/pipeline?owners=all&status=won&pipeline=all"
           title={t("wonAllTime")}
           icon={<CrownIcon className="h-4 w-4 shrink-0 text-amber-600" />}
-          value={<Money value={headline?.won.allTime ?? 0} />}
+          value={headline ? <Money value={headline.won.allTime} /> : na}
         >
-          {t("wonAllTimeDesc", { count: headline?.won.allTimeCount ?? 0 })}
+          {headline && t("wonAllTimeDesc", { count: headline.won.allTimeCount })}
         </HeadlineKpi>
         <HeadlineKpi
           href="/dashboard/sales/finance"
           title={t("collected")}
           icon={<BanknoteIcon className="h-4 w-4 shrink-0 text-blue-600" />}
-          value={amounts(headline?.collected.month)}
+          value={headline ? amounts(headline.collected.month) : na}
         >
-          {t("sinceYearStart")} {amounts(headline?.collected.year)}
+          {headline && `${t("sinceYearStart")} ${amounts(headline.collected.year)}`}
         </HeadlineKpi>
         <HeadlineKpi
           href="/dashboard/sales/invoices?status=issued"
           title={t("invoiced")}
           icon={<ReceiptTextIcon className="h-4 w-4 shrink-0 text-violet-600" />}
-          value={amounts(headline?.invoiced.month)}
+          value={headline ? amounts(headline.invoiced.month) : na}
         >
-          {t("invoicedDesc")} · {t("sinceYearStart")} {amounts(headline?.invoiced.year)}
+          {headline && `${t("invoicedDesc")} · ${t("sinceYearStart")} ${amounts(headline.invoiced.year)}`}
         </HeadlineKpi>
       </div>
 
@@ -123,10 +140,12 @@ export async function MoneyDashboard() {
           title={t("outstanding")}
           icon={<WalletIcon className="h-4 w-4 shrink-0 text-blue-500" />}
         >
-          <div className={KPI_VALUE}>{perCurrency((row) => row.outstanding)}</div>
-          <p className="mt-1 text-muted-foreground text-xs">
-            {t("outstandingDesc", { count: receivables?.invoices.length ?? 0 })}
-          </p>
+          <div className={KPI_VALUE}>{receivables ? perCurrency((row) => row.outstanding) : na}</div>
+          {receivables && (
+            <p className="mt-1 text-muted-foreground text-xs">
+              {t("outstandingDesc", { count: receivables.invoices.length })}
+            </p>
+          )}
         </Kpi>
         <Kpi
           href="/dashboard/sales/finance"
@@ -136,16 +155,16 @@ export async function MoneyDashboard() {
             <AlarmClockIcon className={`h-4 w-4 shrink-0 ${overdueAny ? "text-red-500" : "text-muted-foreground"}`} />
           }
         >
-          <div className={KPI_VALUE}>{perCurrency((row) => row.overdue)}</div>
+          <div className={KPI_VALUE}>{receivables ? perCurrency((row) => row.overdue) : na}</div>
           <p className="mt-1 text-muted-foreground text-xs">{t("overdueDesc")}</p>
         </Kpi>
         <Kpi
           href="/dashboard/sales/orders?status=completed"
-          accent={figures.ordersToInvoice > 0 ? "border-l-amber-500" : "border-l-slate-300"}
+          accent={figures && figures.ordersToInvoice > 0 ? "border-l-amber-500" : "border-l-slate-300"}
           title={t("toInvoice")}
           icon={<PackageCheckIcon className="h-4 w-4 shrink-0 text-amber-500" />}
         >
-          <div className={KPI_VALUE}>{figures.ordersToInvoice}</div>
+          <div className={KPI_VALUE}>{figures ? figures.ordersToInvoice : na}</div>
           <p className="mt-1 text-muted-foreground text-xs">{t("toInvoiceDesc")}</p>
         </Kpi>
         <Kpi
@@ -154,7 +173,7 @@ export async function MoneyDashboard() {
           title={t("drafts")}
           icon={<FilePenLineIcon className="h-4 w-4 shrink-0 text-violet-500" />}
         >
-          <div className={KPI_VALUE}>{figures.draftInvoices}</div>
+          <div className={KPI_VALUE}>{figures ? figures.draftInvoices : na}</div>
           <p className="mt-1 text-muted-foreground text-xs">{t("draftsDesc")}</p>
         </Kpi>
         <Kpi
@@ -163,9 +182,7 @@ export async function MoneyDashboard() {
           title={t("commissions")}
           icon={<PercentIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
         >
-          <div className={KPI_VALUE}>
-            <Money value={report?.totals.amount ?? 0} />
-          </div>
+          <div className={KPI_VALUE}>{failed(commissionsO) ? na : <Money value={report?.totals.amount ?? 0} />}</div>
           <p className="mt-1 text-muted-foreground text-xs">
             {!report || report.totals.amount === 0
               ? t("commissionsNone")
@@ -180,7 +197,7 @@ export async function MoneyDashboard() {
           title={t("renewals")}
           icon={<ScrollTextIcon className="h-4 w-4 shrink-0 text-yellow-500" />}
         >
-          <div className={KPI_VALUE}>{recurring.renewalsDue}</div>
+          <div className={KPI_VALUE}>{recurring ? recurring.renewalsDue : na}</div>
           <p className="mt-1 text-muted-foreground text-xs">{t("renewalsDesc")}</p>
         </Kpi>
       </div>
@@ -201,7 +218,9 @@ export async function MoneyDashboard() {
           </Button>
         </CardHeader>
         <CardContent className="p-0">
-          {overdueList.length === 0 ? (
+          {!receivables ? (
+            <p className="px-6 py-8 text-center text-muted-foreground text-sm">{t("unavailableHint")}</p>
+          ) : overdueList.length === 0 ? (
             <p className="px-6 py-8 text-center text-muted-foreground text-sm">{t("noOverdue")}</p>
           ) : (
             <ul className="divide-y">

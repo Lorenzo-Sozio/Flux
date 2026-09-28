@@ -420,7 +420,7 @@ export async function sendAppointmentInviteEmail(
 export async function sendInvoiceCopyEmail(data: {
   to: string;
   issuerName: string;
-  documentType: "TD01" | "TD04";
+  documentType: "TD01" | "TD02" | "TD04";
   documentNumber: string;
   issueDate: string;
   total: string;
@@ -431,7 +431,8 @@ export async function sendInvoiceCopyEmail(data: {
 }) {
   const tx = INVOICE_TEXT[data.lang];
   const day = (iso: string) => iso.split("-").reverse().join("/");
-  const label = data.documentType === "TD04" ? tx.creditNote : tx.invoice;
+  const label =
+    data.documentType === "TD04" ? tx.creditNote : data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
   const body =
     fill(tx.emailBody, {
       label: esc(data.lang === "it" ? label.toLowerCase() : label),

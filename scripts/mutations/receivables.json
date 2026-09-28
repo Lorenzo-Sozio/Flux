@@ -8,7 +8,7 @@
   {
     "file": "src/lib/receivables.ts",
     "description": "⚠️⚠️ le note di credito finiscono nello scadenzario come crediti da incassare",
-    "find": "        eq(invoices.documentType, \"TD01\"),",
+    "find": "        inArray(invoices.documentType, [...RECEIVABLE_TYPES]),",
     "replace": ""
   },
   {
@@ -20,8 +20,8 @@
   {
     "file": "src/lib/receivables.ts",
     "description": "⚠️ una fattura senza scadenza non scade mai: non verrà mai sollecitata",
-    "find": "      const due = r.dueDate ?? r.issueDate ?? input.today;",
-    "replace": "      const due = r.dueDate ?? input.today;"
+    "find": "      const due = next?.dueDate ?? r.dueDate ?? r.issueDate ?? input.today;",
+    "replace": "      const due = next?.dueDate ?? r.dueDate ?? input.today;"
   },
   {
     "file": "src/lib/receivables.ts",
@@ -32,20 +32,20 @@
   {
     "file": "src/lib/receivables.ts",
     "description": "⚠️ lo scaduto conta anche ciò che non è ancora scaduto",
-    "find": "    if (r.bucket !== \"current\") t.overdue = Math.round((t.overdue + r.outstanding) * 100) / 100;",
-    "replace": "    t.overdue = Math.round((t.overdue + r.outstanding) * 100) / 100;"
+    "find": "      if (bucket !== \"current\") t.overdue = Math.round((t.overdue + part.amount) * 100) / 100;",
+    "replace": "      t.overdue = Math.round((t.overdue + part.amount) * 100) / 100;"
   },
   {
-    "file": "src/lib/receivables.ts",
+    "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ si può incassare una bozza o una nota di credito",
-    "find": "  if (invoice.status !== \"issued\" || invoice.documentType !== \"TD01\") return { ok: false, reason: \"not_receivable\" };",
-    "replace": ""
+    "find": "      if (doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))",
+    "replace": "      if (false)"
   },
   {
-    "file": "src/lib/receivables.ts",
+    "file": "src/lib/receipts.ts",
     "description": "⚠️ ogni pagamento dopo il saldo manda di nuovo invoice.paid",
-    "find": "  const becamePaid = settled && balance.outstanding + amount > 0;",
-    "replace": "  const becamePaid = settled;"
+    "find": "    if (s.outstanding <= 0 && s.outstanding + now > 0) out.push({ invoiceId: doc.id, paid: s.paid, due });",
+    "replace": "    if (s.outstanding <= 0) out.push({ invoiceId: doc.id, paid: s.paid, due });"
   },
   {
     "file": "src/lib/receivables-aging.ts",
@@ -56,13 +56,13 @@
   {
     "file": "src/actions/orders.ts",
     "description": "⚠️⚠️ con più fatture sullo stesso ordine il pagamento finisce su una a caso",
-    "find": "  if (issued.length === 1) {",
-    "replace": "  if (issued.length >= 1) {"
+    "find": "  } else if (issued.length === 1) invoiceId = issued[0].id;",
+    "replace": "  } else if (issued.length >= 1) invoiceId = issued[0].id;"
   },
   {
     "file": "src/actions/orders.ts",
     "description": "⚠️ un pagamento sull'ordine non arriva mai alla sua unica fattura: lo scadenzario la sollecita già pagata",
-    "find": "  if (issued.length === 1) {",
-    "replace": "  if (false) {"
+    "find": "  } else if (issued.length === 1) invoiceId = issued[0].id;",
+    "replace": "  } else if (false) invoiceId = issued[0].id;"
   }
 ]

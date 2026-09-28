@@ -1,0 +1,134 @@
+[
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ una proposta che lascia credito o non spiega tutto l'importo diventa sicura e si conferma in blocco",
+    "find": "      i === 0 && p.score >= SURE_SCORE && explained && !f.ambiguous && !f.conflict && p.score - rival >= SURE_MARGIN;",
+    "replace": "      i === 0 && p.score >= SURE_SCORE && !f.ambiguous && !f.conflict && p.score - rival >= SURE_MARGIN;"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ due fatture con lo stesso residuo: la proposta resta sicura e paga quella sbagliata",
+    "find": "      i === 0 && p.score >= SURE_SCORE && explained && !f.ambiguous && !f.conflict && p.score - rival >= SURE_MARGIN;",
+    "replace": "      i === 0 && p.score >= SURE_SCORE && explained && !f.conflict && p.score - rival >= SURE_MARGIN;"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ causale e IBAN indicano clienti diversi e la proposta è comunque sicura",
+    "find": "      i === 0 && p.score >= SURE_SCORE && explained && !f.ambiguous && !f.conflict && p.score - rival >= SURE_MARGIN;",
+    "replace": "      i === 0 && p.score >= SURE_SCORE && explained && !f.ambiguous && p.score - rival >= SURE_MARGIN;"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ un incasso già registrato a mano non passa davanti: la stessa somma si incassa due volte",
+    "find": "      p.score -= 30;",
+    "replace": "      p.score -= 0;"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️ una data nella causale («10/09/2026») viene letta come fattura 9 del 2026",
+    "find": "    .replace(/\\b\\d{1,2}[/.-]\\d{1,2}[/.-](?:\\d{4}|\\d{2})\\b/g, \" \")",
+    "replace": "    .replace(/$^/g, \" \")"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️ un cliente di una sola parola («Italia») si riconosce in qualunque causale",
+    "find": "  if (company.length === 1) return company[0].length >= 4 && payer.has(company[0]);",
+    "replace": "  if (company.length === 1) return company[0].length >= 4 && (payer.has(company[0]) || described.has(company[0]));"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️ un movimento in dollari viene proposto su una fattura in euro",
+    "find": "    const invoices = ctx.invoices.filter((i) => i.currency === tx.currency && cents(i.outstanding) > 0);",
+    "replace": "    const invoices = ctx.invoices.filter((i) => cents(i.outstanding) > 0);"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ due movimenti sicuri della stessa fattura restano sicuri: la conferma in blocco la paga due volte",
+    "find": "    if (top?.confidence === \"sure\" && touched(top).some((t) => (count.get(t) ?? 0) > 1)) {",
+    "replace": "    if (top?.confidence === \"sure\" && touched(top).some((t) => (count.get(t) ?? 0) > 2)) {"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ un movimento ignorato riceve comunque un incasso",
+    "find": "      ok: sql<number>`1 / (case when \"bank_transaction\".\"ignored_at\" is not null\n        or abs(",
+    "replace": "      ok: sql<number>`1 / (case when false\n        or abs("
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ due conferme dello stesso movimento scrivono due incassi",
+    "find": "        or abs(coalesce((select sum(r.amount) from receipt r where r.bank_transaction_id = ${transactionId}), 0)) > abs(\"bank_transaction\".\"amount\")",
+    "replace": "        or abs(coalesce((select sum(r.amount) from receipt r where r.bank_transaction_id = ${transactionId}), 0)) > 2 * abs(\"bank_transaction\".\"amount\")"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ l'incasso dalla banca non controlla più il movimento dopo averlo scritto",
+    "find": "      ...(line ? [guardBankTransaction(h, line)] : []),",
+    "replace": "      ...[],"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️ la banca paga una fattura oltre il suo residuo",
+    "find": "    if (cents(Number(a.amount)) > cents(balance.outstanding)) return { ok: false, reason: \"overpays\" };",
+    "replace": "    if (false) return { ok: false, reason: \"overpays\" };"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️ resta un credito senza cliente",
+    "find": "  if (allocated < cents(left) && !input.companyId) return { ok: false, reason: \"no_customer\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ annullare un abbinamento cancella anche l'incasso registrato a mano",
+    "find": "    h.delete(receipts).where(and(eq(receipts.bankTransactionId, id), eq(receipts.source, \"bank\"))),",
+    "replace": "    h.delete(receipts).where(eq(receipts.bankTransactionId, id)),"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ la conferma in blocco conferma proposte cambiate o non sicure",
+    "find": "    if (!p || p.key !== pick.key || p.confidence !== \"sure\") {",
+    "replace": "    if (!p) {"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️ un movimento in un'altra valuta entra nel conto",
+    "find": "    if (m.currency !== account.currency) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ reimportare lo stesso estratto conto fallisce invece di saltare i movimenti già presenti",
+    "find": "      .onConflictDoNothing()\n      .returning({ id: bankTransactions.id });",
+    "replace": "      .returning({ id: bankTransactions.id });"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️ un IBAN resta associato al cliente dopo l'annullamento",
+    "find": "  await db.delete(companyIbans).where(and(eq(companyIbans.iban, iban), sql`${companyIbans.seen} <= 0`));",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️ un movimento già riconciliato si può ignorare, alle spalle del suo incasso",
+    "find": "        sql`not exists (select 1 from receipt r where r.bank_transaction_id = \"bank_transaction\".\"id\")`,",
+    "replace": "        sql`true`,"
+  },
+  {
+    "file": "src/lib/bank/movement.ts",
+    "description": "⚠️⚠️ due pagamenti identici nello stesso file diventano uno",
+    "find": "    const n = (seen.get(base) ?? 0) + 1;",
+    "replace": "    const n = 1;"
+  },
+  {
+    "file": "src/lib/bank/camt.ts",
+    "description": "⚠️ un movimento non contabilizzato (PDNG) viene importato",
+    "find": "  return code === \"\" || code === \"BOOK\";",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/bank/camt.ts",
+    "description": "⚠️ un lotto viene diviso anche quando i dettagli non tornano con l'importo",
+    "find": "        Math.round(amounts.reduce((s: number, a) => s + Math.abs(a ?? 0), 0) * 100) ===\n          Math.round(Math.abs(amount.value) * 100);",
+    "replace": "        true;"
+  }
+]

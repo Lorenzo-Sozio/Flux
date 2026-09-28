@@ -1,15 +1,20 @@
 import { computeDocument } from "@/lib/document-totals";
+import { deductionExceeds } from "@/lib/invoice-deposits";
 
 /**
  * The rules of an invoice that do not depend on how it reaches SDI.
  *
  * Perimeter decided on 15 September 2026 (D2, D3): TD01 invoices and TD04 credit
  * notes, ordinary VAT with a Natura code on every zero-rate line, virtual stamp
- * duty (src/lib/stamp-duty.ts); one invoice per order. Split payment, withholding tax and reverse charge
+ * duty (src/lib/stamp-duty.ts). Since 28 September (R6, I11) also TD02 deposit invoices, and
+ * a balance invoice that takes them off (src/lib/invoice-deposits.ts). Split payment, withholding tax and reverse charge
  * are a later version, and nothing here pretends to handle them.
  */
 
-export const DOCUMENT_TYPES = ["TD01", "TD04"] as const;
+export const DOCUMENT_TYPES = ["TD01", "TD02", "TD04"] as const;
+
+/** What a customer owes and pays: an invoice or a deposit invoice — never a credit note. */
+export const RECEIVABLE_TYPES: readonly string[] = ["TD01", "TD02"];
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
 
 /**
@@ -49,13 +54,18 @@ export type DraftProblem =
   | { kind: "not_positive" }
   | { kind: "stamp_override_without_reason" }
   | { kind: "credit_exceeds_residual" }
-  | { kind: "credit_without_original" };
+  | { kind: "credit_without_original" }
+  | { kind: "deduction_exceeds" }
+  /** Installments written by hand that do not add up to the total (I12). */
+  | { kind: "installments_total" };
 
 /** What stops this draft being issued, line by line (1-based). Empty means it can go. */
 export function draftProblems(
   lines: readonly DraftLine[],
   discountPercent = 0,
   stamp: { mode: string; note?: string | null } = { mode: "auto" },
+  /** A balance invoice's generated lines taking its deposits off (src/lib/invoice-deposits.ts). */
+  deductions: readonly DraftLine[] = [],
 ): DraftProblem[] {
   if (lines.length === 0) return [{ kind: "no_lines" }];
   const problems: DraftProblem[] = [];
@@ -68,9 +78,20 @@ export function draftProblems(
     if (l.taxPercent > 0 && nature) problems.push({ kind: "nature_with_vat", line });
     if (nature && !Object.hasOwn(NATURE_CODES, nature)) problems.push({ kind: "unknown_nature", line });
   });
-  const totals = computeDocument({ lines: [...lines], discountPercent });
+  const totals = computeDocument({ lines: [...lines, ...deductions], discountPercent });
   // A credit note is its own document type; an invoice of zero or less is not one.
   if (!(totals.total > 0)) problems.push({ kind: "not_positive" });
+  // A deposit taken off a rate the balance no longer has enough of: the order changed after
+  // the deposit was invoiced, and SDI refuses a negative taxable.
+  if (
+    deductions.length > 0 &&
+    deductionExceeds(
+      [...lines, ...deductions].map((l) => ({ ...l, description: l.description ?? "" })),
+      discountPercent,
+    )
+  ) {
+    problems.push({ kind: "deduction_exceeds" });
+  }
   // Overriding what the Natura codes say about stamp duty is sometimes right, and
   // always something an auditor will ask about: the reason travels with the invoice.
   if (stamp.mode !== "auto" && (stamp.note ?? "").trim().length < 5) {

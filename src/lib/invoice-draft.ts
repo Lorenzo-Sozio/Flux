@@ -3,6 +3,7 @@ import { documentLanguage } from "@/lib/document-language";
 import { normaliseVat } from "@/lib/fiscal-ids";
 import { type Refusal, refuse } from "@/lib/i18n-message";
 import { isValidSeries, NATURE_CODES } from "@/lib/invoice-rules";
+import { cleanTerms, type PaymentTerms } from "@/lib/payment-terms";
 
 /**
  * A draft invoice: made from an order, edited by a person, frozen when issued.
@@ -25,6 +26,8 @@ export interface DraftInput {
   stampDutyMode: string;
   stampDutyNote?: string | null;
   paymentMethod: string;
+  /** I12: a preset or installments written by hand; absent or null, one payment on `dueDate`. */
+  paymentTerms?: PaymentTerms | null;
   notes?: string | null;
   lines: DraftLineInput[];
 }
@@ -82,6 +85,8 @@ export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } |
     return refuse("validation.invoices.stampDutyModeUnknown");
   }
   if (input.lines.length > 200) return refuse("validation.invoices.tooManyLines", { max: 200 });
+  const paymentTerms = input.paymentTerms ? cleanTerms(input.paymentTerms) : null;
+  if (input.paymentTerms && !paymentTerms) return refuse("validation.invoices.termsInvalid");
 
   const lines: DraftLineInput[] = [];
   for (const [i, l] of input.lines.entries()) {
@@ -122,6 +127,7 @@ export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } |
       // Kept only while it means something: back on automatic, the old reason is noise.
       stampDutyNote: input.stampDutyMode === "auto" ? null : input.stampDutyNote?.trim().slice(0, 500) || null,
       paymentMethod: input.paymentMethod,
+      paymentTerms,
       notes: input.notes?.trim().slice(0, 2000) || null,
       lines,
     },

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getFormatter, getTranslations } from "next-intl/server";
 
-import { getOrderById, getOrderPayments } from "@/actions/orders";
+import { getOrderById, getOrderInvoicesToPay, getOrderPayments } from "@/actions/orders";
 import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
 import {
@@ -46,6 +46,7 @@ import { getDb } from "@/lib/tenant-context";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 import { CreateInvoiceButton } from "./_components/create-invoice-button";
+import { DepositInvoiceButton } from "./_components/deposit-invoice-button";
 import { AdvanceStatusButton, OrderMoreMenu } from "./_components/order-actions";
 import { OrderLines } from "./_components/order-lines";
 import { ORDER_STATUS_TONE, PAYMENT_TONE } from "./_components/order-tones";
@@ -92,6 +93,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const [
     order,
     payments,
+    invoicesToPay,
     products,
     ticketsAbout,
     orderInvoices,
@@ -109,6 +111,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   ] = await Promise.all([
     getOrderById(id),
     getOrderPayments(id),
+    // The issued invoices a payment on this order can pay, with what each still owes (I10).
+    getOrderInvoicesToPay(id),
     // The add-line dialog's catalogue, and only for somebody who can add a line.
     canWrite ? getProductsForSelect() : Promise.resolve([]),
     // An order could be prepared, shipped and closed while a conversation about it
@@ -190,12 +194,23 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const issuedInvoice = invoiceDocs.find((i) => i.status === "issued");
   const draftInvoice = invoiceDocs.find((i) => i.status === "draft");
   const offerInvoice = canInvoice && order.status !== "cancelled" && !issuedInvoice;
+  // I11: deposit invoices (TD02) for part of the order, and the balance that takes them off.
+  const deposits = orderInvoices.filter((i) => i.documentType === "TD02");
+  const hasIssuedDeposit = deposits.some((i) => i.status === "issued");
+  // What is left to invoice: the order less every invoice and deposit invoice written for it.
+  const invoicedSoFar = orderInvoices
+    .filter((i) => i.documentType === "TD01" || i.documentType === "TD02")
+    .reduce((sum, i) => sum + Number(i.total ?? 0), 0);
+  const leftToInvoice = Math.max(0, Math.round((Number(order.totalAmount ?? 0) - invoicedSoFar) * 100) / 100);
+  // Money received on the order that no invoice carries yet: a deposit to invoice.
+  const depositNotInvoiced =
+    Math.round(payments.filter((p) => !p.invoiceId).reduce((sum, p) => sum + Number(p.amount ?? 0), 0) * 100) / 100;
 
   // The balance is late when the invoice asked for it by a date that has passed.
   // An order carries no due date of its own; its issued invoice does.
   const today = todayIn(timeZone);
   const dueDate =
-    invoiceDocs
+    [...invoiceDocs, ...deposits]
       .filter((i) => i.status === "issued" && i.dueDate)
       .map((i) => i.dueDate as string)
       .sort()[0] ?? null;
@@ -216,9 +231,13 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       ? i.documentNumber
         ? tInv("credit.noteNumber", { number: i.documentNumber })
         : tInv("credit.draftNote")
-      : i.documentNumber
-        ? tInv("numberTitle", { number: i.documentNumber })
-        : tInv("draftTitle");
+      : i.documentType === "TD02"
+        ? i.documentNumber
+          ? tInv("deposit.numberTitle", { number: i.documentNumber })
+          : tInv("deposit.draftTitle")
+        : i.documentNumber
+          ? tInv("numberTitle", { number: i.documentNumber })
+          : tInv("draftTitle");
 
   // ── Sections ──
   const details = (
@@ -323,6 +342,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {offerInvoice && depositNotInvoiced > 0 && (
+          // A payment received in advance is invoiced when it arrives.
+          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50/70 p-2.5 text-amber-900 text-xs dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200">
+            {tInv("deposit.receivedNotInvoiced", { amount: money(depositNotInvoiced, order.currency) })}
+          </p>
+        )}
         {orderInvoices.length === 0 ? (
           <EmptyHint>{t("noInvoices")}</EmptyHint>
         ) : (
@@ -346,6 +371,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               </li>
             ))}
           </ul>
+        )}
+        {offerInvoice && !draftInvoice && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <DepositInvoiceButton
+              orderId={order.id}
+              left={leftToInvoice}
+              total={Number(order.totalAmount ?? 0)}
+              leftText={money(leftToInvoice, order.currency)}
+              suggested={depositNotInvoiced > 0 ? Math.min(depositNotInvoiced, leftToInvoice) : undefined}
+            />
+          </div>
         )}
       </CardContent>
     </Card>
@@ -436,6 +472,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   orderId={order.id}
                   draftId={draftInvoice?.id ?? null}
                   variant={canWrite && !terminal ? "outline" : "default"}
+                  balance={hasIssuedDeposit}
                 />
               )}
               <OrderMoreMenu orderId={order.id} status={order.status} canWrite={canWrite} canDelete={canDelete} />
@@ -509,7 +546,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 currency={order.currency}
                 deliveredAt={order.deliveredAt ?? null}
                 payments={payments}
+                invoices={invoicesToPay}
                 canWrite={canWrite}
+                canInvoice={canInvoice}
               />
             ),
           },

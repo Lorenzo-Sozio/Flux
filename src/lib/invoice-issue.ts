@@ -29,6 +29,13 @@ import { sql } from "drizzle-orm";
  * Postgres re-checks), finds too little left, and takes neither an amount nor a
  * number. A check made in a separate query first, or even in a subquery here,
  * would read the old figure and let both through.
+ *
+ * ⚠️⚠️ **A balance invoice takes its deposits off in the same statement** (I11). `deduct` marks
+ * each deposit invoice (TD02) as taken off by this one, only while no other invoice has taken
+ * it off, and `next` numbers the balance only when every deposit it names was marked. Two
+ * balance invoices of one order issued together queue on the deposit's row; the second finds
+ * it taken, marks nothing and takes no number — the same guarantee as `credit`, for the same
+ * reason.
  */
 
 // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
@@ -49,6 +56,10 @@ export interface IssueInput {
   linesSnapshot: unknown;
   /** For a credit note, the issued invoice it gives back from; null for an invoice. */
   creditOf?: string | null;
+  /** For a balance invoice, the deposit invoices (TD02) it takes off. */
+  deducts?: readonly string[];
+  /** The installments the terms became (I12): frozen with the invoice, the last one its due date. */
+  installments?: readonly { dueDate: string; amount: number }[] | null;
   stampDuty: boolean;
   totals: {
     subtotal: number;
@@ -61,6 +72,7 @@ export interface IssueInput {
 
 export function issueStatement(input: IssueInput) {
   const money = (n: number) => n.toFixed(2);
+  const deducts = [...new Set(input.deducts ?? [])];
   return sql`
     WITH target AS (
       SELECT id FROM invoice
@@ -70,15 +82,28 @@ export function issueStatement(input: IssueInput) {
     credit AS (
       UPDATE invoice SET credited_amount = credited_amount + ${money(input.totals.total)}::numeric, updated_at = now()
       WHERE id = ${input.creditOf ?? null}::text
-        AND status = 'issued' AND document_type = 'TD01'
+        AND status = 'issued' AND document_type IN ('TD01', 'TD02')
+        -- A deposit already taken off a balance invoice is corrected there, not here.
+        AND deducted_in_invoice_id IS NULL
         AND total - credited_amount >= ${money(input.totals.total)}::numeric
+        AND EXISTS (SELECT 1 FROM target)
+      RETURNING id
+    ),
+    deduct AS (
+      UPDATE invoice SET deducted_in_invoice_id = ${input.invoiceId}, updated_at = now()
+      WHERE id IN (SELECT jsonb_array_elements_text(${JSON.stringify(deducts)}::jsonb))
+        AND status = 'issued' AND document_type = 'TD02'
+        AND deducted_in_invoice_id IS NULL
+        -- A deposit a credit note touched is not a plain deposit any more: a person decides.
+        AND credited_amount = 0
         AND EXISTS (SELECT 1 FROM target)
       RETURNING id
     ),
     next AS (
       INSERT INTO document_counter (scope, last_value, updated_at)
       SELECT ${input.scope}, 1, now() FROM target
-      WHERE ${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit)
+      WHERE (${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit))
+        AND (SELECT count(*) FROM deduct) = ${deducts.length}
       ON CONFLICT (scope) DO UPDATE SET last_value = document_counter.last_value + 1, updated_at = now()
       RETURNING last_value
     )
@@ -100,6 +125,8 @@ export function issueStatement(input: IssueInput) {
       taxable_amount = ${money(input.totals.taxableAmount)},
       tax_amount = ${money(input.totals.taxAmount)},
       total = ${money(input.totals.total)},
+      installments = ${input.installments?.length ? JSON.stringify(input.installments) : null}::jsonb,
+      due_date = coalesce(${input.installments?.length ? input.installments[input.installments.length - 1].dueDate : null}::date, invoice.due_date),
       updated_at = now()
     FROM next
     -- Repeats what the target CTE already established in this same snapshot; kept so the

@@ -3,7 +3,8 @@
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
 import { deals, orders, pipelineStages } from "@/db/schema";
-import { requireAdminAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requirePlanModule } from "@/lib/auth-guard";
+import { type CashStats, cashStats } from "@/lib/cash-stats";
 import { closedBetween, dealEur, orderEur } from "@/lib/metrics";
 import { getDb } from "@/lib/tenant-context";
 import { toWallDate } from "@/lib/wall-clock";
@@ -144,4 +145,16 @@ export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
     },
     revenueTrend,
   };
+}
+
+/**
+ * The cash side (I14): what came in, what was invoiced, DSO, the collection rate, deposits to
+ * invoice and customers' credit — each defined in src/lib/cash-stats.ts, where the page's
+ * definitions are written too.
+ */
+export async function getCashStats(): Promise<CashStats> {
+  await requireAdminAccess();
+  await requirePlanModule("sales");
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  return cashStats(db, { today: toWallDate(new Date(), timeZone), timeZone });
 }

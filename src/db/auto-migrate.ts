@@ -2,6 +2,7 @@ import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 import { applyTenantMigrations, readLastApplied } from "@/db/migrate-tenant";
 import { tenantMigrations } from "@/db/migrations-tenant.generated";
+import { healPaymentsWithoutReceipt, RECEIPTS_SINCE } from "@/lib/receipts";
 
 /**
  * auto-migrate.ts — closing the window between deploying and migrating.
@@ -86,11 +87,19 @@ async function bringUpToDate(tenantId: string, db: AnyDb): Promise<void> {
     return;
   }
 
-  if (lastApplied >= target) return;
+  if (lastApplied < target) {
+    const { applied } = await applyTenantMigrations(db);
+    if (applied.length > 0) {
+      console.log(`[auto-migrate] ${tenantId} brought up to ${target}: applied ${applied.join(", ")}`);
+    }
+  }
 
-  const { applied } = await applyTenantMigrations(db);
-  if (applied.length > 0) {
-    console.log(`[auto-migrate] ${tenantId} brought up to ${target}: applied ${applied.join(", ")}`);
+  // After the schema, one repair that a migration cannot make once and for all: payments the
+  // code before receipts (I10) recorded after 0059 reached this database. One statement,
+  // nothing done when nothing needs it (src/lib/receipts.ts).
+  if (target >= RECEIPTS_SINCE) {
+    const healed = await healPaymentsWithoutReceipt(db);
+    if (healed > 0) console.log(`[auto-migrate] ${tenantId}: gave ${healed} payment(s) the receipt they lacked`);
   }
 }
 

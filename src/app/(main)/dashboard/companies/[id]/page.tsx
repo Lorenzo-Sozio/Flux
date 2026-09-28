@@ -29,11 +29,13 @@ import { getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getCustomerRecord } from "@/actions/customer-record";
 import { getPriceListsForSelect } from "@/actions/price-lists";
+import { getCustomerMoney } from "@/actions/receipts";
 import { deleteTask, getAllUsers, getTasksByCompany } from "@/actions/tasks";
 import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
 import { DealAmount } from "@/app/(main)/dashboard/pipeline/[id]/_components/deal-amount";
 import { auth } from "@/auth";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
+import { CustomerMoneyCard } from "@/components/crm/customer-money-card";
 import { CustomerRecordPanel } from "@/components/crm/customer-record";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { FormattedDate } from "@/components/crm/formatted-date";
@@ -140,6 +142,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     priceLists,
     people,
     [figures],
+    money,
     t,
     tD,
     tI,
@@ -198,6 +201,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       })
       .from(deals)
       .where(eq(deals.companyId, companyId)),
+    // What the customer paid, what it paid, and what is left as their credit (I10). Absent
+    // without the sales module, or before the migration: the card is then not drawn.
+    getCustomerMoney(companyId).catch(() => null),
     getTranslations("companies"),
     getTranslations("entityDetail"),
     getTranslations("invoicing"),
@@ -841,6 +847,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               />
             ),
           },
+          ...(money
+            ? [
+                {
+                  tab: "sales",
+                  column: "side" as const,
+                  node: (
+                    <CustomerMoneyCard companyId={companyId} data={money} canWrite={can(tenantRole, "invoice:write")} />
+                  ),
+                },
+              ]
+            : []),
           { tab: "sales", column: "side", node: <DocumentPanel entityType="company" entityId={companyId} /> },
         ]}
       />

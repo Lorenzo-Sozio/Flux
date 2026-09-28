@@ -110,6 +110,26 @@ describe("issuing", () => {
     });
   });
 
+  it("⚠️⚠️ freezes the installments, and the last one is the due date (I12)", async () => {
+    await draft("a");
+    await db.execute(sql`update invoice set due_date = '2026-10-01' where id = 'a'`);
+    const installments = [
+      { dueDate: "2026-10-31", amount: 61 },
+      { dueDate: "2026-11-30", amount: 61 },
+    ];
+    await issueInvoice(db, input("a", { installments }));
+    const [row] = await rows(sql`select installments, due_date::text as due from invoice where id = 'a'`);
+    expect(row).toEqual({ installments, due: "2026-11-30" });
+    // Without installments the due date typed on the draft stands.
+    await draft("b");
+    await db.execute(sql`update invoice set due_date = '2026-10-01' where id = 'b'`);
+    await issueInvoice(db, input("b"));
+    expect((await rows(sql`select installments, due_date::text as due from invoice where id = 'b'`))[0]).toEqual({
+      installments: null,
+      due: "2026-10-01",
+    });
+  });
+
   it("⚠️⚠️ the database refuses two invoices with one number, whatever the code does", async () => {
     await draft("a");
     await draft("b");
@@ -184,5 +204,55 @@ describe("credit notes", () => {
     await issuedInvoice("inv", 100);
     expect(await credited("inv")).toBe("0.00");
     expect(await counter(scope)).toBe(1);
+  });
+});
+
+describe("⚠️⚠️ a balance invoice takes its deposits off in the same statement (I11)", () => {
+  const scope = invoiceScope("", 2026);
+  const deducted = async (id: string) =>
+    (await rows(sql`select deducted_in_invoice_id from invoice where id = ${id}`))[0]?.deducted_in_invoice_id ?? null;
+
+  async function issuedDeposit(id: string) {
+    await db.execute(sql`insert into invoice (id, document_type) values (${id}, 'TD02')`);
+    await issueInvoice(db, input(id));
+  }
+
+  it("takes a deposit off once: a second balance naming it is refused and takes no number", async () => {
+    await issuedDeposit("dep");
+    await draft("bal1");
+    await draft("bal2");
+    expect((await issueInvoice(db, input("bal1", { deducts: ["dep"] })))?.number).toBe(2);
+    expect(await deducted("dep")).toBe("bal1");
+    expect(await issueInvoice(db, input("bal2", { deducts: ["dep"] })), "the deposit was taken off twice").toBeNull();
+    expect(await counter(scope), "a refused balance consumed a number").toBe(2);
+    expect((await rows(sql`select status from invoice where id = 'bal2'`))[0].status).toBe("draft");
+  });
+
+  it("⚠️ takes off only an issued deposit invoice, never a draft or another kind", async () => {
+    await db.execute(sql`insert into invoice (id, document_type) values ('dep-draft', 'TD02')`);
+    await draft("inv");
+    await issueInvoice(db, input("inv"));
+    await draft("bal");
+    expect(await issueInvoice(db, input("bal", { deducts: ["dep-draft"] }))).toBeNull();
+    expect(await issueInvoice(db, input("bal", { deducts: ["inv"] }))).toBeNull();
+    expect(await deducted("inv")).toBeNull();
+  });
+
+  it("⚠️ a deposit taken off is not credited, and one a credit note touched is not taken off", async () => {
+    await issuedDeposit("dep");
+    await draft("bal");
+    await issueInvoice(db, input("bal", { deducts: ["dep"] }));
+    await db.execute(sql`insert into invoice (id, document_type, original_invoice_id) values ('cn', 'TD04', 'dep')`);
+    expect(await issueInvoice(db, input("cn", { creditOf: "dep" })), "credited after being taken off").toBeNull();
+
+    await issuedDeposit("dep2");
+    await db.execute(sql`update invoice set credited_amount = '10' where id = 'dep2'`);
+    await draft("bal2");
+    expect(await issueInvoice(db, input("bal2", { deducts: ["dep2"] }))).toBeNull();
+  });
+
+  it("an invoice that names no deposit is issued as before", async () => {
+    await draft("plain");
+    expect((await issueInvoice(db, input("plain", { deducts: [] })))?.number).toBe(1);
   });
 });

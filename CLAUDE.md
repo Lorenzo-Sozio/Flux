@@ -484,9 +484,10 @@ and a mismatch is a silent no-op.
 ⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
 schedules to fit; an eighth job on a new schedule needs Workers Paid.
 
-⚠️⚠️ **The bundle is 9.55 MB gzipped against a 10 MB limit** (measured on 26 September
-2026 with `npx wrangler deploy --dry-run`: 9,783 KiB of 10,240). It fits Workers Paid,
-never Free (3 MB), and the margin is about 450 KiB — one heavy dependency. It used to
+⚠️⚠️ **The bundle is 9.45 MB gzipped against a 10 MB limit** (measured on 29 September
+2026 with `npx wrangler deploy --dry-run`: 9,677 KiB of 10,240, after bank reconciliation,
+installments and the cash figures added 82 together). It fits Workers Paid, never Free (3 MB),
+and the margin is about 560 KiB — one heavy dependency. It used to
 be written here as "~8 MB", which is how nobody noticed it growing. Measure it with the
 dry run before adding a library, and after a dependency update: the September update
 took it *down* by 154 KiB, which is the direction to keep.
@@ -1169,11 +1170,11 @@ by age, most overdue first — and each invoice page records its payments.
 - ⚠️⚠️ **Owed = total − credit notes − payments that name it**, through `paymentSummary`, the
   arithmetic an order uses. Only an issued TD01 is a receivable; a credit note is money going
   the other way. No due date means due on issue.
-- ⚠️⚠️ **A payment on an order reaches its invoice only when there is one issued invoice** — the
-  rule the migration applied to the past as well. With several, nobody can say which one it
-  paid, so it stays on the order. Issuing an order's only invoice links the deposits already
-  on it (`linkOrderPayments`), by the same rule. Recording the money again on the invoice would
-  count it twice on the order.
+- ⚠️⚠️ **A payment on an order reaches its invoice when there is no doubt which**: the order's only
+  issued invoice, or — with several — the one the person chooses; `recordOrderPayment` refuses
+  to guess (I10). With none it is a deposit on the order, and issuing the order's only invoice
+  links it (`linkOrderPayments`). A deposit left on an order that now has invoices is linked from
+  its row (`linkAllocation`).
 - ⚠️⚠️ **Deleting an order keeps what was paid on its invoices** (detached, `order_id` null):
   the cascade used to take it, and a paid invoice went back to overdue.
 - ⚠️ An amount is read once, strictly (`parsePaymentAmount`): `parseFloat` read "12abc" as 12
@@ -1187,6 +1188,152 @@ by age, most overdue first — and each invoice page records its payments.
 
 `src/lib/receivables.test.ts`, `src/actions/order-invoice-payment.test.ts`;
 `scripts/mutations/receivables.json`.
+
+#### Money that arrived, and where it went
+
+[src/lib/receipts.ts](src/lib/receipts.ts), migration `0059_what_arrived_and_where_it_went` (I10,
+roadmap Fase 4). A **receipt** (`receipt`) is what reached the account: day, amount, currency,
+the bank's reference, the customer. Its **allocations** — the `order_payment` rows, which name
+their receipt — say which invoices or orders it paid. What is left unallocated is the
+customer's **credit**; a negative receipt is a **refund**.
+
+- ⚠️⚠️ **"Collected" reads receipts, by the day they arrived** (cash); what an invoice owes reads
+  the allocations that name it. One transfer can pay several invoices of one customer, in one
+  currency (`recordReceipt`), and a later invoice spends credit in one click (`allocateCredit`).
+- ⚠️⚠️ **An allocation never exceeds its receipt, and the database decides.** Spending credit
+  locks the receipt's row, inserts, then checks the sum inside the same transaction — a
+  division by a row-dependent zero fails it. ⚠️ A constant `1 / 0` in a CASE is folded while
+  the query is planned and fails every time; a stored "allocated" figure would drift from the
+  rows the first time a cascade deleted one.
+- ⚠️ Correlated subqueries name their outer column in full (`"receipt"."id"`): in a select list
+  Drizzle writes a column without its table, and `p.receipt_id = "id"` compared the allocation
+  with its own id — every sum was zero.
+- ⚠️ Taking a payment back deletes its receipt when it was all of it, otherwise only the share,
+  which returns to credit (`removeAllocation`). From an order's page it asks for
+  `invoice:write` when the payment paid an invoice. Deleting an order leaves its deposits as
+  the customer's credit: money that arrived does not disappear with a document.
+- ⚠️ A payment is dated today or before (`paymentDay`): a future day was counted in this
+  month's "collected" the moment it was typed.
+- ⚠️⚠️ **Code before I10 writes payments without receipts.** When 0059 reaches a database before
+  the code that writes receipts — a workspace migrated from a machine running newer code —
+  those payments would be missing from "collected" and credit for good. So the auto-migration
+  runs `healPaymentsWithoutReceipt` once per process and workspace: one idempotent statement.
+- Merging two companies moves their receipts (`merge-children.ts`).
+
+The company page's "Payments received" card, the order and invoice payment cards and the
+correction dialog (`receipt-edit-dialog.tsx`) are the screens. `src/lib/receipts.test.ts`
+(PGlite); `scripts/mutations/receipts.json`.
+
+#### A deposit invoice, and the balance that takes it off
+
+[src/lib/invoice-deposits.ts](src/lib/invoice-deposits.ts), migration `0060_the_deposit_and_the_balance`
+(I11, decision R6: the usual way). From an order, "Deposit invoice" makes a **TD02** draft for an
+amount or a share of the order; the invoice for the rest ("Balance invoice") lists the whole
+order and takes each issued deposit off.
+
+- ⚠️⚠️ **Both are split by VAT rate, in the order's proportion.** The deposit is one line per
+  (rate, Natura) of the order; the balance takes off each deposit's *taxable* per rate
+  (`deductionLines`), never its gross — so deposit + balance is the order, and no VAT is charged
+  twice. A rate taken below zero (the order shrank) is a draft problem, `deduction_exceeds`.
+- ⚠️⚠️ **Deduction lines are generated, never stored as typed lines.** `invoice.deducts` names
+  the deposits on the balance draft; the lines are rebuilt on every read and save, carry
+  `isDeduction`, and stay out of the document discount base (`own` in `fatturapa/totals.ts`) —
+  a discount on what was already invoiced would be a second discount.
+- ⚠️⚠️ **The issuing statement decides that a deposit is taken off once.** Its `deduct` CTE sets
+  `deducted_in_invoice_id` on each TD02 only while null and while no credit note touched it, and
+  `next` numbers the balance only if every one was taken. A deducted deposit cannot be credited;
+  a credited one cannot be deducted.
+- ⚠️ A TD02 is a receivable (`RECEIVABLE_TYPES`) and shares the invoices' numbering. A payment on
+  the order goes to the deposit invoice (`linkOrderPayments` reads TD01 and TD02), never to the
+  balance. A deposit received with no deposit invoice shows on the order as one to invoice, with
+  that amount proposed. "Orders to invoice" counts only a TD01: a deposit does not invoice an order.
+- The XML carries TD02 and one `DatiFattureCollegate` per deposit taken off, both checked against
+  the XSD.
+
+`src/lib/invoice-deposits.test.ts`, `src/lib/invoice-issue.test.ts` (PGlite);
+`scripts/mutations/deposits.json`.
+
+#### Cash figures, and a figure that did not load
+
+[src/lib/cash-stats.ts](src/lib/cash-stats.ts) (I14), the Cash section at the top of Finance: collected
+this month, DSO, collection rate, deposits to invoice, customers' credit, and collected against
+invoiced by month. **Each figure's definition is written in that file and printed under the number**
+(`finance.cash.*Def`): collected is receipts by the day they arrived, refunds included; invoiced is
+invoices and deposit invoices by issue date less credit notes; DSO is owed now ÷ invoiced in 90
+days × 90; the collection rate is paid ÷ asked, gross on gross, over invoices of the last twelve
+months already due, paid capped at what each asks. Per currency, never summed across two.
+
+- ⚠️⚠️ **A figure that did not load is not a zero.** `loadOutcome` ([src/lib/load-outcome.ts](src/lib/load-outcome.ts))
+  tells a failure (logged, shown as "Unavailable") from a plan without the module (card absent),
+  and lets Next's redirects through. The home's money dashboard used `.catch(() => null)` and
+  `?? 0`, so a database that did not answer showed "€ 0 overdue". Use it for any new money figure.
+- The old Finance cards are now "Sales: won and orders": they were called revenue and are not cash.
+- **A customer's statement of account**: `GET /api/companies/{id}/statement?from&to` (CSV, the
+  button on the customer's Payments card), built by [src/lib/customer-statement.ts](src/lib/customer-statement.ts):
+  invoices and refunds as debit, credit notes and receipts as credit, the balance after each, an
+  opening balance for a period. ⚠️ Money is counted once, as the receipt — never per allocation.
+
+`src/lib/cash-stats.test.ts`, `src/lib/customer-statement.test.ts` (PGlite), `src/lib/load-outcome.test.ts`;
+`scripts/mutations/cash-stats.json`.
+
+#### Installments
+
+[src/lib/payment-terms.ts](src/lib/payment-terms.ts), migration `0062_in_installments` (I12, "mode A"
+of R6: one invoice paid in parts). A customer has usual terms (`company.payment_terms`, a preset
+key); an invoice has its own (`invoice.payment_terms`: a preset or installments written by hand),
+starting from the customer's. Issuing turns them into dated amounts from the issue date and the
+total and freezes them (`invoice.installments`, the last one also `due_date`) in the numbering
+statement.
+
+- ⚠️⚠️ **"gg d.f.f.m." counts months**: the end of the Nth month after the invoice's month, as
+  Italian ledgers read it. 31 January at 30 days is 28 February, not 31 March.
+- ⚠️⚠️ The XML carries `TP01` and one `DettaglioPagamento` per installment when there are several
+  (checked against the XSD); one installment stays `TP02`. Shares add up to the cent (`shareOut`).
+- ⚠️⚠️ **Receivables read per installment** (`installmentStates`): payments settle the earliest
+  first, a credit note reduces the last. An invoice is as late as its first installment still
+  owed, `overdueAmount` is only what is past due, and each installment ages in its own bucket.
+- ⚠️ Installments written by hand must add up to the total: a draft problem (`installments_total`)
+  on screen as typed, and again at issue. A credit note has none.
+- The bank reads an amount equal to the next installment as exact (`installment_exact`).
+
+`src/lib/payment-terms.test.ts`, `src/lib/receivables.test.ts`, `src/lib/fatturapa/xml.test.ts`;
+`scripts/mutations/installments.json`.
+
+#### Bank reconciliation
+
+[src/lib/bank/](src/lib/bank/), migration `0061_what_the_bank_says`, `/dashboard/sales/bank` (I13).
+A statement — CAMT.053 or the bank's CSV — is read **in the browser** and sent as normalized
+movements, five hundred at a time; Flux proposes where each line goes, with its reasons, and a
+person confirms. Capability `bank:reconcile` (admin), reading included: a statement is every
+movement on the account, salaries and suppliers too.
+
+- ⚠️⚠️ **A line is reconciled when receipts name it** (`receipt.bank_transaction_id`), a new
+  receipt written by the confirmation (`source = 'bank'`) or receipts typed by hand before the
+  statement came. There is no "matched" flag to drift from them. Undo deletes a bank receipt and
+  only unlinks a hand-typed one.
+- ⚠️⚠️ **The database decides that a line is explained once.** Every write naming a line takes its
+  row lock and ends with `guardBankTransaction` (in `receipts.ts`, beside the allocation guard):
+  receipts over the line, the other way, or on an ignored line fail the transaction.
+- ⚠️⚠️ **Money already recorded comes first.** A loose receipt of the same amount near the day is
+  proposed as a link and makes every new-receipt proposal unsure (`recorded_already`) — otherwise
+  the transfer typed by hand as credit is collected a second time beside the invoice.
+- ⚠️⚠️ **`sure` is narrow**: the whole amount explained, no credit left, no ambiguity, no
+  disagreement (reference vs IBAN), no rival within 20 points, and no other line sure of the same
+  document (`markContested`). Bulk confirmation acts only on `sure`, and only while the proposal's
+  `key` is still the one the person saw. Nothing is confirmed automatically.
+- ⚠️ The same statement imported twice adds nothing: a fingerprint of day, amount, bank reference
+  and description, unique per account. Identical lines in one file are numbered over the **whole
+  file** by the page (`numberRepeats`) — numbered per chunk, the second of two payments would have
+  been taken for the first.
+- ⚠️ The XML is read by `xml-lite.ts`, not `DOMParser` (tests) nor a library (the Worker bundle).
+  Only booked entries; a batch is split only when its details add up to it.
+- ⚠️ The CSV mapping is stored per account **by header name**: a bank adding a column asks for
+  the mapping again instead of shifting every field. Files may be Windows-1252.
+- The payer's IBAN is learned on every confirmation (`company_iban`) and unlearned on undo; a
+  company merge carries it (`collidesOn` in `merge-children.ts`).
+- The bank never pays an invoice beyond what it owes (`overpays`); the rest is the customer's credit.
+
+`src/lib/bank/*.test.ts` (reconcile on PGlite); `scripts/mutations/bank.json`.
 
 ### Accepting a quote is signing it
 

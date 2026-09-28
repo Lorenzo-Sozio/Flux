@@ -36,7 +36,7 @@ export function FinanceKPICards({ data }: { data: FinanceDashboardData }) {
       />
       <MetricCard
         icon={TrendingUp}
-        label={t("thisMonth")}
+        label={t("wonThisMonth")}
         value={formatAmount(data.monthlyRevenue, { noDecimals: true })}
         description={
           momDelta !== null

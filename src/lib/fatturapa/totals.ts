@@ -27,6 +27,9 @@ export interface InvoiceLine {
   taxPercent: number;
   nature?: string | null;
   isStampRecharge?: boolean;
+  /** A balance invoice's line taking a deposit invoice off (src/lib/invoice-deposits.ts). */
+  isDeduction?: boolean;
+  depositInvoiceId?: string;
 }
 
 export interface DetailLine {
@@ -93,21 +96,20 @@ export function invoiceTotals(lines: readonly InvoiceLine[], documentDiscountPer
     };
   });
 
-  const groups = new Map<string, { rate: number; nature: string | null; net: number }>();
-  for (const d of details) {
+  // `own` is what the document discount applies to: every line but the stamp recharge — a
+  // fixed legal amount — and a deposit taken off, which was invoiced (and discounted) already.
+  const groups = new Map<string, { rate: number; nature: string | null; net: number; own: number }>();
+  details.forEach((d, i) => {
     const key = groupKey(d.rate, d.nature);
-    const g = groups.get(key) ?? { rate: d.rate, nature: d.nature, net: 0 };
+    const g = groups.get(key) ?? { rate: d.rate, nature: d.nature, net: 0, own: 0 };
     g.net = round2(g.net + d.total);
+    if (!lines[i].isStampRecharge && !lines[i].isDeduction) g.own = round2(g.own + d.total);
     groups.set(key, g);
-  }
+  });
   const list = [...groups.values()];
   const subtotal = round2(list.reduce((s, g) => s + g.net, 0));
-  // The stamp recharge is not discounted: it is a fixed legal amount, so it is
-  // neither in the base of the discount nor given a share of it.
-  const stamp = stampShare(lines);
-  const discountAmount = round2(((subtotal - stamp) * (documentDiscountPercent ?? 0)) / 100);
-
-  const discountable = list.map((g) => (g.rate === 0 && g.nature === "N1" ? Math.max(0, g.net - stamp) : g.net));
+  const discountable = list.map((g) => Math.max(0, g.own));
+  const discountAmount = round2((discountable.reduce((s, n) => s + n, 0) * (documentDiscountPercent ?? 0)) / 100);
   const shares = shareOut(discountAmount, discountable);
 
   const summary: SummaryRow[] = list.map((g, i) => {
@@ -142,8 +144,4 @@ export function invoiceTotals(lines: readonly InvoiceLine[], documentDiscountPer
     taxAmount,
     total: round2(taxableAmount + taxAmount),
   };
-}
-
-function stampShare(lines: readonly InvoiceLine[]): number {
-  return round2(lines.filter((l) => l.isStampRecharge).reduce((s, l) => s + computeLine(l).net, 0));
 }

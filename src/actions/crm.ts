@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, asc, count, desc, eq, getTableColumns, ilike, isNull, ne, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, ilike, inArray, isNull, ne, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { getTranslations } from "next-intl/server";
 
@@ -1010,9 +1010,21 @@ async function mergeRecords(
   type Update = ReturnType<typeof db.update>;
   const writes: unknown[] = [
     (db.update(parent.table as never) as Update).set({ ...fields, updatedAt: new Date() }).where(eq(parent.id, keepId)),
-    ...children.map((child) =>
-      (db.update(child.table as never) as Update).set({ [child.field]: keepId }).where(eq(childColumn(child), mergeId)),
-    ),
+    ...children.flatMap((child) => {
+      const moved = (db.update(child.table as never) as Update)
+        .set({ [child.field]: keepId })
+        .where(eq(childColumn(child), mergeId));
+      if (!child.collidesOn) return [moved];
+      const key = childColumn({ table: child.table, field: child.collidesOn });
+      const survivors = db
+        .select({ key })
+        .from(child.table as never)
+        .where(eq(childColumn(child), keepId));
+      return [
+        db.delete(child.table as never).where(and(eq(childColumn(child), mergeId), inArray(key, survivors))),
+        moved,
+      ];
+    }),
     db.delete(parent.table as never).where(eq(parent.id, mergeId)),
   ];
   await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);

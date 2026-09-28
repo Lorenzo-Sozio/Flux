@@ -1,4 +1,4 @@
-import { and, desc, eq, or, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, type SQL, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import {
@@ -331,8 +331,9 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     );
   },
 
-  invoice: (db, t) => searchInvoices(db, t, "TD01"),
-  creditNote: (db, t) => searchInvoices(db, t, "TD04"),
+  // A deposit invoice (TD02) is an invoice to whoever searches for one.
+  invoice: (db, t) => searchInvoices(db, t, ["TD01", "TD02"]),
+  creditNote: (db, t) => searchInvoices(db, t, ["TD04"]),
 
   async ticket(db, { like }) {
     const rows = await db
@@ -474,9 +475,9 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
   },
 };
 
-async function searchInvoices(db: Db, { like }: SearchTerms, documentType: "TD01" | "TD04"): Promise<SearchHit[]> {
+async function searchInvoices(db: Db, { like }: SearchTerms, documentTypes: string[]): Promise<SearchHit[]> {
   const where: SQL | undefined = and(
-    eq(invoices.documentType, documentType),
+    inArray(invoices.documentType, documentTypes),
     or(matches(invoices.documentNumber, like), matches(companies.name, like), matches(invoices.notes, like)),
   );
   const rows = await db
@@ -494,7 +495,7 @@ async function searchInvoices(db: Db, { like }: SearchTerms, documentType: "TD01
     .where(where)
     .orderBy(desc(invoices.createdAt))
     .limit(PER_ENTITY);
-  const type = documentType === "TD04" ? "creditNote" : "invoice";
+  const type = documentTypes.includes("TD04") ? "creditNote" : "invoice";
   return rows.map(
     (r: {
       id: string;

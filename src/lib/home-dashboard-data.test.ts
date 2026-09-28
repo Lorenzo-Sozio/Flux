@@ -95,6 +95,7 @@ describe("the money side", () => {
       ["o2", "completed"],
       ["o3", "completed"],
       ["o4", "processing"],
+      ["o5", "completed"],
     ] as const) {
       await db
         .insert(schema.orders)
@@ -103,8 +104,12 @@ describe("the money side", () => {
     await db.insert(schema.invoices).values({ id: "i1", orderId: "o1", status: "issued" } as never);
     await db.insert(schema.invoices).values({ id: "i2", orderId: "o2", status: "draft" } as never);
     await db.insert(schema.invoices).values({ id: "i3", status: "draft" } as never);
+    // I11: a deposit invoice alone does not invoice the order — the rest is still to invoice.
+    await db
+      .insert(schema.invoices)
+      .values({ id: "i4", orderId: "o5", status: "issued", documentType: "TD02" } as never);
 
-    expect(await moneyFigures(db)).toEqual({ ordersToInvoice: 1, draftInvoices: 2 });
+    expect(await moneyFigures(db)).toEqual({ ordersToInvoice: 2, draftInvoices: 2 });
   });
 });
 
@@ -158,30 +163,25 @@ describe("⚠️⚠️ the money dashboard's four figures", () => {
     ]);
   });
 
-  it("collects every payment, an order's too, in the currency of what it paid", async () => {
-    await db.insert(schema.orders).values({
-      id: "o1",
-      orderNumber: "o1",
-      status: "completed",
-      currency: "USD",
-      subtotal: "0",
-      totalAmount: "0",
-      taxAmount: "0",
-    } as never);
-    await db.insert(schema.invoices).values({ id: "i1", status: "issued", currency: "EUR" } as never);
-    await db.insert(schema.orderPayments).values([
-      { id: "p1", invoiceId: "i1", amount: "600", paidAt: new Date("2026-09-15T10:00:00Z") },
-      { id: "p2", orderId: "o1", amount: "50", paidAt: new Date("2026-09-20T10:00:00Z") },
-      { id: "p3", invoiceId: "i1", amount: "100", paidAt: new Date("2026-01-15T10:00:00Z") },
-      { id: "p4", invoiceId: "i1", amount: "999", paidAt: new Date("2025-06-15T10:00:00Z") },
+  it("collects every receipt by the day it arrived — a deposit, unused credit, a refund taken off — in its own currency", async () => {
+    // I10: collected is cash (receipts), not what the money was allocated to.
+    await db.insert(schema.receipts).values([
+      { id: "r1", amount: "600", currency: "EUR", receivedAt: new Date("2026-09-15T10:00:00Z") },
+      // A deposit on an order in dollars, allocated to nothing yet.
+      { id: "r2", amount: "50", currency: "USD", receivedAt: new Date("2026-09-20T10:00:00Z") },
+      { id: "r3", amount: "100", currency: "EUR", receivedAt: new Date("2026-01-15T10:00:00Z") },
+      // Money given back this month.
+      { id: "r5", amount: "-20", currency: "EUR", receivedAt: new Date("2026-09-21T10:00:00Z") },
+      // Last year's.
+      { id: "r4", amount: "999", currency: "EUR", receivedAt: new Date("2025-06-15T10:00:00Z") },
     ] as never);
     const h = await moneyHeadline(db, NOW, ZONE);
     expect(h.collected.month).toEqual([
-      { currency: "EUR", amount: 600 },
+      { currency: "EUR", amount: 580 },
       { currency: "USD", amount: 50 },
     ]);
     expect(h.collected.year).toEqual([
-      { currency: "EUR", amount: 700 },
+      { currency: "EUR", amount: 680 },
       { currency: "USD", amount: 50 },
     ]);
   });

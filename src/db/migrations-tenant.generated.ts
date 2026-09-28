@@ -818,4 +818,52 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '-- A person\'s own settings for this workspace, starting with the dashboard the home opens on.\n--\n-- Per person and not per browser: the choice follows somebody from the desk to the phone.\n-- Not in notification_preference, which is about being told things; the language the\n-- morning email is written in stays there.\n--\n-- Additive and re-runnable, like every tenant migration.\nCREATE TABLE IF NOT EXISTS "user_preference" (\n  "user_id" text PRIMARY KEY NOT NULL,\n  "home_dashboard" text,\n  "updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
     ],
   },
+  {
+    tag: "0059_what_arrived_and_where_it_went",
+    folderMillis: 1793059200000,
+    hash: "33fc45502a610af18019423a8a2ff7dd2ab29b420218c89376d93b7fc685c00b",
+    sql: [
+      '-- A receipt is money that arrived (I10): the day it reached the account, how much, the\n-- bank\'s reference, the customer. Where it went is a separate question, answered by its\n-- allocations — the `order_payment` rows, which now name their receipt.\n--\n-- One transfer used to be one row on one document, so a transfer paying two invoices could\n-- not be written down, money paid beyond an invoice had nowhere to be, and deleting a\n-- cancelled order deleted what the customer had paid on it. What arrived and where it went\n-- are two facts: "collected" reads the first, what an invoice still owes reads the second,\n-- and the difference is the customer\'s credit.\n--\n-- A negative receipt is money given back: a refund.\n--\n-- Every payment recorded before this becomes a receipt of its own, with the same id, the\n-- currency of what it paid and the customer of that document. Additive and re-runnable, like\n-- every tenant migration: the copy skips what it has already copied.\nCREATE TABLE IF NOT EXISTS "receipt" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"company_id" text REFERENCES "company"("id") ON DELETE SET NULL,\n\t"amount" numeric(12, 2) NOT NULL,\n\t"currency" text DEFAULT \'EUR\' NOT NULL,\n\t"received_at" timestamp NOT NULL,\n\t"method" text,\n\t"reference" text,\n\t"note" text,\n\t"account_id" text,\n\t"source" text DEFAULT \'manual\' NOT NULL,\n\t"bank_transaction_id" text,\n\t"recorded_by_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_by_id" text REFERENCES "user"("id") ON DELETE SET NULL\n);\n',
+      '\nCREATE INDEX IF NOT EXISTS "receipt_company_idx" ON "receipt" ("company_id");\n',
+      '\nCREATE INDEX IF NOT EXISTS "receipt_received_at_idx" ON "receipt" ("received_at");\n',
+      '\nALTER TABLE "order_payment" ADD COLUMN IF NOT EXISTS "receipt_id" text REFERENCES "receipt"("id") ON DELETE CASCADE;\n',
+      '\nCREATE INDEX IF NOT EXISTS "order_payment_receipt_idx" ON "order_payment" ("receipt_id");\n',
+      '\nINSERT INTO "receipt" ("id", "company_id", "amount", "currency", "received_at", "method", "note", "recorded_by_id", "created_at", "updated_at")\nSELECT p."id", coalesce(i."company_id", o."company_id"), p."amount", coalesce(i."currency", o."currency", \'EUR\'),\n       p."paid_at", p."method", p."note", p."recorded_by_id", p."created_at", p."created_at"\nFROM "order_payment" p\nLEFT JOIN "invoice" i ON i."id" = p."invoice_id"\nLEFT JOIN "order" o ON o."id" = p."order_id"\nWHERE p."receipt_id" IS NULL AND NOT EXISTS (SELECT 1 FROM "receipt" r WHERE r."id" = p."id");\n',
+      '\nUPDATE "order_payment" SET "receipt_id" = "id" WHERE "receipt_id" IS NULL;\n',
+    ],
+  },
+  {
+    tag: "0060_the_deposit_and_the_balance",
+    folderMillis: 1793145600000,
+    hash: "9861854b57e999792189a3e9f9201e28491ff728bf79ffa117b215c19ed5c9b0",
+    sql: [
+      '-- A deposit invoice (TD02) and the invoice for the balance that deducts it (I11).\n--\n-- The customer pays a deposit on the order, and a payment received in advance has to be\n-- invoiced when it arrives: that is the deposit invoice, a TD02. The final invoice then\n-- lists the whole order and takes the deposits already invoiced off it, one line per VAT\n-- rate, citing each deposit invoice.\n--\n-- `deducts` is written on the balance invoice while it is a draft: the deposit invoices it\n-- will take off. `deducted_in_invoice_id` is written on a deposit invoice by the statement\n-- that issues the balance, and only while it is still empty — so a deposit is taken off\n-- once, whatever two people do at the same moment.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "deducts" jsonb;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "deducted_in_invoice_id" text;\n',
+      '\nCREATE INDEX IF NOT EXISTS "invoice_deducted_in_idx" ON "invoice" ("deducted_in_invoice_id");\n',
+    ],
+  },
+  {
+    tag: "0061_what_the_bank_says",
+    folderMillis: 1793232000000,
+    hash: "07d859cbddafd719e44fc2d4f42d22a3977106a9e141fe48fea18e9bc7a465f2",
+    sql: [
+      '-- Bank reconciliation (I13). A workspace\'s accounts, the lines of their statements, and what\n-- each payer\'s IBAN has been seen paying for.\n--\n-- A line is reconciled when receipts name it (`receipt.bank_transaction_id`, which I10 left\n-- ready): the new receipt a confirmation writes, or receipts typed by hand before the\n-- statement arrived. There is no "matched" flag to keep in step with them — the receipts are\n-- the fact. A line nobody needs to explain (bank charges, a supplier paid) is ignored instead.\n--\n-- The same statement imported twice adds nothing: a line is kept under a fingerprint of its\n-- day, amount, the bank\'s reference and description, unique per account.\n--\n-- Additive and re-runnable, like every tenant migration.\nCREATE TABLE IF NOT EXISTS "bank_account" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"name" text NOT NULL,\n\t"iban" text,\n\t"currency" text DEFAULT \'EUR\' NOT NULL,\n\t"csv_mapping" jsonb,\n\t"archived_at" timestamp,\n\t"created_by_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE TABLE IF NOT EXISTS "bank_import" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"account_id" text NOT NULL REFERENCES "bank_account"("id") ON DELETE CASCADE,\n\t"file_name" text,\n\t"format" text NOT NULL,\n\t"created" integer DEFAULT 0 NOT NULL,\n\t"skipped" integer DEFAULT 0 NOT NULL,\n\t"created_by_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE TABLE IF NOT EXISTS "bank_transaction" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"account_id" text NOT NULL REFERENCES "bank_account"("id") ON DELETE CASCADE,\n\t"import_id" text REFERENCES "bank_import"("id") ON DELETE SET NULL,\n\t"booked_on" date NOT NULL,\n\t"value_on" date,\n\t"amount" numeric(12, 2) NOT NULL,\n\t"currency" text DEFAULT \'EUR\' NOT NULL,\n\t"counterparty_name" text,\n\t"counterparty_iban" text,\n\t"remittance" text,\n\t"bank_reference" text,\n\t"fingerprint" text NOT NULL,\n\t"ignored_at" timestamp,\n\t"ignored_by_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE UNIQUE INDEX IF NOT EXISTS "bank_transaction_fingerprint_idx" ON "bank_transaction" ("account_id", "fingerprint");\n',
+      '\nCREATE INDEX IF NOT EXISTS "bank_transaction_booked_idx" ON "bank_transaction" ("account_id", "booked_on");\n',
+      '\nCREATE TABLE IF NOT EXISTS "company_iban" (\n\t"iban" text NOT NULL,\n\t"company_id" text NOT NULL REFERENCES "company"("id") ON DELETE CASCADE,\n\t"seen" integer DEFAULT 1 NOT NULL,\n\t"last_seen_at" timestamp DEFAULT now() NOT NULL,\n\tPRIMARY KEY ("iban", "company_id")\n);\n',
+      '\nCREATE INDEX IF NOT EXISTS "receipt_bank_transaction_idx" ON "receipt" ("bank_transaction_id");\n',
+    ],
+  },
+  {
+    tag: "0062_in_installments",
+    folderMillis: 1793318400000,
+    hash: "637b7b6c5b4e318bc01dd21ada1e8d39aac1a88d3228600d6823cb98bbb7007c",
+    sql: [
+      '-- Payment terms and installments (I12). A customer\'s default terms, an invoice\'s own terms\n-- (a preset or installments written by hand), and the installments frozen when it is issued:\n-- the dates and amounts the XML states and the receivables schedule reads.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "payment_terms" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "payment_terms" jsonb;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "installments" jsonb;\n',
+    ],
+  },
 ];

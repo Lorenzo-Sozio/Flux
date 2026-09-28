@@ -124,6 +124,9 @@ export const CAPABILITIES = {
   // Setting commission rates, approving a month, and seeing everyone's commissions. What
   // a colleague earns is not a record of the workspace: without this, a person sees their own.
   "commission:manage": "admin",
+  // Importing bank statements and reconciling them (I13). Admin: a statement is every movement on
+  // the account — salaries, suppliers, taxes — not only what customers paid.
+  "bank:reconcile": "admin",
 } as const satisfies Record<string, TenantRole>;
 
 export type Capability = keyof typeof CAPABILITIES;

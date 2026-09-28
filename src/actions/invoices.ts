@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, asc, count, desc, eq, gte, ilike, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, or, type SQL, sql } from "drizzle-orm";
 
 import {
   companies,
@@ -16,17 +16,26 @@ import {
   products,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { documentLanguage, formatDocumentMoney } from "@/lib/document-language";
+import {
+  type DocumentLanguage,
+  documentLanguage,
+  fill,
+  formatDocumentMoney,
+  INVOICE_TEXT,
+} from "@/lib/document-language";
 import { sendInvoiceCopyEmail } from "@/lib/email";
-import { invoiceTotals } from "@/lib/fatturapa/totals";
+import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { serverT } from "@/lib/i18n-server";
 import { archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
+import { deductionLines, depositLines, type IssuedDeposit } from "@/lib/invoice-deposits";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
 import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
-import { paymentDay } from "@/lib/order-payment";
+import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
+import { cleanTerms, installmentsFor, installmentsMatch, isPreset } from "@/lib/payment-terms";
+import { openCredits, removeAllocation } from "@/lib/receipts";
 import {
   balanceOf,
   invoiceBalance,
@@ -98,9 +107,17 @@ async function writeLines(db: Db, invoiceId: string, lines: DraftInput["lines"])
  * line when the stamp applies and the issuer recharges it. Decided in one place so
  * the draft screen, the saved totals and the issued snapshot cannot disagree.
  */
-function finalLines(lines: DraftLine[], discountPercent: number, mode: string, recharge: boolean) {
-  const stamp = assessStampDuty(lines, discountPercent, mode as StampMode);
-  const withDescription = lines.map((l) => ({ ...l, description: l.description ?? "" }));
+function finalLines(
+  lines: DraftLine[],
+  discountPercent: number,
+  mode: string,
+  recharge: boolean,
+  /** A balance invoice's lines taking its deposits off (I11): generated, never typed. */
+  deductions: readonly DraftLine[] = [],
+) {
+  const all = [...lines, ...deductions];
+  const stamp = assessStampDuty(all, discountPercent, mode as StampMode);
+  const withDescription = all.map((l) => ({ ...l, description: l.description ?? "" }));
   return { stamp, lines: withStampRecharge(withDescription, stamp.applied, recharge) as DraftLine[] };
 }
 
@@ -124,10 +141,13 @@ async function creditRoom(db: Db, originalId: string | null) {
       total: invoices.total,
       creditedAmount: invoices.creditedAmount,
       currency: invoices.currency,
+      deductedInInvoiceId: invoices.deductedInInvoiceId,
     })
     .from(invoices)
     .where(eq(invoices.id, originalId));
-  if (!original || original.status !== "issued" || original.documentType !== "TD01") return null;
+  if (!original || original.status !== "issued" || !["TD01", "TD02"].includes(original.documentType)) return null;
+  // A deposit already taken off a balance invoice is corrected on that invoice, not here.
+  if (original.deductedInInvoiceId) return null;
   const residual = Math.round((Number(original.total) - Number(original.creditedAmount)) * 100) / 100;
   return { ...original, residual };
 }
@@ -167,6 +187,190 @@ function totalsOf(lines: DraftLine[], discountPercent: number) {
     taxAmount: t.taxAmount,
     total: t.total,
   };
+}
+
+// ─── Deposits and the balance (I11) ───────────────────────────────────────────
+
+/** A day as the documents print it: 28/09/2026. */
+function printedDay(day: string | null): string {
+  return day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}` : "";
+}
+
+/** The deposit invoices a balance invoice names, as they were issued. Anything else is dropped. */
+async function depositsOf(db: Db, ids: readonly string[] | null | undefined): Promise<IssuedDeposit[]> {
+  if (!ids?.length) return [];
+  const rows = await db
+    .select({
+      id: invoices.id,
+      documentNumber: invoices.documentNumber,
+      issueDate: invoices.issueDate,
+      discountPercent: invoices.discountPercent,
+      linesSnapshot: invoices.linesSnapshot,
+      status: invoices.status,
+      documentType: invoices.documentType,
+    })
+    .from(invoices)
+    .where(inArray(invoices.id, [...ids]));
+  return rows
+    .filter((r) => r.status === "issued" && r.documentType === "TD02")
+    .map((r) => ({
+      id: r.id,
+      documentNumber: r.documentNumber,
+      issueDate: r.issueDate,
+      discountPercent: Number(r.discountPercent),
+      lines: (r.linesSnapshot ?? []) as InvoiceLine[],
+    }));
+}
+
+/**
+ * The order's issued deposit invoices no invoice has taken off yet, oldest first: what a new
+ * invoice for the order deducts. A deposit a credit note touched is left out — what is left of
+ * it is not a plain deposit any more, and a person decides.
+ */
+async function undeductedDeposits(db: Db, orderId: string): Promise<IssuedDeposit[]> {
+  const rows = await tolerateUnmigrated(
+    "invoice.deducted_in_invoice_id",
+    () =>
+      db
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.orderId, orderId),
+            eq(invoices.status, "issued"),
+            eq(invoices.documentType, "TD02"),
+            isNull(invoices.deductedInInvoiceId),
+            eq(invoices.creditedAmount, "0"),
+          ),
+        )
+        .orderBy(asc(invoices.issueDate), asc(invoices.number)),
+    [] as { id: string }[],
+  );
+  return depositsOf(
+    db,
+    rows.map((r) => r.id),
+  );
+}
+
+/** The lines taking these deposits off, in the customer's language. */
+function deductionsFor(deposits: IssuedDeposit[], language: DocumentLanguage): DraftLine[] {
+  const tx = INVOICE_TEXT[language];
+  return deductionLines(deposits, (number, date) =>
+    fill(tx.deductionLine, { number, date: printedDay(date) }),
+  ) as unknown as DraftLine[];
+}
+
+/**
+ * A deposit invoice (TD02) for part of an order, as a draft: `amount` is what the customer
+ * pays, VAT included, split across the order's VAT rates in the order's proportion
+ * (src/lib/invoice-deposits.ts). Reviewed and issued like any invoice.
+ *
+ * ⚠️ Never more than is left to invoice on the order: its total less every invoice and deposit
+ * invoice already written for it, drafts included — two deposits typed at once would otherwise
+ * invoice the order twice.
+ */
+export async function createDepositInvoice(
+  orderId: string,
+  amount: number | string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const t = await serverT("serverErrors.invoices");
+  const gross = parsePaymentAmount(amount);
+  if (gross === null) return { ok: false, error: t("depositAmount") };
+  const db = await getDb();
+
+  const [order] = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      companyId: orders.companyId,
+      currency: orders.currency,
+      discountPercent: orders.discountPercent,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+  if (!order?.companyId) return { ok: false, error: t("chooseCustomer") };
+  // After the invoice for the order there is nothing to take a deposit on: it would be invoiced twice.
+  const [invoiced] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.orderId, orderId),
+        eq(invoices.documentType, "TD01"),
+        inArray(invoices.status, ["draft", "issued"]),
+      ),
+    );
+  if (invoiced) return { ok: false, error: t("depositAfterInvoice") };
+  const [company] = await db
+    .select({ language: companies.language, country: companies.country })
+    .from(companies)
+    .where(eq(companies.id, order.companyId));
+  const items = await db
+    .select({
+      productId: orderItems.productId,
+      description: orderItems.description,
+      productName: products.name,
+      quantity: orderItems.quantity,
+      unitPrice: orderItems.unitPrice,
+      discountPercent: orderItems.discountPercent,
+      taxPercent: orderItems.taxPercent,
+    })
+    .from(orderItems)
+    .leftJoin(products, eq(orderItems.productId, products.id))
+    .where(eq(orderItems.orderId, orderId));
+
+  const orderLines = linesFromOrder(items).map((l) => ({ ...l, description: l.description }));
+  const discount = Number(order.discountPercent ?? 0);
+  const orderTotal = invoiceTotals(orderLines, discount).total;
+  const [written] = await db
+    .select({ total: sql<string>`coalesce(sum(${invoices.total}), 0)` })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.orderId, orderId),
+        inArray(invoices.documentType, ["TD01", "TD02"]),
+        inArray(invoices.status, ["draft", "issued"]),
+      ),
+    );
+  const left = Math.round((orderTotal - Number(written?.total ?? 0)) * 100) / 100;
+  if (gross > left) return { ok: false, error: t("depositExceedsOrder", { left: left.toFixed(2) }) };
+
+  const tx = INVOICE_TEXT[documentLanguage(company)];
+  const lines = depositLines(orderLines, discount, gross, (rate, _nature, several) =>
+    several
+      ? fill(tx.depositLineRate, { order: order.orderNumber, rate: `${rate}%` })
+      : fill(tx.depositLine, { order: order.orderNumber }),
+  );
+  if (!lines?.length) return { ok: false, error: t("depositAmount") };
+
+  const final = finalLines(lines, 0, "auto", await issuerRecharges(db));
+  const totals = totalsOf(final.lines, 0);
+  const [row] = await db
+    .insert(invoices)
+    .values({
+      documentType: "TD02",
+      orderId,
+      companyId: order.companyId,
+      currency: order.currency || "EUR",
+      series: "",
+      discountPercent: "0",
+      stampDuty: final.stamp.applied,
+      stampDutyMode: "auto",
+      paymentMethod: "MP05",
+      subtotal: String(totals.subtotal),
+      discountAmount: String(totals.discountAmount),
+      taxableAmount: String(totals.taxableAmount),
+      taxAmount: String(totals.taxAmount),
+      total: String(totals.total),
+      createdBy: actor.userId,
+    })
+    .returning({ id: invoices.id });
+  await writeLines(db, row.id, lines);
+  revalidatePath(LIST);
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
+  return { ok: true, id: row.id };
 }
 
 // ─── Reading ──────────────────────────────────────────────────────────────────
@@ -239,7 +443,10 @@ export async function getInvoice(id: string) {
   const discount = Number(invoice.discountPercent);
   const isCredit = invoice.documentType === "TD04";
   const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);
-  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);
+  // A balance invoice takes its deposit invoices off (I11): the lines are generated from them.
+  const deposits = invoice.documentType === "TD01" ? await depositsOf(db, invoice.deducts) : [];
+  const deductions = deductionsFor(deposits, documentLanguage(company));
+  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge, deductions);
   const [original, creditNotes] = await Promise.all([
     isCredit ? creditRoom(db, invoice.originalInvoiceId) : Promise.resolve(null),
     isCredit
@@ -256,7 +463,12 @@ export async function getInvoice(id: string) {
           .where(and(eq(invoices.originalInvoiceId, id), eq(invoices.documentType, "TD04")))
           .orderBy(asc(invoices.createdAt)),
   ]);
-  const draftChecks = draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote });
+  const draftChecks = draftProblems(
+    lines,
+    discount,
+    { mode: invoice.stampDutyMode, note: invoice.stampDutyNote },
+    deductions,
+  );
   if (isCredit && invoice.status === "draft") {
     if (!original) draftChecks.push({ kind: "credit_without_original" });
     else if (
@@ -268,6 +480,22 @@ export async function getInvoice(id: string) {
       draftChecks.push({ kind: "credit_exceeds_residual" });
     }
   }
+  // Installments written by hand must add up to what the draft totals now (I12).
+  const terms = cleanTerms(invoice.paymentTerms);
+  if (
+    invoice.status === "draft" &&
+    !isCredit &&
+    terms &&
+    "custom" in terms &&
+    !installmentsMatch(
+      terms.custom,
+      invoiceTotals(
+        final.lines.map((l) => ({ ...l, description: l.description ?? "" })),
+        discount,
+      ).total,
+    )
+  )
+    draftChecks.push({ kind: "installments_total" });
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
@@ -277,6 +505,18 @@ export async function getInvoice(id: string) {
     invoice,
     original,
     creditNotes,
+    // The deposit invoices this balance takes off, and the lines that do it.
+    deposits: deposits.map((d) => ({ id: d.id, documentNumber: d.documentNumber, issueDate: d.issueDate })),
+    deductions,
+    // For a deposit invoice: the balance invoice that took it off, if one has.
+    deductedIn: invoice.deductedInInvoiceId
+      ? ((
+          await db
+            .select({ id: invoices.id, documentNumber: invoices.documentNumber })
+            .from(invoices)
+            .where(eq(invoices.id, invoice.deductedInInvoiceId))
+        )[0] ?? null)
+      : null,
     items,
     companyName: company?.name ?? null,
     customerEmail: company?.mainEmail ?? null,
@@ -342,6 +582,8 @@ export async function getNewInvoiceData() {
         city: companies.city,
         province: companies.state,
         country: companies.country,
+        // Their usual terms, which a new invoice to them starts with (I12).
+        paymentTerms: companies.paymentTerms,
       })
       .from(companies)
       .orderBy(asc(companies.name))
@@ -417,7 +659,10 @@ export async function createInvoice(
   const { lines, ...header } = cleaned.value;
   const db = await getDb();
 
-  const [company] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, input.companyId));
+  const [company] = await db
+    .select({ id: companies.id, paymentTerms: companies.paymentTerms })
+    .from(companies)
+    .where(eq(companies.id, input.companyId));
   if (!company) return { ok: false, error: (await serverT("serverErrors.invoices"))("chooseCustomer") };
 
   const orderId = input.orderId || null;
@@ -428,14 +673,38 @@ export async function createInvoice(
       .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "draft"), eq(invoices.documentType, "TD01")));
     if (draft)
       return { ok: false, error: (await serverT("serverErrors.invoices"))("orderHasDraft"), existingId: draft.id };
+    // A deposit invoice still in draft would not be taken off: it is issued, or deleted, first.
+    const [depositDraft] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "draft"), eq(invoices.documentType, "TD02")));
+    if (depositDraft)
+      return {
+        ok: false,
+        error: (await serverT("serverErrors.invoices"))("depositStillDraft"),
+        existingId: depositDraft.id,
+      };
   }
 
-  const final = finalLines(lines, header.discountPercent, header.stampDutyMode, await issuerRecharges(db));
+  // An invoice for an order whose deposits were invoiced is the balance: it takes them off (I11).
+  const deposits = orderId ? await undeductedDeposits(db, orderId) : [];
+  const [language] = await db
+    .select({ language: companies.language, country: companies.country })
+    .from(companies)
+    .where(eq(companies.id, company.id));
+  const final = finalLines(
+    lines,
+    header.discountPercent,
+    header.stampDutyMode,
+    await issuerRecharges(db),
+    deductionsFor(deposits, documentLanguage(language)),
+  );
   const totals = totalsOf(final.lines, header.discountPercent);
   const [row] = await db
     .insert(invoices)
     .values({
       documentType: "TD01",
+      deducts: deposits.length > 0 ? deposits.map((d) => d.id) : null,
       orderId,
       companyId: company.id,
       currency: input.currency || "EUR",
@@ -446,6 +715,11 @@ export async function createInvoice(
       stampDutyMode: header.stampDutyMode,
       stampDutyNote: header.stampDutyNote,
       paymentMethod: header.paymentMethod,
+      // Not chosen on the form: the customer's usual terms (I12).
+      paymentTerms:
+        input.paymentTerms === undefined && isPreset(company.paymentTerms)
+          ? { preset: company.paymentTerms }
+          : (header.paymentTerms ?? null),
       notes: header.notes,
       subtotal: String(totals.subtotal),
       discountAmount: String(totals.discountAmount),
@@ -550,12 +824,24 @@ export async function saveInvoiceDraft(
   const { lines, ...header } = cleaned.value;
   const db = await getDb();
 
-  const [current] = await db.select({ documentType: invoices.documentType }).from(invoices).where(eq(invoices.id, id));
+  const [current] = await db
+    .select({ documentType: invoices.documentType, deducts: invoices.deducts, companyId: invoices.companyId })
+    .from(invoices)
+    .where(eq(invoices.id, id));
+  const [customer] = current?.companyId
+    ? await db
+        .select({ language: companies.language, country: companies.country })
+        .from(companies)
+        .where(eq(companies.id, current.companyId))
+    : [];
   const final = finalLines(
     lines,
     header.discountPercent,
     header.stampDutyMode,
     await rechargesFor(db, current?.documentType ?? "TD01"),
+    current?.documentType === "TD01"
+      ? deductionsFor(await depositsOf(db, current.deducts), documentLanguage(customer))
+      : [],
   );
   const totals = totalsOf(final.lines, header.discountPercent);
   const [bumped] = await db
@@ -568,6 +854,7 @@ export async function saveInvoiceDraft(
       stampDutyMode: header.stampDutyMode,
       stampDutyNote: header.stampDutyNote,
       paymentMethod: header.paymentMethod,
+      paymentTerms: header.paymentTerms ?? null,
       notes: header.notes,
       subtotal: String(totals.subtotal),
       discountAmount: String(totals.discountAmount),
@@ -623,24 +910,36 @@ export async function issueInvoiceAction(
   const lines = toDraftLines(items);
   const discount = Number(invoice.discountPercent);
   const isCredit = invoice.documentType === "TD04";
+  // A balance invoice's deposits, as issued: one that is no longer there cannot be taken off.
+  const deducts = invoice.documentType === "TD01" ? (invoice.deducts ?? []) : [];
+  const deposits = await depositsOf(db, deducts);
+  if (deposits.length !== deducts.length)
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("depositGone") };
+  const deductions = deductionsFor(deposits, documentLanguage(company));
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
-    draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),
+    draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }, deductions),
   };
   // Decided again here, from the lines being frozen, rather than trusted from the
   // draft row: the stamp and its recharge line are part of what is issued.
   const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);
-  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);
+  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge, deductions);
   const totals = totalsOf(final.lines, discount);
   const room = isCredit ? await creditRoom(db, invoice.originalInvoiceId) : null;
   if (isCredit && !room) blockers.draft.push({ kind: "credit_without_original" });
   if (room && totals.total > room.residual) blockers.draft.push({ kind: "credit_exceeds_residual" });
+  // The terms become dated amounts now, from the day it is issued and what it totals (I12). A
+  // credit note gives money back and has no installments.
+  const issueDate = italianToday();
+  const terms = isCredit ? null : cleanTerms(invoice.paymentTerms);
+  const installments = terms ? installmentsFor(terms, issueDate, totals.total) : null;
+  if (installments && !installmentsMatch(installments, totals.total))
+    blockers.draft.push({ kind: "installments_total" });
   if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {
     return { ok: false, error: (await serverT("serverErrors.invoices"))("cannotIssueYet"), blockers };
   }
 
-  const issueDate = italianToday();
   const fiscalYear = Number(issueDate.slice(0, 4));
   const { id: _id, updatedAt: _u, updatedBy: _b, ...issuerFields } = issuer;
   const result = await issueInvoice(db, {
@@ -658,13 +957,19 @@ export async function issueInvoiceAction(
     totals,
     // The statement takes the amount from the original, within what is left, or issues nothing.
     creditOf: isCredit ? invoice.originalInvoiceId : null,
+    // And takes each deposit off once, or issues nothing (I11).
+    deducts,
+    installments,
   });
   if (!result) {
     return {
       ok: false,
-      error: (await serverT("serverErrors.invoices"))(isCredit ? "creditNoteNotIssued" : "changedInTheMeantime"),
+      error: (await serverT("serverErrors.invoices"))(
+        isCredit ? "creditNoteNotIssued" : deducts.length > 0 ? "depositTakenOff" : "changedInTheMeantime",
+      ),
     };
   }
+  for (const d of deducts) revalidatePath(`${LIST}/${d}`);
   if (room) revalidatePath(`${LIST}/${room.id}`);
 
   // Money already on the order — a deposit — reaches its only invoice now (I9). And an invoice
@@ -703,6 +1008,7 @@ export async function issueInvoiceAction(
       companyId: invoice.companyId,
       orderId: invoice.orderId,
       originalInvoiceId: isCredit ? invoice.originalInvoiceId : null,
+      depositInvoiceIds: deducts,
     },
     { via: "user", actor: actor.userId },
   ).catch((err) => console.error("[invoices] invoice.issued not dispatched", err));
@@ -830,12 +1136,28 @@ export async function getInvoicePayments(invoiceId: string) {
   await requirePlanModule("sales");
   const db = await getDb();
   const [invoice] = await db
-    .select({ total: invoices.total, credited: invoices.creditedAmount })
+    .select({
+      total: invoices.total,
+      credited: invoices.creditedAmount,
+      companyId: invoices.companyId,
+      currency: invoices.currency,
+    })
     .from(invoices)
     .where(eq(invoices.id, invoiceId));
   if (!invoice) return null;
-  const payments = await tolerateUnmigrated("invoice payments", () => invoicePayments(db, invoiceId), []);
-  return { payments, balance: invoiceBalance(invoice.total, invoice.credited, payments) };
+  const [payments, credits] = await Promise.all([
+    tolerateUnmigrated("invoice payments", () => invoicePayments(db, invoiceId), []),
+    // The customer's money not yet used, in this invoice's currency: what "use credit" can spend (I10).
+    invoice.companyId
+      ? tolerateUnmigrated("receipts", () => openCredits(db, invoice.companyId as string), [])
+      : Promise.resolve([]),
+  ]);
+  return {
+    payments,
+    balance: invoiceBalance(invoice.total, invoice.credited, payments),
+    companyId: invoice.companyId,
+    credits: credits.filter((c) => c.currency === invoice.currency),
+  };
 }
 
 /**
@@ -844,7 +1166,7 @@ export async function getInvoicePayments(invoiceId: string) {
  */
 export async function recordInvoicePaymentAction(
   invoiceId: string,
-  data: { amount: number | string; paidAt?: string; method?: string; note?: string },
+  data: { amount: number | string; paidAt?: string; method?: string; note?: string; reference?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
@@ -856,6 +1178,7 @@ export async function recordInvoicePaymentAction(
     amount: data.amount,
     paidAt,
     method: data.method,
+    reference: data.reference,
     note: data.note,
     by: actor.userId,
   });
@@ -873,19 +1196,25 @@ export async function recordInvoicePaymentAction(
   return { ok: true };
 }
 
-/** A payment recorded by mistake, taken back. Whoever may write the invoice may do it. */
+/**
+ * A payment recorded by mistake, taken back. Whoever may write the invoice may do it. The
+ * receipt goes with it when this was all of it; a share of a larger transfer returns to the
+ * customer's credit instead (src/lib/receipts.ts).
+ */
 export async function deleteInvoicePaymentAction(paymentId: string): Promise<{ ok: boolean }> {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
   const [row] = await db
-    .delete(orderPayments)
-    .where(and(eq(orderPayments.id, paymentId), sql`${orderPayments.invoiceId} is not null`))
-    .returning({ invoiceId: orderPayments.invoiceId, orderId: orderPayments.orderId });
-  if (row?.invoiceId) revalidatePath(`${LIST}/${row.invoiceId}`);
-  if (row?.orderId) revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
+    .select({ id: orderPayments.id })
+    .from(orderPayments)
+    .where(and(eq(orderPayments.id, paymentId), sql`${orderPayments.invoiceId} is not null`));
+  if (!row) return { ok: false };
+  const removed = await removeAllocation(db, paymentId);
+  if (removed.invoiceId) revalidatePath(`${LIST}/${removed.invoiceId}`);
+  if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);
   revalidatePath("/dashboard/sales/finance");
-  return { ok: Boolean(row) };
+  return { ok: removed.removed !== null };
 }
 
 /** The receivables schedule: every issued invoice still owed something, by age. */

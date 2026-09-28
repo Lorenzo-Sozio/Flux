@@ -169,6 +169,37 @@ export const openApiSpec = {
         },
       },
     },
+    "/api/companies/{id}/statement": {
+      get: {
+        tags: ["Companies"],
+        operationId: "companyStatement",
+        summary: "A customer's statement of account as CSV",
+        description:
+          "Every issued invoice, deposit invoice and credit note of the company and every payment received or refunded, in date order, with the balance after each, per currency. `from` and `to` (YYYY-MM-DD) limit the period; the first row of each currency is the opening balance. Headers follow the reader's language; Italian uses a semicolon and a decimal comma.",
+        security: session(),
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string" } },
+          { name: "from", in: "query", required: false, schema: { type: "string", format: "date" } },
+          { name: "to", in: "query", required: false, schema: { type: "string", format: "date" } },
+        ],
+        responses: {
+          "200": { description: "CSV file", content: { "text/csv": { schema: { type: "string" } } } },
+          "400": {
+            description: "A date that is not YYYY-MM-DD",
+            content: { "text/plain": { schema: { type: "string" } } },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "403": {
+            description: "The caller may not export records, or the plan has no sales module",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "404": { description: "No such company", content: { "text/plain": { schema: { type: "string" } } } },
+        },
+      },
+    },
     "/api/companies/import": {
       post: {
         tags: ["Companies"],

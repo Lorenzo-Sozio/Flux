@@ -72,7 +72,7 @@ describe("issuing", () => {
 
   it("⚠️⚠️ decides the stamp again from the lines being frozen, and freezes the recharge line with them", () => {
     const b = body("issueInvoiceAction");
-    const decide = b.indexOf("const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);");
+    const decide = b.indexOf("const final = finalLines(lines, discount, invoice.stampDutyMode, recharge, deductions);");
     expect(decide, "the stamp is taken from the draft row instead").toBeGreaterThan(-1);
     expect(decide).toBeLessThan(b.indexOf("await issueInvoice("));
     expect(b).toContain("stampDuty: final.stamp.applied,");
@@ -81,7 +81,7 @@ describe("issuing", () => {
 
   it("⚠️ refuses a stamp override without a reason", () => {
     expect(body("issueInvoiceAction")).toContain(
-      "draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),",
+      "draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }, deductions),",
     );
   });
 

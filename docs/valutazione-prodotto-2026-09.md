@@ -1271,6 +1271,58 @@ secondo le regole di chiusura già in uso.
 | V3.11 | Documentazione API pubblica da una fonte; catalogo eventi; Zapier/Make | L9 | M+M |
 | — | Dal piano di chiusura: ~~**L9** API di lettura~~ (fatta), **I6** SDI (D1 da scegliere), ~~**I9** incassi~~ (fatto: pagamenti collegati alla fattura oltre che all'ordine, scadenzario dei crediti per età su Finance, evento `invoice.paid`; `src/lib/receivables.ts`, migrazione 0053, spec 11/11), ~~**L2** firma semplice (D5)~~ (fatta: nome, consenso dal server nella lingua del cliente, IP, browser, SHA-256 e byte del PDF conservati; `src/lib/quote-signature.ts`, migrazione 0049, spec 12/12), ~~**L8** provvigioni sul vinto (D6)~~ (fatta: aliquote per persona e pipeline con data di decorrenza, mese approvato e congelato in un solo statement, scostamenti segnalati, vittorie tardive pagate col mese successivo, ognuno vede le proprie; `src/lib/commissions.ts`, migrazione 0051, `/dashboard/pipeline/commissions`, spec 23/23) | D1, D5, D6 | come pianificato |
 
+### Fase 4 — Incassi affidabili
+
+**Decisione R6 (28/09): entrambi i modi di fatturare un acconto, il B come predefinito; riconciliazione bancaria sì**
+
+Oggi un incasso è una riga scritta a mano su un ordine o una fattura, e l'acconto seguito dal saldo
+— il caso più comune — non ha una strada: nessuna fattura d'acconto (TD02), una seconda fattura
+precompilata con tutto l'ordine, un incasso dall'ordine con due fatture che non si collega più a
+nessuna, una sola scadenza per fattura. I numeri di Finanza e della dashboard Amministrazione
+ereditano tutto questo.
+
+| ID | Intervento | Taglia |
+|---|---|---|
+| ~~I10~~ | **Il modello dell'incasso** — *fatto il 28/09: `src/lib/receipts.ts`, migrazione 0059, scheda «Incassi» sull'azienda, spec `receipts.json` 14/14*. Un incasso è un fatto (data di accredito, importo, conto, riferimento CRO/TRN, cliente, origine: a mano, banca, carta); le sue **imputazioni** dicono a quali documenti va, anche più fatture con un bonifico solo. Il non imputato è **credito del cliente**, utilizzabile sulle fatture successive. Rimborsi come movimento negativo legato alla nota di credito. Gli incassi esistenti diventano un incasso con un'imputazione ciascuno. Sull'ordine con più fatture si sceglie la fattura; gli incassi già orfani si collegano a mano; modifica con storico; niente date future; cancellare un incasso di una fattura chiede i permessi della fattura. «Incassato» si calcola sugli incassi (cassa), non sulle imputazioni | L |
+| ~~I11~~ | **Acconto e saldo (modo B, predefinito)** — *fatto il 28/09: `src/lib/invoice-deposits.ts`, migrazione 0060, «Fattura d'acconto» e «Fattura di saldo» sull'ordine, spec `deposits.json` 11/11*. Dall'ordine «Fattura d'acconto» (TD02) per importo o percentuale, IVA ripartita per aliquota come l'ordine; «Fattura di saldo» precompilata con le righe dell'ordine **meno lo storno degli acconti** (un rigo per aliquota, col riferimento alla TD02). Sull'ordine: ordinato, fatturato, incassato, da fatturare, da incassare; una fattura oltre il residuo è rifiutata. Un incasso sull'ordine senza fattura è segnalato come **acconto da fatturare**, con la TD02 proposta per quell'importo | L |
+| ~~I12~~ | **Rate (modo A)** — *fatto il 29/09: `src/lib/payment-terms.ts`, migrazione 0062, condizioni abituali sul cliente e sulla fattura, rate fissate all'emissione, spec `installments.json` 12/12*. Piano di pagamento sulla fattura (date e importi, modelli 30/70 e 30-60-90 gg d.f.f.m.), condizioni di pagamento predefinite per cliente; XML con `TP01` e un `DettaglioPagamento` per rata; scadenzario per rata, con gli incassi imputati alle rate in ordine di scadenza | M |
+| ~~I13~~ | **Riconciliazione bancaria** (progetto sotto) — *fatto il 29/09: `src/lib/bank/`, migrazione 0061, `/dashboard/sales/bank`, spec `bank.json` 22/22. CAMT.053/052/054 e CSV letti nel browser, proposte con motivi, conferma singola, da tastiera e in blocco delle sicure, scelta a mano con credito, incassi già registrati collegati e non duplicati, IBAN imparato. Il flusso automatico PSD2 resta per dopo* | L |
+| ~~I14~~ | **Statistiche di cassa verificabili** — *fatto il 29/09, salvo le provvigioni sull'incassato (decisione aperta, vedi D6): `src/lib/cash-stats.ts`, sezione Cassa in Finanza con le definizioni accanto a ogni cifra, estratto conto CSV dal cliente, «Non disponibile» invece di € 0, spec `cash-stats.json` 10/10*. Definizioni scritte accanto a ogni numero; incassi per mese; DSO; riscossione lordo su lordo; acconti da fatturare; estratto conto per cliente esportabile; i numeri di Finanza che oggi sono «vinto e ordini» chiamati così; un errore di caricamento mostrato come errore, non come «€ 0»; provvigioni sull'incassato come opzione (rivaluta D6) | M |
+
+Ordine: I10 per primo (tutto il resto imputa incassi), poi I11 (il modo usato), I13, I12, I14.
+
+**Riconciliazione bancaria (I13): il progetto**
+
+- **Conti.** Uno o più conti del workspace (nome, IBAN, valuta). Ogni incasso dice su quale è arrivato.
+- **Movimenti.** Importati da file: **CAMT.053** (lo standard ISO 20022 che le banche italiane
+  forniscono via CBI) e **CSV** con una mappatura delle colonne salvata per conto, perché ogni
+  banca esporta il suo. Il file si legge **nel browser** (`DOMParser`, `papaparse`, già nelle
+  dipendenze): al server arrivano movimenti normalizzati, validati di nuovo, e il bundle del Worker
+  non cresce. Un movimento già importato non entra due volte: impronta unica per conto su
+  data, importo, riferimento della banca e causale. Import in blocchi, come l'API (tre passaggi,
+  niente scritture nel ciclo).
+- **Abbinamento.** Una funzione pura, testabile, propone per ogni accredito i documenti con un
+  punteggio e i **motivi in chiaro**:
+  - numero di fattura nella causale (forte; normalizzato: «FT 12/2026», «fatt. n.12», «12-2026»);
+  - IBAN del pagante già visto per quel cliente (forte; imparato a ogni conferma);
+  - importo uguale al residuo di una fattura, di una rata o di un acconto da fatturare;
+  - somma esatta di più fatture aperte dello stesso cliente (ricerca limitata);
+  - nome del pagante simile alla ragione sociale;
+  - vicinanza alla scadenza.
+- **Lavoro.** Una coda «Da riconciliare» per conto, con la proposta migliore già pronta:
+  - **conferma in un gesto**, anche da tastiera;
+  - **conferma in blocco** delle proposte sicure;
+  - ripartizione su più fatture;
+  - «credito del cliente» quando non c'è ancora un documento;
+  - «ignora» per commissioni e movimenti non di clienti;
+  - annullamento di un abbinamento.
+
+  Niente conferma automatica per impostazione: la precisione vale più della velocità, e la conferma
+  in blocco dà la velocità.
+- **Uscite.** Gli addebiti sono ignorati, salvo i rimborsi abbinati a una nota di credito.
+- **Dopo.** Un flusso automatico dalla banca (PSD2, tramite un aggregatore) dietro un adattatore,
+  come la posta: stesso abbinamento, stessa coda; il file resta la via che funziona sempre.
+
 **Dove si innesta il piano di chiusura.** L9, gli ambiti delle chiavi, è il prossimo passo già
 deciso, e può correre in parallelo alla Fase 0 perché non tocca le stesse aree. I9 va prima di
 V2.9, così la scheda per commerciale può mostrare l'incassato. L8, con la provvigione sul vinto (D6), non dipende più da I9; «sull'incassato» si rivaluta quando I9 ci sarà.
@@ -1295,6 +1347,7 @@ che non coincidevano:
 | R3 · Telefoni (27/09) | **Prefisso del workspace**: un numero senza prefisso è del paese in cui il workspace fattura (Italia se non impostato) | Fatto: opt-out, assistente, cancellazione e accesso ai dati |
 | R4 · Correzioni minori (27/09) | Fatte: descrizione del ticket al cliente solo se l'ha scritta lui; il segno dell'assistente appartiene alla chiave che l'ha messo (migrazione 0055); il replay idempotente conserva lo stato (201). **Non fatta, per scelta**: il blocco dei webhook verso nomi che risolvono a IP privati | — |
 | R5 · Home «Io / Azienda» (27/09) | Rivista V2.3: la seconda metà è lo **stato dell'azienda**, non un report della squadra, e si chiama «Azienda». Si apre per ruolo (chi gestisce tutti i record → Azienda, gli altri → Io) e poi sull'ultima scelta del browser. In «Io» un quarto numero, **Lead da lavorare** (attivi, propri o non assegnati), che apre la lista filtrata; nei filtri a scelta c'è ora «È vuoto». I dati aziendali si leggono solo quando la metà è aperta | Fatto: `src/lib/home-view.ts` |
+| R6 · Incassi (28/09) | **Entrambi i modi di fatturare un acconto** — fattura d'acconto TD02 e saldo con storno (B, **predefinito**), oppure una fattura con rate (A) — e **riconciliazione bancaria** da estratto conto, pensata per la precisione: proposte con motivi, conferma in un gesto o in blocco, niente conferma automatica | Fase 4, I10–I14 |
 | D1 · SDI | Proposto Namirial; **confronto fatto** con A-Cube, Openapi, Aruba e InfoCert. Criterio decisivo: un contratto partner per molte partite IVA, API REST con webhook di consegna e scarto, sandbox, conservazione a norma inclusa (l'archivio di Flux non lo è), ricezione del passivo. Prossimo passo: preventivi da Namirial (programma partner) e A-Cube su quei quattro punti e sul prezzo per fattura ai volumi attesi. I6 si costruisce dietro un adattatore sostituibile, come la posta | I6 ferma fino alla scelta del fornitore |
 
 Nessuna blocca le Fasi 0 e 1. Accanto a ciascuna c'è la raccomandazione, com'era prima della scelta.

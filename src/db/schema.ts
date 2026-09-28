@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   date,
   index,
@@ -13,6 +14,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
+
+import type { Installment, PaymentTerms } from "@/lib/payment-terms";
 
 export const users = pgTable("user", {
   id: text("id")
@@ -188,6 +191,8 @@ export const companies = pgTable("company", {
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   vatNumber: text("vat_number"),
   sdiCode: text("sdi_code"),
+  // The terms a new invoice to this customer starts with: a preset key (src/lib/payment-terms.ts).
+  paymentTerms: text("payment_terms"),
   // Codice fiscale and PEC: with the partita IVA and codice destinatario, what an
   // invoice needs to reach this customer. Checked when issuing, not when saving.
   fiscalCode: text("fiscal_code"),
@@ -456,7 +461,116 @@ export const orderPayments = pgTable("order_payment", {
   note: text("note"),
   recordedById: text("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  // I10: the money this row is a share of. A row is an allocation — how much of one receipt
+  // went to this order or invoice (src/lib/receipts.ts). Migration 0059 gave every older row a
+  // receipt of its own; deleting the receipt takes its allocations with it.
+  receiptId: text("receipt_id").references((): AnyPgColumn => receipts.id, { onDelete: "cascade" }),
 });
+
+/**
+ * Money that arrived (I10, migration 0059): when it reached the account, how much, the bank's
+ * reference, the customer. Where it went is its allocations (`order_payment`); what is left
+ * unallocated is the customer's credit. A negative amount is money given back — a refund.
+ *
+ * ⚠️ "Collected" is these rows, by `receivedAt`: cash, not the allocations, which can be moved.
+ */
+export const receipts = pgTable("receipt", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").default("EUR").notNull(),
+  receivedAt: timestamp("received_at", { mode: "date" }).notNull(),
+  method: text("method"),
+  // The bank's reference: CRO / TRN, or the transfer's description.
+  reference: text("reference"),
+  note: text("note"),
+  // The account it reached (I13, bank reconciliation).
+  accountId: text("account_id"),
+  // "manual", "bank" (a reconciled statement line), "card".
+  source: text("source").default("manual").notNull(),
+  bankTransactionId: text("bank_transaction_id"),
+  recordedById: text("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  updatedById: text("updated_by_id").references(() => users.id, { onDelete: "set null" }),
+});
+
+// Bank reconciliation (I13, migration 0061, src/lib/bank/). A line is reconciled when receipts
+// name it (`receipts.bankTransactionId`): there is no flag to keep in step with them.
+export const bankAccounts = pgTable("bank_account", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  iban: text("iban"),
+  currency: text("currency").default("EUR").notNull(),
+  // The CSV columns this bank exports, by header name (src/lib/bank/csv.ts).
+  csvMapping: jsonb("csv_mapping"),
+  archivedAt: timestamp("archived_at", { mode: "date" }),
+  createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const bankImports = pgTable("bank_import", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  accountId: text("account_id")
+    .notNull()
+    .references(() => bankAccounts.id, { onDelete: "cascade" }),
+  fileName: text("file_name"),
+  format: text("format").notNull(),
+  created: integer("created").default(0).notNull(),
+  skipped: integer("skipped").default(0).notNull(),
+  createdById: text("created_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const bankTransactions = pgTable(
+  "bank_transaction",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => bankAccounts.id, { onDelete: "cascade" }),
+    importId: text("import_id").references(() => bankImports.id, { onDelete: "set null" }),
+    bookedOn: date("booked_on").notNull(),
+    valueOn: date("value_on"),
+    // Positive: money in. Negative: money out.
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: text("currency").default("EUR").notNull(),
+    counterpartyName: text("counterparty_name"),
+    counterpartyIban: text("counterparty_iban"),
+    remittance: text("remittance"),
+    bankReference: text("bank_reference"),
+    fingerprint: text("fingerprint").notNull(),
+    ignoredAt: timestamp("ignored_at", { mode: "date" }),
+    ignoredById: text("ignored_by_id").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("bank_transaction_fingerprint_idx").on(t.accountId, t.fingerprint),
+    index("bank_transaction_booked_idx").on(t.accountId, t.bookedOn),
+  ],
+);
+
+// What a payer's IBAN has been seen paying for, learned from every confirmation.
+export const companyIbans = pgTable(
+  "company_iban",
+  {
+    iban: text("iban").notNull(),
+    companyId: text("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    seen: integer("seen").default(1).notNull(),
+    lastSeenAt: timestamp("last_seen_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.iban, t.companyId] })],
+);
 
 export const orderItems = pgTable("order_item", {
   id: text("id")
@@ -1080,7 +1194,7 @@ export const invoices = pgTable(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => crypto.randomUUID()),
-    documentType: text("document_type").default("TD01").notNull(), // TD01 | TD04
+    documentType: text("document_type").default("TD01").notNull(), // TD01 | TD02 (deposit) | TD04
     status: text("status").default("draft").notNull(), // draft | issued
     series: text("series").default("").notNull(),
     fiscalYear: integer("fiscal_year"),
@@ -1107,7 +1221,16 @@ export const invoices = pgTable(
     // On an issued invoice: what its issued credit notes have given back. Advanced only by
     // the statement that issues a credit note, and never past `total`.
     creditedAmount: numeric("credited_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+    // I11, migration 0060. On a balance invoice (a TD01 with deposits): the deposit invoices it
+    // takes off, chosen while it is a draft. On a deposit invoice (TD02): the invoice that took
+    // it off — written only by the statement that issues that invoice, and only while empty.
+    deducts: jsonb("deducts").$type<string[]>(),
+    deductedInInvoiceId: text("deducted_in_invoice_id"),
     paymentMethod: text("payment_method").default("MP05").notNull(),
+    // I12, migration 0062 (src/lib/payment-terms.ts). The terms chosen on the draft — a preset or
+    // installments written by hand — and the installments they became at issue, frozen with it.
+    paymentTerms: jsonb("payment_terms").$type<PaymentTerms>(),
+    installments: jsonb("installments").$type<Installment[]>(),
     notes: text("notes"),
     revision: integer("revision").default(1).notNull(),
     issuerSnapshot: jsonb("issuer_snapshot"),

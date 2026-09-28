@@ -7,7 +7,7 @@
  */
 import { and, asc, eq, gte, inArray, notExists, sql } from "drizzle-orm";
 
-import { deals, invoices, orderPayments, orders, tickets, users } from "@/db/schema";
+import { deals, invoices, orders, receipts, tickets, users } from "@/db/schema";
 import { closedBetween, dealEur } from "@/lib/metrics";
 import { OPEN_TICKET_STATUSES } from "@/lib/support-metrics";
 import { fromWallValue, toWallDate } from "@/lib/wall-clock";
@@ -122,8 +122,14 @@ export async function moneyFigures(db: AnyDb): Promise<MoneyFigures> {
       .where(
         and(
           eq(orders.status, "completed"),
-          // A draft counts as started: it is somebody's work in progress, not a forgotten order.
-          notExists(db.select({ one: sql`1` }).from(invoices).where(eq(invoices.orderId, orders.id))),
+          // A draft counts as started: it is somebody's work in progress, not a forgotten order. Only an
+          // invoice (TD01) invoices the order: a deposit invoice alone leaves the rest to invoice (I11).
+          notExists(
+            db
+              .select({ one: sql`1` })
+              .from(invoices)
+              .where(and(eq(invoices.orderId, orders.id), eq(invoices.documentType, "TD01"))),
+          ),
         ),
       ),
   ]);
@@ -139,7 +145,7 @@ export interface CurrencyAmount {
 export interface MoneyHeadline {
   /** Won deals, closed on the workspace's clock. EUR, as every deal amount at rest. */
   won: { month: number; year: number; allTime: number; allTimeCount: number };
-  /** Payments recorded, on invoices or orders, in the currency of what they paid. */
+  /** Money that arrived (receipts, I10), in the currency it arrived in; refunds taken off. */
   collected: { month: CurrencyAmount[]; year: CurrencyAmount[] };
   /** Issued invoices' taxable amount (VAT excluded), less credit notes, by issue date. */
   invoiced: { month: CurrencyAmount[]; year: CurrencyAmount[] };
@@ -157,7 +163,8 @@ const byCurrency = (rows: { currency: string | null; amount: string | number | n
  *
  * ⚠️ Invoiced is what was *issued*: a draft is not revenue, and a credit note (TD04)
  * takes back what it credits. The taxable amount, because VAT is the State's money.
- * ⚠️ Collected is every recorded payment, an order's too: money received before an
+ * ⚠️ Collected is every receipt, by the day it arrived (I10): an order's deposit, credit not
+ * yet used, and a refund taken off — cash, whatever it was allocated to. Money received before an
  * invoice exists is still money received.
  */
 export async function moneyHeadline(db: AnyDb, now: Date, timeZone: string): Promise<MoneyHeadline> {
@@ -167,7 +174,6 @@ export async function moneyHeadline(db: AnyDb, now: Date, timeZone: string): Pro
   const monthFirst = toWallDate(month, timeZone);
 
   const signed = sql`case when ${invoices.documentType} = 'TD04' then -${invoices.taxableAmount} else ${invoices.taxableAmount} end`;
-  const paidIn = sql<string>`coalesce(${invoices.currency}, ${orders.currency}, 'EUR')`;
 
   const [[won], invoicedRows, collectedRows] = await Promise.all([
     db
@@ -190,15 +196,13 @@ export async function moneyHeadline(db: AnyDb, now: Date, timeZone: string): Pro
       .groupBy(invoices.currency),
     db
       .select({
-        currency: paidIn,
-        month: sql<string>`coalesce(sum(${orderPayments.amount}) filter (where ${orderPayments.paidAt} >= ${month}), 0)`,
-        year: sql<string>`coalesce(sum(${orderPayments.amount}), 0)`,
+        currency: receipts.currency,
+        month: sql<string>`coalesce(sum(${receipts.amount}) filter (where ${receipts.receivedAt} >= ${month}), 0)`,
+        year: sql<string>`coalesce(sum(${receipts.amount}), 0)`,
       })
-      .from(orderPayments)
-      .leftJoin(invoices, eq(invoices.id, orderPayments.invoiceId))
-      .leftJoin(orders, eq(orders.id, orderPayments.orderId))
-      .where(gte(orderPayments.paidAt, year))
-      .groupBy(sql`1`),
+      .from(receipts)
+      .where(gte(receipts.receivedAt, year))
+      .groupBy(receipts.currency),
   ]);
 
   const pick = (rows: { currency: string | null; month: string; year: string }[], key: "month" | "year") =>

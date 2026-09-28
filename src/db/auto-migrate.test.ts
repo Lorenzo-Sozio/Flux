@@ -43,6 +43,8 @@ function fakeDb(recorded: number | null) {
     execute(query: unknown) {
       const text = render(query as { queryChunks?: unknown[] });
       statements.push(text);
+      // The receipt repair (I10): idempotent, and here nothing is missing a receipt.
+      if (text.includes("with orphans")) return Promise.resolve([]);
       // Only the history read returns rows; everything else is a write.
       if (text.includes("created_at")) {
         return Promise.resolve(recorded === null ? [] : [{ created_at: recorded }]);
@@ -54,7 +56,10 @@ function fakeDb(recorded: number | null) {
 
 /** Counts the statements that are not the bookkeeping read or its CREATE guards. */
 const writes = (db: ReturnType<typeof fakeDb>) =>
-  db.statements.filter((s) => !s.includes("created_at") && !s.includes("CREATE SCHEMA")).length;
+  db.statements.filter((s) => !s.includes("created_at") && !s.includes("CREATE SCHEMA") && !isRepair(s)).length;
+
+/** The one repair a current database still gets: payments without a receipt (src/lib/receipts.ts). */
+const isRepair = (s: string) => s.includes("with orphans");
 
 beforeEach(() => {
   for (const id of ["t1", "t2", "t3", "t4"]) forgetMigrationAttempt(id);
@@ -74,11 +79,13 @@ describe("ensureTenantMigrated", () => {
     expect(writes(db)).toBe(0);
   });
 
-  it("does nothing when the database is already current", async () => {
+  it("does nothing when the database is already current — but the one idempotent receipt repair", async () => {
     const db = fakeDb(NEWEST);
     // biome-ignore lint/suspicious/noExplicitAny: a stand-in for the driver
     await ensureTenantMigrated("t2", db as any);
     expect(writes(db)).toBe(0);
+    // ⚠️ Payments recorded by older code after 0059 reached the database get their receipt here.
+    expect(db.statements.filter(isRepair)).toHaveLength(1);
   });
 
   it("applies what is pending when the database is behind", async () => {
@@ -102,7 +109,8 @@ describe("ensureTenantMigrated", () => {
       // biome-ignore lint/suspicious/noExplicitAny: a stand-in for the driver
       Array.from({ length: 5 }, () => ensureTenantMigrated("t2", db as any)),
     );
-    // One history read, not five.
-    expect(db.statements.filter((s) => s.includes("created_at")).length).toBe(1);
+    // One history read, not five — and one repair.
+    expect(db.statements.filter((s) => s.includes("created_at") && !isRepair(s)).length).toBe(1);
+    expect(db.statements.filter(isRepair)).toHaveLength(1);
   });
 });

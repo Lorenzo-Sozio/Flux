@@ -18,16 +18,20 @@ export function CreateInvoiceButton({
   orderId,
   draftId,
   variant = "outline",
+  balance = false,
 }: {
   orderId: string;
   draftId?: string | null;
   variant?: "outline" | "default";
+  /** The order has deposit invoices: this one is the balance, and takes them off (I11). */
+  balance?: boolean;
 }) {
   const t = useTranslations("invoices");
   return (
     <Button asChild variant={variant} size="sm" className="gap-1.5">
       <Link href={draftId ? `/dashboard/sales/invoices/${draftId}` : `/dashboard/sales/invoices/new?order=${orderId}`}>
-        <Receipt className="size-3.5" aria-hidden /> {draftId ? t("new.openDraft") : t("createFromOrder")}
+        <Receipt className="size-3.5" aria-hidden />{" "}
+        {draftId ? t("new.openDraft") : balance ? t("deposit.createBalance") : t("createFromOrder")}
       </Link>
     </Button>
   );

@@ -119,6 +119,34 @@ describe("⚠️⚠️ the receivables schedule", () => {
   });
 });
 
+describe("⚠️⚠️ an invoice paid in installments (I12)", () => {
+  it("is as late as its first installment still owed, and each installment ages on its own", async () => {
+    await invoice("rate", { due: "2026-10-31" });
+    await db.execute(
+      sql`update invoice set installments = ${JSON.stringify([
+        { dueDate: "2026-07-31", amount: 400 },
+        { dueDate: "2026-08-31", amount: 300 },
+        { dueDate: "2026-10-31", amount: 300 },
+      ])}::jsonb where id = 'rate'`,
+    );
+    // 500 paid: the first installment settled, 200 left of the second.
+    await pay("rate", 500);
+    const s = await schedule();
+    const [r] = s.invoices;
+    expect([r.dueDate, r.bucket, r.daysOverdue, r.overdueAmount, r.outstanding]).toEqual([
+      "2026-08-31",
+      "1-30",
+      27,
+      200,
+      500,
+    ]);
+    expect(r.installments?.map((i) => i.outstanding)).toEqual([0, 200, 300]);
+    // 300 due next month is not late because an earlier installment is.
+    expect(s.totals[0].buckets).toMatchObject({ current: 300, "1-30": 200 });
+    expect(s.totals[0].overdue).toBe(200);
+  });
+});
+
 describe("recording a payment on an invoice", () => {
   it("names the invoice's order too, and says which payment settled it", async () => {
     await db.execute(

@@ -13,6 +13,8 @@
  */
 import { z } from "zod";
 
+import { TERM_PRESET_KEYS, type TermPreset } from "@/lib/payment-terms";
+
 /** Empty strings arrive from every uncontrolled input; they mean "not provided". */
 const optionalText = z
   .string()
@@ -187,6 +189,10 @@ export const CompanySchema = z.object({
   // The list this customer's documents are priced from. Empty means the
   // catalogue, which is a real choice and not a missing one.
   priceListId: optionalId,
+  // The terms a new invoice to them starts with (I12): a preset key; empty means none.
+  paymentTerms: z
+    .union([z.enum(TERM_PRESET_KEYS as [TermPreset, ...TermPreset[]]), z.literal(""), z.null(), z.undefined()])
+    .transform((v) => (v === undefined ? undefined : v || null)),
 });
 
 export const CompanyUpdateSchema = CompanySchema.partial().extend({

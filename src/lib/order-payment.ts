@@ -88,6 +88,9 @@ export function isRecordablePayment(amount: unknown): boolean {
 export function paymentDay(value: string | null | undefined, zone: string, now = new Date()): Date | null {
   if (!value) return now;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  // ⚠️ Money arrives today or before: a day ahead is a promise, not a receipt, and it was
+  // counted in this month's "collected" the moment it was typed (I10).
+  if (value > toWallDate(now, zone)) return null;
   const d = fromWallValue(`${value}T12:00`, zone);
   return d && !Number.isNaN(d.getTime()) && toWallDate(d, zone) === value ? d : null;
 }

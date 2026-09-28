@@ -30,6 +30,7 @@ import {
   appointments,
   campaignLogs,
   companies,
+  companyIbans,
   contacts,
   contracts,
   deals,
@@ -38,6 +39,7 @@ import {
   leads,
   orders,
   quotes,
+  receipts,
   tasks,
   tickets,
 } from "@/db/schema";
@@ -46,6 +48,11 @@ export interface MergeChild {
   table: AnyPgTable;
   /** The camelCase column on that table which points at the merged record. */
   field: string;
+  /**
+   * A column that, with `field`, is unique: a row of the loser that the survivor already has
+   * is dropped before the move instead of failing the whole merge on the key.
+   */
+  collidesOn?: string;
 }
 
 /** The column itself, looked up once so the field name is the only thing written twice. */
@@ -65,6 +72,11 @@ export const COMPANY_CHILDREN: MergeChild[] = [
   { table: contracts, field: "companyId" },
   // The legal parties are frozen in the invoice snapshot; the pointer follows the survivor.
   { table: invoices, field: "companyId" },
+  // Money that arrived (I10): the customer's credit follows them, or it is stranded on a record
+  // that no longer exists.
+  { table: receipts, field: "companyId" },
+  // The IBANs a customer has paid from (I13). Both having paid from one account is one fact.
+  { table: companyIbans, field: "companyId", collidesOn: "iban" },
 ];
 
 export const CONTACT_CHILDREN: MergeChild[] = [

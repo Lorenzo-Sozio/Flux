@@ -26,10 +26,12 @@ import { A4, type Canvas, createCanvas, type Hex } from "./canvas";
  */
 
 export interface InvoicePdfData {
-  documentType: "TD01" | "TD04";
+  documentType: "TD01" | "TD02" | "TD04";
   documentNumber: string;
   issueDate: string;
   dueDate: string | null;
+  /** More than one: the installments, each with its date and amount (I12). */
+  installments?: readonly { dueDate: string; amount: number }[] | null;
   currency: string;
   paymentMethod: string;
   notes: string | null;
@@ -38,6 +40,8 @@ export interface InvoicePdfData {
   customer: XmlParty;
   totals: InvoiceTotals;
   originalInvoice?: { documentNumber: string; issueDate: string } | null;
+  /** For a balance invoice, the deposit invoices it takes off (I11). */
+  depositInvoices?: { documentNumber: string; issueDate: string }[];
   discountPercent: number;
   lang: DocumentLanguage;
 }
@@ -75,7 +79,8 @@ export async function renderInvoicePdfDocument(data: InvoicePdfData): Promise<Ui
   const num = (n: number) =>
     new Intl.NumberFormat(DOCUMENT_LOCALE[lang], { maximumFractionDigits: 3, useGrouping: "always" }).format(n);
   const pct = (n: number) => `${num(n)}%`;
-  const title = data.documentType === "TD04" ? tx.creditNote : tx.invoice;
+  const title =
+    data.documentType === "TD04" ? tx.creditNote : data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
 
   const widths = { qty: 44, price: 74, disc: 46, vat: 46, total: 78 };
   const cols = (c: Canvas) => {
@@ -161,6 +166,18 @@ export async function renderInvoicePdfDocument(data: InvoicePdfData): Promise<Ui
       date: day(data.originalInvoice.issueDate),
     });
     c.text(ref, c.left, ry, { size: 9, color: BODY, align: "right", width: c.contentWidth });
+    ry += 13;
+  }
+  if (data.depositInvoices?.length) {
+    const list = data.depositInvoices
+      .map((d) => `${tx.number} ${d.documentNumber} ${tx.dated} ${day(d.issueDate)}`)
+      .join(", ");
+    c.text(fill(tx.deductionsReference, { list }), c.left, ry, {
+      size: 9,
+      color: BODY,
+      align: "right",
+      width: c.contentWidth,
+    });
     ry += 13;
   }
   c.y = Math.max(leftBottom, ry) + 20;
@@ -250,7 +267,11 @@ export async function renderInvoicePdfDocument(data: InvoicePdfData): Promise<Ui
       label: tx.payment,
       lines: [
         PAYMENT_METHOD_TEXT[lang][data.paymentMethod] ?? data.paymentMethod,
-        ...(data.dueDate ? [`${tx.due} ${day(data.dueDate)}`] : []),
+        ...(data.installments && data.installments.length > 1
+          ? data.installments.map((i, k) => `${tx.installment} ${k + 1} · ${day(i.dueDate)} · ${money(i.amount)}`)
+          : data.dueDate
+            ? [`${tx.due} ${day(data.dueDate)}`]
+            : []),
         ...(issuer.iban ? [`IBAN ${issuer.iban}${issuer.bankName ? ` · ${issuer.bankName}` : ""}`] : []),
       ],
     },

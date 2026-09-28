@@ -8,12 +8,21 @@ import { BanknoteIcon, Loader2, Plus, Trash2, TruckIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { deleteOrderPayment, type getOrderPayments, recordOrderPayment, setOrderDelivered } from "@/actions/orders";
+import {
+  deleteOrderPayment,
+  type getOrderInvoicesToPay,
+  type getOrderPayments,
+  linkOrderPaymentToInvoice,
+  recordOrderPayment,
+  setOrderDelivered,
+} from "@/actions/orders";
+import { ReceiptEditDialog } from "@/components/crm/receipt-edit-dialog";
 import { StatusBadge } from "@/components/crm/record/record-page";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Separator } from "@/components/ui/separator";
 import { useCurrency } from "@/hooks/use-currency";
 import { isRecordablePayment, paymentSummary } from "@/lib/order-payment";
@@ -21,6 +30,7 @@ import { isRecordablePayment, paymentSummary } from "@/lib/order-payment";
 import { PAYMENT_TONE } from "./order-tones";
 
 type Payment = Awaited<ReturnType<typeof getOrderPayments>>[number];
+type PayableInvoice = Awaited<ReturnType<typeof getOrderInvoicesToPay>>[number];
 
 /**
  * What has been paid, and when it was delivered.
@@ -38,6 +48,11 @@ type Payment = Awaited<ReturnType<typeof getOrderPayments>>[number];
  * that kept its own copy would let a payment recorded here leave the header saying
  * the order was still unpaid. Every change refreshes the route instead, so both are
  * redrawn from one read.
+ *
+ * ⚠️⚠️ Which invoice a payment pays (I10). With one issued invoice it is that one; with none it
+ * is a deposit on the order, which reaches the invoice when it is issued; with several the
+ * person says which — a payment that paid "the order" used to leave every invoice unpaid.
+ * A deposit left on an order that now has invoices is linked from its row.
  */
 export function PaymentsCard({
   orderId,
@@ -45,7 +60,9 @@ export function PaymentsCard({
   currency,
   deliveredAt,
   payments,
+  invoices,
   canWrite,
+  canInvoice,
 }: {
   orderId: string;
   totalAmount: string | number | null;
@@ -53,8 +70,12 @@ export function PaymentsCard({
   currency: string;
   deliveredAt: Date | string | null;
   payments: Payment[];
+  /** The order's issued invoices, with what each still owes. */
+  invoices: PayableInvoice[];
   /** A viewer reads the payments; the controls that would only answer "forbidden" are not drawn. */
   canWrite: boolean;
+  /** Paying or correcting an invoice's money asks for the invoice's permission too. */
+  canInvoice: boolean;
 }) {
   const t = useTranslations("orders.payments");
   const format = useFormatter();
@@ -64,6 +85,9 @@ export function PaymentsCard({
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [method, setMethod] = useState("");
+  const [reference, setReference] = useState("");
+  // The invoice this payment pays: chosen when there are several, implied otherwise.
+  const [invoiceId, setInvoiceId] = useState("");
   const [delivered, setDelivered] = useState(deliveredAt ? new Date(deliveredAt).toISOString().slice(0, 10) : "");
   const [pending, startTransition] = useTransition();
 
@@ -74,11 +98,23 @@ export function PaymentsCard({
       toast.error(t("amountInvalid"));
       return;
     }
+    if (invoices.length > 1 && !invoiceId) {
+      toast.error(t("chooseInvoice"));
+      return;
+    }
     startTransition(async () => {
       try {
-        await recordOrderPayment(orderId, { amount: Number(amount), paidAt, method });
+        await recordOrderPayment(orderId, {
+          amount: Number(amount),
+          paidAt,
+          method,
+          reference,
+          invoiceId: invoiceId || undefined,
+        });
         setAmount("");
         setMethod("");
+        setReference("");
+        setInvoiceId("");
         setAdding(false);
         router.refresh();
       } catch (err) {
@@ -97,6 +133,21 @@ export function PaymentsCard({
       }
     });
   }
+
+  function link(paymentId: string, target: string) {
+    if (!target) return;
+    startTransition(async () => {
+      try {
+        await linkOrderPaymentToInvoice(paymentId, target);
+        router.refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t("recordFailed"));
+      }
+    });
+  }
+
+  const invoiceLabel = (i: PayableInvoice) =>
+    `${i.number ?? t("invoiceUnnumbered")} · ${t("stillOwed", { amount: formatMoney(Math.max(0, i.outstanding), i.currency) })}`;
 
   function saveDelivered(value: string) {
     setDelivered(value);
@@ -141,10 +192,48 @@ export function PaymentsCard({
                   <p className="truncate text-muted-foreground text-xs">
                     {format.dateTime(new Date(p.paidAt), { dateStyle: "medium" })}
                     {p.method ? ` · ${p.method}` : ""}
+                    {p.reference ? ` · ${p.reference}` : ""}
                     {p.recordedBy ? ` · ${p.recordedBy}` : ""}
                   </p>
+                  <p className="truncate text-xs">
+                    {p.invoiceId ? (
+                      <span className="text-muted-foreground">
+                        {t("paidInvoice", { number: p.invoiceNumber ?? t("invoiceUnnumbered") })}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 dark:text-amber-400">{t("depositOnOrder")}</span>
+                    )}
+                  </p>
+                  {!p.invoiceId && invoices.length > 0 && canWrite && canInvoice && (
+                    <NativeSelect
+                      aria-label={t("linkToInvoice")}
+                      className="mt-1 h-8 text-xs"
+                      value=""
+                      onChange={(e) => link(p.id, e.target.value)}
+                      disabled={pending}
+                    >
+                      <NativeSelectOption value="">{t("linkToInvoice")}</NativeSelectOption>
+                      {invoices.map((i) => (
+                        <NativeSelectOption key={i.id} value={i.id}>
+                          {invoiceLabel(i)}
+                        </NativeSelectOption>
+                      ))}
+                    </NativeSelect>
+                  )}
                 </div>
-                {canWrite && (
+                {canWrite && (!p.invoiceId || canInvoice) && p.receiptId && (
+                  <ReceiptEditDialog
+                    receipt={{
+                      id: p.receiptId,
+                      amount: p.receiptAmount ?? p.amount,
+                      receivedAt: p.paidAt,
+                      method: p.method,
+                      reference: p.reference,
+                      note: p.note,
+                    }}
+                  />
+                )}
+                {canWrite && (!p.invoiceId || canInvoice) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -189,17 +278,51 @@ export function PaymentsCard({
                   <Input id="payment-date" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
                 </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="payment-method" className="text-xs">
-                  {t("method")}
-                </Label>
-                <Input
-                  id="payment-method"
-                  value={method}
-                  onChange={(e) => setMethod(e.target.value)}
-                  placeholder={t("methodPlaceholder")}
-                />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="payment-method" className="text-xs">
+                    {t("method")}
+                  </Label>
+                  <Input
+                    id="payment-method"
+                    value={method}
+                    onChange={(e) => setMethod(e.target.value)}
+                    placeholder={t("methodPlaceholder")}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="payment-reference" className="text-xs">
+                    {t("reference")}
+                  </Label>
+                  <Input
+                    id="payment-reference"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    placeholder={t("referencePlaceholder")}
+                  />
+                </div>
               </div>
+              {invoices.length > 1 ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="payment-invoice" className="text-xs">
+                    {t("invoice")}
+                  </Label>
+                  <NativeSelect id="payment-invoice" value={invoiceId} onChange={(e) => setInvoiceId(e.target.value)}>
+                    <NativeSelectOption value="">{t("chooseInvoice")}</NativeSelectOption>
+                    {invoices.map((i) => (
+                      <NativeSelectOption key={i.id} value={i.id}>
+                        {invoiceLabel(i)}
+                      </NativeSelectOption>
+                    ))}
+                  </NativeSelect>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {invoices.length === 1
+                    ? t("goesToInvoice", { number: invoices[0].number ?? t("invoiceUnnumbered") })
+                    : t("goesToOrder")}
+                </p>
+              )}
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="ghost" onClick={() => setAdding(false)} disabled={pending}>
                   {t("cancel")}

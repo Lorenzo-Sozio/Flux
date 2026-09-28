@@ -44,7 +44,7 @@ export interface XmlParty {
 }
 
 export interface XmlInvoice {
-  documentType: "TD01" | "TD04";
+  documentType: "TD01" | "TD02" | "TD04";
   documentNumber: string;
   issueDate: string;
   currency: string;
@@ -52,6 +52,8 @@ export interface XmlInvoice {
   stampDuty: boolean;
   paymentMethod: string;
   dueDate?: string | null;
+  /** The installments frozen at issue (I12): more than one is TP01, one DettaglioPagamento each. */
+  installments?: readonly { dueDate: string; amount: number }[] | null;
   notes?: string | null;
   issuer: XmlParty;
   customer: XmlParty;
@@ -62,6 +64,8 @@ export interface XmlInvoice {
   transmitter?: { country: string; code: string };
   /** For a credit note, the invoice it corrects. */
   originalInvoice?: { documentNumber: string; issueDate: string } | null;
+  /** For a balance invoice, the deposit invoices it takes off (I11): each one cited. */
+  depositInvoices?: { documentNumber: string; issueDate: string }[];
 }
 
 // ─── Values ───────────────────────────────────────────────────────────────────
@@ -225,12 +229,13 @@ export function buildFatturaPaXml(inv: XmlInvoice): string {
       el("ImportoTotaleDocumento", amount2(totals.total)) +
       causali.map((c) => el("Causale", c)).join(""),
   );
-  const collegate = inv.originalInvoice
-    ? block(
-        "DatiFattureCollegate",
-        el("IdDocumento", latin(inv.originalInvoice.documentNumber, 20)) + el("Data", inv.originalInvoice.issueDate),
-      )
-    : "";
+  // The invoice a credit note corrects, and the deposit invoices a balance takes off: one
+  // DatiFattureCollegate each, which the schema allows as many times as needed.
+  const collegate = [...(inv.originalInvoice ? [inv.originalInvoice] : []), ...(inv.depositInvoices ?? [])]
+    .map((linked) =>
+      block("DatiFattureCollegate", el("IdDocumento", latin(linked.documentNumber, 20)) + el("Data", linked.issueDate)),
+    )
+    .join("");
 
   const lines = totals.details
     .map((d, i) =>
@@ -265,18 +270,22 @@ export function buildFatturaPaXml(inv: XmlInvoice): string {
     .join("");
 
   const iban = (inv.issuer.iban ?? "").replace(/\s+/g, "").toUpperCase();
+  const detail = (dueDate: string | null | undefined, amount: number) =>
+    block(
+      "DettaglioPagamento",
+      el("ModalitaPagamento", inv.paymentMethod) +
+        el("DataScadenzaPagamento", dueDate ?? "") +
+        el("ImportoPagamento", amount2(amount)) +
+        (inv.paymentMethod === "MP05" && iban ? el("IBAN", iban) : ""),
+    );
+  // Paid in parts: TP01, one detail per installment, their amounts adding up to the document.
+  const plan = inv.installments && inv.installments.length > 1 ? inv.installments : null;
   const payment =
     totals.total > 0
       ? block(
           "DatiPagamento",
-          el("CondizioniPagamento", "TP02") +
-            block(
-              "DettaglioPagamento",
-              el("ModalitaPagamento", inv.paymentMethod) +
-                el("DataScadenzaPagamento", inv.dueDate ?? "") +
-                el("ImportoPagamento", amount2(totals.total)) +
-                (inv.paymentMethod === "MP05" && iban ? el("IBAN", iban) : ""),
-            ),
+          el("CondizioniPagamento", plan ? "TP01" : "TP02") +
+            (plan ? plan.map((i) => detail(i.dueDate, i.amount)).join("") : detail(inv.dueDate, totals.total)),
         )
       : "";
 

@@ -14,6 +14,7 @@ import { validateXML } from "xmllint-wasm";
 
 import { TAX_REGIMES } from "../fiscal-ids";
 import { NATURE_CODES } from "../invoice-rules";
+import { invoiceTotals } from "./totals";
 import { buildFatturaPaXml, delivery, fatturaPaFileName, latin, transmissionIdFor, type XmlInvoice } from "./xml";
 
 const DIR = "src/lib/fatturapa/schema/";
@@ -195,6 +196,83 @@ describe("a valid FatturaPA", () => {
     expect(xml).toContain(
       "<DatiFattureCollegate><IdDocumento>12</IdDocumento><Data>2026-09-15</Data></DatiFattureCollegate>",
     );
+  });
+
+  it("⚠️⚠️ paid in installments: TP01, one DettaglioPagamento each, adding up to the document", async () => {
+    const total = invoiceTotals(base.lines, base.discountPercent).total;
+    const first = Math.round((total * 100) / 3) / 100;
+    const xml = buildFatturaPaXml({
+      ...base,
+      installments: [
+        { dueDate: "2026-10-31", amount: first },
+        { dueDate: "2026-11-30", amount: first },
+        { dueDate: "2026-12-31", amount: Math.round((total - 2 * first) * 100) / 100 },
+      ],
+    });
+    expect(await validate(xml)).toEqual([]);
+    expect(xml).toContain("<CondizioniPagamento>TP01</CondizioniPagamento>");
+    expect(xml.match(/<DettaglioPagamento>/g)).toHaveLength(3);
+    const amounts = [...xml.matchAll(/<ImportoPagamento>([\d.]+)<\/ImportoPagamento>/g)].map((m) => Number(m[1]));
+    expect(Math.round(amounts.reduce((s, a) => s + a, 0) * 100)).toBe(Math.round(total * 100));
+    expect(xml).toContain("<DataScadenzaPagamento>2026-12-31</DataScadenzaPagamento>");
+  });
+
+  it("one installment is a single payment: TP02, as before", async () => {
+    const xml = buildFatturaPaXml({
+      ...base,
+      dueDate: "2026-10-31",
+      installments: [{ dueDate: "2026-10-31", amount: 1 }],
+    });
+    expect(xml).toContain("<CondizioniPagamento>TP02</CondizioniPagamento>");
+    expect(xml.match(/<DettaglioPagamento>/g)).toHaveLength(1);
+  });
+
+  it("⚠️⚠️ for a deposit invoice (TD02), split across two rates", async () => {
+    const xml = buildFatturaPaXml({
+      ...base,
+      documentType: "TD02",
+      lines: [
+        { description: "Acconto sull'ordine ORD-7 (IVA 22%)", quantity: 1, unitPrice: 250, taxPercent: 22 },
+        { description: "Acconto sull'ordine ORD-7 (IVA 10%)", quantity: 1, unitPrice: 250, taxPercent: 10 },
+      ],
+    });
+    expect(await validate(xml)).toEqual([]);
+    expect(xml).toContain("<TipoDocumento>TD02</TipoDocumento>");
+  });
+
+  it("⚠️⚠️ for a balance invoice taking two deposits off, each cited, with negative lines per rate", async () => {
+    const xml = buildFatturaPaXml({
+      ...base,
+      lines: [
+        { description: "Piante", quantity: 10, unitPrice: 100, taxPercent: 22 },
+        { description: "Posa", quantity: 1, unitPrice: 1000, taxPercent: 10 },
+        {
+          description: "Storno acconto fattura n. 7 del 10/09/2026",
+          quantity: 1,
+          unitPrice: -250,
+          taxPercent: 22,
+          isDeduction: true,
+          depositInvoiceId: "d7",
+        },
+        {
+          description: "Storno acconto fattura n. 9 del 12/09/2026",
+          quantity: 1,
+          unitPrice: -100,
+          taxPercent: 10,
+          isDeduction: true,
+          depositInvoiceId: "d9",
+        },
+      ],
+      depositInvoices: [
+        { documentNumber: "7", issueDate: "2026-09-10" },
+        { documentNumber: "9", issueDate: "2026-09-12" },
+      ],
+    });
+    expect(await validate(xml)).toEqual([]);
+    expect(xml).toContain("<PrezzoUnitario>-250.00</PrezzoUnitario>");
+    expect(xml.match(/<DatiFattureCollegate>/g)).toHaveLength(2);
+    expect(xml).toContain("<ImponibileImporto>750.00</ImponibileImporto>");
+    expect(xml).toContain("<ImponibileImporto>900.00</ImponibileImporto>");
   });
 
   it("⚠️⚠️ when descriptions carry characters the schema does not accept", async () => {

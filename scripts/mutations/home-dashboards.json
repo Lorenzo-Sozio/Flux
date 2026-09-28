@@ -13,9 +13,9 @@
   },
   {
     "file": "src/lib/home-dashboard-data.ts",
-    "description": "⚠️ gli ordini da fatturare tornano a contare anche quelli già fatturati",
-    "find": "          notExists(db.select({ one: sql`1` }).from(invoices).where(eq(invoices.orderId, orders.id))),",
-    "replace": "          undefined,"
+    "description": "⚠️ un ordine con la sola fattura d'acconto sparisce dai «da fatturare»: il saldo non viene mai fatturato",
+    "find": "              .where(and(eq(invoices.orderId, orders.id), eq(invoices.documentType, \"TD01\"))),",
+    "replace": "              .where(eq(invoices.orderId, orders.id)),"
   },
   {
     "file": "src/lib/home-dashboard-data.ts",
@@ -37,8 +37,8 @@
   },
   {
     "file": "src/lib/home-dashboard-data.ts",
-    "description": "⚠️ un pagamento registrato sull'ordine smette di contare come incassato, o finisce nella valuta sbagliata",
-    "find": "  const paidIn = sql<string>`coalesce(${invoices.currency}, ${orders.currency}, 'EUR')`;",
-    "replace": "  const paidIn = sql<string>`coalesce(${invoices.currency}, 'EUR')`;"
+    "description": "⚠️ l'incassato finisce tutto in una valuta: dollari ed euro sommati come se fossero la stessa moneta",
+    "find": "        currency: receipts.currency,",
+    "replace": "        currency: sql<string>`'EUR'`,"
   }
 ]

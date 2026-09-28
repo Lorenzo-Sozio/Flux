@@ -28,6 +28,7 @@ import {
   issueInvoiceAction,
   saveInvoiceDraft,
 } from "@/actions/invoices";
+import { PaymentTermsField } from "@/components/crm/payment-terms-field";
 import {
   Field,
   FieldList,
@@ -66,6 +67,7 @@ import { useMessageText } from "@/hooks/use-message-text";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { italianToday, PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
+import { installmentsMatch, type PaymentTerms } from "@/lib/payment-terms";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 
 import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
@@ -125,6 +127,7 @@ export function InvoiceView({
   const say = useMessageText();
   const tI = useTranslations("invoicing");
   const tR = useTranslations("record");
+  const tT = useTranslations("invoices.terms");
   const format = useFormatter();
   const router = useRouter();
   const { formatMoney } = useCurrency();
@@ -139,6 +142,7 @@ export function InvoiceView({
   const [stampMode, setStampMode] = useState<StampMode>(invoice.stampDutyMode as StampMode);
   const [stampNote, setStampNote] = useState(invoice.stampDutyNote ?? "");
   const [paymentMethod, setPaymentMethod] = useState(invoice.paymentMethod);
+  const [terms, setTerms] = useState<PaymentTerms | null>(invoice.paymentTerms ?? null);
   const [notes, setNotes] = useState(invoice.notes ?? "");
   const [lines, setLines] = useState<EditableLine[]>(() => {
     // An issued invoice is read from what was frozen when it was issued.
@@ -165,13 +169,16 @@ export function InvoiceView({
   const blockers = refused ?? data.blockers;
 
   const draftLines = useMemo(() => asDraftLines(lines), [lines]);
+  // A balance invoice's deposits come off in generated lines (I11): part of the totals and the
+  // stamp while it is a draft, frozen with the rest once issued.
+  const deductions = isDraft ? data.deductions : [];
   // A draft decides the stamp live from its lines; an issued invoice shows what was frozen.
-  const stamp = assessStampDuty(draftLines, num(discount), stampMode);
+  const stamp = assessStampDuty([...draftLines, ...deductions], num(discount), stampMode);
   const stampApplied = isDraft ? stamp.applied : invoice.stampDuty;
   const rechargeLine = isDraft && stamp.applied && data.rechargeStamp;
   const totalledLines = isDraft
     ? withStampRecharge(
-        draftLines.map((l) => ({ ...l, description: l.description })),
+        [...draftLines, ...deductions].map((l) => ({ ...l, description: l.description ?? "" })),
         stamp.applied,
         data.rechargeStamp,
       )
@@ -179,8 +186,9 @@ export function InvoiceView({
   const totals = invoiceTotals(totalledLines, num(discount));
   // The draft checks run on the screen as typed, so the list of what is missing moves with the edit.
   const isCredit = invoice.documentType === "TD04";
+  const isDeposit = invoice.documentType === "TD02";
   const liveDraftProblems = isDraft
-    ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote })
+    ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote }, deductions)
     : [];
   // A credit note cannot give back more than is left on its invoice; the issuing
   // statement enforces it, this says so while the lines are being edited.
@@ -188,6 +196,9 @@ export function InvoiceView({
     if (!data.original) liveDraftProblems.push({ kind: "credit_without_original" });
     else if (totals.total > data.original.residual) liveDraftProblems.push({ kind: "credit_exceeds_residual" });
   }
+  // Installments written by hand add up to the total as it is now, edit by edit (I12).
+  if (isDraft && !isCredit && terms && "custom" in terms && !installmentsMatch(terms.custom, totals.total))
+    liveDraftProblems.push({ kind: "installments_total" });
   const money = (n: number) => formatMoney(n, invoice.currency);
 
   const touch =
@@ -205,6 +216,7 @@ export function InvoiceView({
       stampDutyMode: stampMode,
       stampDutyNote: stampNote,
       paymentMethod,
+      paymentTerms: terms,
       notes,
       lines: draftLines,
     });
@@ -284,8 +296,10 @@ export function InvoiceView({
     d ? format.dateTime(new Date(`${d}T00:00:00Z`), { dateStyle: "medium", timeZone: "UTC" }) : null;
 
   const title = invoice.documentNumber
-    ? t(isCredit ? "credit.noteNumber" : "numberTitle", { number: invoice.documentNumber })
-    : t(isCredit ? "credit.draftNote" : "draftTitle");
+    ? t(isCredit ? "credit.noteNumber" : isDeposit ? "deposit.numberTitle" : "numberTitle", {
+        number: invoice.documentNumber,
+      })
+    : t(isCredit ? "credit.draftNote" : isDeposit ? "deposit.draftTitle" : "draftTitle");
 
   // When it is due, on the Italian calendar the invoice itself is dated by. The hint
   // stays neutral: an invoice carries no payment record, so a date that has passed
@@ -325,6 +339,23 @@ export function InvoiceView({
           rechargeLine={Boolean(rechargeLine)}
           money={money}
         />
+        {deductions.length > 0 && (
+          // Generated from the deposit invoices, not typed: shown, never edited.
+          <ul className="divide-y border-t bg-muted/20 text-sm">
+            {deductions.map((d) => (
+              <li
+                key={`${d.description}-${d.taxPercent}-${d.nature ?? ""}`}
+                className="flex items-center justify-between gap-3 px-4 py-2 sm:px-6"
+              >
+                <span className="min-w-0 truncate">{d.description}</span>
+                <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+                  {t("deposit.rate", { rate: d.taxPercent })}
+                </span>
+                <span className="shrink-0 font-medium tabular-nums">{money(d.unitPrice)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         {/* The totals under the lines they add up, as on the document itself. */}
         <div className="border-t px-4 py-4 sm:px-6">
           <div className="sm:ml-auto sm:max-w-sm">
@@ -415,16 +446,19 @@ export function InvoiceView({
             placeholder={t("mainSeries")}
           />
         </div>
-        <div>
-          <Label htmlFor="inv-due">{t("dueDate")}</Label>
-          <Input
-            id="inv-due"
-            type="date"
-            className="mt-1.5"
-            value={dueDate}
-            onChange={(e) => touch(setDueDate)(e.target.value)}
-          />
-        </div>
+        {/* With terms, the due date comes from them at issue (I12). */}
+        {!terms && (
+          <div>
+            <Label htmlFor="inv-due">{t("dueDate")}</Label>
+            <Input
+              id="inv-due"
+              type="date"
+              className="mt-1.5"
+              value={dueDate}
+              onChange={(e) => touch(setDueDate)(e.target.value)}
+            />
+          </div>
+        )}
         <div>
           <Label htmlFor="inv-discount">{t("documentDiscount")}</Label>
           <Input
@@ -450,6 +484,18 @@ export function InvoiceView({
             </SelectContent>
           </Select>
         </div>
+        {invoice.documentType !== "TD04" && (
+          <div className="sm:col-span-2">
+            <PaymentTermsField
+              id="inv-terms"
+              terms={terms}
+              onChange={touch(setTerms)}
+              total={totals.total}
+              today={italianToday()}
+              money={money}
+            />
+          </div>
+        )}
         <div className="sm:col-span-2">{stampBlock}</div>
         <div className="sm:col-span-2">
           <Label htmlFor="inv-notes">{t("notes")}</Label>
@@ -481,6 +527,17 @@ export function InvoiceView({
           <Field label={t("dueDate")} always>
             {calendarDay(shownDue)}
           </Field>
+          {invoice.installments && invoice.installments.length > 1 && (
+            <Field label={tT("installments")} always>
+              <ul className="space-y-0.5 tabular-nums">
+                {invoice.installments.map((i, k) => (
+                  <li key={i.dueDate}>
+                    {tT("installment", { n: k + 1 })} · {calendarDay(i.dueDate)} · {money(i.amount)}
+                  </li>
+                ))}
+              </ul>
+            </Field>
+          )}
           <Field label={t("documentDiscount")}>{num(discount) !== 0 ? `${num(discount)}%` : null}</Field>
           <Field label={t("paymentMethod")} always>
             {paymentMethod}
@@ -589,6 +646,24 @@ export function InvoiceView({
                 {data.original.issueDate ? ` · ${calendarDay(data.original.issueDate)}` : ""}
               </MetaItem>
             )}
+            {data.deposits.length > 0 && (
+              <MetaItem>
+                {t("deposit.takesOff")}{" "}
+                {data.deposits.map((d, i) => (
+                  <span key={d.id}>
+                    {i > 0 ? ", " : ""}
+                    <a className="text-primary hover:underline" href={`/dashboard/sales/invoices/${d.id}`}>
+                      {d.documentNumber ?? "—"}
+                    </a>
+                  </span>
+                ))}
+              </MetaItem>
+            )}
+            {isDeposit && data.deductedIn && (
+              <MetaItem href={`/dashboard/sales/invoices/${data.deductedIn.id}`}>
+                {t("deposit.takenOffIn", { number: data.deductedIn.documentNumber ?? "—" })}
+              </MetaItem>
+            )}
             {isCredit && data.original && isDraft && (
               <MetaItem>{t("credit.residualLeft", { amount: money(data.original.residual) })}</MetaItem>
             )}
@@ -640,7 +715,9 @@ export function InvoiceView({
                   customerEmail={data.customerEmail}
                 />
               )}
-              {!isCredit && canWrite && <CreditNoteButton invoiceId={invoice.id} residual={residual} />}
+              {!isCredit && !data.deductedIn && canWrite && (
+                <CreditNoteButton invoiceId={invoice.id} residual={residual} />
+              )}
             </>
           )
         }
