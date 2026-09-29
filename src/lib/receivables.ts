@@ -234,19 +234,29 @@ export async function recordInvoicePayment(
     .from(invoices)
     .where(eq(invoices.id, input.invoiceId));
   if (!invoice) return { ok: false, reason: "not_found" };
-  const before = await balanceOf(db, input.invoiceId);
-  const share = Math.min(amount, before?.outstanding ?? 0);
-  const result = await recordReceipt(db, {
-    companyId: invoice.companyId,
-    currency: invoice.currency,
-    amount,
-    receivedAt: input.paidAt ?? new Date(),
-    method: input.method,
-    reference: input.reference,
-    note: input.note,
-    by: input.by,
-    allocations: share > 0 ? [{ invoiceId: input.invoiceId, amount: share }] : [],
-  });
+  // ⚠️⚠️ Two payments crossing on one invoice both read what it owes before either lands; the
+  // database lets the first take it and refuses the second (`overpays`). The money still
+  // arrived: read what is owed again and record it, the rest as credit. Refusing it lost a
+  // transfer that had reached the bank (29 September 2026, src/lib/money-on-postgres.test.ts).
+  let share = 0;
+  let result: Awaited<ReturnType<typeof recordReceipt>> | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const before = await balanceOf(db, input.invoiceId);
+    share = Math.max(0, Math.min(amount, before?.outstanding ?? 0));
+    result = await recordReceipt(db, {
+      companyId: invoice.companyId,
+      currency: invoice.currency,
+      amount,
+      receivedAt: input.paidAt ?? new Date(),
+      method: input.method,
+      reference: input.reference,
+      note: input.note,
+      by: input.by,
+      allocations: share > 0 ? [{ invoiceId: input.invoiceId, amount: share }] : [],
+    });
+    if (result.ok || result.reason !== "overpays") break;
+  }
+  if (!result) return { ok: false, reason: "not_found" };
   if (!result.ok) {
     const reason = result.reason === "invalid_allocation" ? "invalid_amount" : result.reason;
     return { ok: false, reason: reason === "not_found" || reason === "invalid_amount" ? reason : "not_receivable" };

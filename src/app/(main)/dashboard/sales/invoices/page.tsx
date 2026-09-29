@@ -16,9 +16,11 @@ import { italianToday } from "@/lib/invoice-draft";
 import { requirePageCapability } from "@/lib/page-guard";
 import { parseListParams } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
+import { needsAttention } from "@/lib/sdi/status";
+import type { SdiStatus } from "@/lib/sdi/types";
 
 // "unpaid" and "overdue" are the receivables schedule's own lists: what Finance chases, findable here.
-const STATUSES = ["all", "draft", "issued", "unpaid", "overdue"] as const;
+const STATUSES = ["all", "draft", "issued", "unpaid", "overdue", "sdi"] as const;
 
 const PAYMENT_TONES: Record<InvoicePaymentState["state"], Tone> = {
   overdue: "danger",
@@ -152,6 +154,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                         <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
                           {t(`statuses.${r.status as "draft" | "issued"}`)}
                         </Badge>
+                        {needsAttention(r.sdiStatus as SdiStatus | null) && (
+                          <StatusBadge tone="danger">{t(`sdiBadge.${r.sdiStatus as "rejected"}`)}</StatusBadge>
+                        )}
                         {Number(r.creditedAmount) > 0 && (
                           <Badge variant="outline">
                             {Number(r.creditedAmount) >= Number(r.total)
@@ -203,6 +208,9 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                           <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
                             {t(`statuses.${r.status as "draft" | "issued"}`)}
                           </Badge>
+                          {needsAttention(r.sdiStatus as SdiStatus | null) && (
+                            <StatusBadge tone="danger">{t(`sdiBadge.${r.sdiStatus as "rejected"}`)}</StatusBadge>
+                          )}
                           {Number(r.creditedAmount) > 0 && (
                             <Badge variant="outline" className="ml-1">
                               {Number(r.creditedAmount) >= Number(r.total)

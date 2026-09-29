@@ -108,6 +108,8 @@ export function xmlInputOf(
       invoice.series,
       invoice.sdiProgressive,
     ),
+    // The intermediary's code when one transmits it (Aruba requires its own): frozen on the invoice.
+    transmitter: invoice.sdiTransmitter ?? undefined,
     originalInvoice,
     depositInvoices,
   };
@@ -146,6 +148,30 @@ export function fileNameOf(input: XmlInvoice, kind: ArchiveKind): string {
     .replace(/'/g, "")
     .replace(/\s+/g, "-");
   return `${kindName}-${input.documentNumber.replace(/[^A-Za-z0-9-]/g, "-")}.pdf`;
+}
+
+/**
+ * The FatturaPA file to hand to SDI: built from the snapshots with the transmitter frozen on the
+ * invoice, never from the records as they are now (src/lib/sdi/transmit.ts).
+ */
+export async function transmissionFile(
+  db: Db,
+  invoice: Invoice,
+): Promise<{
+  xml: string;
+  name: string;
+  sha256: string;
+  document: XmlInvoice & { number: number | null; series: string };
+}> {
+  const input = xmlInputOf(invoice, await originalOf(db, invoice), await depositsTakenOffBy(db, invoice));
+  const xml = buildFatturaPaXml(input);
+  return {
+    xml,
+    name: fatturaPaFileName(input),
+    sha256: contentHash(new TextEncoder().encode(xml)),
+    // The same invoice as data, for an intermediary that builds its own file (Fatture in Cloud).
+    document: { ...input, number: invoice.number, series: invoice.series },
+  };
 }
 
 export async function renderInvoicePdf(input: XmlInvoice): Promise<Uint8Array> {
@@ -209,12 +235,26 @@ export async function readInvoiceFile(
   kind: ArchiveKind,
   storage?: StorageDriver,
 ): Promise<{ bytes: Uint8Array; name: string; contentType: string; archived: boolean }> {
+  // Built by the intermediary (Fatture in Cloud) and kept when it was sent: that is the file SDI
+  // received, and the only XML of the invoice to hand anyone.
+  if (kind === "xml" && invoice.sdiSentXml) {
+    return {
+      bytes: new TextEncoder().encode(invoice.sdiSentXml),
+      name: invoice.sdiFileName ?? `${invoice.documentNumber ?? invoice.id}.xml`,
+      contentType: CONTENT_TYPE.xml,
+      archived: true,
+    };
+  }
   const input = xmlInputOf(invoice, await originalOf(db, invoice), await depositsTakenOffBy(db, invoice));
   const name = fileNameOf(input, kind);
   const key = kind === "xml" ? invoice.xmlKey : invoice.pdfKey;
   const expected = kind === "xml" ? invoice.xmlSha256 : invoice.pdfSha256;
+  // ⚠️ Archived before it was handed to an intermediary with another transmitter: the archived
+  // XML is not the file SDI received. The one sent is rebuilt from the snapshots and the frozen
+  // transmitter — the same bytes, which `sdi_file_sha256` vouches for.
+  const sentOtherwise = kind === "xml" && invoice.sdiFileSha256 != null && invoice.sdiFileSha256 !== expected;
 
-  if (key && isValidArchiveKey(key, kind)) {
+  if (key && isValidArchiveKey(key, kind) && !sentOtherwise) {
     try {
       const store = storage ?? (await getStorage());
       const bytes = await store.get(key);

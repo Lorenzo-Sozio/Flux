@@ -124,6 +124,8 @@ export {
   // Reports
   savedReports,
   savedReportsRelations,
+  // To SDI through an intermediary
+  sdiSettings,
   sessions,
   slas,
   slasRelations,

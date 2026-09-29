@@ -1,0 +1,140 @@
+[
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️⚠️ il blocco non controlla lo stato: un doppio clic consegna la fattura due volte all'intermediario",
+    "find": "        or(isNull(invoices.sdiStatus), inArray(invoices.sdiStatus, [\"send_failed\", \"error\"])),\n      ),\n    )\n    .returning();\n  if (!claimed) return { ok: false, reason: \"not_sendable\" };",
+    "replace": "      ),\n    )\n    .returning();\n  if (!claimed) return { ok: false, reason: \"not_sendable\" };"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️⚠️ il file inviato non porta Aruba come trasmittente: Aruba lo rifiuta (errore 0094)",
+    "find": "      sdiChannel: provider.id,\n      sdiTransmitter: provider.transmitter,",
+    "replace": "      sdiChannel: provider.id,"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️ l'impronta del file inviato non viene salvata: l'XML scaricato dopo non è quello inviato",
+    "find": "      sdiFileSha256: sent.sentXml ? createHash(\"sha256\").update(sent.sentXml, \"utf8\").digest(\"hex\") : file.sha256,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️⚠️ uno stato arretra: un 'Inviata' tardivo cancella 'Consegnata'",
+    "find": "  if (answer.status === from || !laterStatus(from, answer.status)) {",
+    "replace": "  if (answer.status === from) {"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️ una fattura B2B già consegnata resta tra quelle da controllare e occupa il posto delle altre",
+    "find": "            sql`length(trim(coalesce(${invoices.customerSnapshot} ->> 'sdiCode', ''))) = 6`,",
+    "replace": "            sql`true`,"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️ un invio interrotto resta 'in invio' per sempre: nessuno può riprovarlo",
+    "find": "        eq(invoices.sdiStatus, \"sending\"),\n        lt(invoices.sdiStatusAt, new Date(now.getTime() - STALE_SENDING_MINUTES * 60_000)),",
+    "replace": "        eq(invoices.sdiStatus, \"__never__\"),\n        lt(invoices.sdiStatusAt, new Date(now.getTime() - STALE_SENDING_MINUTES * 60_000)),"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️ all'emissione il trasmittente non viene fissato: l'archivio contiene un file diverso da quello inviato",
+    "find": "      .set({ sdiTransmitter: provider.transmitter })\n      .where(and(eq(invoices.id, invoiceId), isNull(invoices.sdiStatus)));",
+    "replace": "      .set({})\n      .where(and(eq(invoices.id, invoiceId), isNull(invoices.sdiStatus)));"
+  },
+  {
+    "file": "src/lib/sdi/aruba.ts",
+    "description": "⚠️⚠️ ogni chiamata fa un nuovo accesso: Aruba ne consente uno al minuto e blocca l'account",
+    "find": "  if (!forceNew && t && t.accessExpiresAt.getTime() - EARLY_MS > now) return t.accessToken;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sdi/aruba.ts",
+    "description": "⚠️⚠️ uno 'Scartata' viene letto come consegnata: la fattura sembra emessa e non lo è",
+    "find": "  scartata: \"rejected\",",
+    "replace": "  scartata: \"delivered\","
+  },
+  {
+    "file": "src/lib/sdi/aruba.ts",
+    "description": "⚠️ un codice d'errore di Aruba viene preso per un successo",
+    "find": "    if (code && code !== \"0000\") {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/sdi/aruba.ts",
+    "description": "⚠️ il file viene codificato in Latin-1: accenti e simboli arrivano rovinati",
+    "find": "  const bytes = new TextEncoder().encode(text);",
+    "replace": "  const bytes = Uint8Array.from(text, (c) => c.charCodeAt(0) & 0xff);"
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️⚠️ lo scarico serve l'XML archiviato con un altro trasmittente invece di quello inviato",
+    "find": "  if (key && isValidArchiveKey(key, kind) && !sentOtherwise) {",
+    "replace": "  if (key && isValidArchiveKey(key, kind)) {"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ due pagamenti incrociati: il secondo viene rifiutato e il bonifico non viene registrato (serve FLUX_PG_TEST_URL)",
+    "find": "    if (result.ok || result.reason !== \"overpays\") break;",
+    "replace": "    break;"
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ Fatture in Cloud calcola un altro totale e la fattura parte lo stesso: allo SDI arriva un importo diverso da quello emesso",
+    "find": "    if (differs.length > 0) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ un invio rifiutato lascia su Fatture in Cloud un documento con il numero della fattura",
+    "find": "      // Not sent: nothing of it may stay in Fatture in Cloud holding the invoice's number.\n      await remove();",
+    "replace": "      // Not sent: nothing of it may stay in Fatture in Cloud holding the invoice's number."
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ 'sent' viene letto come consegnata subito: uno scarto successivo verrebbe ignorato",
+    "find": "  sent: \"pending\",",
+    "replace": "  sent: \"delivered\","
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ una fattura scartata risulta consegnata",
+    "find": "  discarded: \"rejected\",",
+    "replace": "  discarded: \"delivered\","
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️ si usa un'aliquota IVA disattivata in Fatture in Cloud",
+    "find": "      !t.is_disabled &&",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ la Natura non conta: una riga esente prende l'aliquota di un'altra esenzione",
+    "find": "      (t.ei_type?.trim().toUpperCase() || null) === wanted,",
+    "replace": "      true,"
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️ la nota di credito parte come fattura",
+    "find": "        type: document.documentType === \"TD04\" ? \"credit_note\" : \"invoice\",",
+    "replace": "        type: \"invoice\","
+  },
+  {
+    "file": "src/lib/sdi/fattureincloud.ts",
+    "description": "⚠️⚠️ una fattura d'acconto parte come fattura ordinaria",
+    "find": "    if (invoice.document.documentType === \"TD02\") {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/sdi/transmit.ts",
+    "description": "⚠️⚠️ il file costruito da Fatture in Cloud non viene conservato: lo scarico non è il file inviato",
+    "find": "      sdiSentXml: sent.sentXml ?? null,",
+    "replace": "      sdiSentXml: null,"
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️⚠️ lo scarico serve l'XML di Flux invece di quello che Fatture in Cloud ha inviato allo SDI",
+    "find": "  if (kind === \"xml\" && invoice.sdiSentXml) {",
+    "replace": "  if (false) {"
+  }
+]

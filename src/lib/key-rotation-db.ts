@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 
-import { emailSettings, mailConnections, tenants } from "@/db/schema";
+import { emailSettings, mailConnections, sdiSettings, tenants } from "@/db/schema";
 
 /**
  * The statements a key rotation writes with, built but not run.
@@ -12,10 +12,16 @@ import { emailSettings, mailConnections, tenants } from "@/db/schema";
  * with an encrypted copy of the old ones.
  */
 
-export type RotatedColumn = "db_url" | "resend_api_key" | "smtp_password" | "access_token" | "refresh_token";
+export type RotatedColumn =
+  | "db_url"
+  | "resend_api_key"
+  | "smtp_password"
+  | "access_token"
+  | "refresh_token"
+  | "sdi_password";
 
 export interface RotatedLocation {
-  table: "tenants" | "email_settings" | "mail_connection";
+  table: "tenants" | "email_settings" | "mail_connection" | "sdi_setting";
   column: RotatedColumn;
   id: string;
 }
@@ -42,6 +48,15 @@ export function conditionalWrite(db: AnyDb, where: RotatedLocation, from: string
       .set(set)
       .where(and(eq(mailConnections.id, where.id), eq(col, from)))
       .returning({ id: mailConnections.id });
+  }
+  // The SDI intermediary's password (src/lib/sdi/). Its tokens are not rotated: a token the new
+  // key cannot open is replaced by a new sign-in.
+  if (where.table === "sdi_setting") {
+    return db
+      .update(sdiSettings)
+      .set({ password: to })
+      .where(and(eq(sdiSettings.id, where.id), eq(sdiSettings.password, from)))
+      .returning({ id: sdiSettings.id });
   }
   const column = where.column === "resend_api_key" ? emailSettings.resendApiKey : emailSettings.smtpPassword;
   const set = where.column === "resend_api_key" ? { resendApiKey: to } : { smtpPassword: to };

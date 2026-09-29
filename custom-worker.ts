@@ -52,6 +52,7 @@ const CRON_JOBS: Record<string, readonly string[]> = {
     "/api/cron/campaign-scheduler",
     "/api/cron/task-reminders",
     "/api/cron/ticket-sla-check",
+    "/api/cron/sdi-status",
   ],
   "0 6 * * *": ["/api/cron/task-overdue-check"],
   // Two jobs on one schedule: the Free plan allows five cron triggers per account,

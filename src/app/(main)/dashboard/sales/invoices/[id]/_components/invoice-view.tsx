@@ -70,6 +70,7 @@ import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import { italianToday, PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
 import { installmentStates, installmentsMatch, type PaymentTerms } from "@/lib/payment-terms";
+import type { SdiChannel, SdiStatus } from "@/lib/sdi/types";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 
 import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
@@ -78,6 +79,7 @@ import { CreditNoteButton, CreditNotesCard } from "./credit-notes";
 import { InvoicePaymentsCard } from "./invoice-payments";
 import { DownloadPdfButton, IssuedInvoiceFiles, SendInvoiceCopyButton } from "./issued-invoice-files";
 import { OverdueBanner } from "./payment-reminder";
+import { SdiPanel } from "./sdi-panel";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
 
@@ -117,6 +119,7 @@ export function InvoiceView({
   canIssue,
   orderNumber,
   payments,
+  sdi,
 }: {
   data: Data;
   canWrite: boolean;
@@ -125,6 +128,8 @@ export function InvoiceView({
   orderNumber: string | null;
   /** An issued invoice's payments and balance (I9); null for a draft or a credit note. */
   payments: Parameters<typeof InvoicePaymentsCard>[0]["data"] | null;
+  /** How the workspace reaches SDI today (src/lib/sdi/). */
+  sdi: { channel: SdiChannel; providerLabel: string | null };
 }) {
   const t = useTranslations("invoices");
   const say = useMessageText();
@@ -833,19 +838,21 @@ export function InvoiceView({
           />
         )}
 
-        {/* ⚠️⚠️ Issuing numbers the invoice; it reaches the customer only through SDI. Until the file
-            has been taken once, the page says so — a numbered invoice never transmitted is one the
-            customer's accountant never receives, and nothing else would notice. */}
-        {!isDraft && !xmlTaken && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-500/40 bg-blue-500/5 p-3 text-sm">
-            <FileCode2 className="size-4 shrink-0 text-blue-600" aria-hidden />
-            <p className="min-w-0 flex-1">{t("sdiReminder")}</p>
-            <Button asChild size="sm" className="shrink-0 gap-1.5">
-              <a href={`/api/invoices/${invoice.id}/xml`} download onClick={() => setXmlTaken(true)}>
-                <FileCode2 className="size-3.5" aria-hidden /> {t("downloadXml")}
-              </a>
-            </Button>
-          </div>
+        {/* ⚠️⚠️ Issuing numbers the invoice; it reaches the customer only through SDI. Until it has,
+            the page says what is missing — a numbered invoice never transmitted, or one SDI
+            discarded, is one the customer's accountant never receives (src/lib/sdi/). */}
+        {!isDraft && (
+          <SdiPanel
+            invoiceId={invoice.id}
+            status={(invoice.sdiStatus ?? null) as SdiStatus | null}
+            message={invoice.sdiMessage ?? null}
+            channel={sdi.channel}
+            providerLabel={sdi.providerLabel}
+            xmlTaken={xmlTaken}
+            onXmlTaken={() => setXmlTaken(true)}
+            canIssue={canIssue}
+            sentAt={(invoice.sdiSentAt as unknown as string | null) ?? null}
+          />
         )}
 
         {/* What stands between this draft and a number, next to the Issue button it disables. */}

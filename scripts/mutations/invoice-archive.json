@@ -44,7 +44,7 @@
   {
     "file": "src/actions/invoices.ts",
     "description": "⚠️ dopo l'emissione i file non vengono archiviati",
-    "find": "  after(() =>\n    archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),\n  );\n\n  revalidatePath(LIST);",
-    "replace": "  revalidatePath(LIST);"
+    "find": "    await archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err));\n    // ⚠️ After the response",
+    "replace": "    // ⚠️ After the response"
   }
 ]

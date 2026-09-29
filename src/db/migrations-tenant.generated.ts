@@ -899,4 +899,33 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminder_count" integer DEFAULT 0 NOT NULL;\n',
     ],
   },
+  {
+    tag: "0067_through_an_intermediary",
+    folderMillis: 1793750400000,
+    hash: "dad30a88650a5e6763fb76727f03a600572be75765fa1252c3b7eb2005f466ec",
+    sql: [
+      '-- Transmitting issued invoices to SDI through an intermediary (Aruba first; src/lib/sdi/).\n--\n-- sdi_setting: one row per workspace — which intermediary, its test or real system, the\n-- account\'s credentials and the token it issued, encrypted with the platform key.\n-- invoice.sdi_*: where each invoice stands with SDI, the name the intermediary gave the file,\n-- the transmitter the file was built with (frozen: Aruba requires its own code in the file,\n-- and the file served for download must be the one that was sent) and its SHA-256.\n--\n-- Additive and re-runnable, like every tenant migration.\nCREATE TABLE IF NOT EXISTS "sdi_setting" (\n\t"id" text PRIMARY KEY DEFAULT \'workspace\' NOT NULL,\n\t"channel" text DEFAULT \'manual\' NOT NULL,\n\t"environment" text DEFAULT \'demo\' NOT NULL,\n\t"username" text,\n\t"password" text,\n\t"access_token" text,\n\t"access_expires_at" timestamp,\n\t"refresh_token" text,\n\t"refresh_expires_at" timestamp,\n\t"auto_send" boolean DEFAULT false NOT NULL,\n\t"updated_by" text,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_channel" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_transmitter" jsonb;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_status" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_file_name" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_file_sha256" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_id" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_message" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_sent_at" timestamp;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_status_at" timestamp;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_checked_at" timestamp;\n',
+      '\nCREATE INDEX IF NOT EXISTS "invoice_sdi_open_idx" ON "invoice" ("sdi_status") WHERE "sdi_status" IN (\'pending\', \'delivered\');\n',
+    ],
+  },
+  {
+    tag: "0068_whatever_went_out",
+    folderMillis: 1793836800000,
+    hash: "e624b9a0c2ca11831ad1746716d1453bbfb79874a7fd02d36d87369afa83e5ca",
+    sql: [
+      "-- A second intermediary (Fatture in Cloud, src/lib/sdi/fattureincloud.ts), which builds its own\n-- FatturaPA file from the invoice's data instead of taking Flux's:\n--\n-- sdi_setting.account_id: the account inside the intermediary the invoices belong to (Fatture in\n--   Cloud's company id);\n-- invoice.sdi_ref: the intermediary's own id for what it holds (the document id), what its status\n--   is read by;\n-- invoice.sdi_sent_xml: the file that actually went to SDI, when the intermediary built it — kept\n--   so the XML downloaded from Flux is the XML SDI received.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE \"sdi_setting\" ADD COLUMN IF NOT EXISTS \"account_id\" text;\n",
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_ref" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_sent_xml" text;\n',
+    ],
+  },
 ];

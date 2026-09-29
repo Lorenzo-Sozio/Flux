@@ -146,7 +146,7 @@
   {
     "file": "src/lib/receivables.ts",
     "description": "⚠️⚠️ un pagamento oltre il dovuto resta sulla fattura invece di andare a credito",
-    "find": "  const share = Math.min(amount, before?.outstanding ?? 0);",
-    "replace": "  const share = amount;"
+    "find": "    share = Math.max(0, Math.min(amount, before?.outstanding ?? 0));",
+    "replace": "    share = amount;"
   }
 ]

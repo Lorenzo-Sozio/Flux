@@ -151,7 +151,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
               {/*
                 One row that rearranges itself, rather than two layouts:
 
-                - Phone: [‹ back] [page title ········] [search] [bell]. The menu
+                - Phone: [‹ back] [page title ········] [search] [recents] [bell]. The menu
                   is the Menu slot of the bottom bar, so the trigger is not here;
                   the preferences that sat on the right live in that hub too.
                 - md and up: [menu trigger | search ········] [recents] [bell]
@@ -178,15 +178,16 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                 <SearchDialog tenantRole={tenantRole} enabledModules={enabledModules} navAccess={navAccess} />
                 <div className="hidden md:block md:flex-1" />
                 <div className="flex shrink-0 items-center gap-1 md:gap-2">
-                  {/* Desktop conveniences. Recently-visited duplicates the browser
-                    history a phone already has, and the layout controls configure
-                    a sidebar that does not exist below md. */}
-                  <div className="hidden items-center gap-2 md:flex">
-                    <RecentlyVisited />
-                  </div>
+                  {/* ⚠️ On a phone too. It was left out as a copy of the browser's
+                    history, but the installed app has no history to go back
+                    through and no address bar: this is the only way back to the
+                    record somebody had open ten minutes ago. */}
+                  <RecentlyVisited />
                   {session?.user?.id && (
                     <NotificationCenter notifications={userNotifications} userId={session.user.id} />
                   )}
+                  {/* Desktop only: the layout controls configure a sidebar that does
+                    not exist below md, and the rest lives in the Menu hub there. */}
                   <div className="hidden items-center gap-2 md:flex">
                     <CurrencySwitcher />
                     <LocaleSwitcher />

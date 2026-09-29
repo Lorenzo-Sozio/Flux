@@ -2369,6 +2369,33 @@ const GROUPS: ApiGroup[] = [
         ],
       },
       {
+        id: "cron-sdi-status",
+        method: "GET",
+        path: "/api/cron/sdi-status",
+        summary: "Legge dallo SDI l'esito delle fatture inviate",
+        description:
+          "Chiede all'intermediario (Aruba) lo stato delle fatture consegnategli e ancora in attesa dello SDI: consegnata, scartata, non consegnata, e per la pubblica amministrazione accettata, rifiutata o decorrenza termini. Ogni dieci minuti, al massimo dieci fatture per workspace.\n\n" +
+          "⚠️ Senza questo job una fattura scartata sembra emessa: per l'Agenzia non lo è, e il cliente non la riceve. Chi l'ha emessa riceve una notifica, una sola volta.",
+        auth: "cron",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Bearer token `CRON_SECRET`.",
+            example: "Bearer sk_cron_abc123xyz",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Quante fatture sono state controllate e quante hanno cambiato stato",
+            example: JSON.stringify({ checked: 3, changed: 1, interrupted: 0 }, null, 2),
+          },
+        ],
+      },
+      {
         id: "cron-webhook-retry",
         method: "GET",
         path: "/api/cron/webhook-retry",

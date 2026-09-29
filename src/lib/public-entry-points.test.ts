@@ -98,6 +98,7 @@ const ACCOUNTED_FOR: Record<string, string> = {
   "src/app/api/cron/ticket-autoclose/route.ts": "runCronJob wraps the body in runWithTenant",
   "src/app/api/cron/ticket-sla-check/route.ts": "runCronJob wraps the body in runWithTenant",
   "src/app/api/cron/webhook-retry/route.ts": "runCronJob wraps the body in runWithTenant",
+  "src/app/api/cron/sdi-status/route.ts": "runCronJob wraps the body in runWithTenant",
   "src/app/api/quotes/public/route.ts": "resolves the workspace from the token and passes the handle down",
   "src/app/api/track/click/route.ts": "resolveTenantByProbe on the log id, handle passed down",
   "src/app/api/track/open/route.ts": "resolveTenantByProbe on the log id, handle passed down",

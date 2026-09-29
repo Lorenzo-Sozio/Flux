@@ -7,6 +7,7 @@
     { "path": "/api/cron/task-reminders", "schedule": "*/10 * * * *" },
     { "path": "/api/cron/task-overdue-check", "schedule": "0 6 * * *" },
     { "path": "/api/cron/ticket-sla-check", "schedule": "*/10 * * * *" },
+    { "path": "/api/cron/sdi-status", "schedule": "*/10 * * * *" },
     { "path": "/api/cron/ticket-autoclose", "schedule": "0 3 * * *" }
   ]
 }

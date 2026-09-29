@@ -49,17 +49,17 @@ import { neon } from "@neondatabase/serverless";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 
-import { emailSettings, mailConnections, tenants } from "../src/db/schema";
+import { emailSettings, mailConnections, sdiSettings, tenants } from "../src/db/schema";
 import { describe, type EncryptedField, type FieldPlan, planRotation } from "../src/lib/key-rotation";
 import { conditionalWrite } from "../src/lib/key-rotation-db";
 import { decryptWithKey, parseEncryptionKey } from "../src/lib/tenant-db";
 
 type Db = ReturnType<typeof drizzle>;
-type Column = "db_url" | "resend_api_key" | "smtp_password" | "access_token" | "refresh_token";
+type Column = "db_url" | "resend_api_key" | "smtp_password" | "access_token" | "refresh_token" | "sdi_password";
 
 interface BackupEntry {
   database: string;
-  table: "tenants" | "email_settings" | "mail_connection";
+  table: "tenants" | "email_settings" | "mail_connection" | "sdi_setting";
   column: Column;
   id: string;
   previous: string;
@@ -181,6 +181,24 @@ async function gather(db: Db, oldKey: Buffer, newKey: Buffer) {
           stored: row.refresh,
         });
       }
+      // The SDI intermediary's password: a workspace migrated before 0067 has no such table.
+      const sdiRows = await withTimeout(
+        tdb.select({ id: sdiSettings.id, password: sdiSettings.password }).from(sdiSettings),
+        CONNECT_TIMEOUT_MS,
+      ).catch((e: unknown) => {
+        if (e instanceof Error && /sdi_setting/.test(e.message)) return [];
+        throw e;
+      });
+      for (const row of sdiRows) {
+        if (row.password)
+          fields.push({
+            database: t.id,
+            table: "sdi_setting",
+            column: "sdi_password",
+            id: row.id,
+            stored: row.password,
+          });
+      }
     } catch (e) {
       unreachable.push({ id: t.id, reason: e instanceof Error ? e.message.split("\n")[0] : "unknown error" });
     }
@@ -207,6 +225,10 @@ async function writeIfUnchanged(db: Db, entry: BackupEntry, from: string, to: st
 async function readBack(db: Db, entry: BackupEntry): Promise<string | null> {
   if (entry.table === "tenants") {
     const [row] = await db.select({ v: tenants.dbUrl }).from(tenants).where(eq(tenants.id, entry.id));
+    return row?.v ?? null;
+  }
+  if (entry.table === "sdi_setting") {
+    const [row] = await db.select({ v: sdiSettings.password }).from(sdiSettings).where(eq(sdiSettings.id, entry.id));
     return row?.v ?? null;
   }
   if (entry.table === "mail_connection") {

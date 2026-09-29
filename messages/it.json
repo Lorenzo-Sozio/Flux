@@ -6511,7 +6511,36 @@
     "billingTitle": "Fatturazione",
     "customerReady": "Dati completi per ricevere una fattura elettronica.",
     "customerNotReady": "Per emettere una fattura a questo cliente manca:",
-    "rechargeStampDutyHint": "Quando il bollo è dovuto, la fattura riceve una riga «Imposta di bollo assolta in modo virtuale» di € 2,00 esclusa IVA (N1). Senza, il bollo resta a carico tuo."
+    "rechargeStampDutyHint": "Quando il bollo è dovuto, la fattura riceve una riga «Imposta di bollo assolta in modo virtuale» di € 2,00 esclusa IVA (N1). Senza, il bollo resta a carico tuo.",
+    "sdi": {
+      "title": "Trasmissione allo SDI",
+      "subtitle": "Come le fatture emesse arrivano al Sistema di Interscambio.",
+      "channel": "Canale",
+      "manual": "Manuale: scarico l'XML e lo trasmetto io",
+      "environment": "Sistema",
+      "demo": "Di prova (non arriva all'Agenzia)",
+      "production": "Reale",
+      "manualHint": "Ogni fattura emessa mostra l'XML da scaricare e caricare sul portale Fatture e Corrispettivi o presso il tuo intermediario, e un pulsante per segnarla come trasmessa.",
+      "username": "Nome utente dell'account",
+      "password": "Password dell'account",
+      "passwordKept": "Lasciala vuota per tenere quella salvata",
+      "autoSend": "Invia automaticamente ogni fattura appena emessa",
+      "autoSendHint": "Altrimenti la invii tu dalla pagina della fattura, dopo averla controllata.",
+      "hintTransmitter": "Le fatture inviate tramite {provider} riportano {provider} come trasmittente, come richiede l'intermediario.",
+      "hintAccount": "Sull'account {provider} devono essere attivi il servizio di fatturazione elettronica con accesso API e la partita IVA dell'emittente.",
+      "hintDemo": "Con il sistema di prova le fatture non arrivano all'Agenzia: usalo per verificare la configurazione, poi passa a quello reale.",
+      "saveAndTest": "Salva e verifica le credenziali",
+      "save": "Salva",
+      "saved": "Impostazioni salvate.",
+      "connected": "Collegamento con {provider} riuscito.",
+      "failed": "Operazione non riuscita.",
+      "token": "Token di accesso",
+      "accountId": "ID dell'azienda",
+      "accountIdPlaceholder": "Si compila da solo alla verifica, se il token vede una sola azienda",
+      "hintFicToken": "Il token si crea in Fatture in Cloud › Impostazioni › Applicazioni collegate, con i permessi su fatture e note di credito e le impostazioni (aliquote IVA). Non scade finché non lo revochi.",
+      "hintFicTotals": "Fatture in Cloud ricalcola i totali per conto suo: prima di inviare, Flux li confronta con quelli della fattura. Se differiscono anche di un centesimo il documento viene cancellato da Fatture in Cloud e non viene inviato nulla allo SDI.",
+      "hintFicNumbers": "Le fatture vengono create su Fatture in Cloud con lo stesso numero e la stessa data di Flux: non emettere fatture della stessa serie anche da Fatture in Cloud, o i numeri si scontreranno."
+    }
   },
   "invoices": {
     "title": "Fatture",
@@ -6774,7 +6803,8 @@
       "draft": "Bozze",
       "issued": "Emesse",
       "unpaid": "Da incassare",
-      "overdue": "Scadute"
+      "overdue": "Scadute",
+      "sdi": "Problemi SDI"
     },
     "paymentColumn": "Incasso",
     "paymentState": {
@@ -6811,6 +6841,49 @@
       "send": "Invia sollecito",
       "sent": "Sollecito inviato a {to}.",
       "failed": "Non è stato possibile inviare il sollecito."
+    },
+    "sdi": {
+      "failed": "Operazione non riuscita.",
+      "sent": "Fattura consegnata a {provider}: la risposta dello SDI arriva di solito entro poche ore.",
+      "refreshed": "Stato aggiornato.",
+      "markedManual": "Segnata come trasmessa.",
+      "downloadXml": "Scarica l'XML",
+      "markManual": "Segna come trasmessa",
+      "manualReminder": "Fattura emessa: ora il file XML deve arrivare allo SDI. Scaricalo e caricalo sul portale Fatture e Corrispettivi o presso il tuo intermediario, poi segnala come trasmessa.",
+      "interrupted": "L'invio a {provider} si è interrotto e non sappiamo se il file sia arrivato. Controlla sul portale di {provider} prima di inviarla di nuovo.",
+      "sendFailed": "{provider} non ha accettato la fattura: niente è arrivato allo SDI.",
+      "providerError": "{provider} non è riuscito a elaborare la fattura.",
+      "toSend": "Fattura emessa: non è ancora stata inviata allo SDI tramite {provider}.",
+      "downloadedWarning": "L'XML è già stato scaricato: se l'hai trasmesso in un altro modo, segnala come trasmessa invece di inviarla di nuovo. Una seconda copia verrebbe scartata.",
+      "retry": "Riprova l'invio",
+      "send": "Invia allo SDI",
+      "waiting": "Inviata tramite {provider}: in attesa della risposta dello SDI",
+      "sentAt": "inviata il {when}",
+      "refresh": "Aggiorna stato",
+      "rejected": "Scartata dallo SDI",
+      "refused": "Rifiutata dalla pubblica amministrazione",
+      "rejectedHint": "Per l'Agenzia delle Entrate la fattura non è stata emessa e il cliente non l'ha ricevuta. Correggi la causa indicata (spesso i dati del cliente) e riemetti la fattura entro 5 giorni con lo stesso numero e la stessa data.",
+      "refusedHint": "La fattura è valida ma il cliente l'ha rifiutata: di solito serve una nota di credito e una nuova fattura corretta.",
+      "notDelivered": "Non consegnata al cliente",
+      "notDeliveredHint": "La fattura è valida ed è disponibile nell'area riservata del cliente sul sito dell'Agenzia. Avvisa il cliente e mandagli la copia di cortesia.",
+      "done": {
+        "delivered": "Consegnata al cliente tramite lo SDI",
+        "accepted": "Accettata dalla pubblica amministrazione",
+        "expired": "Decorsi i termini: la pubblica amministrazione non ha risposto entro 15 giorni",
+        "sent_manually": "Segnata come trasmessa allo SDI"
+      },
+      "reasons": {
+        "totals": "Fatture in Cloud calcola totali diversi da quelli della fattura ({detail}): il documento è stato cancellato da Fatture in Cloud e allo SDI non è arrivato nulla. Invia questa fattura in un altro modo (scarica l'XML).",
+        "vat": "In Fatture in Cloud manca l'aliquota IVA {detail}: aggiungila nelle impostazioni di Fatture in Cloud e riprova.",
+        "deposit": "Le fatture d'acconto (TD02) non si inviano tramite Fatture in Cloud: scarica l'XML e trasmettilo in un altro modo."
+      }
+    },
+    "sdiBadge": {
+      "send_failed": "Invio SDI non riuscito",
+      "error": "Errore intermediario",
+      "rejected": "Scartata SDI",
+      "not_delivered": "Non consegnata",
+      "refused": "Rifiutata PA"
     }
   },
   "entities": {
@@ -8095,6 +8168,19 @@
     },
     "companies": {
       "hasAccounts": "Il cliente ha fatture emesse o incassi: non si elimina. Se è un doppione, uniscilo all'altro cliente."
+    },
+    "sdi": {
+      "channelInvalid": "Canale di trasmissione non valido.",
+      "usernameRequired": "Inserisci il nome utente dell'account.",
+      "passwordRequired": "Inserisci la password dell'account.",
+      "manual": "La trasmissione è manuale: scarica l'XML dalla fattura.",
+      "not_configured": "Mancano le credenziali dell'intermediario: impostale in Impostazioni › Fatturazione.",
+      "not_sendable": "La fattura non si può inviare ora: è una bozza, oppure è già stata inviata.",
+      "auth": "L'intermediario ha rifiutato le credenziali. {detail}",
+      "invalid": "L'intermediario ha rifiutato il file: {detail}",
+      "unavailable": "L'intermediario non risponde: riprova tra qualche minuto. {detail}",
+      "rate_limited": "Troppe richieste all'intermediario: riprova tra un minuto.",
+      "account": "Scegli l'azienda di Fatture in Cloud: il token ne vede più di una (o nessuna). {detail}"
     }
   },
   "validation": {
@@ -8425,6 +8511,26 @@
     "chatMention": {
       "title": "{sender} ti ha menzionato in {conversation}",
       "message": "{preview}"
+    },
+    "sdiRejected": {
+      "title": "Fattura scartata dallo SDI",
+      "message": "La fattura {number} è stata scartata: va corretta e riemessa entro 5 giorni."
+    },
+    "sdiNotDelivered": {
+      "title": "Fattura non consegnata",
+      "message": "La fattura {number} non è stata consegnata al cliente: avvisalo e mandagli la copia di cortesia."
+    },
+    "sdiRefused": {
+      "title": "Fattura rifiutata",
+      "message": "La pubblica amministrazione ha rifiutato la fattura {number}."
+    },
+    "sdiError": {
+      "title": "Errore dell'intermediario",
+      "message": "L'intermediario non è riuscito a elaborare la fattura {number}."
+    },
+    "sdiSendFailed": {
+      "title": "Invio allo SDI non riuscito",
+      "message": "La fattura {number} non è arrivata allo SDI."
     }
   },
   "activityReminderEmail": {

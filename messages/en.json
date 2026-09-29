@@ -6506,7 +6506,36 @@
     "billingTitle": "Billing",
     "customerReady": "Complete for receiving an e-invoice.",
     "customerNotReady": "Before an invoice can be issued to this customer:",
-    "rechargeStampDutyHint": "When stamp duty is due, the invoice gets a €2.00 line \"Imposta di bollo assolta in modo virtuale\", excluded from VAT (N1). Without it, you bear the stamp."
+    "rechargeStampDutyHint": "When stamp duty is due, the invoice gets a €2.00 line \"Imposta di bollo assolta in modo virtuale\", excluded from VAT (N1). Without it, you bear the stamp.",
+    "sdi": {
+      "title": "Transmission to SDI",
+      "subtitle": "How issued invoices reach the Exchange System.",
+      "channel": "Channel",
+      "manual": "Manual: I download the XML and send it myself",
+      "environment": "System",
+      "demo": "Test (does not reach the Agenzia)",
+      "production": "Live",
+      "manualHint": "Every issued invoice shows the XML to download and upload to the Fatture e Corrispettivi portal or your intermediary, and a button to mark it as sent.",
+      "username": "Account username",
+      "password": "Account password",
+      "passwordKept": "Leave empty to keep the saved one",
+      "autoSend": "Send every invoice as soon as it is issued",
+      "autoSendHint": "Otherwise you send it from the invoice page, after checking it.",
+      "hintTransmitter": "Invoices sent through {provider} name {provider} as the transmitter, as the intermediary requires.",
+      "hintAccount": "The {provider} account needs the e-invoicing service with API access, and the issuer's VAT number, enabled.",
+      "hintDemo": "On the test system invoices do not reach the Agenzia: use it to check the setup, then switch to the live one.",
+      "saveAndTest": "Save and check the credentials",
+      "save": "Save",
+      "saved": "Settings saved.",
+      "connected": "Connected to {provider}.",
+      "failed": "The operation did not succeed.",
+      "token": "Access token",
+      "accountId": "Company ID",
+      "accountIdPlaceholder": "Filled in by the check, when the token reaches a single company",
+      "hintFicToken": "Create the token in Fatture in Cloud › Settings › Connected applications, with access to invoices, credit notes and settings (VAT rates). It does not expire until you revoke it.",
+      "hintFicTotals": "Fatture in Cloud recomputes the totals itself: before sending, Flux compares them with the invoice's. If they differ by even a cent the document is deleted from Fatture in Cloud and nothing is sent to SDI.",
+      "hintFicNumbers": "Invoices are created in Fatture in Cloud with Flux's number and date: do not issue invoices of the same series from Fatture in Cloud too, or the numbers will collide."
+    }
   },
   "invoices": {
     "title": "Invoices",
@@ -6769,7 +6798,8 @@
       "draft": "Drafts",
       "issued": "Issued",
       "unpaid": "To collect",
-      "overdue": "Overdue"
+      "overdue": "Overdue",
+      "sdi": "SDI problems"
     },
     "paymentColumn": "Payment",
     "paymentState": {
@@ -6806,6 +6836,49 @@
       "send": "Send reminder",
       "sent": "Reminder sent to {to}.",
       "failed": "The reminder could not be sent."
+    },
+    "sdi": {
+      "failed": "The operation did not succeed.",
+      "sent": "Invoice handed to {provider}: SDI usually answers within a few hours.",
+      "refreshed": "Status updated.",
+      "markedManual": "Marked as sent.",
+      "downloadXml": "Download the XML",
+      "markManual": "Mark as sent",
+      "manualReminder": "Invoice issued: the XML file now has to reach SDI. Download it and upload it to the Fatture e Corrispettivi portal or your intermediary, then mark it as sent.",
+      "interrupted": "Sending to {provider} was interrupted and it is unknown whether the file arrived. Check {provider}'s portal before sending it again.",
+      "sendFailed": "{provider} did not accept the invoice: nothing reached SDI.",
+      "providerError": "{provider} could not process the invoice.",
+      "toSend": "Invoice issued: not yet sent to SDI through {provider}.",
+      "downloadedWarning": "The XML was downloaded already: if you sent it another way, mark it as sent instead of sending it again. A second copy would be discarded.",
+      "retry": "Try sending again",
+      "send": "Send to SDI",
+      "waiting": "Sent through {provider}: waiting for SDI's answer",
+      "sentAt": "sent on {when}",
+      "refresh": "Refresh status",
+      "rejected": "Discarded by SDI",
+      "refused": "Refused by the public administration",
+      "rejectedHint": "For the Agenzia delle Entrate the invoice was not issued and the customer did not receive it. Fix the cause given (often the customer's details) and issue it again within 5 days with the same number and date.",
+      "refusedHint": "The invoice is valid but the customer refused it: usually a credit note and a new, corrected invoice are needed.",
+      "notDelivered": "Not delivered to the customer",
+      "notDeliveredHint": "The invoice is valid and available in the customer's reserved area on the Agenzia's site. Tell the customer and send them the courtesy copy.",
+      "done": {
+        "delivered": "Delivered to the customer through SDI",
+        "accepted": "Accepted by the public administration",
+        "expired": "Terms elapsed: the public administration did not answer within 15 days",
+        "sent_manually": "Marked as sent to SDI"
+      },
+      "reasons": {
+        "totals": "Fatture in Cloud computes other totals than the invoice's ({detail}): the document was deleted from Fatture in Cloud and nothing reached SDI. Send this invoice another way (download the XML).",
+        "vat": "Fatture in Cloud has no VAT rate {detail}: add it in Fatture in Cloud's settings and try again.",
+        "deposit": "Deposit invoices (TD02) are not sent through Fatture in Cloud: download the XML and transmit it another way."
+      }
+    },
+    "sdiBadge": {
+      "send_failed": "SDI send failed",
+      "error": "Intermediary error",
+      "rejected": "Discarded by SDI",
+      "not_delivered": "Not delivered",
+      "refused": "Refused by PA"
     }
   },
   "entities": {
@@ -8090,6 +8163,19 @@
     },
     "companies": {
       "hasAccounts": "The customer has issued invoices or payments: it cannot be deleted. If it is a duplicate, merge it into the other customer."
+    },
+    "sdi": {
+      "channelInvalid": "Invalid transmission channel.",
+      "usernameRequired": "Enter the account username.",
+      "passwordRequired": "Enter the account password.",
+      "manual": "Transmission is manual: download the XML from the invoice.",
+      "not_configured": "The intermediary's credentials are missing: set them in Settings › Invoicing.",
+      "not_sendable": "The invoice cannot be sent now: it is a draft, or it was sent already.",
+      "auth": "The intermediary refused the credentials. {detail}",
+      "invalid": "The intermediary refused the file: {detail}",
+      "unavailable": "The intermediary is not answering: try again in a few minutes. {detail}",
+      "rate_limited": "Too many requests to the intermediary: try again in a minute.",
+      "account": "Choose the Fatture in Cloud company: the token reaches more than one (or none). {detail}"
     }
   },
   "validation": {
@@ -8420,6 +8506,26 @@
     "chatMention": {
       "title": "{sender} mentioned you in {conversation}",
       "message": "{preview}"
+    },
+    "sdiRejected": {
+      "title": "Invoice discarded by SDI",
+      "message": "Invoice {number} was discarded: it must be fixed and issued again within 5 days."
+    },
+    "sdiNotDelivered": {
+      "title": "Invoice not delivered",
+      "message": "Invoice {number} was not delivered to the customer: tell them and send the courtesy copy."
+    },
+    "sdiRefused": {
+      "title": "Invoice refused",
+      "message": "The public administration refused invoice {number}."
+    },
+    "sdiError": {
+      "title": "Intermediary error",
+      "message": "The intermediary could not process invoice {number}."
+    },
+    "sdiSendFailed": {
+      "title": "Sending to SDI failed",
+      "message": "Invoice {number} did not reach SDI."
     }
   },
   "activityReminderEmail": {

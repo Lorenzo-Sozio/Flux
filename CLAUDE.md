@@ -98,6 +98,7 @@ webhook-retry        every 10 minutes  redelivers failed webhook events
 campaign-scheduler   every 10 minutes  starts due campaigns
 task-reminders       every 10 minutes  reminds about tasks; sends the reminder set on each appointment
 ticket-sla-check     every 10 minutes  flags tickets past their SLA
+sdi-status           every 10 minutes  reads what SDI said about invoices handed to the intermediary
 task-overdue-check   daily at 06:00    flags overdue tasks; tells owners of contracts due for renewal;
                                         sends the morning digest (src/lib/morning-digest.ts);
                                         runs the `onSchedule` automation rules (src/lib/scheduled-rules.ts)
@@ -484,10 +485,14 @@ and a mismatch is a silent no-op.
 ⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
 schedules to fit; an eighth job on a new schedule needs Workers Paid.
 
-⚠️⚠️ **The bundle is 9.51 MB gzipped against a 10 MB limit** (measured on 29 September
-2026 with `npx wrangler deploy --dry-run`: 9,735 KiB of 10,240, after bank reconciliation,
-installments, the cash figures and the accounting audit). It fits Workers Paid, never Free
-(3 MB), and the margin is about 505 KiB — one heavy dependency. It used to
+⚠️⚠️ **The bundle is 8.76 MB gzipped against a 10 MB limit** (measured on 29 September
+2026 with `npx wrangler deploy --dry-run`: 8,968 KiB of 10,240). It fits Workers Paid, never
+Free (3 MB). ⚠️⚠️ **Next bundles per route, so an import is paid once per route that reaches
+it.** The SDI integration first took it to 9,977 KiB — 263 KiB from the limit — because the
+settings page and the job imported the sending module, which imported the invoice archive, which
+imports the PDF library: one more copy of pdf-lib per route. Loading the archive only where a file
+is built (`await import(...)` in `sendToSdi`) took it to 8,968. Before importing a heavy module
+into something many routes use, measure. It used to
 be written here as "~8 MB", which is how nobody noticed it growing. Measure it with the
 dry run before adding a library, and after a dependency update: the September update
 took it *down* by 154 KiB, which is the direction to keep.
@@ -1388,6 +1393,92 @@ the rule (`'overpays:' || id` cast to int, or a row-dependent division by zero).
 
 `src/lib/invoice-issue.test.ts`, `src/lib/receipts.test.ts`, `src/actions/payment-reminder.test.ts`,
 `src/lib/metrics.test.ts`; `scripts/mutations/{invoices,receipts,payment-reminder,home-dashboards}.json`.
+
+#### The money rules on a real Postgres
+
+`src/lib/money-on-postgres.test.ts` runs the rules above through the driver production uses
+(`createTenantDb` → `pg` pool → `batchOnPool`), with **real** races: two payments crossing on one
+invoice, two refunds on one credit, one credit on two invoices, the same draft issued twice, five
+drafts at once, the same invoice sent to SDI twice — each ten times. PGlite is one connection and
+cannot race, so a guard that only works when nothing else runs passes every other test.
+
+```bash
+docker run --rm -d --name flux-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=flux -e POSTGRES_DB=flux_test postgres:16
+FLUX_PG_TEST_URL=postgres://postgres:flux@localhost:55432/flux_test npx vitest run src/lib/money-on-postgres.test.ts
+```
+
+Skipped without the variable, and refused for anything but a local address: it drops the schema.
+⚠️⚠️ It found one on its first run (29 September 2026): two payments crossing on one invoice —
+the database let the first take what was owed and refused the second, so a transfer that had
+reached the bank was not recorded. `recordInvoicePayment` now reads what is owed again and records
+it, the rest as credit.
+
+### Transmitting to SDI through an intermediary
+
+[src/lib/sdi/](src/lib/sdi/), migration `0067_through_an_intermediary`, Settings → Invoicing →
+"Transmission to SDI". Like every CRM that issues Italian e-invoices, Flux does not talk to SDI: it
+hands the FatturaPA file to an accredited intermediary and reads back what SDI said. **Aruba first**;
+every intermediary is one file implementing `SdiProvider` (`types.ts`) and one line in
+`registry.ts` — the settings, the sending, the job and the invoice page read that list only.
+"Manual" stays a channel: download the XML, then "mark as sent".
+
+- ⚠️⚠️ **The claim decides who sends.** `sendToSdi` moves the invoice to `sending` with an update
+  that applies only while nothing valid reached SDI (`maySend`: none, `send_failed`, `error`). A
+  second copy at SDI is discarded as a duplicate — and takes the first one's status with it.
+- ⚠️⚠️ **Aruba is the transmitter** (IdTrasmittente IT01879020517; anything else is refused with
+  0094). The intermediary's code is frozen on the invoice (`sdi_transmitter`) at issue
+  (`prepareForSdi`, before the archive) and by the claim, and the XML is built with it; the SHA-256
+  of what was sent is kept, and `readInvoiceFile` never serves an archived XML built with another
+  transmitter (`sentOtherwise`). The file downloaded is the file sent.
+- ⚠️⚠️ **One Aruba sign-in per minute per IP**, a token for 30 minutes: the token is kept in
+  `sdi_setting`, encrypted, and reused by every isolate until it is about to expire (then the
+  refresh token, then the password). A sign-in per call would lock the account at the second
+  invoice. The password is encrypted with the platform key and is in the key rotation; the tokens
+  are not (unreadable → a new sign-in).
+- ⚠️⚠️ **`sdi-status` (every ten minutes) is what makes a discard visible.** It asks about
+  `pending` invoices, and `delivered` ones of a public administration (six-character recipient code,
+  in SQL — a delivered B2B invoice left among the candidates would crowd out the waiting ones), at
+  most `STATUS_PER_RUN` per workspace (Aruba: twelve reads a minute), longest unasked first. A status
+  only moves forward (`laterStatus`); only the run whose conditional update wrote a change notifies
+  whoever issued the invoice, once. A send stuck in `sending` for 15 minutes becomes `send_failed`
+  with "check the intermediary's portal first": whether it arrived is unknown.
+- Sending is `invoice:issue`'s (admin): what reached SDI cannot be taken back. Automatic sending
+  after issue is off by default and runs in `after()`, after the archive, never failing the issue.
+- The invoice page says what is missing (`sdi-panel.tsx`); the list filters "SDI problems"
+  (`SDI_ATTENTION`). A discarded invoice is, for the Agenzia, not issued: the page says to fix and
+  re-issue within five days with the same number and date — ⚠️ **not yet automated**: re-issuing a
+  discarded invoice with corrected data is still manual.
+- ⚠️ **No real Aruba account has been through this.** Written against the published API
+  (docs.html, v1 upload and `getByFilename`), tested with recorded answers. Try it on Aruba's demo
+  system first (`environment: demo`); the account needs the API enabled and the issuer's VAT number
+  associated (asynchronous error FATRSM205 otherwise).
+
+**Fatture in Cloud** ([fattureincloud.ts](src/lib/sdi/fattureincloud.ts), migration
+`0068_whatever_went_out`) is the other shape an intermediary can have, and the interface carries
+both: `send` receives Flux's file **and** the invoice as data (`OutgoingInvoice`).
+
+- ⚠️⚠️ **It takes no FatturaPA file.** Its API sends to SDI only documents created in it, from
+  JSON; the invoice is created there (Flux's number, date, customer, the XML's detail lines, rates
+  by id from its `vat_types` — percentage *and* Natura — installments) and then sent. It builds the
+  XML with its own transmitter: `transmitter` is null, and the file it sent is fetched and kept
+  (`sdi_sent_xml`), which `readInvoiceFile` serves before anything else.
+- ⚠️⚠️ **Its totals are its own**, and its maintainers say its rounding cannot be changed. The
+  created document's net, VAT and gross are compared with the frozen ones to the cent; on any
+  difference it is deleted and nothing is sent (`totals:` in `sdi_message`, said in words on the
+  invoice page). A send it refuses deletes the document too: nothing may stay there holding the
+  number. A deposit invoice (TD02) is refused, not sent as an ordinary one.
+- ⚠️⚠️ **`ei_status` has no "delivered"** (the SDK's enum, 2.1.3): a B2B invoice stays `sent`. It
+  is read as pending, and as delivered only after `DISCARD_WINDOW_DAYS` (SDI must discard within
+  five) — never earlier, or a late discard would be refused as a status going back.
+- Signed in with a token made in Fatture in Cloud (Settings → Connected applications), which does
+  not expire; the company is `sdi_setting.account_id`, taken by "check" when the token reaches one.
+  ⚠️ Invoices of the same series must not be issued from Fatture in Cloud too: the numbers collide.
+- ⚠️ **No real Fatture in Cloud account has been through this** either, and three fields are the
+  SDK's names untried: `country_iso`, `ei_data.invoice_number`/`invoice_date` for a credit note's
+  original, `options.fix_payments`. The totals check is what stands between a wrong mapping and SDI.
+
+`src/lib/sdi/aruba.test.ts`, `src/lib/sdi/fattureincloud.test.ts`, `src/lib/sdi/transmit.test.ts` (PGlite), the SDI race in
+`src/lib/money-on-postgres.test.ts`; `scripts/mutations/sdi.json`.
 
 ### Accepting a quote is signing it
 

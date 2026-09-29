@@ -123,11 +123,12 @@ export function RecentlyVisited() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-8 w-8"
+          // On a phone the same 40px target as the search beside it.
+          className="relative h-8 w-8 max-md:size-10"
           aria-label={t("recents.button")}
           title={t("recents.button")}
         >
-          <History className="h-4 w-4" />
+          <History className="h-4 w-4 max-md:size-5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-0">

@@ -98,12 +98,14 @@ describe("issuing", () => {
 describe("files and the courtesy copy", () => {
   it("⚠️⚠️ archives after issuing, never before and never in the way of the response", () => {
     const b = body("issueInvoiceAction");
-    const archive = b.indexOf("after(() =>\n    archiveInvoice(db, id)");
+    // Inside after(): awaited there, so the automatic send to SDI follows the archive — never before
+    // the response.
+    const archive = b.indexOf("after(async () => {\n    await archiveInvoice(db, id)");
     expect(archive, "the invoice is not archived after issuing").toBeGreaterThan(-1);
     const refused = b.indexOf("if (!result) {");
     expect(refused, "the refusal branch moved: re-read this test").toBeGreaterThan(-1);
     expect(archive).toBeGreaterThan(refused);
-    expect(b).not.toContain("await archiveInvoice(");
+    expect(b.split("await archiveInvoice(").length, "archived outside after()").toBe(2);
   });
 
   it("⚠️⚠️ sends a courtesy copy only of an issued invoice, to a checked address", () => {

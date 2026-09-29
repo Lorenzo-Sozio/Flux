@@ -1256,6 +1256,27 @@ export const invoices = pgTable(
     /** The last payment reminder sent, and how many were (migration 0066). */
     remindedAt: timestamp("reminded_at", { mode: "date" }),
     reminderCount: integer("reminder_count").default(0).notNull(),
+    // ── To SDI through an intermediary (migration 0067, src/lib/sdi/) ──
+    /** The intermediary it was handed to ("aruba"); null while it has not been. */
+    sdiChannel: text("sdi_channel"),
+    /** IdTrasmittente the file was built with — frozen, so the file served is the file sent. */
+    sdiTransmitter: jsonb("sdi_transmitter").$type<{ country: string; code: string } | null>(),
+    /** Where it stands with SDI (`SdiStatus` in src/lib/sdi/types.ts). */
+    sdiStatus: text("sdi_status"),
+    /** The intermediary's name for the file: what its status is read by. */
+    sdiFileName: text("sdi_file_name"),
+    sdiFileSha256: text("sdi_file_sha256"),
+    /** SDI's identifier, once SDI has one. */
+    sdiId: text("sdi_id"),
+    /** The intermediary's or SDI's own words about the last status: what tells a person what to fix. */
+    sdiMessage: text("sdi_message"),
+    sdiSentAt: timestamp("sdi_sent_at", { mode: "date" }),
+    sdiStatusAt: timestamp("sdi_status_at", { mode: "date" }),
+    sdiCheckedAt: timestamp("sdi_checked_at", { mode: "date" }),
+    /** The intermediary's own id for what it holds (Fatture in Cloud's document id; migration 0068). */
+    sdiRef: text("sdi_ref"),
+    /** The file that went to SDI when the intermediary built it: served as the invoice's XML. */
+    sdiSentXml: text("sdi_sent_xml"),
     createdBy: text("created_by"),
     issuedBy: text("issued_by"),
     issuedAt: timestamp("issued_at", { mode: "date" }),
@@ -1942,6 +1963,32 @@ export const apiKeys = pgTable(
   },
   (t) => [uniqueIndex("api_key_hash_idx").on(t.hash)],
 );
+
+/**
+ * How the workspace reaches SDI (migration 0067, src/lib/sdi/): by hand, or through an
+ * intermediary with the account's credentials. ⚠️ `password` and the tokens are encrypted with
+ * the platform key (`encryptSecret`); the password is part of the key rotation.
+ */
+export const sdiSettings = pgTable("sdi_setting", {
+  id: text("id").primaryKey().default("workspace"),
+  /** "manual" or an intermediary's id (src/lib/sdi/registry.ts). */
+  channel: text("channel").notNull().default("manual"),
+  /** The intermediary's test system ("demo") or the real one ("production"). */
+  environment: text("environment").notNull().default("demo"),
+  username: text("username"),
+  /** The account's password or access token, encrypted. */
+  password: text("password"),
+  /** The account inside the intermediary (Fatture in Cloud's company id; migration 0068). */
+  accountId: text("account_id"),
+  accessToken: text("access_token"),
+  accessExpiresAt: timestamp("access_expires_at", { mode: "date" }),
+  refreshToken: text("refresh_token"),
+  refreshExpiresAt: timestamp("refresh_expires_at", { mode: "date" }),
+  /** Hand every invoice over as soon as it is issued. Off by default: it writes to the tax authority. */
+  autoSend: boolean("auto_send").notNull().default(false),
+  updatedBy: text("updated_by"),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
 
 export const workspaceSettings = pgTable("workspace_setting", {
   key: text("key").primaryKey(),

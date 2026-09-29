@@ -61,6 +61,10 @@ const REMEMBERS: Record<string, { how: string; marker: string }> = {
     how: "the queue is the memory: a row is marked sent or failed as it is processed",
     marker: "processedAt",
   },
+  "/api/cron/sdi-status": {
+    how: "tells only the status changes its own conditional update wrote",
+    marker: "changesToTell",
+  },
 };
 
 /** Jobs that repeat but tell nobody anything, so they have nothing to remember. */

@@ -10,6 +10,10 @@ import { orders } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { sdiProvider } from "@/lib/sdi/registry";
+import { readSdiSettings } from "@/lib/sdi/transmit";
+import type { SdiChannel } from "@/lib/sdi/types";
 import { getDb } from "@/lib/tenant-context";
 
 import { InvoiceView } from "./_components/invoice-view";
@@ -39,6 +43,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       ? await getInvoicePayments(id)
       : null;
 
+  // How the workspace reaches SDI: by hand, or through an intermediary (src/lib/sdi/).
+  const sdiSettings = await tolerateUnmigrated("sdi settings", async () => readSdiSettings(await getDb()), null);
+  const provider = sdiProvider(sdiSettings?.channel);
+  const sdi = { channel: (provider?.id ?? "manual") as SdiChannel, providerLabel: provider?.label ?? null };
+
   // A draft has no number yet: the customer is what names it until it is issued.
   const visitType = data.invoice.documentType === "TD04" ? "creditNote" : "invoice";
   const visitLabel = data.invoice.documentNumber ?? `${data.companyName ?? ""} · ${t("draftNumber")}`;
@@ -58,6 +67,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
         canIssue={can(actor, "invoice:issue")}
         orderNumber={orderNumber}
         payments={payments ? JSON.parse(JSON.stringify(payments)) : null}
+        sdi={sdi}
       />
     </RecordPage>
   );

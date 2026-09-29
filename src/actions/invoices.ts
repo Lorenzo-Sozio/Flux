@@ -46,6 +46,8 @@ import {
   recordInvoicePayment,
 } from "@/lib/receivables";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { SDI_ATTENTION } from "@/lib/sdi/status";
+import { prepareForSdi, sendToSdi } from "@/lib/sdi/transmit";
 import { assessStampDuty, quarterlyStampDuty, quarterOf, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 import { getDb } from "@/lib/tenant-context";
 import { toWallDate } from "@/lib/wall-clock";
@@ -489,6 +491,8 @@ export async function getInvoices(
   const term = params.search.trim();
   const clauses: SQL[] = [];
   if (status === "draft" || status === "issued") clauses.push(eq(invoices.status, status));
+  // Something a person must do about SDI: a send that failed, a discarded or undelivered invoice (src/lib/sdi/).
+  if (status === "sdi") clauses.push(inArray(invoices.sdiStatus, [...SDI_ATTENTION]));
   if (status === "unpaid" || status === "overdue") {
     const ids = (owed?.invoices ?? []).filter((r) => status === "unpaid" || r.overdueAmount > 0).map((r) => r.id);
     clauses.push(ids.length > 0 ? inArray(invoices.id, ids) : sql`false`);
@@ -524,6 +528,7 @@ export async function getInvoices(
             currency: invoices.currency,
             companyName: companies.name,
             createdAt: invoices.createdAt,
+            sdiStatus: invoices.sdiStatus,
             // ⚠️ The outer column named in full: bare, "id" would be the payment's own.
             paid: sql<string>`(select coalesce(sum(p.amount), 0) from order_payment p where p.invoice_id = "invoice"."id")`,
           })
@@ -1249,11 +1254,18 @@ export async function issueInvoiceAction(
     { via: "user", actor: actor.userId },
   ).catch((err) => console.error("[invoices] invoice.issued not dispatched", err));
 
+  // Sent through an intermediary: the file carries its transmitter from the start, so the XML
+  // archived below is the one that will reach SDI (src/lib/sdi/transmit.ts).
+  const sdi = await tolerateUnmigrated("sdi", () => prepareForSdi(db, id), { autoSend: false });
+
   // The files are kept after the response: the number is already assigned, and a
   // failure here is retried by the next download rather than failing the issue.
-  after(() =>
-    archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),
-  );
+  after(async () => {
+    await archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err));
+    // ⚠️ After the response, and never failing the issue: a send that does not go through leaves
+    // `send_failed` with the intermediary's words on the page, and a button to try again.
+    if (sdi.autoSend) await sendToSdi(db, id).catch((err) => console.error(`[sdi] invoice ${id} not sent`, err));
+  });
 
   revalidatePath(LIST);
   revalidatePath(`${LIST}/${id}`);
