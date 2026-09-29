@@ -32,6 +32,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { companiesWithAccounts } from "@/lib/company-accounts";
 import { isSameCompanyName, normalizeCompanyName } from "@/lib/company-name";
 import { type ConsentSource, consentPatch } from "@/lib/consent";
 import { announceOptOut } from "@/lib/consent-events";
@@ -45,7 +46,7 @@ import {
   LEAD_FIELDS,
 } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
-import { guardedT } from "@/lib/i18n-server";
+import { guardedT, serverT } from "@/lib/i18n-server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
 import { notify } from "@/lib/notify";
@@ -688,9 +689,12 @@ export async function updateCompany(id: string, data: unknown) {
   });
 }
 
-export async function deleteCompany(id: string) {
+export async function deleteCompany(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireWriteAccess();
   const db = await getDb();
+  // A customer with invoices or payments is merged, never deleted (src/lib/company-accounts.ts).
+  if ((await companiesWithAccounts(db, [id])).size > 0)
+    return { ok: false, error: (await serverT("serverErrors.companies"))("hasAccounts") };
 
   // Free any lead that was converted into this company so it can be re-converted
   await db
@@ -707,6 +711,7 @@ export async function deleteCompany(id: string) {
 
   await db.delete(companies).where(eq(companies.id, id));
   revalidatePath("/dashboard/companies");
+  return { ok: true };
 }
 
 // ── Lightweight lists for FK select dropdowns ─────────────────────────────────

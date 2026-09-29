@@ -866,4 +866,30 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "installments" jsonb;\n',
     ],
   },
+  {
+    tag: "0063_one_name_per_file",
+    folderMillis: 1793404800000,
+    hash: "0f412a968325e7cbea224814da8a3be184b6f94509ccd8848220cf275944f415",
+    sql: [
+      '-- The progressive of the file an invoice is sent to SDI as, for invoices in a series other than\n-- the main one. Their name used to be built from the series and the number and then cut to five\n-- characters, which cut exactly the digits telling two invoices apart: invoices 12/B and 13/B had\n-- the same file name, and SDI refuses a name it has already received. The progressive comes from\n-- a counter of the workspace, taken by the statement that issues the invoice.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_progressive" integer;\n',
+    ],
+  },
+  {
+    tag: "0064_money_going_back",
+    folderMillis: 1793491200000,
+    hash: "907b338df87be1ff2e6278cf68caea96be55412fe0b6a1c50daf4892ff424010",
+    sql: [
+      '-- A bank line that returns a payment (a direct debit or RiBa unpaid, CAMT RvslInd): it is money\n-- going back the way it came, and it must not be ignored with the bank\'s charges.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "bank_transaction" ADD COLUMN IF NOT EXISTS "reversal" boolean DEFAULT false NOT NULL;\n',
+    ],
+  },
+  {
+    tag: "0065_the_file_went_out",
+    folderMillis: 1793577600000,
+    hash: "7943feb57ff5d6aed2398166a9a2a0c24b1a9b198ae35416cb50429c4078fdd4",
+    sql: [
+      '-- When the FatturaPA file of an issued invoice was first downloaded: until then the invoice\r\n-- page reminds whoever issued it that the file still has to reach SDI. An invoice that is\r\n-- numbered and never transmitted is one the customer\'s accountant never receives.\r\n--\r\n-- Additive and re-runnable, like every tenant migration.\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "xml_downloaded_at" timestamp;\r\n',
+      '\r\n-- The last payment reminder sent for an overdue invoice, and how many: the page says when the\r\n-- customer was last reminded, and a second click within the hour sends nothing.\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminded_at" timestamp;\r\n',
+      '\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminder_count" integer DEFAULT 0 NOT NULL;\r\n',
+    ],
+  },
 ];

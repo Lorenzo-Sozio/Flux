@@ -27,6 +27,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
           companyId: fromOrder.companyId,
           currency: fromOrder.currency,
           discountPercent: fromOrder.discountPercent,
+          depositCount: fromOrder.depositCount,
           lines: fromOrder.lines.length
             ? fromOrder.lines.map((l, i) => ({ ...editableFields(l), key: `o${i}` }))
             : [blankLine()],

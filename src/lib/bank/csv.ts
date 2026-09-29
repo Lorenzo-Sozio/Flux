@@ -26,11 +26,13 @@ export interface CsvMapping {
   iban?: string | null;
   reference?: string | null;
   currency?: string | null;
+  /** A column saying which way the amount goes (D/A, Dare/Avere, +/-), when the amount has no sign. */
+  sign?: string | null;
   dateOrder: "dmy" | "ymd" | "mdy";
   decimal: "," | ".";
 }
 
-export type CsvProblem = "date" | "amount";
+export type CsvProblem = "date" | "amount" | "balance";
 
 export interface CsvRead {
   movements: Movement[];
@@ -99,6 +101,7 @@ const WORDS = {
   iban: ["iban"],
   reference: ["cro", "trn", "riferimento", "reference", "id operazione"],
   currency: ["divisa", "currency"],
+  sign: ["segno", "d/a", "dare/avere", "dare avere", "c/d", "cd", "sign", "debit/credit"],
 } as const;
 
 const find = (headers: string[], words: readonly string[], taken: Set<number>, exact = false): number => {
@@ -112,11 +115,26 @@ const find = (headers: string[], words: readonly string[], taken: Set<number>, e
 
 /** The header row: the first of the first thirty with a date column and three filled cells. */
 export function findHeaderRow(rows: readonly string[][]): number {
+  // ⚠️ By score, not by the first row with "data" in it: a preamble "Data estrazione: 30/09/2026"
+  // was taken as the header, and the file could not be read. A header names a date, an amount (or
+  // credit and debit) and a description; the row naming most of them wins, the earliest on a tie.
+  let best = 0;
+  let bestScore = 0;
   for (let i = 0; i < Math.min(rows.length, 30); i++) {
-    const cells = rows[i].map((c) => fold(String(c ?? "")));
-    if (cells.filter(Boolean).length >= 3 && cells.some((c) => c.includes("data") || c.includes("date"))) return i;
+    const cells = rows[i].map((c) => fold(String(c ?? ""))).filter(Boolean);
+    if (cells.length < 3) continue;
+    const has = (words: readonly string[]) => cells.some((c) => words.some((w) => c === w || c.includes(w)));
+    const score =
+      Number(has(WORDS.date)) +
+      Number(has(WORDS.amount) || (has(WORDS.credit) && has(WORDS.debit))) +
+      Number(has(WORDS.description)) +
+      Number(has(WORDS.valueDate));
+    if (score > bestScore) {
+      best = i;
+      bestScore = score;
+    }
   }
-  return 0;
+  return bestScore >= 2 ? best : 0;
 }
 
 /** A first guess at the mapping from the header and a few rows, to be corrected on screen. */
@@ -135,6 +153,7 @@ export function guessMapping(rows: readonly string[][]): { headerRow: number; ma
   const credit = pick(WORDS.credit, true) ?? pick(WORDS.credit);
   const debit = pick(WORDS.debit, true) ?? pick(WORDS.debit);
   const amount = credit && debit ? null : pick(WORDS.amount);
+  const sign = amount ? pick(WORDS.sign, true) : null;
   const iban = pick(WORDS.iban);
   const reference = pick(WORDS.reference, true);
   const currency = pick(WORDS.currency);
@@ -171,6 +190,7 @@ export function guessMapping(rows: readonly string[][]): { headerRow: number; ma
       iban,
       reference,
       currency,
+      sign,
       dateOrder,
       decimal: dotDecimal > commaDecimal ? "." : ",",
     },
@@ -189,10 +209,14 @@ export function missingColumns(headers: readonly string[], mapping: CsvMapping):
     mapping.iban,
     mapping.reference,
     mapping.currency,
+    mapping.sign,
     ...mapping.description,
   ].filter((h): h is string => Boolean(h));
   return needed.filter((h) => !headers.includes(h));
 }
+
+/** A row that states a balance or a total, not a movement. */
+const BALANCE_ROW = /^\s*(saldo|totale|totali|saldo iniziale|saldo finale|saldo contabile|saldo disponibile)\b/i;
 
 export function readCsv(
   rows: readonly string[][],
@@ -214,6 +238,12 @@ export function readCsv(
     // whole row is empty, reported otherwise.
     if (!row || row.every((c) => !String(c ?? "").trim())) continue;
     const line = r + 1;
+    // ⚠️ A balance row ("Saldo finale 30/09/2026 12.345,67") has a date and an amount: read as a
+    // line, it became a payment of the whole balance. Any cell that starts with saldo or totale.
+    if (row.some((c) => BALANCE_ROW.test(String(c ?? "")))) {
+      out.problems.push({ line, problem: "balance" });
+      continue;
+    }
     const bookedOn = parseBankDate(at(row, mapping.date), mapping.dateOrder);
     if (!bookedOn) {
       out.problems.push({ line, problem: "date" });
@@ -226,6 +256,13 @@ export function readCsv(
       const debit = parseBankAmount(at(row, mapping.debit), mapping.decimal);
       // Some banks write Dare as a negative number, others as a positive one.
       amount = credit ? Math.abs(credit) : debit ? -Math.abs(debit) : null;
+    }
+    // ⚠️ A separate sign column: without it every line of such a file read as money in, and the
+    // salaries were matched to customers.
+    if (amount !== null && mapping.sign) {
+      const way = (at(row, mapping.sign) ?? "").trim().toLowerCase();
+      if (/^(d|dare|db|dbit|debit|debito|addebito|-)$/.test(way)) amount = -Math.abs(amount);
+      else if (/^(a|avere|c|cr|crdt|credit|credito|accredito|\+)$/.test(way)) amount = Math.abs(amount);
     }
     if (amount === null || Math.round(amount * 100) === 0) {
       out.problems.push({ line, problem: "amount" });

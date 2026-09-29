@@ -2,6 +2,7 @@ import { and, eq, gte, lte, notInArray, type SQL, sql } from "drizzle-orm";
 
 import { deals, orders, quotes, tickets } from "@/db/schema";
 import { CLOSED_TICKET_STATUSES } from "@/lib/ticket-states";
+import { addDaysToDate, fromWallValue } from "@/lib/wall-clock";
 
 /**
  * One definition per number, read by every screen that shows it.
@@ -75,10 +76,19 @@ export function ticketIsOpen(): SQL {
 
 // ── Periods ─────────────────────────────────────────────────────────────────
 
-/** A report's `from`/`to` (YYYY-MM-DD, both inclusive) as instants. */
-export function periodOf(from?: string, to?: string): { from?: Date; to?: Date } {
+/**
+ * A report's `from`/`to` (YYYY-MM-DD, both inclusive) as instants, on the workspace's clock.
+ *
+ * ⚠️ `new Date("2026-09-01")` is midnight in UTC, and `T23:59:59` without a zone is the
+ * server's: on Workers both are UTC, so in Rome a deal won at 00:30 on the 1st was counted in
+ * the month before, and one won at 23:30 on the 30th in no month at all.
+ */
+export function periodOf(from?: string, to?: string, timeZone = "Europe/Rome"): { from?: Date; to?: Date } {
+  const start = from ? fromWallValue(from, timeZone) : null;
+  const end = to ? fromWallValue(addDaysToDate(to.slice(0, 10), 1), timeZone) : null;
   return {
-    from: from ? new Date(from) : undefined,
-    to: to ? new Date(`${to}T23:59:59.999`) : undefined,
+    from: start ?? undefined,
+    // The last instant of the day: the next midnight on the workspace's clock, less a millisecond.
+    to: end ? new Date(end.getTime() - 1) : undefined,
   };
 }

@@ -47,10 +47,15 @@ describe("drafts", () => {
   it("⚠️⚠️ saving checks the input and bumps the revision conditionally, before touching the lines", () => {
     const b = body("saveInvoiceDraft");
     expect(b).toContain("const cleaned = cleanDraft(input);");
-    const bump = b.indexOf('eq(invoices.status, "draft"), eq(invoices.revision, revision)');
-    expect(bump, "the bump is not conditional").toBeGreaterThan(-1);
-    expect(bump).toBeLessThan(b.indexOf("await writeLines("));
-    expect(b).toContain("if (!bumped) return");
+    // Locked at the revision edited, checked again in a statement of its own, then written —
+    // header and lines in one transaction.
+    const lock = b.indexOf('eq(invoices.status, "draft"), eq(invoices.revision, revision)');
+    expect(lock, "the draft is not locked at its revision").toBeGreaterThan(-1);
+    const guard = b.indexOf("i.status = 'draft' and i.revision = ${revision}) then 1 else 0 end");
+    expect(guard, "a save that landed meanwhile is not refused").toBeGreaterThan(lock);
+    expect(guard).toBeLessThan(b.indexOf("h.update(invoices).set(header_)"));
+    expect(b.indexOf("...lineStatements(h, id, lines)")).toBeGreaterThan(b.indexOf("h.update(invoices).set(header_)"));
+    expect(b).toContain("await together(db, (h) => [");
   });
 });
 
@@ -134,7 +139,11 @@ describe("credit notes", () => {
 
   it("⚠️ copies the invoice's issued lines without the stamp recharge, and only from an issued invoice", () => {
     const b = body("createCreditNote");
-    expect(b).toContain(".filter((l) => !l.isStampRecharge)");
+    // In full: the original's taxable per rate, no discount — its total to the cent.
+    expect(b).toContain("invoiceTotals(snapshot, Number(invoice.discountPercent)).summary");
+    expect(b).toContain('const discount = mode === "full" ? 0 : Number(invoice.discountPercent);');
+    // In part: its own lines, never the stamp recharge or a deposit taken off.
+    expect(b).toContain(".filter((l) => !l.isStampRecharge && !l.isDeduction)");
     expect(
       b.indexOf('if (!room) return { ok: false, error: "Only an issued invoice can be credited." };'),
     ).toBeLessThan(b.indexOf(".insert(invoices)"));

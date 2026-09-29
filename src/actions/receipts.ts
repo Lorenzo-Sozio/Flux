@@ -15,6 +15,7 @@ import {
   type ReceiptRefusal,
   recordReceipt,
   recordRefund,
+  releaseOverpayment,
   type Settled,
   updateReceipt,
 } from "@/lib/receipts";
@@ -103,6 +104,8 @@ export async function getCustomerMoney(companyId: string) {
               )
           : [];
       return {
+        // The workspace's day: the browser's clock put an evening payment a day ahead of it.
+        today: toWallDate(new Date(), timeZone),
         credit,
         credits,
         owed: owed.invoices,
@@ -128,6 +131,8 @@ export async function recordCustomerReceiptAction(
     method?: string;
     reference?: string;
     note?: string;
+    /** The currency the card showed: needed when nothing is allocated, the money all credit. */
+    currency?: string;
     allocations: { invoiceId: string; amount: number | string }[];
   },
 ): Promise<Outcome> {
@@ -143,8 +148,13 @@ export async function recordCustomerReceiptAction(
     method: data.method,
     reference: data.reference,
     note: data.note,
+    // ⚠️ Without it a credit-only receipt from a customer billed in dollars was stored in euros.
+    currency: typeof data.currency === "string" && /^[A-Z]{3}$/.test(data.currency) ? data.currency : null,
     by: actor.userId,
-    allocations: data.allocations.filter((a) => Number(String(a.amount).replace(",", ".")) > 0),
+    // Only the shares left blank are dropped; one that is not a number is refused, not ignored.
+    allocations: data.allocations.filter(
+      (a) => String(a.amount ?? "").trim() !== "" && Number(String(a.amount).replace(",", ".")) !== 0,
+    ),
   });
   if (!result.ok) return refusal(result.reason);
   announcePaid(result.settled, actor.userId);
@@ -198,6 +208,8 @@ export async function updateReceiptAction(
     by: actor.userId,
   });
   if (!result.ok) return refusal(result.reason);
+  // A correction that settles an invoice tells the integrations, as a payment would.
+  announcePaid(result.settled, actor.userId);
   const [receipt] = await db.select({ companyId: receipts.companyId }).from(receipts).where(eq(receipts.id, receiptId));
   refresh({ companyId: receipt?.companyId, invoiceIds: result.invoiceIds, orderIds: result.orderIds });
   return { ok: true };
@@ -231,6 +243,27 @@ export async function recordRefundAction(input: {
     by: actor.userId,
   });
   if (!result.ok) return refusal(result.reason);
-  refresh({ companyId: input.companyId, invoiceIds: input.invoiceId ? [input.invoiceId] : [] });
+  // A refund on an invoice changes the customer's card and statement too.
+  const [owner] = input.invoiceId
+    ? await db.select({ companyId: invoices.companyId }).from(invoices).where(eq(invoices.id, input.invoiceId))
+    : [];
+  refresh({
+    companyId: input.companyId ?? owner?.companyId ?? null,
+    invoiceIds: input.invoiceId ? [input.invoiceId] : [],
+  });
   return { ok: true };
+}
+
+/**
+ * Moves what an invoice was paid beyond what it owes to the customer's credit, where the next
+ * invoice can use it — after a credit note, or a payment recorded twice.
+ */
+export async function releaseOverpaymentAction(invoiceId: string): Promise<Outcome & { moved?: number }> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const moved = await releaseOverpayment(db, invoiceId);
+  const [invoice] = await db.select({ companyId: invoices.companyId }).from(invoices).where(eq(invoices.id, invoiceId));
+  refresh({ companyId: invoice?.companyId, invoiceIds: [invoiceId] });
+  return { ok: true, moved };
 }

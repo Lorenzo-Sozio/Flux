@@ -6,6 +6,7 @@ import { inArray } from "drizzle-orm";
 
 import { companies, contacts, leads } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { companiesWithAccounts } from "@/lib/company-accounts";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Leads ────────────────────────────────────────────────────────────────────
@@ -71,10 +72,13 @@ export async function bulkAssignContacts(ids: string[], ownerId: string) {
 export async function bulkDeleteCompanies(ids: string[]) {
   await requireWriteAccess();
   const db = await getDb();
-  if (ids.length === 0) return { deleted: 0 };
-  await db.delete(companies).where(inArray(companies.id, ids));
+  if (ids.length === 0) return { deleted: 0, kept: 0 };
+  // Customers with invoices or payments are kept: merged, never deleted (src/lib/company-accounts.ts).
+  const kept = await companiesWithAccounts(db, ids);
+  const deletable = ids.filter((id) => !kept.has(id));
+  if (deletable.length > 0) await db.delete(companies).where(inArray(companies.id, deletable));
   revalidatePath("/dashboard/companies");
-  return { deleted: ids.length };
+  return { deleted: deletable.length, kept: kept.size };
 }
 
 export async function bulkUpdateCompanyStatus(ids: string[], status: string) {

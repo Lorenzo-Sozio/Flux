@@ -10,6 +10,7 @@ import {
   BuildingIcon,
   CalendarIcon,
   CircleAlert,
+  FileCode2,
   FileTextIcon,
   FolderIcon,
   InfoIcon,
@@ -28,6 +29,7 @@ import {
   issueInvoiceAction,
   saveInvoiceDraft,
 } from "@/actions/invoices";
+import { PAYMENT_TONE } from "@/app/(main)/dashboard/sales/orders/[id]/_components/order-tones";
 import { PaymentTermsField } from "@/components/crm/payment-terms-field";
 import {
   Field,
@@ -64,10 +66,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
 import { useMessageText } from "@/hooks/use-message-text";
-import { invoiceTotals } from "@/lib/fatturapa/totals";
+import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import { italianToday, PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
-import { installmentsMatch, type PaymentTerms } from "@/lib/payment-terms";
+import { installmentStates, installmentsMatch, type PaymentTerms } from "@/lib/payment-terms";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 
 import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
@@ -75,6 +77,7 @@ import { InvoiceLinesTable, InvoiceTotals } from "../../_components/invoice-part
 import { CreditNoteButton, CreditNotesCard } from "./credit-notes";
 import { InvoicePaymentsCard } from "./invoice-payments";
 import { DownloadPdfButton, IssuedInvoiceFiles, SendInvoiceCopyButton } from "./issued-invoice-files";
+import { OverdueBanner } from "./payment-reminder";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
 
@@ -128,6 +131,7 @@ export function InvoiceView({
   const tI = useTranslations("invoicing");
   const tR = useTranslations("record");
   const tT = useTranslations("invoices.terms");
+  const tP = useTranslations("orders.payments");
   const format = useFormatter();
   const router = useRouter();
   const { formatMoney } = useCurrency();
@@ -182,7 +186,11 @@ export function InvoiceView({
         stamp.applied,
         data.rechargeStamp,
       )
-    : draftLines;
+    : // ⚠️⚠️ Issued: the frozen lines as they were totalled, stamp recharge and deductions marked.
+      // Passed through the editable form they lost their marks, and the page applied the
+      // document discount to the €2 stamp and to the deposits taken off: a total the XML, the
+      // PDF and the customer never saw.
+      ((invoice.linesSnapshot as InvoiceLine[] | null) ?? []).map((l) => ({ ...l, description: l.description ?? "" }));
   const totals = invoiceTotals(totalledLines, num(discount));
   // The draft checks run on the screen as typed, so the list of what is missing moves with the edit.
   const isCredit = invoice.documentType === "TD04";
@@ -196,6 +204,9 @@ export function InvoiceView({
     if (!data.original) liveDraftProblems.push({ kind: "credit_without_original" });
     else if (totals.total > data.original.residual) liveDraftProblems.push({ kind: "credit_exceeds_residual" });
   }
+  if (isDraft && invoice.currency !== "EUR") liveDraftProblems.push({ kind: "currency_not_eur" });
+  if (isDraft && !isCredit && terms && "custom" in terms && terms.custom.some((i) => i.dueDate < italianToday()))
+    liveDraftProblems.push({ kind: "installment_before_issue" });
   // Installments written by hand add up to the total as it is now, edit by edit (I12).
   if (isDraft && !isCredit && terms && "custom" in terms && !installmentsMatch(terms.custom, totals.total))
     liveDraftProblems.push({ kind: "installments_total" });
@@ -319,6 +330,31 @@ export function InvoiceView({
 
   const credited = Number(invoice.creditedAmount);
   const residual = Math.max(0, Math.round((Number(invoice.total) - credited) * 100) / 100);
+
+  // ── Where the customer's money stands (I9, I12) ──
+  // Paid in parts: each installment with what it still owes, the earliest settled first — the
+  // arithmetic the receivables schedule uses, so the page and Finance agree on what is late.
+  const plan =
+    !isDraft && payments && invoice.installments && invoice.installments.length > 1
+      ? installmentStates(invoice.installments, payments.balance.due, payments.balance.paid)
+      : null;
+  const nextInstallment = plan?.find((i) => i.outstanding > 0) ?? null;
+  const today = italianToday();
+  const owedBy = nextInstallment?.dueDate ?? shownDue ?? invoice.issueDate;
+  const outstanding = payments ? payments.balance.outstanding : 0;
+  const daysLate =
+    payments && outstanding > 0.005 && owedBy && owedBy < today
+      ? Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${owedBy}T00:00:00Z`)) / DAY)
+      : 0;
+  // What is past due: the installments whose day has come, or all of it (the schedule's rule).
+  const overdueAmount =
+    daysLate > 0
+      ? plan
+        ? Math.round(plan.filter((i) => i.dueDate < today).reduce((s, i) => s + i.outstanding, 0) * 100) / 100
+        : outstanding
+      : 0;
+  // Until the XML has been downloaded once, the page says the invoice still has to reach SDI.
+  const [xmlTaken, setXmlTaken] = useState(Boolean(invoice.xmlDownloadedAt));
 
   // ── Sections ──
   const linesCard = (
@@ -530,11 +566,35 @@ export function InvoiceView({
           {invoice.installments && invoice.installments.length > 1 && (
             <Field label={tT("installments")} always>
               <ul className="space-y-0.5 tabular-nums">
-                {invoice.installments.map((i, k) => (
-                  <li key={i.dueDate}>
-                    {tT("installment", { n: k + 1 })} · {calendarDay(i.dueDate)} · {money(i.amount)}
-                  </li>
-                ))}
+                {(plan ?? invoice.installments).map((i, k) => {
+                  const state = plan ? (i as (typeof plan)[number]) : null;
+                  const late = state && state.outstanding > 0 && i.dueDate < today;
+                  return (
+                    <li key={i.dueDate}>
+                      {tT("installment", { n: k + 1 })} · {calendarDay(i.dueDate)} · {money(i.amount)}
+                      {state && (
+                        <span
+                          className={
+                            state.outstanding <= 0
+                              ? "ml-1 text-emerald-700 dark:text-emerald-400"
+                              : late
+                                ? "ml-1 text-destructive"
+                                : "ml-1 text-muted-foreground"
+                          }
+                        >
+                          ·{" "}
+                          {state.outstanding <= 0
+                            ? tT("installmentPaid")
+                            : late
+                              ? tT("installmentLate", { amount: money(state.outstanding) })
+                              : state.paid > 0
+                                ? tT("installmentPartly", { amount: money(state.outstanding) })
+                                : tT("installmentOpen")}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Field>
           )}
@@ -627,6 +687,11 @@ export function InvoiceView({
               <StatusBadge tone={residual === 0 ? "neutral" : "warning"}>
                 <Undo2Icon aria-hidden />
                 {residual === 0 ? t("credit.fullyCredited") : t("credit.partlyCredited")}
+              </StatusBadge>
+            )}
+            {payments && residual > 0 && (
+              <StatusBadge tone={daysLate > 0 ? "danger" : PAYMENT_TONE[payments.balance.state]}>
+                {daysLate > 0 ? t("paymentBadge.overdue", { days: daysLate }) : tP(`state.${payments.balance.state}`)}
               </StatusBadge>
             )}
           </>
@@ -727,11 +792,61 @@ export function InvoiceView({
           <Metric label={t("vat")} hint={`${t("on")} ${money(totals.taxableAmount)}`}>
             {money(totals.taxAmount)}
           </Metric>
-          <Metric label={t("dueDate")} hint={dueHint}>
-            {calendarDay(shownDue) ?? tR("notSet")}
-          </Metric>
-          {!isDraft && !isCredit && credited > 0 && <Metric label={t("credit.residual")}>{money(residual)}</Metric>}
+          {nextInstallment ? (
+            // Paid in parts: the date that matters is the next installment's, not the last one's.
+            <Metric
+              label={t("nextInstallment")}
+              hint={tT("installmentOf", {
+                n: (plan?.indexOf(nextInstallment) ?? 0) + 1,
+                count: plan?.length ?? 0,
+                amount: money(nextInstallment.outstanding),
+              })}
+            >
+              {calendarDay(nextInstallment.dueDate)}
+            </Metric>
+          ) : (
+            <Metric label={t("dueDate")} hint={dueHint}>
+              {calendarDay(shownDue) ?? tR("notSet")}
+            </Metric>
+          )}
+          {payments && residual > 0 ? (
+            <Metric
+              label={outstanding < 0 ? tP("credit") : tP("outstanding")}
+              hint={daysLate > 0 ? t("paymentBadge.overdue", { days: daysLate }) : undefined}
+            >
+              <span className={daysLate > 0 ? "text-destructive" : undefined}>{money(Math.abs(outstanding))}</span>
+            </Metric>
+          ) : (
+            !isDraft && !isCredit && credited > 0 && <Metric label={t("credit.residual")}>{money(residual)}</Metric>
+          )}
         </MetricStrip>
+
+        {daysLate > 0 && overdueAmount > 0 && (
+          <OverdueBanner
+            invoiceId={invoice.id}
+            daysLate={daysLate}
+            overdueText={money(overdueAmount)}
+            customerEmail={data.customerEmail}
+            remindedAt={invoice.remindedAt as unknown as string | null}
+            reminderCount={invoice.reminderCount ?? 0}
+            canWrite={canWrite}
+          />
+        )}
+
+        {/* ⚠️⚠️ Issuing numbers the invoice; it reaches the customer only through SDI. Until the file
+            has been taken once, the page says so — a numbered invoice never transmitted is one the
+            customer's accountant never receives, and nothing else would notice. */}
+        {!isDraft && !xmlTaken && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-500/40 bg-blue-500/5 p-3 text-sm">
+            <FileCode2 className="size-4 shrink-0 text-blue-600" aria-hidden />
+            <p className="min-w-0 flex-1">{t("sdiReminder")}</p>
+            <Button asChild size="sm" className="shrink-0 gap-1.5">
+              <a href={`/api/invoices/${invoice.id}/xml`} download onClick={() => setXmlTaken(true)}>
+                <FileCode2 className="size-3.5" aria-hidden /> {t("downloadXml")}
+              </a>
+            </Button>
+          </div>
+        )}
 
         {/* What stands between this draft and a number, next to the Issue button it disables. */}
         {isDraft && allProblems.length > 0 && (
@@ -866,7 +981,40 @@ export function InvoiceView({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("issueTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("issueDescription")}</AlertDialogDescription>
+            {/* ⚠️ What is about to be fixed for good, read once more: an issued invoice is corrected
+                only with a credit note. */}
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-sm">
+                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-md border bg-muted/20 p-3 text-foreground">
+                  <dt className="text-muted-foreground">{t("issueSummary.document")}</dt>
+                  <dd>
+                    {t(`types.${invoice.documentType as "TD01" | "TD02" | "TD04"}`)} ·{" "}
+                    {t("issueSummary.series", { series: series || t("mainSeries") })}
+                  </dd>
+                  <dt className="text-muted-foreground">{t("issueSummary.date")}</dt>
+                  <dd>{calendarDay(italianToday())}</dd>
+                  <dt className="text-muted-foreground">{t("issueSummary.customer")}</dt>
+                  <dd className="break-words">{customerName ?? "—"}</dd>
+                  {isCredit && data.original && (
+                    <>
+                      <dt className="text-muted-foreground">{t("credit.creditsInvoice")}</dt>
+                      <dd>{t("numberTitle", { number: data.original.documentNumber ?? "—" })}</dd>
+                    </>
+                  )}
+                  <dt className="text-muted-foreground">{t("issueSummary.total")}</dt>
+                  <dd className="font-semibold tabular-nums">{money(totals.total)}</dd>
+                  {!isCredit && (
+                    <>
+                      <dt className="text-muted-foreground">{t("dueDate")}</dt>
+                      <dd>{terms ? t("issueSummary.fromTerms") : (calendarDay(shownDue) ?? tR("notSet"))}</dd>
+                      <dt className="text-muted-foreground">{t("paymentMethod")}</dt>
+                      <dd>{PAYMENT_METHODS[paymentMethod] ?? paymentMethod}</dd>
+                    </>
+                  )}
+                </dl>
+                <p>{t("issueDescription")}</p>
+              </div>
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>

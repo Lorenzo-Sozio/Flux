@@ -84,6 +84,7 @@ export function NewInvoiceForm({
     currency: string;
     discountPercent: number;
     lines: EditableLine[];
+    depositCount?: number;
   } | null;
   canIssue: boolean;
 }) {
@@ -98,6 +99,9 @@ export function NewInvoiceForm({
   const [companyId, setCompanyId] = useState(initialOrder?.companyId ?? "");
   const [orderId, setOrderId] = useState(initialOrder?.id ?? "");
   const [currency, setCurrency] = useState(initialOrder?.currency ?? "EUR");
+  // ⚠️ A balance invoice: its deposits come off on the server, so this page's total is not the
+  // one that would be issued. It saves a draft, where the deductions and the true total show.
+  const [depositCount, setDepositCount] = useState(initialOrder?.depositCount ?? 0);
   const [lines, setLines] = useState<EditableLine[]>(() => initialOrder?.lines ?? [blankLine()]);
   const [discount, setDiscount] = useState(String(initialOrder?.discountPercent ?? 0));
   const [paymentMethod, setPaymentMethod] = useState("MP05");
@@ -184,6 +188,7 @@ export function NewInvoiceForm({
   const chooseOrder = async (value: string) => {
     if (value === NO_ORDER) {
       setOrderId("");
+      setDepositCount(0);
       return;
     }
     const picked = data.orders.find((o) => o.id === value);
@@ -196,6 +201,7 @@ export function NewInvoiceForm({
         return;
       }
       setOrderId(value);
+      setDepositCount(loaded.depositCount);
       if (loaded.companyId) {
         setCompanyId(loaded.companyId);
         setTerms(termsOf(loaded.companyId));
@@ -232,7 +238,9 @@ export function NewInvoiceForm({
     });
     if (!result.ok) {
       if (result.existingId) {
-        toast.error(tn("orderHasDraft"), {
+        // The server says which: a draft of this order, its deposit invoice still in draft, or
+        // the invoice already issued.
+        toast.error(say(result), {
           action: {
             label: tn("openDraft"),
             onClick: () => router.push(`/dashboard/sales/invoices/${result.existingId}`),
@@ -301,11 +309,15 @@ export function NewInvoiceForm({
             <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
             <span className="font-bold text-base tabular-nums">{money(totals.total)}</span>
           </div>
-          <Button variant={canIssue ? "outline" : "default"} onClick={onSaveDraft} disabled={busy !== null || !company}>
+          <Button
+            variant={canIssue && depositCount === 0 ? "outline" : "default"}
+            onClick={onSaveDraft}
+            disabled={busy !== null || !company}
+          >
             {busy === "draft" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {tn("saveDraft")}
           </Button>
-          {canIssue && (
+          {canIssue && depositCount === 0 && (
             <Button onClick={() => setConfirmIssue(true)} disabled={busy !== null || problems.length > 0}>
               {busy === "issue" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("issue")}
@@ -628,7 +640,13 @@ export function NewInvoiceForm({
                 ) : (
                   <>
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
-                    <p className="min-w-0">{canIssue ? tn("readyToIssue") : tn("readyNoPermission")}</p>
+                    <p className="min-w-0">
+                      {depositCount > 0
+                        ? tn("balanceNotice", { count: depositCount })
+                        : canIssue
+                          ? tn("readyToIssue")
+                          : tn("readyNoPermission")}
+                    </p>
                   </>
                 )}
               </CardContent>

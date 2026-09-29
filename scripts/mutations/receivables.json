@@ -38,14 +38,8 @@
   {
     "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ si può incassare una bozza o una nota di credito",
-    "find": "      if (doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))",
-    "replace": "      if (false)"
-  },
-  {
-    "file": "src/lib/receipts.ts",
-    "description": "⚠️ ogni pagamento dopo il saldo manda di nuovo invoice.paid",
-    "find": "    if (s.outstanding <= 0 && s.outstanding + now > 0) out.push({ invoiceId: doc.id, paid: s.paid, due });",
-    "replace": "    if (s.outstanding <= 0) out.push({ invoiceId: doc.id, paid: s.paid, due });"
+    "find": "      if (!doc) return { ok: false, reason: \"not_found\" };\n      if (doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))\n        return { ok: false, reason: \"not_receivable\" };\n      if (doc.companyId) customerIds.add(doc.companyId);",
+    "replace": "      if (!doc) return { ok: false, reason: \"not_found\" };\n      if (doc.companyId) customerIds.add(doc.companyId);"
   },
   {
     "file": "src/lib/receivables-aging.ts",
@@ -56,13 +50,13 @@
   {
     "file": "src/actions/orders.ts",
     "description": "⚠️⚠️ con più fatture sullo stesso ordine il pagamento finisce su una a caso",
-    "find": "  } else if (issued.length === 1) invoiceId = issued[0].id;",
-    "replace": "  } else if (issued.length >= 1) invoiceId = issued[0].id;"
+    "find": "  else if (owing.length > 1) throw new Error(t(\"paymentChooseInvoice\"));",
+    "replace": "  else if (owing.length > 1) invoiceId = owing[0].id;"
   },
   {
     "file": "src/actions/orders.ts",
     "description": "⚠️ un pagamento sull'ordine non arriva mai alla sua unica fattura: lo scadenzario la sollecita già pagata",
-    "find": "  } else if (issued.length === 1) invoiceId = issued[0].id;",
-    "replace": "  } else if (false) invoiceId = issued[0].id;"
+    "find": "  } else if (owing.length === 1) invoiceId = owing[0].id;",
+    "replace": "  } else if (false) invoiceId = owing[0].id;"
   }
 ]

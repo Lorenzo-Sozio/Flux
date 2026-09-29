@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, inArray, isNull, lt, ne, or, type SQL, sql } from "drizzle-orm";
 
 import {
   companies,
@@ -16,6 +16,7 @@ import {
   products,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { together } from "@/lib/db-together";
 import {
   type DocumentLanguage,
   documentLanguage,
@@ -23,7 +24,7 @@ import {
   formatDocumentMoney,
   INVOICE_TEXT,
 } from "@/lib/document-language";
-import { sendInvoiceCopyEmail } from "@/lib/email";
+import { sendInvoiceCopyEmail, sendPaymentReminderEmail } from "@/lib/email";
 import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { serverT } from "@/lib/i18n-server";
@@ -31,11 +32,11 @@ import { archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
 import { deductionLines, depositLines, type IssuedDeposit } from "@/lib/invoice-deposits";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
-import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
+import { type DraftLine, type DraftProblem, draftProblems, invoiceScope, RECEIVABLE_TYPES } from "@/lib/invoice-rules";
 import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { cleanTerms, installmentsFor, installmentsMatch, isPreset } from "@/lib/payment-terms";
-import { openCredits, removeAllocation } from "@/lib/receipts";
+import { isOverAllocation, openCredits, releaseOverpayment, removeAllocation } from "@/lib/receipts";
 import {
   balanceOf,
   invoiceBalance,
@@ -65,41 +66,49 @@ function toDraftLines(items: (typeof invoiceItems.$inferSelect)[]): DraftLine[] 
   }));
 }
 
+/**
+ * The statements that write a draft's lines: upsert by position, then remove the tail. Returned,
+ * not run, so they land in the same transaction as the header they belong to.
+ */
+function lineStatements(h: Db, invoiceId: string, lines: DraftInput["lines"]): unknown[] {
+  return [
+    ...(lines.length
+      ? [
+          h
+            .insert(invoiceItems)
+            .values(
+              lines.map((l, position) => ({
+                invoiceId,
+                position,
+                productId: l.productId ?? null,
+                description: l.description,
+                quantity: String(l.quantity),
+                unitPrice: String(l.unitPrice),
+                discountPercent: String(l.discountPercent ?? 0),
+                taxPercent: String(l.taxPercent),
+                nature: l.nature ?? null,
+              })),
+            )
+            .onConflictDoUpdate({
+              target: [invoiceItems.invoiceId, invoiceItems.position],
+              set: {
+                productId: sqlExcluded("product_id"),
+                description: sqlExcluded("description"),
+                quantity: sqlExcluded("quantity"),
+                unitPrice: sqlExcluded("unit_price"),
+                discountPercent: sqlExcluded("discount_percent"),
+                taxPercent: sqlExcluded("tax_percent"),
+                nature: sqlExcluded("nature"),
+              },
+            }),
+        ]
+      : []),
+    h.delete(invoiceItems).where(and(eq(invoiceItems.invoiceId, invoiceId), gte(invoiceItems.position, lines.length))),
+  ];
+}
+
 async function writeLines(db: Db, invoiceId: string, lines: DraftInput["lines"]) {
-  if (lines.length) {
-    // Upsert by position, then remove the tail: no transaction on this driver, and
-    // stopping between the two leaves extra lines on a draft, never an empty one.
-    await db
-      .insert(invoiceItems)
-      .values(
-        lines.map((l, position) => ({
-          invoiceId,
-          position,
-          productId: l.productId ?? null,
-          description: l.description,
-          quantity: String(l.quantity),
-          unitPrice: String(l.unitPrice),
-          discountPercent: String(l.discountPercent ?? 0),
-          taxPercent: String(l.taxPercent),
-          nature: l.nature ?? null,
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [invoiceItems.invoiceId, invoiceItems.position],
-        set: {
-          productId: sqlExcluded("product_id"),
-          description: sqlExcluded("description"),
-          quantity: sqlExcluded("quantity"),
-          unitPrice: sqlExcluded("unit_price"),
-          discountPercent: sqlExcluded("discount_percent"),
-          taxPercent: sqlExcluded("tax_percent"),
-          nature: sqlExcluded("nature"),
-        },
-      });
-  }
-  await db
-    .delete(invoiceItems)
-    .where(and(eq(invoiceItems.invoiceId, invoiceId), gte(invoiceItems.position, lines.length)));
+  await together(db, (h) => lineStatements(h, invoiceId, lines));
 }
 
 /**
@@ -197,20 +206,76 @@ function printedDay(day: string | null): string {
 }
 
 /** The deposit invoices a balance invoice names, as they were issued. Anything else is dropped. */
-async function depositsOf(db: Db, ids: readonly string[] | null | undefined): Promise<IssuedDeposit[]> {
-  if (!ids?.length) return [];
-  const rows = await db
+/**
+ * Why an invoice of an order may not be issued now, in words the person can act on: the order
+ * already has an invoice not credited back, a deposit of it would be left out of the balance, or
+ * deposits would exceed the order. The issuing statement refuses the same things (src/lib/invoice-issue.ts).
+ */
+async function orderIssueProblem(
+  db: Db,
+  invoice: { id: string; orderId: string | null; documentType: string; total: string },
+  deducts: readonly string[],
+): Promise<string | null> {
+  if (!invoice.orderId || invoice.documentType === "TD04") return null;
+  const others = await db
     .select({
       id: invoices.id,
-      documentNumber: invoices.documentNumber,
-      issueDate: invoices.issueDate,
-      discountPercent: invoices.discountPercent,
-      linesSnapshot: invoices.linesSnapshot,
-      status: invoices.status,
       documentType: invoices.documentType,
+      total: invoices.total,
+      credited: invoices.creditedAmount,
+      deductedIn: invoices.deductedInInvoiceId,
     })
     .from(invoices)
-    .where(inArray(invoices.id, [...ids]));
+    .where(and(eq(invoices.orderId, invoice.orderId), eq(invoices.status, "issued"), ne(invoices.id, invoice.id)));
+  const open = (o: { total: string; credited: string }) => Number(o.credited) < Number(o.total);
+  if (invoice.documentType === "TD01") {
+    if (others.some((o) => o.documentType === "TD01" && open(o))) return "orderAlreadyInvoiced";
+    if (others.some((o) => o.documentType === "TD02" && open(o) && !o.deductedIn && !deducts.includes(o.id)))
+      return "depositLeftOut";
+    if (others.some((o) => deducts.includes(o.id) && o.deductedIn)) return "depositTakenOff";
+  }
+  if (invoice.documentType === "TD02") {
+    const [order] = await db.select({ total: orders.totalAmount }).from(orders).where(eq(orders.id, invoice.orderId));
+    const invoiced = others
+      .filter((o) => o.documentType === "TD01" || o.documentType === "TD02")
+      .reduce((sum, o) => sum + Number(o.total) - Number(o.credited), 0);
+    if (order && invoiced + Number(invoice.total) > Number(order.total) + 0.05) return "depositOverOrder";
+  }
+  return null;
+}
+
+async function depositsOf(db: Db, ids: readonly string[] | null | undefined): Promise<IssuedDeposit[]> {
+  if (!ids?.length) return [];
+  const [rows, credits] = await Promise.all([
+    db
+      .select({
+        id: invoices.id,
+        documentNumber: invoices.documentNumber,
+        issueDate: invoices.issueDate,
+        discountPercent: invoices.discountPercent,
+        linesSnapshot: invoices.linesSnapshot,
+        status: invoices.status,
+        documentType: invoices.documentType,
+        creditedAmount: invoices.creditedAmount,
+      })
+      .from(invoices)
+      .where(inArray(invoices.id, [...ids])),
+    // What their credit notes gave back: a deposit partly credited is taken off for the rest.
+    db
+      .select({
+        originalId: invoices.originalInvoiceId,
+        discountPercent: invoices.discountPercent,
+        linesSnapshot: invoices.linesSnapshot,
+      })
+      .from(invoices)
+      .where(
+        and(
+          inArray(invoices.originalInvoiceId, [...ids]),
+          eq(invoices.documentType, "TD04"),
+          eq(invoices.status, "issued"),
+        ),
+      ),
+  ]);
   return rows
     .filter((r) => r.status === "issued" && r.documentType === "TD02")
     .map((r) => ({
@@ -219,6 +284,10 @@ async function depositsOf(db: Db, ids: readonly string[] | null | undefined): Pr
       issueDate: r.issueDate,
       discountPercent: Number(r.discountPercent),
       lines: (r.linesSnapshot ?? []) as InvoiceLine[],
+      creditedAmount: Number(r.creditedAmount),
+      credits: credits
+        .filter((c) => c.originalId === r.id)
+        .map((c) => ({ discountPercent: Number(c.discountPercent), lines: (c.linesSnapshot ?? []) as InvoiceLine[] })),
     }));
 }
 
@@ -240,7 +309,8 @@ async function undeductedDeposits(db: Db, orderId: string): Promise<IssuedDeposi
             eq(invoices.status, "issued"),
             eq(invoices.documentType, "TD02"),
             isNull(invoices.deductedInInvoiceId),
-            eq(invoices.creditedAmount, "0"),
+            // Partly credited: taken off for what is left. Credited in full: nothing to take off.
+            sql`${invoices.creditedAmount} < ${invoices.total}`,
           ),
         )
         .orderBy(asc(invoices.issueDate), asc(invoices.number)),
@@ -299,7 +369,11 @@ export async function createDepositInvoice(
       and(
         eq(invoices.orderId, orderId),
         eq(invoices.documentType, "TD01"),
-        inArray(invoices.status, ["draft", "issued"]),
+        // An invoice credited back in full invoices nothing: the order takes deposits again.
+        or(
+          eq(invoices.status, "draft"),
+          and(eq(invoices.status, "issued"), sql`${invoices.creditedAmount} < ${invoices.total}`),
+        ),
       ),
     );
   if (invoiced) return { ok: false, error: t("depositAfterInvoice") };
@@ -325,7 +399,8 @@ export async function createDepositInvoice(
   const discount = Number(order.discountPercent ?? 0);
   const orderTotal = invoiceTotals(orderLines, discount).total;
   const [written] = await db
-    .select({ total: sql<string>`coalesce(sum(${invoices.total}), 0)` })
+    // Net of credit notes: a deposit credited back no longer takes up the order.
+    .select({ total: sql<string>`coalesce(sum(${invoices.total} - ${invoices.creditedAmount}), 0)` })
     .from(invoices)
     .where(
       and(
@@ -335,7 +410,14 @@ export async function createDepositInvoice(
       ),
     );
   const left = Math.round((orderTotal - Number(written?.total ?? 0)) * 100) / 100;
-  if (gross > left) return { ok: false, error: t("depositExceedsOrder", { left: left.toFixed(2) }) };
+  if (gross > left)
+    return {
+      ok: false,
+      // As money, not as "1234.50": the figure the person compares with the order's page.
+      error: t("depositExceedsOrder", {
+        left: formatDocumentMoney(Math.max(0, left), order.currency || "EUR", documentLanguage(company)),
+      }),
+    };
 
   const tx = INVOICE_TEXT[documentLanguage(company)];
   const lines = depositLines(orderLines, discount, gross, (rate, _nature, several) =>
@@ -375,22 +457,53 @@ export async function createDepositInvoice(
 
 // ─── Reading ──────────────────────────────────────────────────────────────────
 
+/** Where an issued invoice stands with the customer's money, as the list shows it. */
+export type InvoicePaymentState =
+  | { state: "overdue" | "open"; outstanding: number; overdueAmount: number; dueDate: string; daysOverdue: number }
+  | { state: "paid" | "overpaid" | "credited" };
+
 /**
- * One page of invoices and credit notes, with the total that matches the query.
+ * One page of invoices and credit notes, with the total that matches the query, and where each
+ * issued invoice stands: owed, overdue, paid.
  *
  * ⚠️ It used to read the first 500 and stop, so invoice 501 existed, was numbered
  * and counted in the stamp duty, and could not be found on the list.
+ *
+ * ⚠️⚠️ "To collect" and "overdue" are the receivables schedule's own list (src/lib/receivables.ts),
+ * installments and credit notes included, so the filter and the Finance page cannot disagree
+ * about which invoices are late.
  */
-export async function getInvoices(params: ListParams, status = "all") {
+export async function getInvoices(
+  params: ListParams,
+  status = "all",
+  /** "2026-09": issued that month — what the home's "invoiced this month" counts. */
+  issuedMonth?: string | null,
+) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
-  const db = await getDb();
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  const today = toWallDate(new Date(), timeZone);
+  const owed = await tolerateUnmigrated("receivables", () => receivables(db, { today }), null);
+  const owedById = new Map((owed?.invoices ?? []).map((r) => [r.id, r]));
 
   const term = params.search.trim();
   const clauses: SQL[] = [];
   if (status === "draft" || status === "issued") clauses.push(eq(invoices.status, status));
+  if (status === "unpaid" || status === "overdue") {
+    const ids = (owed?.invoices ?? []).filter((r) => status === "unpaid" || r.overdueAmount > 0).map((r) => r.id);
+    clauses.push(ids.length > 0 ? inArray(invoices.id, ids) : sql`false`);
+  }
   if (term) {
     clauses.push(or(ilike(invoices.documentNumber, `%${term}%`), ilike(companies.name, `%${term}%`)) as SQL);
+  }
+  if (issuedMonth && /^\d{4}-(0[1-9]|1[0-2])$/.test(issuedMonth)) {
+    const [y, m] = issuedMonth.split("-").map(Number);
+    const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+    clauses.push(
+      eq(invoices.status, "issued"),
+      gte(invoices.issueDate, `${issuedMonth}-01`),
+      lt(invoices.issueDate, next),
+    );
   }
   const where = clauses.length ? and(...clauses) : undefined;
 
@@ -411,6 +524,8 @@ export async function getInvoices(params: ListParams, status = "all") {
             currency: invoices.currency,
             companyName: companies.name,
             createdAt: invoices.createdAt,
+            // ⚠️ The outer column named in full: bare, "id" would be the payment's own.
+            paid: sql<string>`(select coalesce(sum(p.amount), 0) from order_payment p where p.invoice_id = "invoice"."id")`,
           })
           .from(invoices)
           .leftJoin(companies, eq(companies.id, invoices.companyId))
@@ -420,10 +535,33 @@ export async function getInvoices(params: ListParams, status = "all") {
           .offset(offsetOf(params)),
         db.select({ n: count() }).from(invoices).leftJoin(companies, eq(companies.id, invoices.companyId)).where(where),
       ]);
-      return toPage(rows, Number(counted?.n ?? 0), params);
+      const decorated = rows.map(({ paid, ...r }: (typeof rows)[number]) => ({
+        ...r,
+        payment: paymentStateOf(r, Number(paid ?? 0), owedById.get(r.id)),
+      }));
+      return toPage(decorated, Number(counted?.n ?? 0), params);
     },
     toPage([], 0, params),
   );
+}
+
+function paymentStateOf(
+  r: { status: string; documentType: string; total: string; creditedAmount: string },
+  paid: number,
+  owed: Awaited<ReturnType<typeof receivables>>["invoices"][number] | undefined,
+): InvoicePaymentState | null {
+  if (r.status !== "issued" || !(RECEIVABLE_TYPES as readonly string[]).includes(r.documentType)) return null;
+  if (owed)
+    return {
+      state: owed.overdueAmount > 0 ? "overdue" : "open",
+      outstanding: owed.outstanding,
+      overdueAmount: owed.overdueAmount,
+      dueDate: owed.dueDate,
+      daysOverdue: owed.daysOverdue,
+    };
+  const due = Number(r.total) - Number(r.creditedAmount);
+  if (due <= 0.005) return { state: "credited" };
+  return { state: paid - due > 0.005 ? "overpaid" : "paid" };
 }
 
 export type IssueBlockers = { issuer: Gap[]; customer: Gap[]; draft: DraftProblem[] };
@@ -564,7 +702,8 @@ export async function getNewInvoiceData() {
         and(
           sql`${orders.status} <> 'cancelled'`,
           sql`${orders.companyId} IS NOT NULL`,
-          sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued')`,
+          // Invoiced is an issued invoice not credited back in full: one that was can be redone.
+          sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued' AND i.credited_amount < i.total)`,
         ),
       )
       .orderBy(desc(orders.createdAt))
@@ -635,11 +774,15 @@ export async function getOrderForInvoice(orderId: string) {
     .from(orderItems)
     .leftJoin(products, eq(products.id, orderItems.productId))
     .where(eq(orderItems.orderId, orderId));
+  // Deposit invoices still to take off: the invoice is a balance, and its total is the order's less
+  // them — which the form cannot show, so it only saves a draft to be checked (I11).
+  const deposits = await undeductedDeposits(db, orderId);
   return {
     companyId: order.companyId,
     currency: order.currency,
     discountPercent: Number(order.discountPercent ?? 0),
     lines: linesFromOrder(items),
+    depositCount: deposits.length,
   };
 }
 
@@ -666,6 +809,35 @@ export async function createInvoice(
   if (!company) return { ok: false, error: (await serverT("serverErrors.invoices"))("chooseCustomer") };
 
   const orderId = input.orderId || null;
+  // The currency is the order's when there is one, and always three capital letters: the
+  // browser's word for it reached the XML's Divisa unchecked.
+  let currency = (input.currency || "EUR").trim().toUpperCase();
+  if (orderId) {
+    const t = await serverT("serverErrors.invoices");
+    const [order] = await db
+      .select({ companyId: orders.companyId, currency: orders.currency })
+      .from(orders)
+      .where(eq(orders.id, orderId));
+    if (!order) return { ok: false, error: t("orderNotFound") };
+    // ⚠️⚠️ The order must be this customer's: its deposits are taken off and its payments linked
+    // to the invoice, so another customer's order handed them this customer's money.
+    if (order.companyId !== company.id) return { ok: false, error: t("orderOtherCustomer") };
+    currency = order.currency;
+    const [invoiced] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.orderId, orderId),
+          eq(invoices.status, "issued"),
+          eq(invoices.documentType, "TD01"),
+          sql`${invoices.creditedAmount} < ${invoices.total}`,
+        ),
+      );
+    if (invoiced) return { ok: false, error: t("orderAlreadyInvoiced"), existingId: invoiced.id };
+  }
+  if (!/^[A-Z]{3}$/.test(currency))
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("currencyInvalid") };
   if (orderId) {
     const [draft] = await db
       .select({ id: invoices.id })
@@ -707,7 +879,7 @@ export async function createInvoice(
       deducts: deposits.length > 0 ? deposits.map((d) => d.id) : null,
       orderId,
       companyId: company.id,
-      currency: input.currency || "EUR",
+      currency,
       series: header.series,
       dueDate: header.dueDate,
       discountPercent: String(header.discountPercent),
@@ -758,22 +930,43 @@ export async function createCreditNote(
   if (room.residual <= 0) return { ok: false, error: (await serverT("serverErrors.invoices"))("creditedInFull") };
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
 
-  const frozen = (
-    (invoice.linesSnapshot ?? []) as (DraftLine & { isStampRecharge?: boolean; productId?: string | null })[]
-  )
-    .filter((l) => !l.isStampRecharge)
-    .map((l) => ({
-      productId: l.productId ?? null,
-      description: l.description ?? "",
-      quantity: Number(l.quantity),
-      unitPrice: Number(l.unitPrice),
-      discountPercent: Number(l.discountPercent ?? 0),
-      taxPercent: Number(l.taxPercent),
-      nature: l.nature ?? null,
-    }));
-  if (frozen.length === 0) return { ok: false, error: (await serverT("serverErrors.invoices"))("noLinesToCredit") };
+  const snapshot = (invoice.linesSnapshot ?? []) as (InvoiceLine & { productId?: string | null })[];
+  const tx = INVOICE_TEXT[documentLanguage(invoice.customerSnapshot as { language?: string | null } | null)];
+  const cited = { number: invoice.documentNumber ?? "", date: printedDay(invoice.issueDate) };
+  // ⚠️⚠️ In full: one line per (rate, Natura), the taxable the original was issued with, and no
+  // discount — so the note is the original's total to the cent, whatever it carried. Copying its
+  // lines lost what marked the stamp recharge and the deposits taken off, and the discount then
+  // applied to them: the note of a balance invoice exceeded what was left to credit and could not
+  // be issued, and the note of an invoice with the stamp recharged left €2 owed.
+  const frozen =
+    mode === "full"
+      ? invoiceTotals(snapshot, Number(invoice.discountPercent)).summary.map((g) => ({
+          productId: null,
+          description: g.nature
+            ? fill(tx.creditLineNature, { ...cited, nature: g.nature })
+            : fill(tx.creditLine, { ...cited, rate: `${g.rate}%` }),
+          quantity: 1,
+          unitPrice: g.taxable,
+          discountPercent: 0,
+          taxPercent: g.rate,
+          nature: g.nature,
+        }))
+      : // In part: the original's own lines to reduce; never the stamp recharge or a deduction.
+        snapshot
+          .filter((l) => !l.isStampRecharge && !l.isDeduction)
+          .map((l) => ({
+            productId: l.productId ?? null,
+            description: l.description ?? "",
+            quantity: Number(l.quantity),
+            unitPrice: Number(l.unitPrice),
+            discountPercent: Number(l.discountPercent ?? 0),
+            taxPercent: Number(l.taxPercent),
+            nature: l.nature ?? null,
+          }));
+  if (frozen.length === 0 || frozen.every((l) => l.unitPrice <= 0))
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("noLinesToCredit") };
 
-  const discount = Number(invoice.discountPercent);
+  const discount = mode === "full" ? 0 : Number(invoice.discountPercent);
   const final = finalLines(frozen, discount, invoice.stampDutyMode, false);
   const totals = totalsOf(final.lines, discount);
   const [row] = await db
@@ -785,13 +978,12 @@ export async function createCreditNote(
       companyId: invoice.companyId,
       currency: invoice.currency,
       series: invoice.series,
-      discountPercent: invoice.discountPercent,
+      discountPercent: String(discount),
       stampDuty: final.stamp.applied,
       stampDutyMode: invoice.stampDutyMode,
       stampDutyNote: invoice.stampDutyNote,
       paymentMethod: invoice.paymentMethod,
-      notes:
-        mode === "full" ? `Storno totale della fattura n. ${invoice.documentNumber} del ${invoice.issueDate}` : null,
+      notes: mode === "full" ? fill(tx.creditNoteNote, cited) : null,
       subtotal: String(totals.subtotal),
       discountAmount: String(totals.discountAmount),
       taxableAmount: String(totals.taxableAmount),
@@ -844,33 +1036,49 @@ export async function saveInvoiceDraft(
       : [],
   );
   const totals = totalsOf(final.lines, header.discountPercent);
-  const [bumped] = await db
-    .update(invoices)
-    .set({
-      series: header.series,
-      dueDate: header.dueDate,
-      discountPercent: String(header.discountPercent),
-      stampDuty: final.stamp.applied,
-      stampDutyMode: header.stampDutyMode,
-      stampDutyNote: header.stampDutyNote,
-      paymentMethod: header.paymentMethod,
-      paymentTerms: header.paymentTerms ?? null,
-      notes: header.notes,
-      subtotal: String(totals.subtotal),
-      discountAmount: String(totals.discountAmount),
-      taxableAmount: String(totals.taxableAmount),
-      taxAmount: String(totals.taxAmount),
-      total: String(totals.total),
-      revision: revision + 1,
-      updatedAt: new Date(),
-    })
-    .where(and(eq(invoices.id, id), eq(invoices.status, "draft"), eq(invoices.revision, revision)))
-    .returning({ revision: invoices.revision });
-  if (!bumped) return { ok: false, error: (await serverT("serverErrors.invoices"))("changedBySomeoneElse") };
-
-  await writeLines(db, id, lines);
+  // ⚠️⚠️ Header and lines in one transaction, and only over the revision the person edited: the
+  // draft is locked at that revision, a separate statement then fails the whole write if it moved
+  // (a save that landed meanwhile), and only then are header and lines written. Three requests one
+  // after the other let a page load, or an issue, read the new revision with the old lines.
+  const nextRevision = revision + 1;
+  const header_ = {
+    series: header.series,
+    dueDate: header.dueDate,
+    discountPercent: String(header.discountPercent),
+    stampDuty: final.stamp.applied,
+    stampDutyMode: header.stampDutyMode,
+    stampDutyNote: header.stampDutyNote,
+    paymentMethod: header.paymentMethod,
+    paymentTerms: header.paymentTerms ?? null,
+    notes: header.notes,
+    subtotal: String(totals.subtotal),
+    discountAmount: String(totals.discountAmount),
+    taxableAmount: String(totals.taxableAmount),
+    taxAmount: String(totals.taxAmount),
+    total: String(totals.total),
+    revision: nextRevision,
+    updatedAt: new Date(),
+  };
+  try {
+    await together(db, (h) => [
+      h
+        .select({ id: invoices.id })
+        .from(invoices)
+        .where(and(eq(invoices.id, id), eq(invoices.status, "draft"), eq(invoices.revision, revision)))
+        .for("update"),
+      h.execute(
+        sql`select 1 / (case when exists (select 1 from invoice i where i.id = ${id} and i.status = 'draft' and i.revision = ${revision}) then 1 else 0 end) as ok`,
+      ),
+      h.update(invoices).set(header_).where(eq(invoices.id, id)),
+      ...lineStatements(h, id, lines),
+    ]);
+  } catch (error) {
+    if (isOverAllocation(error))
+      return { ok: false, error: (await serverT("serverErrors.invoices"))("changedBySomeoneElse") };
+    throw error;
+  }
   revalidatePath(`${LIST}/${id}`);
-  return { ok: true, revision: bumped.revision };
+  return { ok: true, revision: nextRevision };
 }
 
 /** Only a draft can be deleted: an issued invoice is corrected with a credit note. */
@@ -915,10 +1123,27 @@ export async function issueInvoiceAction(
   const deposits = await depositsOf(db, deducts);
   if (deposits.length !== deducts.length)
     return { ok: false, error: (await serverT("serverErrors.invoices"))("depositGone") };
+  // Said here in words; the issuing statement refuses the same things whatever this read.
+  const orderProblem = await orderIssueProblem(db, invoice, deducts);
+  if (orderProblem) return { ok: false, error: (await serverT("serverErrors.invoices"))(orderProblem) };
   const deductions = deductionsFor(deposits, documentLanguage(company));
+  // A credit note whose customer record was deleted credits the customer as the original froze
+  // them: the one the invoice was issued to, which is who the note is for.
+  const [originalParty] =
+    isCredit && !company && invoice.originalInvoiceId
+      ? await db
+          .select({ snapshot: invoices.customerSnapshot })
+          .from(invoices)
+          .where(eq(invoices.id, invoice.originalInvoiceId))
+      : [];
+  const frozenCustomer = (originalParty?.snapshot ?? null) as ReturnType<typeof customerSnapshot> | null;
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
-    customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
+    customer: company
+      ? customerGaps({ ...company, province: company.state })
+      : frozenCustomer
+        ? []
+        : [{ field: "name", problem: "missing" }],
     draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }, deductions),
   };
   // Decided again here, from the lines being frozen, rather than trusted from the
@@ -936,6 +1161,10 @@ export async function issueInvoiceAction(
   const installments = terms ? installmentsFor(terms, issueDate, totals.total) : null;
   if (installments && !installmentsMatch(installments, totals.total))
     blockers.draft.push({ kind: "installments_total" });
+  if (installments?.some((i) => i.dueDate < issueDate)) blockers.draft.push({ kind: "installment_before_issue" });
+  // ⚠️ Another currency needs the exchange rate the law asks for, and the stamp is in euros: not
+  // issued until that is recorded.
+  if (invoice.currency !== "EUR") blockers.draft.push({ kind: "currency_not_eur" });
   if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {
     return { ok: false, error: (await serverT("serverErrors.invoices"))("cannotIssueYet"), blockers };
   }
@@ -951,14 +1180,16 @@ export async function issueInvoiceAction(
     issueDate,
     issuedBy: actor.userId,
     issuerSnapshot: issuerFields,
-    customerSnapshot: customerSnapshot(company),
+    customerSnapshot: company ? customerSnapshot(company) : frozenCustomer,
     linesSnapshot: final.lines,
     stampDuty: final.stamp.applied,
     totals,
     // The statement takes the amount from the original, within what is left, or issues nothing.
     creditOf: isCredit ? invoice.originalInvoiceId : null,
-    // And takes each deposit off once, or issues nothing (I11).
-    deducts,
+    // And takes each deposit off once, as it was read, or issues nothing (I11).
+    deducts: deposits.map((d) => ({ id: d.id, credited: d.creditedAmount ?? 0 })),
+    documentType: invoice.documentType,
+    orderId: invoice.orderId,
     installments,
   });
   if (!result) {
@@ -988,12 +1219,17 @@ export async function issueInvoiceAction(
   if (!isCredit && invoice.orderId) {
     const linked = await tolerateUnmigrated(
       "invoice payments",
-      () => linkOrderPayments(db, invoice.orderId as string),
+      () => linkOrderPayments(db, invoice.orderId as string, id),
       0,
     );
     if (linked > 0) await settledNow(id, 0);
   }
-  if (isCredit && room) await settledNow(room.id, totals.total);
+  if (isCredit && room) {
+    // ⚠️⚠️ What the customer had paid beyond what the invoice now owes becomes their credit, which
+    // the corrected invoice can use; left on the credited invoice it showed in no total.
+    await tolerateUnmigrated("receipts", () => releaseOverpayment(db, room.id), 0);
+    await settledNow(room.id, totals.total);
+  }
 
   // An accounting system waits for this more than for anything else a CRM does (§13.11).
   dispatchWebhook(
@@ -1021,6 +1257,10 @@ export async function issueInvoiceAction(
 
   revalidatePath(LIST);
   revalidatePath(`${LIST}/${id}`);
+  // Issuing moves money on the order (its deposits are linked) and on the customer's figures.
+  if (invoice.orderId) revalidatePath(`/dashboard/sales/orders/${invoice.orderId}`);
+  if (invoice.companyId) revalidatePath(`/dashboard/companies/${invoice.companyId}`);
+  revalidatePath("/dashboard/sales/finance");
   return { ok: true, documentNumber: result.documentNumber };
 }
 
@@ -1081,6 +1321,10 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
     issueDate: invoice.issueDate,
     total: formatDocumentMoney(invoice.total, invoice.currency, lang),
     dueDate: invoice.dueDate,
+    installments: (invoice.installments ?? []).map((i: { dueDate: string; amount: number }) => ({
+      dueDate: i.dueDate,
+      amount: formatDocumentMoney(i.amount, invoice.currency, lang),
+    })),
     pdf: { filename: pdf.name, bytes: pdf.bytes },
     replyTo: issuer.email,
     lang,
@@ -1098,7 +1342,78 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
   return { ok: true };
 }
 
-/** The value the upsert tried to insert, for the columns it updates on conflict. */
+/**
+ * A payment reminder for an overdue invoice (sollecito), to the customer, in their language,
+ * with the courtesy PDF: what is overdue and since when, how to pay, and that a payment already
+ * made makes it void.
+ *
+ * ⚠️ The figures are the receivables schedule's (src/lib/receivables.ts): the first installment
+ * still owed, and what is past due — never the invoice total, which a partial payment or a
+ * credit note has already reduced.
+ * ⚠️ Claimed before it is sent, with a conditional update: a second click within the hour, or
+ * a colleague on the same invoice, sends nothing. A send that fails gives the claim back.
+ */
+export async function sendPaymentReminder(
+  id: string,
+  to: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const t = await serverT("serverErrors.invoices");
+  const address = to.trim();
+  if (!EMAIL.test(address)) return { ok: false, error: t("emailInvalid") };
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  if (!invoice) return { ok: false, error: t("notFound") };
+  if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate || !invoice.companyId)
+    return { ok: false, error: t("reminderNotOwed") };
+  const today = toWallDate(new Date(), timeZone);
+  const owed = (await receivables(db, { today, companyId: invoice.companyId })).invoices.find((r) => r.id === id);
+  if (!owed || owed.overdueAmount <= 0) return { ok: false, error: t("reminderNotOverdue") };
+
+  const previous = invoice.remindedAt;
+  const [claimed] = await db
+    .update(invoices)
+    .set({ remindedAt: new Date(), reminderCount: sql`${invoices.reminderCount} + 1` })
+    .where(
+      and(
+        eq(invoices.id, id),
+        // The cutoff is written as the column is (an instant from here), never against now(): the
+        // column has no zone, and now() compared with it depends on the session's.
+        or(isNull(invoices.remindedAt), lt(invoices.remindedAt, new Date(Date.now() - 3_600_000))),
+      ),
+    )
+    .returning({ id: invoices.id });
+  if (!claimed) return { ok: false, error: t("reminderJustSent") };
+
+  const issuer = (invoice.issuerSnapshot ?? {}) as { legalName?: string; email?: string; iban?: string | null };
+  const lang = documentLanguage(invoice.customerSnapshot as { language?: string | null; country?: string | null });
+  // The PDF is a courtesy: a reminder still goes out when the file cannot be built.
+  const pdf = await readInvoiceFile(db, invoice, "pdf").catch(() => null);
+  const sent = await sendPaymentReminderEmail({
+    to: address,
+    issuerName: issuer.legalName ?? "",
+    documentType: invoice.documentType as "TD01" | "TD02",
+    documentNumber: invoice.documentNumber,
+    issueDate: invoice.issueDate,
+    dueDate: owed.dueDate,
+    amount: formatDocumentMoney(owed.overdueAmount, invoice.currency, lang),
+    iban: invoice.paymentMethod === "MP05" ? issuer.iban : null,
+    pdf: pdf ? { filename: pdf.name, bytes: pdf.bytes } : null,
+    replyTo: issuer.email,
+    lang,
+  });
+  if (!sent.success) {
+    await db
+      .update(invoices)
+      .set({ remindedAt: previous, reminderCount: sql`greatest(${invoices.reminderCount} - 1, 0)` })
+      .where(eq(invoices.id, id));
+    return { ok: false, error: sent.error ?? t("emailNotSent") };
+  }
+  revalidatePath(`${LIST}/${id}`);
+  return { ok: true };
+}
+
 /**
  * Stamp duty on the invoices issued in `year`, by quarter, with the F24 deadline.
  *
@@ -1134,7 +1449,7 @@ function sqlExcluded(column: string) {
 export async function getInvoicePayments(invoiceId: string) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
-  const db = await getDb();
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const [invoice] = await db
     .select({
       total: invoices.total,
@@ -1157,6 +1472,8 @@ export async function getInvoicePayments(invoiceId: string) {
     balance: invoiceBalance(invoice.total, invoice.credited, payments),
     companyId: invoice.companyId,
     credits: credits.filter((c) => c.currency === invoice.currency),
+    // The workspace's day, for the payment form: the browser's put an evening payment a day ahead.
+    today: toWallDate(new Date(), timeZone),
   };
 }
 
@@ -1167,7 +1484,7 @@ export async function getInvoicePayments(invoiceId: string) {
 export async function recordInvoicePaymentAction(
   invoiceId: string,
   data: { amount: number | string; paidAt?: string; method?: string; note?: string; reference?: string },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; toCredit?: number } | { ok: false; error: string }> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
@@ -1193,7 +1510,14 @@ export async function recordInvoicePaymentAction(
   }
   revalidatePath(`${LIST}/${invoiceId}`);
   revalidatePath("/dashboard/sales/finance");
-  return { ok: true };
+  const [owner] = await db
+    .select({ companyId: invoices.companyId, orderId: invoices.orderId })
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId));
+  if (owner?.companyId) revalidatePath(`/dashboard/companies/${owner.companyId}`);
+  if (owner?.orderId) revalidatePath(`/dashboard/sales/orders/${owner.orderId}`);
+  // What was paid beyond the invoice went to the customer's credit: said, not silently kept.
+  return { ok: true, toCredit: result.toCredit };
 }
 
 /**
@@ -1201,7 +1525,9 @@ export async function recordInvoicePaymentAction(
  * receipt goes with it when this was all of it; a share of a larger transfer returns to the
  * customer's credit instead (src/lib/receipts.ts).
  */
-export async function deleteInvoicePaymentAction(paymentId: string): Promise<{ ok: boolean }> {
+export async function deleteInvoicePaymentAction(
+  paymentId: string,
+): Promise<{ ok: boolean; removed?: "receipt" | "allocation" | null }> {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
@@ -1213,8 +1539,10 @@ export async function deleteInvoicePaymentAction(paymentId: string): Promise<{ o
   const removed = await removeAllocation(db, paymentId);
   if (removed.invoiceId) revalidatePath(`${LIST}/${removed.invoiceId}`);
   if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);
+  if (removed.companyId) revalidatePath(`/dashboard/companies/${removed.companyId}`);
   revalidatePath("/dashboard/sales/finance");
-  return { ok: removed.removed !== null };
+  // "allocation": the money stayed, as the customer's credit — the screen says so.
+  return { ok: removed.removed !== null, removed: removed.removed };
 }
 
 /** The receivables schedule: every issued invoice still owed something, by age. */

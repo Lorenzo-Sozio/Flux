@@ -67,12 +67,6 @@
   },
   {
     "file": "src/lib/bank/reconcile.ts",
-    "description": "⚠️ la banca paga una fattura oltre il suo residuo",
-    "find": "    if (cents(Number(a.amount)) > cents(balance.outstanding)) return { ok: false, reason: \"overpays\" };",
-    "replace": "    if (false) return { ok: false, reason: \"overpays\" };"
-  },
-  {
-    "file": "src/lib/bank/reconcile.ts",
     "description": "⚠️ resta un credito senza cliente",
     "find": "  if (allocated < cents(left) && !input.companyId) return { ok: false, reason: \"no_customer\" };",
     "replace": ""
@@ -130,5 +124,71 @@
     "description": "⚠️ un lotto viene diviso anche quando i dettagli non tornano con l'importo",
     "find": "        Math.round(amounts.reduce((s: number, a) => s + Math.abs(a ?? 0), 0) * 100) ===\n          Math.round(Math.abs(amount.value) * 100);",
     "replace": "        true;"
+  },
+  {
+    "file": "src/lib/bank/csv.ts",
+    "description": "⚠️⚠️ la colonna del segno viene ignorata: gli stipendi entrano come incassi",
+    "find": "      if (/^(d|dare|db|dbit|debit|debito|addebito|-)$/.test(way)) amount = -Math.abs(amount);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/csv.ts",
+    "description": "⚠️⚠️ il saldo finale del CSV diventa un incasso",
+    "find": "    if (row.some((c) => BALANCE_ROW.test(String(c ?? \"\")))) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ il server registra di nuovo un incasso già scritto a mano",
+    "find": "    if (near.length > 0) return { ok: false, reason: \"recorded_already\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ un estratto importato mesi dopo non trova l'incasso scritto a mano nel suo mese",
+    "find": "  const since = new Date(Date.parse(`${input.from ?? input.today}T00:00:00Z`) - LOOSE_RECEIPT_DAYS * day);",
+    "replace": "  const since = new Date(Date.parse(`${input.today}T00:00:00Z`) - LOOSE_RECEIPT_DAYS * day);"
+  },
+  {
+    "file": "src/lib/bank/reconcile.ts",
+    "description": "⚠️⚠️ le righe di un altro conto entrano in questo",
+    "find": "    if (iban && m.accountIban && m.accountIban !== iban) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ «CANONE 09/2026» viene letto come la fattura 9",
+    "find": "    if ((Number(m[1]) <= 12 && !cited) || PERIOD_WORDS.test(before)) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️⚠️ un riferimento senza la parola fattura vale come un numero di fattura: sicuro per il cliente sbagliato",
+    "find": "            score: (reading.every((i) => weakOnly.has(i.id)) ? 20 : 50) + (exact ? 30 : 0) + e.score,",
+    "replace": "            score: 50 + (exact ? 30 : 0) + e.score,"
+  },
+  {
+    "file": "src/lib/bank/match.ts",
+    "description": "⚠️ un IBAN visto una volta basta a rendere sicura una proposta",
+    "find": "    e.score += byIban.length === 1 ? (seen >= 2 ? 40 : 25) : 15;",
+    "replace": "    e.score += byIban.length === 1 ? 40 : 15;"
+  },
+  {
+    "file": "src/lib/bank/camt.ts",
+    "description": "⚠️ uno storno prende come controparte noi stessi invece del cliente",
+    "find": "      const other = credit !== reversal ? \"Dbtr\" : \"Cdtr\";",
+    "replace": "      const other = credit ? \"Dbtr\" : \"Cdtr\";"
+  },
+  {
+    "file": "src/lib/bank/camt.ts",
+    "description": "⚠️⚠️ un file con due conti non dice di quale conto è ogni riga",
+    "find": "          accountIban: reportIban,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/bank/camt.ts",
+    "description": "⚠️⚠️ un lotto non divisibile viene attribuito tutto al primo ordinante",
+    "find": "      else if (details.length > 1)",
+    "replace": "      else if (false)"
   }
 ]

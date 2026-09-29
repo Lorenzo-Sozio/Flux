@@ -71,6 +71,9 @@ function isBooked(entry: XmlNode): boolean {
   return code === "" || code === "BOOK";
 }
 
+/** How an unsplittable batch says what it is, in the description the matcher and a person read. */
+const BATCH_WORD = "pagamenti in lotto";
+
 export function parseCamt(source: string): CamtStatement {
   const doc = parseXml(source.replace(/^﻿/, ""));
   const reports = [...descendants(doc, "Stmt"), ...descendants(doc, "Rpt"), ...descendants(doc, "Ntfctn")];
@@ -84,7 +87,11 @@ export function parseCamt(source: string): CamtStatement {
   };
   for (const report of reports) {
     const acct = child(report, "Acct");
-    out.accountIban ??= textAt(acct, "Id", "IBAN");
+    // ⚠️⚠️ Each movement carries its own account's IBAN: a file can hold several accounts, and
+    // only the one being reconciled may be imported into it — the others were imported whole
+    // into it once, and counted twice when their own statement came.
+    const reportIban = textAt(acct, "Id", "IBAN");
+    out.accountIban ??= reportIban;
     const acctCurrency = textAt(acct, "Ccy");
     out.currency ??= acctCurrency;
 
@@ -101,13 +108,16 @@ export function parseCamt(source: string): CamtStatement {
       }
       const credit = (textAt(entry, "CdtDbtInd") ?? "CRDT").toUpperCase() === "CRDT";
       const sign = credit ? 1 : -1;
+      // ⚠️ A reversal (a direct debit or RiBa returned unpaid) goes the other way from what it
+      // undoes: on the debit that takes the money back, the customer is still the debtor.
+      const reversal = (textAt(entry, "RvslInd") ?? "").toLowerCase() === "true";
       const valueOn = day(child(entry, "ValDt"));
       const currency = amount.currency ?? acctCurrency ?? "EUR";
       const entryRef = textAt(entry, "AcctSvcrRef");
 
       // An entry may carry one NtryDtls per batch (each with its `Btch` summary): all their details.
       const details = children(entry, "NtryDtls").flatMap((d) => children(d, "TxDtls"));
-      const other = credit ? "Dbtr" : "Cdtr";
+      const other = credit !== reversal ? "Dbtr" : "Cdtr";
       const read = (tx: XmlNode | undefined, value: number, index: number): Movement => {
         const parties = child(tx, "RltdPties");
         const refs = child(tx, "Refs");
@@ -126,6 +136,8 @@ export function parseCamt(source: string): CamtStatement {
           counterpartyIban: partyIban(parties, other),
           remittance: remittanceOf(tx, entry),
           bankReference: ref,
+          accountIban: reportIban,
+          ...(reversal ? { reversal: true } : {}),
         };
       };
 
@@ -138,8 +150,16 @@ export function parseCamt(source: string): CamtStatement {
         amounts.every((a) => a !== null) &&
         Math.round(amounts.reduce((s: number, a) => s + Math.abs(a ?? 0), 0) * 100) ===
           Math.round(Math.abs(amount.value) * 100);
-      if (!splits) out.movements.push(read(details[0], amount.value, 0));
-      else for (const [i, tx] of details.entries()) out.movements.push(read(tx, amounts[i] ?? 0, i));
+      if (splits) for (const [i, tx] of details.entries()) out.movements.push(read(tx, amounts[i] ?? 0, i));
+      // ⚠️⚠️ A batch that cannot be split is several payers under one amount: it takes nothing from
+      // its first detail. Given the first payer's name and IBAN, the whole amount was proposed to
+      // one of them — and that IBAN learned for them.
+      else if (details.length > 1)
+        out.movements.push({
+          ...read(undefined, amount.value, 0),
+          remittance: [textAt(entry, "AddtlNtryInf"), `(${details.length} ${BATCH_WORD})`].filter(Boolean).join(" "),
+        });
+      else out.movements.push(read(details[0], amount.value, 0));
     }
   }
   return out;

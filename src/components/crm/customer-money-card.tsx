@@ -5,11 +5,11 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { BanknoteIcon, DownloadIcon, Loader2, Plus, WalletIcon } from "lucide-react";
+import { BanknoteIcon, DownloadIcon, Loader2, Plus, Undo2, WalletIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { type getCustomerMoney, recordCustomerReceiptAction } from "@/actions/receipts";
+import { type getCustomerMoney, recordCustomerReceiptAction, recordRefundAction } from "@/actions/receipts";
 import { ReceiptEditDialog } from "@/components/crm/receipt-edit-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,15 +47,27 @@ export function CustomerMoneyCard({
   const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState("");
-  const [day, setDay] = useState(() => new Date().toLocaleDateString("en-CA"));
+  // The workspace's day, not the browser's: an evening payment typed abroad was dated tomorrow.
+  const [day, setDay] = useState(data.today);
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
   // Typed shares, by invoice; an invoice not typed takes the proposal.
   const [typed, setTyped] = useState<Record<string, string>>({});
 
-  // A transfer is in one currency: the one of the invoice owed longest, or the first owed.
-  const currency = data.owed[0]?.currency ?? data.credit[0]?.currency ?? "EUR";
+  // ⚠️ A transfer is in one currency. The card offers every currency the customer owes or holds
+  // credit in, the one owed longest first; what is owed is shown per currency, never summed.
+  const currencies = useMemo(
+    () => [...new Set([...data.owed.map((i) => i.currency), ...data.credit.map((c) => c.currency), "EUR"])],
+    [data.owed, data.credit],
+  );
+  const [currency, setCurrency] = useState(currencies[0]);
   const owed = useMemo(() => data.owed.filter((i) => i.currency === currency), [data.owed, currency]);
+  const owedByCurrency = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const i of data.owed)
+      out.set(i.currency, Math.round(((out.get(i.currency) ?? 0) + i.outstanding) * 100) / 100);
+    return [...out];
+  }, [data.owed]);
 
   // The proposal: what arrived, shared oldest due first, never beyond what each owes.
   const proposal = useMemo(() => {
@@ -92,15 +104,19 @@ export function CustomerMoneyCard({
         paidAt: day,
         method,
         reference,
+        currency,
         allocations: shares.filter((s) => s.amount > 0),
       }).catch(() => null);
       if (!r?.ok) {
         toast.error(r && !r.ok ? r.error : t("recordFailed"));
         return;
       }
-      toast.success(t("recorded"));
+      toast.success(
+        toCredit > 0 ? t("recordedWithCredit", { amount: formatMoney(toCredit, currency) }) : t("recorded"),
+      );
       setAdding(false);
       setAmount("");
+      setDay(data.today);
       setMethod("");
       setReference("");
       setTyped({});
@@ -124,29 +140,31 @@ export function CustomerMoneyCard({
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-muted-foreground">{t("owed")}</span>
-            <span className="tabular-nums">
-              {owed.length === 0
-                ? "—"
-                : formatMoney(
-                    owed.reduce((s, i) => s + i.outstanding, 0),
-                    currency,
-                  )}
-            </span>
-          </div>
-          {data.credit.map((c) => (
-            <div
-              key={c.currency}
-              className="flex items-center justify-between gap-3 font-medium text-emerald-700 dark:text-emerald-400"
-            >
-              <span className="flex items-center gap-1.5">
-                <WalletIcon className="size-3.5" aria-hidden />
-                {t("credit")}
-              </span>
-              <span className="tabular-nums">{formatMoney(c.credit, c.currency)}</span>
+          {owedByCurrency.length === 0 ? (
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-muted-foreground">{t("owed")}</span>
+              <span className="tabular-nums">—</span>
             </div>
-          ))}
+          ) : (
+            owedByCurrency.map(([c, total]) => (
+              <div key={c} className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">{t("owed")}</span>
+                <span className="tabular-nums">{formatMoney(total, c)}</span>
+              </div>
+            ))
+          )}
+          {data.credit
+            .filter((c) => c.credit > 0.005)
+            .map((c) => (
+              <CreditRow
+                key={c.currency}
+                companyId={companyId}
+                currency={c.currency}
+                credit={c.credit}
+                today={data.today}
+                canWrite={canWrite}
+              />
+            ))}
         </div>
 
         {canWrite &&
@@ -154,6 +172,28 @@ export function CustomerMoneyCard({
             <div className="space-y-3 rounded-md border bg-muted/20 p-3">
               {/* One column: this card lives in the side column, a phone's width even on a desktop. */}
               <div className="grid grid-cols-1 gap-3">
+                {currencies.length > 1 && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="receipt-currency" className="text-xs">
+                      {t("currency")}
+                    </Label>
+                    <select
+                      id="receipt-currency"
+                      value={currency}
+                      onChange={(e) => {
+                        setCurrency(e.target.value);
+                        setTyped({});
+                      }}
+                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                    >
+                      {currencies.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label htmlFor="receipt-amount" className="text-xs">
                     {t("amountReceived", { currency })}
@@ -176,7 +216,13 @@ export function CustomerMoneyCard({
                   <Label htmlFor="receipt-day" className="text-xs">
                     {t("date")}
                   </Label>
-                  <Input id="receipt-day" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+                  <Input
+                    id="receipt-day"
+                    type="date"
+                    max={data.today}
+                    value={day}
+                    onChange={(e) => setDay(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="receipt-method" className="text-xs">
@@ -320,5 +366,148 @@ export function CustomerMoneyCard({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The customer's credit in one currency and, for whoever may, giving it back. A refund is a
+ * negative receipt: the database refuses one larger than the credit, whoever else spends it at
+ * the same moment.
+ */
+function CreditRow({
+  companyId,
+  currency,
+  credit,
+  today,
+  canWrite,
+}: {
+  companyId: string;
+  currency: string;
+  credit: number;
+  today: string;
+  canWrite: boolean;
+}) {
+  const t = useTranslations("receipts");
+  const router = useRouter();
+  const { formatMoney } = useCurrency();
+  const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
+  const [amount, setAmount] = useState(String(credit));
+  const [day, setDay] = useState(today);
+  const [method, setMethod] = useState("");
+  const [reference, setReference] = useState("");
+  const id = `refund-${currency}`;
+
+  function refund() {
+    const value = parsePaymentAmount(amount);
+    if (value === null || value <= 0) {
+      toast.error(t("amountInvalid"));
+      return;
+    }
+    if (value > credit + 0.005) {
+      toast.error(t("refundOverCredit", { amount: formatMoney(credit, currency) }));
+      return;
+    }
+    startTransition(async () => {
+      const r = await recordRefundAction({ companyId, currency, amount, paidAt: day, method, reference }).catch(
+        () => null,
+      );
+      if (!r?.ok) {
+        toast.error(r && !r.ok ? r.error : t("refundFailed"));
+        return;
+      }
+      toast.success(t("refunded", { amount: formatMoney(value, currency) }));
+      setOpen(false);
+      router.refresh();
+    });
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3 font-medium text-emerald-700 dark:text-emerald-400">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <WalletIcon className="size-3.5 shrink-0" aria-hidden />
+          {t("credit")}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="tabular-nums">{formatMoney(credit, currency)}</span>
+          {canWrite && !open && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 px-2 text-xs"
+              onClick={() => {
+                setAmount(String(credit));
+                setDay(today);
+                setOpen(true);
+              }}
+            >
+              <Undo2 className="size-3.5" aria-hidden /> {t("refund")}
+            </Button>
+          )}
+        </span>
+      </div>
+      {open && (
+        <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+          <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor={`${id}-amount`} className="text-xs">
+                {t("refundAmount", { currency })}
+              </Label>
+              <Input
+                id={`${id}-amount`}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max={credit}
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="tabular-nums"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${id}-day`} className="text-xs">
+                {t("refundDate")}
+              </Label>
+              <Input id={`${id}-day`} type="date" max={today} value={day} onChange={(e) => setDay(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${id}-method`} className="text-xs">
+                {t("method")}
+              </Label>
+              <Input
+                id={`${id}-method`}
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                placeholder={t("methodPlaceholder")}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`${id}-reference`} className="text-xs">
+                {t("reference")}
+              </Label>
+              <Input
+                id={`${id}-reference`}
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder={t("referencePlaceholder")}
+              />
+            </div>
+          </div>
+          <p className="text-muted-foreground text-xs">{t("refundHint")}</p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+              {t("cancel")}
+            </Button>
+            <Button type="button" onClick={refund} disabled={pending} className="gap-1.5">
+              {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+              {t("refundConfirm")}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

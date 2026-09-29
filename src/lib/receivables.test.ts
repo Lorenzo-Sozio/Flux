@@ -235,11 +235,12 @@ describe("⚠️⚠️ security review, 27 September 2026", () => {
     );
     await db.execute(sql`insert into order_payment (id, order_id, amount) values ('dep', 'o1', '300')`);
     await invoice("only", { order: "o1" });
-    expect(await linkOrderPayments(db, "o1")).toBe(1);
+    expect(await linkOrderPayments(db, "o1", "only")).toBe(1);
     expect(await balanceOf(db, "only")).toMatchObject({ paid: 300, outstanding: 700 });
-    // A second invoice on the order: nobody can say which one new money pays.
-    await invoice("second", { order: "o1" });
+    // Money left on the order reaches the next invoice issued, never beyond what it owes.
+    await invoice("second", { order: "o1", total: 50 });
     await db.execute(sql`insert into order_payment (id, order_id, amount) values ('dep2', 'o1', '100')`);
-    expect(await linkOrderPayments(db, "o1")).toBe(0);
+    expect(await linkOrderPayments(db, "o1", "second")).toBe(1);
+    expect(await balanceOf(db, "second")).toMatchObject({ paid: 50, outstanding: 0 });
   });
 });

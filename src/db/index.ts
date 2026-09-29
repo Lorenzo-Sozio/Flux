@@ -45,7 +45,14 @@ function batchOnPool(pool: Pool) {
       await client.query("begin");
       const results: unknown[] = [];
       for (const query of queries) {
-        const { sql, params } = (query as unknown as { toSQL(): { sql: string; params: unknown[] } }).toSQL();
+        // A builder knows `toSQL`; a raw `db.execute(sql…)` (PgRaw) only `_prepare().getQuery()`,
+        // which is what Neon's own batch reads — both must run inside the one transaction.
+        const q = query as unknown as {
+          toSQL?: () => { sql: string; params: unknown[] };
+          _prepare?: () => { getQuery(): { sql: string; params: unknown[] } };
+        };
+        const { sql, params } = q.toSQL ? q.toSQL() : (q._prepare?.().getQuery() ?? { sql: "", params: [] });
+        if (!sql) throw new Error("batch: a statement that is neither a builder nor a raw query");
         const result = await client.query(sql, params as never[]);
         results.push(result.rows);
       }

@@ -17,6 +17,7 @@ const db = drizzle(new PGlite());
 
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => db }));
 vi.mock("@/lib/auth-guard", () => ({ requireCapability: async () => undefined }));
+vi.mock("@/lib/workspace-time-zone", () => ({ getWorkspaceTimeZone: async () => "Europe/Rome" }));
 
 const { getActivityByAction, getActivityByUser, getDailyActivityTrend, getReportKPIs, getTaskPerformanceByUser } =
   await import("./reports");

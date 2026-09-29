@@ -185,7 +185,10 @@ function cessionario(p: XmlParty): string {
 
 /** Where SDI delivers: the codice destinatario, the PEC with 0000000, or XXXXXXX abroad. */
 export function delivery(customer: XmlParty): { code: string; pec: string | null } {
-  if ((countryCode(customer.country) ?? "IT") !== "IT") return { code: "XXXXXXX", pec: null };
+  const nation = countryCode(customer.country) ?? "IT";
+  // San Marino has its own office, and its own code: XXXXXXX is for everywhere else abroad.
+  if (nation === "SM") return { code: "2R4GTO8", pec: null };
+  if (nation !== "IT") return { code: "XXXXXXX", pec: null };
   const sdi = (customer.sdiCode ?? "").trim().toUpperCase();
   if (/^[A-Z0-9]{7}$/.test(sdi) && sdi !== "0000000") return { code: sdi, pec: null };
   const pec = customer.pec?.trim() || null;
@@ -310,7 +313,26 @@ export function fatturaPaFileName(inv: Pick<XmlInvoice, "issuer" | "transmitter"
  * A ProgressivoInvio for an invoice: base 36 of year and number, so it is unique for
  * the issuer, stable across retries of the same invoice, and five characters long.
  */
-export function transmissionIdFor(fiscalYear: number, number: number, series: string): string {
+/** Where the progressives of a series other than the main one start: above every main-series one. */
+export const SERIES_PROGRESSIVE_BASE = 30_000_000;
+
+/**
+ * The ProgressivoInvio, and the five characters of the file name.
+ *
+ * The main series encodes year and number: (year % 100) × 100,000 + number is below ten million,
+ * five base-36 characters, unique. ⚠️⚠️ Another series used to put its letters in front and was
+ * then cut to five, dropping the digits that told two invoices apart — 12/B and 13/B had one file
+ * name, and SDI refuses a name it has received. A series invoice now carries a progressive from a
+ * counter of the workspace (`sdi_progressive`, taken at issue), offset above every main-series
+ * value and still five characters. An invoice of a series issued before that keeps the old id.
+ */
+export function transmissionIdFor(
+  fiscalYear: number,
+  number: number,
+  series: string,
+  sdiProgressive?: number | null,
+): string {
+  if (series && sdiProgressive) return (SERIES_PROGRESSIVE_BASE + sdiProgressive).toString(36).toUpperCase();
   const seriesPart = series
     ? series
         .replace(/[^A-Z0-9]/gi, "")

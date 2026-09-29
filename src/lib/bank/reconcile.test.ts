@@ -294,3 +294,94 @@ describe("ignoring, and bulk confirmation", () => {
     expect(await owes("inv13")).toBe(300);
   });
 });
+
+describe("⚠️⚠️ audit of 29 September 2026", () => {
+  it("⚠️⚠️ a statement imported months later still finds the receipt typed by hand in its own month", async () => {
+    await invoice("inv12", "12");
+    await recordReceipt(db, {
+      companyId: "glicine",
+      amount: 1220,
+      receivedAt: new Date("2026-06-10T10:00:00Z"),
+      by: "u1",
+      allocations: [],
+    });
+    const l = await importOne({ bookedOn: "2026-06-11" });
+    expect(l.proposals[0].receiptIds).toHaveLength(1);
+    expect(l.proposals.find((p) => p.receiptIds.length === 0)?.confidence).not.toBe("sure");
+  });
+
+  it("⚠️⚠️ the server refuses to receive again money already typed by hand, whatever the screen sent", async () => {
+    await invoice("inv12", "12");
+    await recordReceipt(db, {
+      companyId: "glicine",
+      amount: 1220,
+      receivedAt: new Date("2026-09-14T10:00:00Z"),
+      by: "u1",
+      allocations: [],
+    });
+    const l = await importOne();
+    expect(
+      await confirmLine(db, {
+        transactionId: l.id,
+        companyId: "glicine",
+        allocations: [{ invoiceId: "inv12", amount: 1220 }],
+        timeZone: TZ,
+        by: "u1",
+      }),
+    ).toEqual({ ok: false, reason: "recorded_already" });
+  });
+
+  it("⚠️⚠️ a line of another account is refused; an account with no IBAN takes the statement's", async () => {
+    const other = await createAccount(db, { name: "Senza IBAN", by: "u1" });
+    if (!other.ok) throw new Error(other.reason);
+    const r = await importMovements(db, {
+      accountId: other.id,
+      movements: [line({ accountIban: "IT11A0306909606100000012345" })],
+      format: "camt",
+      by: "u1",
+    });
+    expect(r).toMatchObject({ created: 1 });
+    const again = await importMovements(db, {
+      accountId: other.id,
+      movements: [line({ bankReference: "X-2", accountIban: "IT60X0542811101000000123456" })],
+      format: "camt",
+      by: "u1",
+    });
+    expect(again).toMatchObject({ created: 0, rejected: [{ index: 0, problem: "other_account" }] });
+  });
+
+  it("⚠️ amounts typed the Italian way are read, and one invoice named twice is added up before the check", async () => {
+    await invoice("inv12", "12", "100");
+    const l = await importOne({ amount: 250 });
+    expect(
+      await confirmLine(db, {
+        transactionId: l.id,
+        companyId: "glicine",
+        allocations: [
+          { invoiceId: "inv12", amount: "60,00" },
+          { invoiceId: "inv12", amount: "60,00" },
+        ],
+        timeZone: TZ,
+        by: "u1",
+      }),
+    ).toEqual({ ok: false, reason: "overpays" });
+    expect(
+      await confirmLine(db, {
+        transactionId: l.id,
+        companyId: "glicine",
+        allocations: [{ invoiceId: "inv12", amount: "1.00,0" }],
+        timeZone: TZ,
+        by: "u1",
+      }),
+    ).toEqual({ ok: false, reason: "invalid_allocation" });
+    const ok = await confirmLine(db, {
+      transactionId: l.id,
+      companyId: "glicine",
+      allocations: [{ invoiceId: "inv12", amount: "100,00" }],
+      timeZone: TZ,
+      by: "u1",
+    });
+    expect(ok.ok).toBe(true);
+    expect(await owes("inv12")).toBe(0);
+  });
+});

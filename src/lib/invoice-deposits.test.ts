@@ -80,6 +80,27 @@ describe("⚠️⚠️ the balance invoice", () => {
     expect(withDiscount.discountAmount).toBe(200);
   });
 
+  it("⚠️⚠️ a deposit partly credited is taken off for what is left of it, rate by rate", () => {
+    const credited = {
+      ...deposit,
+      // A credit note gave back 50 of the 22% part.
+      credits: [
+        {
+          discountPercent: 0,
+          lines: [{ description: "Storno", quantity: 1, unitPrice: 50, taxPercent: 22, nature: null }],
+        },
+      ],
+    };
+    const lines = deductionLines([credited], (n, d) => `Storno acconto n. ${n} del ${d}`);
+    expect(lines.map((d) => [d.taxPercent, d.unitPrice])).toEqual([
+      [10, -250],
+      [22, -200],
+    ]);
+    // Credited in full at a rate: nothing left to take off there.
+    const all = { ...deposit, credits: [{ discountPercent: 0, lines: deposit.lines.slice(0, 1) }] };
+    expect(deductionLines([all], () => "x").map((d) => d.taxPercent)).toEqual([10]);
+  });
+
   it("⚠️ a rate taken below zero stops the issue", () => {
     const shrunk = [
       { description: "Piante", quantity: 1, unitPrice: 100, taxPercent: 22, nature: null },

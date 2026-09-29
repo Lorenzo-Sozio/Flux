@@ -39,7 +39,7 @@ export const PAYMENT_METHODS: Record<string, string> = {
   MP05: "Bonifico",
   MP08: "Carta di pagamento",
   MP12: "RIBA",
-  MP19: "SEPA Direct Debit",
+  MP19: "Addebito diretto SEPA (SDD)",
   MP23: "PagoPA",
 };
 

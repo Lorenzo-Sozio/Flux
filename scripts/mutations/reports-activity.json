@@ -8,8 +8,8 @@
   {
     "file": "src/actions/reports.ts",
     "description": "⚠️ il filtro per persona torna a essere ignorato nel dato principale",
-    "find": "  const actConditions = [...dateRange(from, to), ...(userId ? [eq(activities.ownerId, userId)] : [])];",
-    "replace": "  const actConditions = [...dateRange(from, to)];"
+    "find": "  const actConditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];",
+    "replace": "  const actConditions = [...dateRange(period)];"
   },
   {
     "file": "src/actions/reports.ts",

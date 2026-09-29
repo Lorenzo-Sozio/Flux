@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, asc, count, desc, eq, ilike, inArray, isNotNull, ne, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, type SQL, sql } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
@@ -31,6 +31,7 @@ import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
 import { nextOrderNumber } from "@/lib/order-number";
 import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import type { OrderStatus } from "@/lib/order-status";
+import { stillToInvoice } from "@/lib/orders-to-invoice";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { closingStageFor } from "@/lib/pipelines";
 import { linkAllocation, recordReceipt, removeAllocation, type Settled } from "@/lib/receipts";
@@ -348,6 +349,23 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   // order moves to completed» cannot tell a move from a re-save without it.
   const [previous] = await db.select().from(orders).where(eq(orders.id, id));
   const [updated] = await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
+  // ⚠️⚠️ A cancelled order holds no money: what was paid on it and no invoice carries goes back to
+  // the customer's credit (the receipts stay), where it can be refunded or used. Left on the order
+  // it was in no total — not "deposits to invoice", not "credit".
+  if (updated && status === "cancelled" && previous?.status !== "cancelled") {
+    await tolerateUnmigrated(
+      "receipts",
+      () =>
+        db
+          .delete(orderPayments)
+          .where(
+            and(eq(orderPayments.orderId, id), isNull(orderPayments.invoiceId), isNotNull(orderPayments.receiptId)),
+          ),
+      undefined,
+    );
+    if (updated.companyId) revalidatePath(`/dashboard/companies/${updated.companyId}`);
+    revalidatePath("/dashboard/sales/finance");
+  }
 
   revalidatePath("/dashboard/sales/orders");
   revalidatePath(`/dashboard/sales/orders/${id}`);
@@ -399,6 +417,27 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   }
 }
 
+/**
+ * Whether an invoice or deposit invoice of the order is issued and not credited back in full.
+ * Its lines are then fixed: a line added or removed moved the order's total under invoices that
+ * were issued from it, and "left to invoice" and the balance no longer added up.
+ */
+async function orderInvoiced(db: Awaited<ReturnType<typeof getDb>>, orderId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(
+      and(
+        eq(invoices.orderId, orderId),
+        eq(invoices.status, "issued"),
+        inArray(invoices.documentType, ["TD01", "TD02"]),
+        sql`${invoices.creditedAmount} < ${invoices.total}`,
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function addOrderItem(
   orderId: string,
   item: { productId: string; quantity: number; unitPrice: number; discountPercent?: number },
@@ -406,13 +445,22 @@ export async function addOrderItem(
   await requireCapability("order:write");
   await requirePlanModule("sales");
   const db = await getDb();
+  const t = await getTranslations("validation.orders");
+  // Numbers checked here: this is an endpoint, and NaN or a negative price reached the total.
+  const quantity = Number(item.quantity);
+  const unitPrice = Number(item.unitPrice);
+  const discount = Number(item.discountPercent ?? 0);
+  if (!(Number.isFinite(quantity) && quantity > 0 && quantity < 1e9)) throw new Error(t("lineInvalid"));
+  if (!(Number.isFinite(unitPrice) && unitPrice >= 0 && unitPrice < 1e10)) throw new Error(t("lineInvalid"));
+  if (!(Number.isFinite(discount) && discount >= 0 && discount <= 100)) throw new Error(t("lineInvalid"));
+  if (await orderInvoiced(db, orderId)) throw new Error(t("linesFrozen"));
 
   await db.insert(orderItems).values({
     orderId,
     productId: item.productId,
-    quantity: item.quantity,
-    unitPrice: String(item.unitPrice),
-    discountPercent: String(item.discountPercent ?? 0),
+    quantity,
+    unitPrice: String(unitPrice),
+    discountPercent: String(discount),
     totalPrice: "0", // replaced by the recalculation below
   });
 
@@ -424,7 +472,9 @@ export async function removeOrderItem(itemId: string, orderId: string) {
   await requireCapability("order:write");
   await requirePlanModule("sales");
   const db = await getDb();
-  await db.delete(orderItems).where(eq(orderItems.id, itemId));
+  if (await orderInvoiced(db, orderId)) throw new Error((await getTranslations("validation.orders"))("linesFrozen"));
+  // Only a line of this order: the id alone deleted a line of any order and recounted this one.
+  await db.delete(orderItems).where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)));
   await recalcOrder(db, orderId);
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
 }
@@ -792,6 +842,7 @@ export async function getOrdersByDeal(dealId: string) {
 /** Every payment recorded against an order, newest first, with the invoice it paid. */
 export async function getOrderPayments(orderId: string) {
   await requireCapability("record:read");
+  await requirePlanModule("sales");
   const db = await getDb();
   return db
     .select({
@@ -806,6 +857,7 @@ export async function getOrderPayments(orderId: string) {
       receiptId: orderPayments.receiptId,
       reference: receipts.reference,
       receiptAmount: receipts.amount,
+      bankLinked: sql<boolean>`${receipts.bankTransactionId} is not null`,
     })
     .from(orderPayments)
     .leftJoin(users, eq(orderPayments.recordedById, users.id))
@@ -818,6 +870,7 @@ export async function getOrderPayments(orderId: string) {
 /** The order's issued invoices, with what each still owes: what a payment on the order can pay. */
 export async function getOrderInvoicesToPay(orderId: string) {
   await requireCapability("record:read");
+  await requirePlanModule("sales");
   const db = await getDb();
   const rows = await tolerateUnmigrated(
     "invoice payments",
@@ -835,7 +888,9 @@ export async function getOrderInvoicesToPay(orderId: string) {
         .orderBy(invoices.issueDate),
     [] as { id: string; number: string | null; currency: string }[],
   );
-  return Promise.all(
+  // Only what still owes something: a settled deposit invoice offered as "to collect 0,00" was
+  // a choice with nothing to choose.
+  const all = await Promise.all(
     rows.map(async (r) => ({
       id: r.id,
       number: r.number,
@@ -843,6 +898,7 @@ export async function getOrderInvoicesToPay(orderId: string) {
       outstanding: (await balanceOf(db, r.id))?.outstanding ?? 0,
     })),
   );
+  return all.filter((r) => r.outstanding > 0);
 }
 
 /**
@@ -863,8 +919,15 @@ export async function getOrderInvoicesToPay(orderId: string) {
  */
 export async function recordOrderPayment(
   orderId: string,
-  data: { amount: number; paidAt?: string; method?: string; note?: string; reference?: string; invoiceId?: string },
-) {
+  data: {
+    amount: number | string;
+    paidAt?: string;
+    method?: string;
+    note?: string;
+    reference?: string;
+    invoiceId?: string;
+  },
+): Promise<{ success: true; onOrder: number }> {
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
   const t = await getTranslations("validation.orders");
@@ -892,14 +955,23 @@ export async function recordOrderPayment(
         ),
     [] as { id: string }[],
   );
+  const owing = (
+    await Promise.all(issued.map(async (i) => ({ id: i.id, owed: (await balanceOf(db, i.id))?.outstanding ?? 0 })))
+  ).filter((i) => i.owed > 0);
   let invoiceId: string | null = null;
   if (data.invoiceId) {
     if (!issued.some((i) => i.id === data.invoiceId)) throw new Error(t("notFound"));
     invoiceId = data.invoiceId;
-  } else if (issued.length === 1) invoiceId = issued[0].id;
-  else if (issued.length > 1) throw new Error(t("paymentChooseInvoice"));
+  } else if (owing.length === 1) invoiceId = owing[0].id;
+  else if (owing.length > 1) throw new Error(t("paymentChooseInvoice"));
   if (invoiceId) await requireCapability("invoice:write");
 
+  // ⚠️⚠️ The invoice takes what it owes and no more; the rest stays on the order as a deposit, for
+  // the invoice still to come. The whole amount on the order's only invoice overpaid a deposit
+  // invoice already settled, and the balance invoice then read unpaid and overdue.
+  const owed = invoiceId ? (owing.find((i) => i.id === invoiceId)?.owed ?? 0) : 0;
+  const share = Math.min(amount, owed);
+  const rest = Math.round((amount - share) * 100) / 100;
   const result = await recordReceipt(db, {
     amount,
     receivedAt: paidAt,
@@ -907,16 +979,21 @@ export async function recordOrderPayment(
     reference: data.reference,
     note: data.note,
     by: actor.userId,
-    allocations: [invoiceId ? { invoiceId, amount } : { orderId, amount }],
+    allocations: [
+      ...(invoiceId && share > 0 ? [{ invoiceId, amount: share }] : []),
+      ...(rest > 0 ? [{ orderId, amount: rest }] : []),
+    ],
   });
-  if (!result.ok) throw new Error(t("paymentPositive"));
+  // The reason in words: every refusal used to read "the amount must be positive".
+  if (!result.ok) throw new Error((await getTranslations("serverErrors.invoices"))(`payment.${result.reason}`));
   announcePaid(result.settled, actor.userId);
 
   if (invoiceId) revalidatePath(`/dashboard/sales/invoices/${invoiceId}`);
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
   revalidatePath("/dashboard/sales/orders");
   revalidatePath("/dashboard/sales/finance");
-  return { success: true };
+  // What stayed on the order as a deposit, beyond what the invoice owed: the screen says it.
+  return { success: true, onOrder: invoiceId ? rest : 0 };
 }
 
 /** `invoice.paid` for every invoice a write settled: the accounting system waits for it. */
@@ -968,15 +1045,17 @@ export async function deleteOrderPayment(paymentId: string) {
     .select({ invoiceId: orderPayments.invoiceId })
     .from(orderPayments)
     .where(eq(orderPayments.id, paymentId));
-  if (!row) return { success: true };
+  if (!row) return { success: true, removed: null };
   if (row.invoiceId) await requireCapability("invoice:write");
 
   const removed = await removeAllocation(db, paymentId);
   if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);
   if (removed.invoiceId) revalidatePath(`/dashboard/sales/invoices/${removed.invoiceId}`);
+  if (removed.companyId) revalidatePath(`/dashboard/companies/${removed.companyId}`);
   revalidatePath("/dashboard/sales/orders");
   revalidatePath("/dashboard/sales/finance");
-  return { success: true };
+  // "allocation": the money stayed, as the customer's credit — the screen says so.
+  return { success: true, removed: removed.removed };
 }
 
 /** Says when the order reached the customer, or takes the date back. */
@@ -1017,7 +1096,8 @@ export async function listOrders(params: ListParams, status?: string) {
 
   const term = params.search.trim();
   const clauses: (SQL | undefined)[] = [
-    status && status !== "all" ? eq(orders.status, status) : undefined,
+    // "to_invoice" is the home's figure of the same name, as a list (src/lib/orders-to-invoice.ts).
+    status === "to_invoice" ? stillToInvoice(db) : status && status !== "all" ? eq(orders.status, status) : undefined,
     term
       ? or(
           ilike(orders.orderNumber, `%${term}%`),

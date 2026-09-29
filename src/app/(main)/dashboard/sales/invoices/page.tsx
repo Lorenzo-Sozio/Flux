@@ -1,10 +1,11 @@
 import Link from "next/link";
 
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getInvoices, getStampDutySummary } from "@/actions/invoices";
+import { getInvoices, getStampDutySummary, type InvoicePaymentState } from "@/actions/invoices";
 import { ListToolbar } from "@/components/crm/list-toolbar";
+import { StatusBadge, type Tone } from "@/components/crm/record/record-page";
 import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,24 +17,50 @@ import { requirePageCapability } from "@/lib/page-guard";
 import { parseListParams } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 
-const STATUSES = ["all", "draft", "issued"] as const;
+// "unpaid" and "overdue" are the receivables schedule's own lists: what Finance chases, findable here.
+const STATUSES = ["all", "draft", "issued", "unpaid", "overdue"] as const;
+
+const PAYMENT_TONES: Record<InvoicePaymentState["state"], Tone> = {
+  overdue: "danger",
+  open: "warning",
+  paid: "success",
+  overpaid: "info",
+  credited: "neutral",
+};
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requirePageCapability("record:read", "/dashboard/sales/invoices");
   const params = await searchParams;
   const status = STATUSES.includes(params.status as (typeof STATUSES)[number]) ? params.status : "all";
   const listParams = parseListParams(params);
+  const issuedMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(params.issued ?? "") ? params.issued : null;
   const year = Number(italianToday().slice(0, 4));
   const [page, stamps, t, actor] = await Promise.all([
-    getInvoices(listParams, status),
+    getInvoices(listParams, status, issuedMonth),
     getStampDutySummary(year),
     getTranslations("invoices"),
     getActor(),
   ]);
   const numberLocale = (await getLocale()) === "it" ? "it-IT" : "en-GB";
   const euro = (n: number) => new Intl.NumberFormat(numberLocale, { style: "currency", currency: "EUR" }).format(n);
-  const money = (value: string, currency: string) =>
+  const money = (value: string | number, currency: string) =>
     new Intl.NumberFormat(numberLocale, { style: "currency", currency }).format(Number(value));
+  // ⚠️ A credit note takes money back: shown with its sign, so a column read top to bottom adds up.
+  const signed = (r: { total: string; currency: string; documentType: string }) =>
+    money(r.documentType === "TD04" ? -Math.abs(Number(r.total)) : Number(r.total), r.currency);
+  // Dates as the reader writes them, not as the database stores them.
+  const day = (value: string | null) =>
+    value
+      ? new Intl.DateTimeFormat(numberLocale, { dateStyle: "medium", timeZone: "UTC" }).format(
+          new Date(`${value}T00:00:00Z`),
+        )
+      : "—";
+  const paymentLabel = (p: InvoicePaymentState, currency: string) =>
+    p.state === "overdue"
+      ? t("paymentState.overdue", { amount: money(p.overdueAmount, currency), days: p.daysOverdue })
+      : p.state === "open"
+        ? t("paymentState.open", { amount: money(p.outstanding, currency), date: day(p.dueDate) })
+        : t(`paymentState.${p.state}`);
 
   return (
     <div className="space-y-6">
@@ -62,12 +89,36 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
             return (
               <Button key={s} asChild size="sm" variant={status === s ? "default" : "outline"}>
                 <Link href={q ? `?${q}` : "?"} scroll={false}>
-                  {s === "all" ? t("allInvoices") : t(`statuses.${s}`)}
+                  {s === "all" ? t("allInvoices") : t(`filters.${s}`)}
                 </Link>
               </Button>
             );
           })}
         </div>
+        {issuedMonth && (
+          // Opened from the home's "invoiced this month": the period is a chip that can be removed.
+          <Button asChild size="sm" variant="secondary" className="gap-1.5">
+            <Link
+              href={(() => {
+                const next = new URLSearchParams(params);
+                next.delete("issued");
+                next.delete("page");
+                const q = next.toString();
+                return q ? `?${q}` : "?";
+              })()}
+              scroll={false}
+            >
+              {t("issuedInMonth", {
+                month: new Intl.DateTimeFormat(numberLocale, {
+                  month: "long",
+                  year: "numeric",
+                  timeZone: "UTC",
+                }).format(new Date(`${issuedMonth}-01T00:00:00Z`)),
+              })}
+              <X className="size-3.5" aria-hidden />
+            </Link>
+          </Button>
+        )}
         <ListToolbar
           total={page.total}
           page={page.page}
@@ -95,7 +146,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                     href: `/dashboard/sales/invoices/${r.id}`,
                     title: <span className="font-mono">{r.documentNumber ?? t("draftNumber")}</span>,
                     subtitle: r.companyName ?? undefined,
-                    badge: <span className="font-semibold text-sm tabular-nums">{money(r.total, r.currency)}</span>,
+                    badge: <span className="font-semibold text-sm tabular-nums">{signed(r)}</span>,
                     meta: (
                       <>
                         <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
@@ -112,7 +163,12 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                           {t(`types.${r.documentType as "TD01" | "TD02" | "TD04"}`)}
                         </span>
                         {r.issueDate && (
-                          <span className="text-muted-foreground text-xs tabular-nums">{r.issueDate}</span>
+                          <span className="text-muted-foreground text-xs tabular-nums">{day(r.issueDate)}</span>
+                        )}
+                        {r.payment && r.payment.state !== "credited" && (
+                          <StatusBadge tone={PAYMENT_TONES[r.payment.state]}>
+                            {paymentLabel(r.payment, r.currency)}
+                          </StatusBadge>
                         )}
                       </>
                     ),
@@ -128,6 +184,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                       <TableHead>{t("customer")}</TableHead>
                       <TableHead>{t("type")}</TableHead>
                       <TableHead>{t("status")}</TableHead>
+                      <TableHead>{t("paymentColumn")}</TableHead>
                       <TableHead className="text-right">{t("total")}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -139,7 +196,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                             {r.documentNumber ?? t("draftNumber")}
                           </Link>
                         </TableCell>
-                        <TableCell className="tabular-nums">{r.issueDate ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap tabular-nums">{day(r.issueDate)}</TableCell>
                         <TableCell>{r.companyName ?? "—"}</TableCell>
                         <TableCell>{t(`types.${r.documentType as "TD01" | "TD02" | "TD04"}`)}</TableCell>
                         <TableCell>
@@ -154,7 +211,24 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{money(r.total, r.currency)}</TableCell>
+                        <TableCell>
+                          {r.payment && r.payment.state !== "credited" ? (
+                            <StatusBadge tone={PAYMENT_TONES[r.payment.state]}>
+                              {paymentLabel(r.payment, r.currency)}
+                            </StatusBadge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell
+                          className={
+                            r.documentType === "TD04"
+                              ? "text-right text-destructive tabular-nums"
+                              : "text-right tabular-nums"
+                          }
+                        >
+                          {signed(r)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

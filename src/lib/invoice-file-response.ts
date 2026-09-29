@@ -1,6 +1,6 @@
 import { after } from "next/server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { invoices } from "@/db/schema";
 import {
@@ -41,6 +41,17 @@ export async function invoiceFileResponse(id: string, kind: ArchiveKind): Promis
   }
 
   const file = await readInvoiceFile(db, invoice, kind);
+  // The first XML download is remembered: the invoice page stops asking for the file to be sent
+  // to SDI. Only the first — the update applies while the column is empty.
+  if (kind === "xml" && !invoice.xmlDownloadedAt) {
+    after(() =>
+      db
+        .update(invoices)
+        .set({ xmlDownloadedAt: new Date() })
+        .where(and(eq(invoices.id, id), isNull(invoices.xmlDownloadedAt)))
+        .catch((err: unknown) => console.error(`[invoice-file] invoice ${id} download not recorded`, err)),
+    );
+  }
   if (!file.archived) {
     after(() =>
       archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),

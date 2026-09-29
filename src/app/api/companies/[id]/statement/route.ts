@@ -78,7 +78,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   }
   // The header row even when there is nothing to list: an empty file reads as a broken download.
   const fields = ["date", "currency", "kind", "document", "reference", "debit", "credit", "balance"].map((k) => t(k));
-  const csv = unparse({ fields, data: rows.map((r) => fields.map((f) => r[f])) }, { delimiter: italian ? ";" : "," });
+  // A cell starting with = + - @ is escaped: a description is written by the payer, and a
+  // formula in it would run in the accountant's spreadsheet.
+  const csv = unparse(
+    { fields, data: rows.map((r) => fields.map((f) => r[f])) },
+    { delimiter: italian ? ";" : ",", escapeFormulae: true },
+  );
   const slug =
     company.name
       .normalize("NFD")

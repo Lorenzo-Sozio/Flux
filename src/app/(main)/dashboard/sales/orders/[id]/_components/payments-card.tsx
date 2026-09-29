@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { BanknoteIcon, Loader2, Plus, Trash2, TruckIcon } from "lucide-react";
+import { BanknoteIcon, Loader2, Plus, TruckIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -16,6 +16,7 @@ import {
   recordOrderPayment,
   setOrderDelivered,
 } from "@/actions/orders";
+import { PaymentRemoveButton } from "@/components/crm/payment-remove-button";
 import { ReceiptEditDialog } from "@/components/crm/receipt-edit-dialog";
 import { StatusBadge } from "@/components/crm/record/record-page";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export function PaymentsCard({
   invoices,
   canWrite,
   canInvoice,
+  today,
 }: {
   orderId: string;
   totalAmount: string | number | null;
@@ -76,6 +78,8 @@ export function PaymentsCard({
   canWrite: boolean;
   /** Paying or correcting an invoice's money asks for the invoice's permission too. */
   canInvoice: boolean;
+  /** The workspace's day: the form's default and its latest allowed date. */
+  today: string;
 }) {
   const t = useTranslations("orders.payments");
   const format = useFormatter();
@@ -83,7 +87,7 @@ export function PaymentsCard({
   const { formatMoney } = useCurrency();
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState("");
-  const [paidAt, setPaidAt] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [paidAt, setPaidAt] = useState(today);
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
   // The invoice this payment pays: chosen when there are several, implied otherwise.
@@ -104,13 +108,18 @@ export function PaymentsCard({
     }
     startTransition(async () => {
       try {
-        await recordOrderPayment(orderId, {
-          amount: Number(amount),
+        const r = await recordOrderPayment(orderId, {
+          // The text as typed: "12,50" is a number to the server's parser and NaN to Number().
+          amount,
           paidAt,
           method,
           reference,
           invoiceId: invoiceId || undefined,
         });
+        // Beyond what the invoice owed, the rest waits on the order for the next invoice: said.
+        toast.success(
+          r.onOrder > 0 ? t("recordedRestOnOrder", { amount: formatMoney(r.onOrder, currency) }) : t("recorded"),
+        );
         setAmount("");
         setMethod("");
         setReference("");
@@ -126,7 +135,8 @@ export function PaymentsCard({
   function remove(id: string) {
     startTransition(async () => {
       try {
-        await deleteOrderPayment(id);
+        const r = await deleteOrderPayment(id);
+        toast.success(r.removed === "allocation" ? t("removedToCredit") : t("removed"));
         router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("recordFailed"));
@@ -234,18 +244,12 @@ export function PaymentsCard({
                   />
                 )}
                 {canWrite && (!p.invoiceId || canInvoice) && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-10 shrink-0 text-muted-foreground hover:text-destructive md:size-8"
-                    onClick={() => remove(p.id)}
+                  <PaymentRemoveButton
+                    payment={p}
+                    currency={currency}
                     disabled={pending}
-                    aria-label={t("removePayment")}
-                    title={t("removePayment")}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </Button>
+                    onConfirm={() => remove(p.id)}
+                  />
                 )}
               </li>
             ))}
@@ -275,7 +279,13 @@ export function PaymentsCard({
                   <Label htmlFor="payment-date" className="text-xs">
                     {t("date")}
                   </Label>
-                  <Input id="payment-date" type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+                  <Input
+                    id="payment-date"
+                    type="date"
+                    max={today}
+                    value={paidAt}
+                    onChange={(e) => setPaidAt(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -338,7 +348,12 @@ export function PaymentsCard({
               type="button"
               variant="outline"
               className="w-full gap-1.5"
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                // One invoice owing: the form opens on what it owes, and on today.
+                setAmount(invoices.length === 1 ? String(invoices[0].outstanding) : "");
+                setPaidAt(today);
+                setAdding(true);
+              }}
               disabled={pending}
             >
               <Plus className="size-3.5" aria-hidden /> {t("addPayment")}

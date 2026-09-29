@@ -805,7 +805,11 @@ export function DeleteCompanyButton({ id }: { id: string }) {
     if (!confirm(t("deleteConfirm"))) return;
     try {
       setIsDeleting(true);
-      await deleteCompany(id);
+      const result = await deleteCompany(id);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(t("deleteSuccess"));
     } catch {
       toast.error(t("deleteFailed"));

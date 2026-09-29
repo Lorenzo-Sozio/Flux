@@ -23,7 +23,7 @@ export function CashCard({ stats }: { stats: CashStats }) {
   const list = (amounts: CurrencyAmount[]) =>
     amounts.length === 0 ? formatMoney(0, "EUR") : amounts.map((a) => formatMoney(a.amount, a.currency)).join(" · ");
 
-  // The chart is in one currency: the workspace's usual one, the one with most money in it.
+  // The chart and the ratios are in one currency: the euro when it is there, else the first.
   const currencies = [...new Set([...stats.collected, ...stats.invoiced].map((s) => s.currency))];
   const main = currencies.sort((a, b) => Number(b === "EUR") - Number(a === "EUR") || a.localeCompare(b))[0] ?? "EUR";
   const collected = stats.collected.find((s) => s.currency === main)?.values ?? stats.months.map(() => 0);
@@ -63,7 +63,9 @@ export function CashCard({ stats }: { stats: CashStats }) {
             icon={<Clock className="size-4 text-amber-600" aria-hidden />}
             label={t("dso")}
             value={dso?.days != null ? t("dsoValue", { days: dso.days }) : "—"}
-            sub={dso?.days == null ? t("dsoNone") : undefined}
+            sub={
+              dso?.days == null ? t("dsoNone") : currencies.length > 1 ? t("inCurrency", { currency: main }) : undefined
+            }
             definition={t("dsoDef")}
           />
           <Figure
@@ -75,6 +77,7 @@ export function CashCard({ stats }: { stats: CashStats }) {
                 ? t("rateOf", { paid: formatMoney(rate.paid, main), asked: formatMoney(rate.asked, main) })
                 : t("rateNone")
             }
+            note={rate?.rate != null && currencies.length > 1 ? t("inCurrency", { currency: main }) : undefined}
             definition={t("rateDef")}
           />
           <Figure
@@ -136,6 +139,25 @@ export function CashCard({ stats }: { stats: CashStats }) {
             </ul>
           </div>
         )}
+
+        {/* Money that arrived and paid nothing yet: each customer's page uses it on an invoice or refunds it. */}
+        {stats.creditCustomers.length > 0 && (
+          <div>
+            <p className="mb-2 font-medium text-sm">{t("creditList")}</p>
+            <ul className="divide-y rounded-md border text-sm">
+              {stats.creditCustomers.map((c) => (
+                <li key={`${c.id}-${c.currency}`} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <Link href={`/dashboard/companies/${c.id}`} className="min-w-0 truncate hover:underline">
+                    {c.name ?? "—"}
+                  </Link>
+                  <span className="shrink-0 text-emerald-700 tabular-nums dark:text-emerald-400">
+                    {formatMoney(c.amount, c.currency)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -146,12 +168,15 @@ function Figure({
   label,
   value,
   sub,
+  note,
   definition,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   sub?: string;
+  /** Which currency the figure is in, when the workspace has more than one. */
+  note?: string;
   definition: string;
 }) {
   return (
@@ -162,6 +187,7 @@ function Figure({
       </div>
       <p className="mt-1 break-words font-bold text-xl tabular-nums">{value}</p>
       {sub && <p className="text-muted-foreground text-xs">{sub}</p>}
+      {note && <p className="text-muted-foreground text-xs">{note}</p>}
       <p className="mt-2 border-t pt-2 text-[11px] text-muted-foreground leading-snug">{definition}</p>
     </div>
   );

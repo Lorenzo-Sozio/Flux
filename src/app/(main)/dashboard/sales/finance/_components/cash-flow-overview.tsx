@@ -78,7 +78,15 @@ export function CashFlowOverview({ revenueTrend }: Props) {
               tickFormatter={(value) => (value >= 1000 ? `${(value / 1000).toFixed(0)}k` : `${value}`)}
               className="text-xs"
             />
-            <ChartTooltip content={<ChartTooltipContent hideLabel={false} />} />
+            {/* The same money as the totals above: in the display currency, formatted, not raw euros. */}
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  hideLabel={false}
+                  formatter={(v) => formatAmount(Number(v), { noDecimals: true })}
+                />
+              }
+            />
             {/* Side by side, never stacked: a won deal and the order it became are one sale,
                 and stacking them drew it twice as tall. */}
             <Bar dataKey="deals" fill={chartConfig.deals.color as string} radius={[4, 4, 0, 0]} />

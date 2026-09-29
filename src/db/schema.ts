@@ -548,6 +548,8 @@ export const bankTransactions = pgTable(
     remittance: text("remittance"),
     bankReference: text("bank_reference"),
     fingerprint: text("fingerprint").notNull(),
+    // A payment returned unpaid (CAMT RvslInd, migration 0064): never ignored with the charges.
+    reversal: boolean("reversal").default(false).notNull(),
     ignoredAt: timestamp("ignored_at", { mode: "date" }),
     ignoredById: text("ignored_by_id").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -1231,6 +1233,8 @@ export const invoices = pgTable(
     // installments written by hand — and the installments they became at issue, frozen with it.
     paymentTerms: jsonb("payment_terms").$type<PaymentTerms>(),
     installments: jsonb("installments").$type<Installment[]>(),
+    // The progressive of its SDI file, for a series other than the main one (migration 0063).
+    sdiProgressive: integer("sdi_progressive"),
     notes: text("notes"),
     revision: integer("revision").default(1).notNull(),
     issuerSnapshot: jsonb("issuer_snapshot"),
@@ -1247,6 +1251,11 @@ export const invoices = pgTable(
     archivedAt: timestamp("archived_at", { mode: "date" }),
     emailedAt: timestamp("emailed_at", { mode: "date" }),
     emailedTo: text("emailed_to"),
+    /** First download of the XML (migration 0065): until then the page says it must reach SDI. */
+    xmlDownloadedAt: timestamp("xml_downloaded_at", { mode: "date" }),
+    /** The last payment reminder sent, and how many were (migration 0065). */
+    remindedAt: timestamp("reminded_at", { mode: "date" }),
+    reminderCount: integer("reminder_count").default(0).notNull(),
     createdBy: text("created_by"),
     issuedBy: text("issued_by"),
     issuedAt: timestamp("issued_at", { mode: "date" }),

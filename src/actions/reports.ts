@@ -32,25 +32,19 @@ export interface ReportFilters {
  */
 const activityDay = sql`coalesce(${activities.date}, ${activities.createdAt})`;
 
-function dateRange(from?: string, to?: string) {
+type Period = ReturnType<typeof periodOf>;
+
+function dateRange(period: Period) {
   const conditions = [];
-  if (from) conditions.push(gte(activityDay, new Date(from)));
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
-    conditions.push(lte(activityDay, toDate));
-  }
+  if (period.from) conditions.push(gte(activityDay, period.from));
+  if (period.to) conditions.push(lte(activityDay, period.to));
   return conditions;
 }
 
-function taskDateRange(from?: string, to?: string) {
+function taskDateRange(period: Period) {
   const conditions = [];
-  if (from) conditions.push(gte(tasks.createdAt, new Date(from)));
-  if (to) {
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
-    conditions.push(lte(tasks.createdAt, toDate));
-  }
+  if (period.from) conditions.push(gte(tasks.createdAt, period.from));
+  if (period.to) conditions.push(lte(tasks.createdAt, period.to));
   return conditions;
 }
 
@@ -60,8 +54,10 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
 
-  const actConditions = [...dateRange(from, to), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const actConditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
 
   // Calls, meetings, emails and notes logged in the period
   const [activityCount] = await db
@@ -73,8 +69,8 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   const taskConditions = [
     eq(tasks.status, "done"),
     isNotNull(tasks.completedAt),
-    ...(from ? [gte(tasks.completedAt!, new Date(from))] : []),
-    ...(to ? [lte(tasks.completedAt!, new Date(`${to}T23:59:59`))] : []),
+    ...(from ? [gte(tasks.completedAt!, period.from as Date)] : []),
+    ...(to ? [lte(tasks.completedAt!, period.to as Date)] : []),
     ...(userId ? [eq(tasks.assigneeId, userId)] : []),
   ];
   const [tasksCompleted] = await db
@@ -83,7 +79,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     .where(and(...taskConditions));
 
   // Tasks total (to compute completion rate)
-  const taskTotalConditions = [...taskDateRange(from, to), ...(userId ? [eq(tasks.assigneeId, userId)] : [])];
+  const taskTotalConditions = [...taskDateRange(period), ...(userId ? [eq(tasks.assigneeId, userId)] : [])];
   const [tasksTotal] = await db
     .select({ count: count() })
     .from(tasks)
@@ -91,8 +87,8 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
 
   // Deals created in period
   const dealConditions = [
-    ...(from ? [gte(deals.createdAt, new Date(from))] : []),
-    ...(to ? [lte(deals.createdAt, new Date(`${to}T23:59:59`))] : []),
+    ...(from ? [gte(deals.createdAt, period.from as Date)] : []),
+    ...(to ? [lte(deals.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(deals.ownerId, userId)] : []),
   ];
   const [dealsCreated] = await db
@@ -101,7 +97,6 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     .where(dealConditions.length ? and(...dealConditions) : undefined);
 
   // Deals won and lost in the period, dated by when they closed (src/lib/metrics.ts).
-  const period = periodOf(from, to);
   const mine = userId ? [eq(deals.ownerId, userId)] : [];
   const [[dealsWon], [dealsLost]] = await Promise.all([
     db
@@ -116,8 +111,8 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
 
   // Leads created in period
   const leadConditions = [
-    ...(from ? [gte(leads.createdAt, new Date(from))] : []),
-    ...(to ? [lte(leads.createdAt, new Date(`${to}T23:59:59`))] : []),
+    ...(from ? [gte(leads.createdAt, period.from as Date)] : []),
+    ...(to ? [lte(leads.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(leads.ownerId, userId)] : []),
   ];
   const [leadsCreated] = await db
@@ -127,8 +122,8 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
 
   // Quotes sent in period
   const quoteConditions = [
-    ...(from ? [gte(quotes.createdAt, new Date(from))] : []),
-    ...(to ? [lte(quotes.createdAt, new Date(`${to}T23:59:59`))] : []),
+    ...(from ? [gte(quotes.createdAt, period.from as Date)] : []),
+    ...(to ? [lte(quotes.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(quotes.ownerId, userId)] : []),
   ];
   const [quotesCreated] = await db
@@ -139,8 +134,8 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   // Open tickets
   const ticketConditions = [
     ticketIsOpen(),
-    ...(from ? [gte(tickets.createdAt, new Date(from))] : []),
-    ...(to ? [lte(tickets.createdAt, new Date(`${to}T23:59:59`))] : []),
+    ...(from ? [gte(tickets.createdAt, period.from as Date)] : []),
+    ...(to ? [lte(tickets.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(tickets.ownerId, userId)] : []),
   ];
   const [openTickets] = await db
@@ -173,8 +168,10 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to } = filters;
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
 
-  const conditions = dateRange(from, to);
+  const conditions = dateRange(period);
 
   const rows = await db
     .select({
@@ -203,8 +200,10 @@ export async function getActivityByAction(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
 
-  const conditions = [...dateRange(from, to), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const conditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
 
   // By type: call, meeting, email, note.
   const rows = await db
@@ -223,18 +222,21 @@ export async function getDailyActivityTrend(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
 
-  const conditions = [...dateRange(from, to), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const conditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
 
   const rows = await db
     .select({
-      day: sql<string>`DATE(${activityDay})`,
+      // The day on the workspace's clock: DATE() of an instant is the database session's day (UTC).
+      day: sql<string>`(${activityDay} at time zone 'UTC' at time zone ${timeZone})::date::text`,
       count: count(),
     })
     .from(activities)
     .where(conditions.length ? and(...conditions) : undefined)
-    .groupBy(sql`DATE(${activityDay})`)
-    .orderBy(sql`DATE(${activityDay})`);
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
 
   return rows.map((r) => ({ day: r.day, count: Number(r.count) }));
 }
@@ -245,6 +247,8 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
   const mine = userId ? [eq(tasks.assigneeId, userId)] : [];
 
   // ⚠️ Three grouped statements, not three per person: on a Worker every statement is a
@@ -254,7 +258,7 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
     db
       .select({ userId: tasks.assigneeId, n: count() })
       .from(tasks)
-      .where(and(isNotNull(tasks.assigneeId), ...taskDateRange(from, to), ...mine))
+      .where(and(isNotNull(tasks.assigneeId), ...taskDateRange(period), ...mine))
       .groupBy(tasks.assigneeId),
     db
       .select({ userId: tasks.assigneeId, n: count() })
@@ -264,8 +268,8 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
           isNotNull(tasks.assigneeId),
           eq(tasks.status, "done"),
           isNotNull(tasks.completedAt),
-          ...(from ? [gte(tasks.completedAt, new Date(from))] : []),
-          ...(to ? [lte(tasks.completedAt, new Date(`${to}T23:59:59`))] : []),
+          ...(from ? [gte(tasks.completedAt, period.from as Date)] : []),
+          ...(to ? [lte(tasks.completedAt, period.to as Date)] : []),
           ...mine,
         ),
       )
@@ -315,7 +319,8 @@ export async function getSalesReport(filters: ReportFilters = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
-  const period = periodOf(from, to);
+  const timeZone = await getWorkspaceTimeZone();
+  const period = periodOf(from, to, timeZone);
   // ⚠️ The person chosen above the tabs: this tab used to ignore them and show everyone's
   // sales under one person's name.
   const mineDeals = userId ? [eq(deals.ownerId, userId)] : [];
@@ -359,7 +364,6 @@ export async function getSalesReport(filters: ReportFilters = {}) {
   // By the workspace's month: the column holds UTC.
   // ⚠️ Grouped and ordered by position (`1`): the zone travels as a parameter, and Postgres
   // reads the same expression with a second parameter as a different one.
-  const timeZone = await getWorkspaceTimeZone();
   const closedMonth = sql<string>`to_char(${deals.closedAt} at time zone 'UTC' at time zone ${timeZone}, 'YYYY-MM')`;
   const monthlyRows = await db
     .select({

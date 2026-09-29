@@ -66,6 +66,8 @@ export interface MatchContext {
   receipts: readonly LooseReceipt[];
   /** IBAN → the customers it has paid for, learned from every confirmation. */
   ibans: ReadonlyMap<string, readonly string[]>;
+  /** How many confirmations taught each "iban|companyId": once is a hint, twice a habit. */
+  ibanSeen?: ReadonlyMap<string, number>;
   companies: readonly { id: string; name: string }[];
 }
 
@@ -88,7 +90,9 @@ export type Reason =
   | { code: "ambiguous" }
   | { code: "other_payer" }
   | { code: "contested" }
-  | { code: "recorded_already" };
+  | { code: "recorded_already" }
+  | { code: "possible_duplicate" }
+  | { code: "reversal" };
 
 export type Confidence = "sure" | "likely" | "weak";
 
@@ -134,11 +138,15 @@ export interface InvoiceRef {
   number: number;
   series: string | null;
   year: number | null;
+  /** Written as "12/2026" with no word saying it is an invoice: a hint, never a proof. */
+  weak?: boolean;
 }
 
 const KEYWORD =
   /\b(?:fatt(?:ura|ure)?|fat|ft|fa|inv(?:oice)?|doc(?:umento)?|rif(?:erimento)?\.?\s*(?:ft|fatt(?:ura)?))\b\.?\s*(?:n(?:r|um|o)?\b\.?\s*|n°\s*|°\s*|#\s*)?/g;
 const ITEM = /^(\d{1,6})(?:\s*[/-]\s*([a-z0-9]{1,6}))?/;
+/** Words for a period: a number/year after them is a month or an installment, not an invoice. */
+const PERIOD_WORDS = /\b(?:canone|competenza|rata|mese|mensilita|periodo|stipendio|affitto|quota)\b[^0-9]*$/;
 const SEPARATOR = /^\s*(?:,|;|\+|&|\be\b|\band\b)\s*(?:n(?:r|um|o)?\b\.?\s*)?/;
 
 function toRef(num: string, suffix: string | undefined): InvoiceRef {
@@ -178,7 +186,17 @@ export function invoiceRefs(text: string | null): InvoiceRef[] {
       rest = rest.slice(sep[0].length);
     }
   }
-  for (const m of t.matchAll(/(?<![\d/.-])(\d{1,6})\s*\/\s*(20\d{2})\b/g)) push(toRef(m[1], m[2]));
+  // ⚠️⚠️ Number/year with no keyword is a hint: "CANONE 09/2026", "RATA 4/2026", "competenza
+  // 03/2026" are periods, not invoices. A number that could be a month, or one after a word for a
+  // period, is not read at all; the others are weak.
+  for (const m of t.matchAll(/(?<![\d/.-])(\d{1,6})\s*\/\s*(20\d{2})\b/g)) {
+    const before = t.slice(Math.max(0, (m.index ?? 0) - 20), m.index ?? 0);
+    // After "rif." a small number is still a reference; anywhere else it may be a month.
+    const cited = /\brif(?:erimento)?\b\.?\s*(?:n(?:r|um|o)?\b\.?\s*)?$/.test(before);
+    if ((Number(m[1]) <= 12 && !cited) || PERIOD_WORDS.test(before)) continue;
+    const ref = toRef(m[1], m[2]);
+    if (!seen.has(`${ref.number}|${ref.series ?? ""}|${ref.year ?? ""}`)) push({ ...ref, weak: true });
+  }
   return out;
 }
 
@@ -300,7 +318,10 @@ export function proposeMatches(tx: MatchTx, ctx: MatchContext): Proposal[] {
   const byIban = payerIban ? (ctx.ibans.get(payerIban) ?? []) : [];
   for (const id of byIban) {
     const e = ev(id);
-    e.score += byIban.length === 1 ? 40 : 15;
+    // ⚠️ Seen once, an IBAN is a hint: a holding, an accountant or a payment provider pays for
+    // several customers, and one confirmation taught it for the first of them.
+    const seen = payerIban ? (ctx.ibanSeen?.get(`${payerIban}|${id}`) ?? 2) : 0;
+    e.score += byIban.length === 1 ? (seen >= 2 ? 40 : 25) : 15;
     e.reasons.push({ code: byIban.length === 1 ? "iban_known" : "iban_shared" });
   }
   const payer = new Set(nameTokens(tx.counterpartyName));
@@ -365,6 +386,9 @@ export function proposeMatches(tx: MatchTx, ctx: MatchContext): Proposal[] {
     const refs = invoiceRefs(tx.remittance);
     if (refs.length > 0) {
       const named = refs.map((r) => invoices.filter((i) => refNames(r, i)));
+      // Invoices only a weak reference names.
+      const strong = new Set(refs.flatMap((r, k) => (r.weak ? [] : named[k].map((i) => i.id))));
+      const weakOnly = new Set(named.flat().flatMap((i) => (strong.has(i.id) ? [] : [i.id])));
       const ambiguous = named.some((list) => list.length > 1);
       // One proposal per reading when a reference fits several invoices; otherwise one in all.
       const readings: OpenInvoice[][] = ambiguous
@@ -401,7 +425,8 @@ export function proposeMatches(tx: MatchTx, ctx: MatchContext): Proposal[] {
             allocations,
             receiptIds: [],
             credit: money(left),
-            score: 50 + (exact ? 30 : 0) + e.score,
+            // A reference written without "fattura" counts little: it is confirmed by the payer.
+            score: (reading.every((i) => weakOnly.has(i.id)) ? 20 : 50) + (exact ? 30 : 0) + e.score,
             reasons: [...reasons, ...e.reasons],
           },
           { ambiguous, conflict },

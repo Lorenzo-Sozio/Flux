@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, useState, useTransition } from "react";
+import { type KeyboardEvent, useEffect, useState, useTransition } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,24 @@ import { cn } from "@/lib/utils";
 
 import { BankChooseDialog } from "./bank-choose-dialog";
 import type { DoneLine, OpenLine } from "./bank-view";
+
+/** Reasons that ask a person to look before confirming: shown amber, and Enter does not confirm them. */
+const WARNINGS = [
+  "ambiguous",
+  "other_payer",
+  "contested",
+  "amount_only",
+  "recorded_already",
+  "possible_duplicate",
+  "reversal",
+];
+
+/** Whether Enter may confirm this proposal: sure, or likely with nothing to look at. */
+function confirmableByKey(p: Proposal | null): boolean {
+  if (!p) return false;
+  if (p.confidence === "sure") return true;
+  return p.confidence === "likely" && !p.reasons.some((r) => WARNINGS.includes(r.code));
+}
 
 const TONE: Record<Proposal["confidence"], Tone> = { sure: "success", likely: "info", weak: "warning" };
 
@@ -80,7 +98,7 @@ function ReasonChips({ reasons, currency }: { reasons: Reason[]; currency: strin
         return tr(r.code);
     }
   };
-  const warn = new Set(["ambiguous", "other_payer", "contested", "amount_only", "recorded_already"]);
+  const warn = new Set(WARNINGS);
   return (
     <ul className="flex flex-wrap gap-1">
       {reasons.map((r, i) => (
@@ -162,7 +180,11 @@ export function OpenLineRow({
   const [index, setIndex] = useState(0);
   const [choosing, setChoosing] = useState(false);
   const [pending, start] = useTransition();
-  const p = line.proposals[index] ?? null;
+  // The proposals change when the queue is read again: the shown one resets to the best.
+  const proposalsKey = line.proposals.map((x) => x.key).join(";");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset when the proposals change
+  useEffect(() => setIndex(0), [proposalsKey]);
+  const p = line.proposals[index] ?? line.proposals[0] ?? null;
 
   function run(action: () => Promise<{ ok: boolean; error?: string } | null>, success: string) {
     onGone();
@@ -176,6 +198,8 @@ export function OpenLineRow({
 
   const confirm = () =>
     p &&
+    // A weak proposal is a guess: confirmed only after the person says so.
+    (p.confidence !== "weak" || window.confirm(t("confirmWeak"))) &&
     run(
       () =>
         confirmBankLineAction(line.id, {
@@ -197,10 +221,10 @@ export function OpenLineRow({
     } else if (e.key === "ArrowUp" || e.key === "k") {
       e.preventDefault();
       rows[at - 1]?.focus();
-    } else if (e.key === "Enter" && p) {
+    } else if (e.key === "Enter" && !e.repeat && confirmableByKey(p)) {
       e.preventDefault();
       confirm();
-    } else if (e.key === "i" || e.key === "I") {
+    } else if ((e.key === "i" || e.key === "I") && !e.repeat) {
       e.preventDefault();
       ignore();
     }

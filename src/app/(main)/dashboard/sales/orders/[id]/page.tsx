@@ -133,6 +133,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             issueDate: invoices.issueDate,
             dueDate: invoices.dueDate,
             total: invoices.total,
+            creditedAmount: invoices.creditedAmount,
             currency: invoices.currency,
           })
           .from(invoices)
@@ -191,16 +192,25 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   // An order is invoiced once an invoice for it is issued — the rule the new-invoice
   // page uses to decide which orders it offers. One with only a draft opens the draft.
   const invoiceDocs = orderInvoices.filter((i) => i.documentType === "TD01");
-  const issuedInvoice = invoiceDocs.find((i) => i.status === "issued");
+  // ⚠️ An invoice credited back in full no longer invoices the order: it can be invoiced again,
+  // and its deposits were given back by the credit note (src/lib/invoice-issue.ts).
+  const stillCounts = (i: { status: string; total: string | null; creditedAmount: string | null }) =>
+    i.status === "issued" && Number(i.creditedAmount ?? 0) < Number(i.total ?? 0);
+  const issuedInvoice = invoiceDocs.find(stillCounts);
+  // Invoiced, its lines are fixed: the server refuses a change, and the page offers none.
+  const linesFrozen = orderInvoices.some(
+    (i) => (i.documentType === "TD01" || i.documentType === "TD02") && stillCounts(i),
+  );
   const draftInvoice = invoiceDocs.find((i) => i.status === "draft");
   const offerInvoice = canInvoice && order.status !== "cancelled" && !issuedInvoice;
   // I11: deposit invoices (TD02) for part of the order, and the balance that takes them off.
   const deposits = orderInvoices.filter((i) => i.documentType === "TD02");
   const hasIssuedDeposit = deposits.some((i) => i.status === "issued");
   // What is left to invoice: the order less every invoice and deposit invoice written for it.
+  // Net of credit notes, and drafts included: a draft is about to invoice it.
   const invoicedSoFar = orderInvoices
     .filter((i) => i.documentType === "TD01" || i.documentType === "TD02")
-    .reduce((sum, i) => sum + Number(i.total ?? 0), 0);
+    .reduce((sum, i) => sum + Number(i.total ?? 0) - Number(i.creditedAmount ?? 0), 0);
   const leftToInvoice = Math.max(0, Math.round((Number(order.totalAmount ?? 0) - invoicedSoFar) * 100) / 100);
   // Money received on the order that no invoice carries yet: a deposit to invoice.
   const depositNotInvoiced =
@@ -470,7 +480,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               {offerInvoice && (
                 <CreateInvoiceButton
                   orderId={order.id}
-                  draftId={draftInvoice?.id ?? null}
+                  // A deposit invoice still in draft is issued or deleted before the balance: the
+                  // button opens it rather than a form that would only refuse.
+                  draftId={draftInvoice?.id ?? deposits.find((i) => i.status === "draft")?.id ?? null}
                   variant={canWrite && !terminal ? "outline" : "default"}
                   balance={hasIssuedDeposit}
                 />
@@ -532,7 +544,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 totalAmount={order.totalAmount}
                 companyId={order.companyId}
                 products={products}
-                canWrite={canWrite}
+                canWrite={canWrite && !linesFrozen}
               />
             ),
           },
@@ -549,6 +561,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                 invoices={invoicesToPay}
                 canWrite={canWrite}
                 canInvoice={canInvoice}
+                today={today}
               />
             ),
           },

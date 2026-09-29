@@ -2,7 +2,7 @@
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️⚠️ il contatore avanza anche senza bozza: ogni doppio clic lascia un buco nella numerazione",
-    "find": "      SELECT ${input.scope}, 1, now() FROM target\n",
+    "find": "      SELECT ${input.scope}, 1, now() FROM ok\n",
     "replace": "      SELECT ${input.scope}, 1, now()\n"
   },
   {
@@ -128,7 +128,7 @@
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️ lo storno si registra anche se la bozza non viene emessa",
-    "find": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n        AND EXISTS (SELECT 1 FROM target)\n",
+    "find": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n        AND EXISTS (SELECT 1 FROM ok)\n",
     "replace": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n"
   },
   {

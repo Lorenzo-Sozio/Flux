@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { BanknoteIcon, Loader2, Plus, Trash2, Undo2, WalletIcon } from "lucide-react";
+import { ArrowRightLeft, BanknoteIcon, Loader2, Plus, Undo2, WalletIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteInvoicePaymentAction, type getInvoicePayments, recordInvoicePaymentAction } from "@/actions/invoices";
-import { allocateCreditAction, recordRefundAction } from "@/actions/receipts";
+import { allocateCreditAction, recordRefundAction, releaseOverpaymentAction } from "@/actions/receipts";
 import { PAYMENT_TONE } from "@/app/(main)/dashboard/sales/orders/[id]/_components/order-tones";
+import { PaymentRemoveButton } from "@/components/crm/payment-remove-button";
 import { ReceiptEditDialog } from "@/components/crm/receipt-edit-dialog";
 import { StatusBadge } from "@/components/crm/record/record-page";
 import { Button } from "@/components/ui/button";
@@ -54,7 +55,7 @@ export function InvoicePaymentsCard({
   const { balance, payments } = data;
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState(balance.outstanding > 0 ? String(balance.outstanding) : "");
-  const [paidAt, setPaidAt] = useState(() => new Date().toLocaleDateString("en-CA"));
+  const [paidAt, setPaidAt] = useState(data.today);
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
   const [refunding, setRefunding] = useState(false);
@@ -72,6 +73,10 @@ export function InvoicePaymentsCard({
         toast.error(r?.error ?? t("recordFailed"));
         return;
       }
+      // What arrived beyond what the invoice owed is the customer's credit: said, never silent.
+      if (r.toCredit && r.toCredit > 0)
+        toast.success(ti("recordedWithCredit", { amount: formatMoney(r.toCredit, currency) }));
+      else toast.success(ti("recorded"));
       setMethod("");
       setReference("");
       setAdding(false);
@@ -115,9 +120,28 @@ export function InvoicePaymentsCard({
 
   function remove(id: string) {
     startTransition(async () => {
-      await deleteInvoicePaymentAction(id).catch(() => toast.error(t("recordFailed")));
+      const r = await deleteInvoicePaymentAction(id).catch(() => null);
+      if (!r?.ok) toast.error(t("recordFailed"));
+      else toast.success(r.removed === "allocation" ? ti("removedToCredit") : ti("removed"));
       router.refresh();
     });
+  }
+
+  /** What the invoice received beyond what it owes, moved to the customer's credit. */
+  function moveToCredit() {
+    startTransition(async () => {
+      const r = await releaseOverpaymentAction(invoiceId).catch(() => null);
+      if (!r?.ok) toast.error(t("recordFailed"));
+      else toast.success(ti("movedToCredit", { amount: formatMoney(r.moved ?? 0, currency) }));
+      router.refresh();
+    });
+  }
+
+  /** The form opens on what is owed now, not on the figure it held when the page was drawn. */
+  function openAdd() {
+    setAmount(balance.outstanding > 0 ? String(balance.outstanding) : "");
+    setPaidAt(data.today);
+    setAdding(true);
   }
 
   return (
@@ -174,18 +198,12 @@ export function InvoicePaymentsCard({
                   />
                 )}
                 {canWrite && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-10 shrink-0 text-muted-foreground hover:text-destructive md:size-8"
-                    onClick={() => remove(p.id)}
+                  <PaymentRemoveButton
+                    payment={p}
+                    currency={currency}
                     disabled={pending}
-                    aria-label={t("removePayment")}
-                    title={t("removePayment")}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden />
-                  </Button>
+                    onConfirm={() => remove(p.id)}
+                  />
                 )}
               </li>
             ))}
@@ -220,7 +238,13 @@ export function InvoicePaymentsCard({
                   aria-label={t("amount")}
                   className="tabular-nums"
                 />
-                <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} aria-label={t("date")} />
+                <Input
+                  type="date"
+                  max={data.today}
+                  value={paidAt}
+                  onChange={(e) => setPaidAt(e.target.value)}
+                  aria-label={t("date")}
+                />
                 <Input
                   value={method}
                   onChange={(e) => setMethod(e.target.value)}
@@ -245,19 +269,31 @@ export function InvoicePaymentsCard({
               </div>
             </div>
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-1.5"
-              onClick={() => {
-                setAmount(String(Math.abs(balance.outstanding)));
-                setRefunding(true);
-              }}
-              disabled={pending}
-            >
-              <Undo2 className="size-3.5" aria-hidden />{" "}
-              {ti("refund", { amount: formatMoney(Math.abs(balance.outstanding), currency) })}
-            </Button>
+            // ⚠️ Overpaid: the money either goes back to the customer or stays with us as their
+            // credit, where the next invoice uses it. Both are one tap; neither is the default.
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-xs">{ti("overpaidHint")}</p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button type="button" variant="outline" className="gap-1.5" onClick={moveToCredit} disabled={pending}>
+                  <ArrowRightLeft className="size-3.5" aria-hidden />{" "}
+                  {ti("moveToCredit", { amount: formatMoney(Math.abs(balance.outstanding), currency) })}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setAmount(String(Math.abs(balance.outstanding)));
+                    setPaidAt(data.today);
+                    setRefunding(true);
+                  }}
+                  disabled={pending}
+                >
+                  <Undo2 className="size-3.5" aria-hidden />{" "}
+                  {ti("refund", { amount: formatMoney(Math.abs(balance.outstanding), currency) })}
+                </Button>
+              </div>
+            </div>
           ))}
 
         {canWrite &&
@@ -286,6 +322,7 @@ export function InvoicePaymentsCard({
                   <Input
                     id="invoice-payment-date"
                     type="date"
+                    max={data.today}
                     value={paidAt}
                     onChange={(e) => setPaidAt(e.target.value)}
                   />
@@ -326,13 +363,7 @@ export function InvoicePaymentsCard({
               </div>
             </div>
           ) : (
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full gap-1.5"
-              onClick={() => setAdding(true)}
-              disabled={pending}
-            >
+            <Button type="button" variant="outline" className="w-full gap-1.5" onClick={openAdd} disabled={pending}>
               <Plus className="size-3.5" aria-hidden /> {t("addPayment")}
             </Button>
           ))}

@@ -96,20 +96,26 @@ describe("the money side", () => {
       ["o3", "completed"],
       ["o4", "processing"],
       ["o5", "completed"],
+      ["o6", "completed"],
     ] as const) {
       await db
         .insert(schema.orders)
         .values({ id, orderNumber: id, status, subtotal: "0", totalAmount: "0", taxAmount: "0" } as never);
     }
-    await db.insert(schema.invoices).values({ id: "i1", orderId: "o1", status: "issued" } as never);
+    await db.insert(schema.invoices).values({ id: "i1", orderId: "o1", status: "issued", total: "1000" } as never);
     await db.insert(schema.invoices).values({ id: "i2", orderId: "o2", status: "draft" } as never);
     await db.insert(schema.invoices).values({ id: "i3", status: "draft" } as never);
     // I11: a deposit invoice alone does not invoice the order — the rest is still to invoice.
     await db
       .insert(schema.invoices)
-      .values({ id: "i4", orderId: "o5", status: "issued", documentType: "TD02" } as never);
+      .values({ id: "i4", orderId: "o5", status: "issued", documentType: "TD02", total: "300" } as never);
 
-    expect(await moneyFigures(db)).toEqual({ ordersToInvoice: 2, draftInvoices: 2 });
+    // An invoice credited back in full invoices nothing: the order is to invoice again.
+    await db
+      .insert(schema.invoices)
+      .values({ id: "i5", orderId: "o6", status: "issued", total: "1000", creditedAmount: "1000" } as never);
+
+    expect(await moneyFigures(db)).toEqual({ ordersToInvoice: 3, draftInvoices: 2 });
   });
 });
 

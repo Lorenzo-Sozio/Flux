@@ -100,6 +100,24 @@ describe("⚠️⚠️ the figures, against the database", () => {
     expect(s.collectionRate).toEqual([{ currency: "EUR", asked: 800, paid: 800, rate: 1 }]);
   });
 
+  it("⚠️ an invoice in installments is asked for the installments already due; DSO nets credit notes", async () => {
+    await invoice("rate", { total: 1200, due: "2026-12-31" });
+    await db.execute(
+      sql`update invoice set installments = ${JSON.stringify([
+        { dueDate: "2026-08-31", amount: 400 },
+        { dueDate: "2026-09-15", amount: 400 },
+        { dueDate: "2026-12-31", amount: 400 },
+      ])}::jsonb where id = 'rate'`,
+    );
+    await receipt("r1", 400, "2026-09-01 10:00", { invoice: "rate", amount: 400 });
+    await invoice("nc", { type: "TD04", total: 600 });
+    const s = await cashStats(db, { today: TODAY, timeZone: TZ });
+    // Two installments due (800), 400 paid.
+    expect(s.collectionRate).toEqual([{ currency: "EUR", asked: 800, paid: 400, rate: 0.5 }]);
+    // Owed 800 of 1200 invoiced less 600 credited: 120 days.
+    expect(s.dso[0]).toMatchObject({ invoiced90: 600, days: 120 });
+  });
+
   it("deposits to invoice are money on orders no invoice carries; credit is money allocated to nothing", async () => {
     await db.execute(sql`insert into "order" (id, order_number, company_id, total_amount, status, currency)
       values ('o1', 'ORD-1', 'acme', '2000', 'processing', 'EUR')`);

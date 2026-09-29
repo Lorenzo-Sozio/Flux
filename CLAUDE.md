@@ -484,10 +484,10 @@ and a mismatch is a silent no-op.
 ⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
 schedules to fit; an eighth job on a new schedule needs Workers Paid.
 
-⚠️⚠️ **The bundle is 9.45 MB gzipped against a 10 MB limit** (measured on 29 September
-2026 with `npx wrangler deploy --dry-run`: 9,677 KiB of 10,240, after bank reconciliation,
-installments and the cash figures added 82 together). It fits Workers Paid, never Free (3 MB),
-and the margin is about 560 KiB — one heavy dependency. It used to
+⚠️⚠️ **The bundle is 9.51 MB gzipped against a 10 MB limit** (measured on 29 September
+2026 with `npx wrangler deploy --dry-run`: 9,735 KiB of 10,240, after bank reconciliation,
+installments, the cash figures and the accounting audit). It fits Workers Paid, never Free
+(3 MB), and the margin is about 505 KiB — one heavy dependency. It used to
 be written here as "~8 MB", which is how nobody noticed it growing. Measure it with the
 dry run before adding a library, and after a dependency update: the September update
 took it *down* by 154 KiB, which is the direction to keep.
@@ -1168,8 +1168,8 @@ optional on it. Finance shows the receivables schedule — issued invoices still
 by age, most overdue first — and each invoice page records its payments.
 
 - ⚠️⚠️ **Owed = total − credit notes − payments that name it**, through `paymentSummary`, the
-  arithmetic an order uses. Only an issued TD01 is a receivable; a credit note is money going
-  the other way. No due date means due on issue.
+  arithmetic an order uses. Only an issued TD01 or TD02 is a receivable (`RECEIVABLE_TYPES`); a
+  credit note is money going the other way. No due date means due on issue.
 - ⚠️⚠️ **A payment on an order reaches its invoice when there is no doubt which**: the order's only
   issued invoice, or — with several — the one the person chooses; `recordOrderPayment` refuses
   to guess (I10). With none it is a deposit on the order, and issuing the order's only invoice
@@ -1208,8 +1208,8 @@ customer's **credit**; a negative receipt is a **refund**.
 - ⚠️ Correlated subqueries name their outer column in full (`"receipt"."id"`): in a select list
   Drizzle writes a column without its table, and `p.receipt_id = "id"` compared the allocation
   with its own id — every sum was zero.
-- ⚠️ Taking a payment back deletes its receipt when it was all of it, otherwise only the share,
-  which returns to credit (`removeAllocation`). From an order's page it asks for
+- ⚠️ Taking a payment back deletes its receipt when it was all of it and did not come from the
+  bank, otherwise only the share, which returns to credit (`removeAllocation`). From an order's page it asks for
   `invoice:write` when the payment paid an invoice. Deleting an order leaves its deposits as
   the customer's credit: money that arrived does not disappear with a document.
 - ⚠️ A payment is dated today or before (`paymentDay`): a future day was counted in this
@@ -1246,7 +1246,8 @@ order and takes each issued deposit off.
 - ⚠️ A TD02 is a receivable (`RECEIVABLE_TYPES`) and shares the invoices' numbering. A payment on
   the order goes to the deposit invoice (`linkOrderPayments` reads TD01 and TD02), never to the
   balance. A deposit received with no deposit invoice shows on the order as one to invoice, with
-  that amount proposed. "Orders to invoice" counts only a TD01: a deposit does not invoice an order.
+  that amount proposed. "Orders to invoice" counts only a TD01 not credited in full: a deposit does
+  not invoice an order ([src/lib/orders-to-invoice.ts](src/lib/orders-to-invoice.ts)).
 - The XML carries TD02 and one `DatiFattureCollegate` per deposit taken off, both checked against
   the XSD.
 
@@ -1334,6 +1335,51 @@ movement on the account, salaries and suppliers too.
 - The bank never pays an invoice beyond what it owes (`overpays`); the rest is the customer's credit.
 
 `src/lib/bank/*.test.ts` (reconcile on PGlite); `scripts/mutations/bank.json`.
+
+#### The accounting rules the database keeps (audit, 29 September 2026)
+
+Every rule below was a way to issue, pay or count money wrongly **with a 200 on screen**. Each is
+enforced where two requests racing cannot both pass: in one transaction (`together()`,
+[src/lib/db-together.ts](src/lib/db-together.ts)), row locks taken in a statement of their own
+first, then a guard read after the write that fails the whole transaction with a message naming
+the rule (`'overpays:' || id` cast to int, or a row-dependent division by zero).
+
+- ⚠️⚠️ **The issuing statement is the gate** ([src/lib/invoice-issue.ts](src/lib/invoice-issue.ts)).
+  Its `ok` CTE requires: the issue date is today in Rome; for a TD01, no other open TD01 on the
+  order and no issued deposit left out of `deducts`; for a TD02, deposits not above the order's
+  total. The order row is locked first. **Every** write of the statement (credit, deduct,
+  numbering, the SDI progressive) depends on `ok` — a data-modifying CTE runs whether or not its
+  result is read, so one that forgets to name `ok` writes anyway.
+- ⚠️⚠️ **An invoice never receives more than it owes** (`guardInvoicesNotOverpaid`): what arrives
+  beyond it is the customer's credit, said on screen (`toCredit`), and a credit note after a payment
+  moves the excess to credit (`releaseOverpayment`, also a button on an overpaid invoice). A refund
+  never exceeds the credit (`guardCustomerCredit`, under the company's lock).
+- ⚠️⚠️ **A receipt from the bank keeps the bank's amount and day**, and taking one of its payments
+  back leaves the money as credit — the Bank page undoes the match. The confirmation dialog says
+  which of the three things will happen (`payment-remove-button.tsx`).
+- ⚠️ A cancelled order gives its deposits back as credit; lines of an order with an issued invoice
+  are fixed (`orderInvoiced`); a company with issued invoices or receipts is not deleted
+  (`companiesWithAccounts`); a credit note for a deleted company is written from the original's
+  snapshot; a non-EUR draft and an installment dated before the issue are draft problems.
+- ⚠️⚠️ **Two series, one file name.** The SDI file name's progressive is per workspace, not per
+  series: a series ≠ '' draws `sdi_progressive` from its own counter (migration `0063_one_name_per_file`,
+  `SERIES_PROGRESSIVE_BASE`), so invoice 1/A and invoice 1 are not both `IT…_00001.xml`.
+- ⚠️ "Owed", "overdue" and "to collect" are the receivables schedule's everywhere: the invoice
+  list's filters (`?status=unpaid|overdue`), its payment column, the invoice page's badge and
+  installments, and the reminder. A figure on the home opens the list it counts:
+  `?issued=YYYY-MM` for "invoiced this month", `?status=to_invoice` for orders — one condition,
+  [src/lib/orders-to-invoice.ts](src/lib/orders-to-invoice.ts); an invoice credited in full
+  invoices nothing.
+- **Reminders** (`sendPaymentReminder`, migration `0065_the_file_went_out`): what is overdue, from
+  the first installment still owed, in the customer's language, with the IBAN for a transfer.
+  Claimed by a conditional update (once an hour); a failed send gives the claim back.
+- **SDI**: issuing numbers an invoice, it does not send it. Until its XML is downloaded once
+  (`xml_downloaded_at`, stamped by the download route) the page says it must reach SDI.
+- ⚠️ Report periods (`periodOf`) and days are on the workspace's clock: `new Date("2026-09-01")`
+  is UTC midnight, and on Workers `T23:59:59` is UTC too.
+
+`src/lib/invoice-issue.test.ts`, `src/lib/receipts.test.ts`, `src/actions/payment-reminder.test.ts`,
+`src/lib/metrics.test.ts`; `scripts/mutations/{invoices,receipts,payment-reminder,home-dashboards}.json`.
 
 ### Accepting a quote is signing it
 

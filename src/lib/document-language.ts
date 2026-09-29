@@ -250,6 +250,9 @@ export const INVOICE_TEXT = {
     depositLineRate: "Acconto sull'ordine {order} (IVA {rate})",
     deductionLine: "Storno acconto fattura n. {number} del {date}",
     deductionsReference: "Detratti gli acconti: {list}",
+    creditNoteNote: "Storno totale della fattura n. {number} del {date}",
+    creditLine: "Storno della fattura n. {number} del {date} (IVA {rate})",
+    creditLineNature: "Storno della fattura n. {number} del {date} ({nature})",
     customer: "Cliente",
     sdiDelivery: "Recapito SDI",
     recipientCode: "Codice destinatario",
@@ -279,6 +282,13 @@ export const INVOICE_TEXT = {
     emailGreeting: "Gentile cliente,",
     emailBody: "in allegato la copia di cortesia della {label} n. {number} del {date}, di importo {total}",
     emailDue: ", con scadenza il {date}",
+    emailInstallments: "Il pagamento è diviso in rate:",
+    reminderSubject: "Sollecito di pagamento",
+    reminderBody:
+      "le scriviamo per ricordarle che risulta ancora da saldare la {label} n. {number} del {date}, scaduta il {due}. L'importo scaduto è di {amount}",
+    reminderIban: "Può effettuare il bonifico sull'IBAN {iban}, indicando il numero della fattura nella causale.",
+    reminderPaid:
+      "Se ha già provveduto al pagamento, la preghiamo di non tenere conto di questo messaggio e di scusarci per il disturbo.",
     emailSignoff: "Cordiali saluti,",
     emailNotice:
       "Il PDF allegato è una copia di cortesia priva di valore fiscale. La fattura elettronica originale è quella trasmessa tramite il Sistema di Interscambio (SDI) ed è disponibile nell'area riservata del sito dell'Agenzia delle Entrate.",
@@ -294,6 +304,9 @@ export const INVOICE_TEXT = {
     depositLineRate: "Deposit on order {order} (VAT {rate})",
     deductionLine: "Deposit invoice no. {number} of {date} deducted",
     deductionsReference: "Deposits deducted: {list}",
+    creditNoteNote: "Full credit of invoice no. {number} of {date}",
+    creditLine: "Credit of invoice no. {number} of {date} (VAT {rate})",
+    creditLineNature: "Credit of invoice no. {number} of {date} ({nature})",
     customer: "Customer",
     sdiDelivery: "SDI delivery",
     recipientCode: "Recipient code",
@@ -325,6 +338,12 @@ export const INVOICE_TEXT = {
     emailGreeting: "Dear customer,",
     emailBody: "please find attached the courtesy copy of {label} no. {number} of {date}, for {total}",
     emailDue: ", due on {date}",
+    emailInstallments: "Payment is due in installments:",
+    reminderSubject: "Payment reminder",
+    reminderBody:
+      "this is a reminder that {label} no. {number} of {date}, due on {due}, has not been paid yet. The overdue amount is {amount}",
+    reminderIban: "You can pay by bank transfer to IBAN {iban}, quoting the invoice number as the reference.",
+    reminderPaid: "If you have already paid, please disregard this message, and accept our apologies.",
     emailSignoff: "Kind regards,",
     emailNotice:
       "The attached PDF is a courtesy copy with no fiscal value. The original electronic invoice is the one transmitted through the Italian Exchange System (SDI).",
@@ -341,7 +360,7 @@ export const PAYMENT_METHOD_TEXT: Record<DocumentLanguage, Record<string, string
     MP05: "Bonifico",
     MP08: "Carta di pagamento",
     MP12: "RIBA",
-    MP19: "SEPA Direct Debit",
+    MP19: "Addebito diretto SEPA (SDD)",
     MP23: "PagoPA",
   },
   en: {

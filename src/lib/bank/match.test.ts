@@ -59,6 +59,13 @@ describe("⚠️⚠️ invoice numbers in a description", () => {
     expect(n("rif. 12/2026 importo 1.220,00")).toEqual([[12, null, 2026]]);
     // "10/09/2026" is a date, not invoice 9 of 2026; "1.220,00" is an amount.
     expect(n("bonifico del 10/09/2026 di 1.220,00")).toEqual([]);
+    // ⚠️⚠️ A period is not an invoice (audit, 29/09/2026).
+    expect(n("CANONE 09/2026")).toEqual([]);
+    expect(n("rata 4/2026 noleggio")).toEqual([]);
+    expect(n("competenza 45/2026")).toEqual([]);
+    // Number/year with no keyword is only a hint.
+    expect(invoiceRefs("saldo 45/2026")[0]?.weak).toBe(true);
+    expect(invoiceRefs("FT 45/2026")[0]?.weak).toBeUndefined();
     // A date straight after the keyword is still a date, not invoice 15 of 2009.
     expect(n("pagamento fattura 15/09/2026")).toEqual([]);
   });
@@ -83,6 +90,22 @@ describe("⚠️⚠️ proposals", () => {
     );
     expect(best.confidence).toBe("sure");
     expect(reasons(best)).toEqual(["amount_exact", "due_near", "iban_known"]);
+  });
+
+  it("⚠️⚠️ a reference with no keyword, and nothing about the payer: never sure", () => {
+    const [best] = proposeMatches(tx({ remittance: "saldo 12x 45/2026" }), ctx({ invoices: [inv("inv45")] }));
+    expect(best.allocations[0].invoiceId).toBe("inv45");
+    expect(best.confidence).not.toBe("sure");
+  });
+
+  it("⚠️ an IBAN seen once is a hint: with the exact amount it is not yet sure", () => {
+    const iban = "IT02L1234512345123456789012";
+    const once = ctx({
+      invoices: [inv("inv12")],
+      ibans: new Map([[iban, ["glicine"]]]),
+      ibanSeen: new Map([[`${iban}|glicine`, 1]]),
+    });
+    expect(proposeMatches(tx({ counterpartyIban: iban }), once)[0].confidence).toBe("likely");
   });
 
   it("⚠️ the payer's name alone and the exact amount: likely, never sure", () => {

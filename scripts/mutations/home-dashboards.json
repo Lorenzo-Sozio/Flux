@@ -12,10 +12,10 @@
     "replace": "    if (candidate) return candidate;"
   },
   {
-    "file": "src/lib/home-dashboard-data.ts",
+    "file": "src/lib/orders-to-invoice.ts",
     "description": "⚠️ un ordine con la sola fattura d'acconto sparisce dai «da fatturare»: il saldo non viene mai fatturato",
-    "find": "              .where(and(eq(invoices.orderId, orders.id), eq(invoices.documentType, \"TD01\"))),",
-    "replace": "              .where(eq(invoices.orderId, orders.id)),"
+    "find": "            eq(invoices.documentType, \"TD01\"),",
+    "replace": ""
   },
   {
     "file": "src/lib/home-dashboard-data.ts",
@@ -40,5 +40,11 @@
     "description": "⚠️ l'incassato finisce tutto in una valuta: dollari ed euro sommati come se fossero la stessa moneta",
     "find": "        currency: receipts.currency,",
     "replace": "        currency: sql<string>`'EUR'`,"
+  },
+  {
+    "file": "src/lib/orders-to-invoice.ts",
+    "description": "⚠️ un ordine la cui fattura è stata stornata per intero sparisce dai «da fatturare»",
+    "find": "            or(eq(invoices.status, \"draft\"), sql`${invoices.creditedAmount} < ${invoices.total}`),",
+    "replace": ""
   }
 ]

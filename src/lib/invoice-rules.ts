@@ -57,7 +57,11 @@ export type DraftProblem =
   | { kind: "credit_without_original" }
   | { kind: "deduction_exceeds" }
   /** Installments written by hand that do not add up to the total (I12). */
-  | { kind: "installments_total" };
+  | { kind: "installments_total" }
+  /** An installment written by hand falls due before the invoice's own date. */
+  | { kind: "installment_before_issue" }
+  /** Another currency than the euro: the exchange rate the law asks for is not recorded. */
+  | { kind: "currency_not_eur" };
 
 /** What stops this draft being issued, line by line (1-based). Empty means it can go. */
 export function draftProblems(

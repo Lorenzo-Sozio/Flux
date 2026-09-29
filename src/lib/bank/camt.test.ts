@@ -90,6 +90,7 @@ describe("⚠️⚠️ reading a camt.053", () => {
         remittance: "Saldo FT 12/2026 & interessi",
         // "NOTPROVIDED" is not a reference: the entry's own is used.
         bankReference: "CRO-0001",
+        accountIban: "IT60X0542811101000000123456",
       },
       {
         bookedOn: "2026-09-15",
@@ -100,6 +101,7 @@ describe("⚠️⚠️ reading a camt.053", () => {
         counterpartyIban: null,
         remittance: "Commissioni tenuta conto",
         bankReference: null,
+        accountIban: "IT60X0542811101000000123456",
       },
     ]);
   });
@@ -120,6 +122,47 @@ describe("⚠️⚠️ reading a camt.053", () => {
   it("⚠️ keeps a batch whole when its details do not add up: a split that does not is a guess", () => {
     const s = parseCamt(v8batch.replace(">200.00<", ">150.00<"));
     expect(s.movements.map((m) => m.amount)).toEqual([300]);
+  });
+
+  it("⚠️⚠️ a file with two accounts says which account each line is on (audit, 29/09/2026)", () => {
+    const two = v2.replace(
+      "</Stmt>",
+      `</Stmt><Stmt><Acct><Id><IBAN>IT11A0306909606100000012345</IBAN></Id><Ccy>EUR</Ccy></Acct>
+        <Ntry><Amt Ccy="EUR">250.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts>BOOK</Sts><BookgDt><Dt>2026-09-16</Dt></BookgDt></Ntry></Stmt>`,
+    );
+    const s = parseCamt(two);
+    expect(s.movements.map((m) => [m.amount, m.accountIban])).toEqual([
+      [1220, "IT60X0542811101000000123456"],
+      [-35.5, "IT60X0542811101000000123456"],
+      [250, "IT11A0306909606100000012345"],
+    ]);
+  });
+
+  it("⚠️⚠️ a batch that cannot be split names nobody: it is several payers, not the first one", () => {
+    const noAmounts = v8batch
+      .replace(/<c:AmtDtls><c:TxAmt><c:Amt Ccy="EUR">100.00<\/c:Amt><\/c:TxAmt><\/c:AmtDtls>/, "")
+      .replace(/<c:AmtDtls><c:TxAmt><c:Amt Ccy="EUR">200.00<\/c:Amt><\/c:TxAmt><\/c:AmtDtls>/, "");
+    const [m] = parseCamt(noAmounts).movements;
+    expect([m.amount, m.counterpartyName, m.counterpartyIban]).toEqual([300, null, null]);
+    expect(m.remittance).toContain("2 pagamenti in lotto");
+  });
+
+  it("⚠️ a payment returned unpaid keeps the customer as the counterparty, and says it is a reversal", () => {
+    const returned = `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.02"><BkToCstmrStmt><Stmt>
+      <Acct><Id><IBAN>IT60X0542811101000000123456</IBAN></Id></Acct>
+      <Ntry><Amt Ccy="EUR">120.00</Amt><CdtDbtInd>DBIT</CdtDbtInd><RvslInd>true</RvslInd><Sts>BOOK</Sts>
+        <BookgDt><Dt>2026-09-20</Dt></BookgDt>
+        <NtryDtls><TxDtls><RltdPties>
+          <Dbtr><Nm>Mario Rossi</Nm></Dbtr><DbtrAcct><Id><IBAN>IT02L1234512345123456789012</IBAN></Id></DbtrAcct>
+          <Cdtr><Nm>Noi SRL</Nm></Cdtr>
+        </RltdPties></TxDtls></NtryDtls></Ntry></Stmt></BkToCstmrStmt></Document>`;
+    const [m] = parseCamt(returned).movements;
+    expect([m.amount, m.counterpartyName, m.counterpartyIban, m.reversal]).toEqual([
+      -120,
+      "Mario Rossi",
+      "IT02L1234512345123456789012",
+      true,
+    ]);
   });
 
   it("refuses a file with no statement in it", () => {

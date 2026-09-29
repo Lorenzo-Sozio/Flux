@@ -74,6 +74,8 @@ export function DepositInvoiceButton({
         return;
       }
       setOpen(false);
+      // A draft, not yet issued: said, so nobody thinks the customer has it already.
+      toast.success(t("created"));
       router.push(`/dashboard/sales/invoices/${r.id}`);
     });
   }

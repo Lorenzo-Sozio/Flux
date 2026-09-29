@@ -242,7 +242,7 @@ export function OrdersClient({
           searchPlaceholder={t("searchPlaceholder")}
         />
         <Select value={status} onValueChange={setFilterStatus}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-44 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -252,6 +252,8 @@ export function OrdersClient({
                 {t(`statuses.${v}` as Parameters<typeof t>[0])}
               </SelectItem>
             ))}
+            {/* Completed with no invoice: what the home counts as "to invoice". */}
+            <SelectItem value="to_invoice">{t("toInvoiceFilter")}</SelectItem>
           </SelectContent>
         </Select>
       </div>

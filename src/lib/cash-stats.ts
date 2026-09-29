@@ -11,10 +11,11 @@
  *   included — cash, whatever it was allocated to. Per currency, never summed across two.
  * - **Invoiced**: issued invoices and deposit invoices by issue date, VAT included, less the
  *   credit notes issued in the same month.
- * - **DSO**: what customers owe today ÷ what was invoiced in the last 90 days × 90. Null when
- *   nothing was invoiced: a ratio of nothing is not zero days.
- * - **Collection rate**, gross on gross: of the invoices issued in the last twelve months whose due
- *   date has passed, what share of what they ask (after credit notes) has been paid. VAT on both
+ * - **DSO**: what customers owe today ÷ what was invoiced in the last 90 days, net of credit
+ *   notes, × 90. Null when nothing was invoiced: a ratio of nothing is not zero days.
+ * - **Collection rate**, gross on gross: of the invoices issued in the last twelve months, what
+ *   they ask that is already due (the installments already due, for one paid in parts; after credit
+ *   notes), and what share of it has been paid. VAT on both
  *   sides, so the rate is not flattered or depressed by it.
  * - **Deposits to invoice**: money received on orders that no invoice carries yet — a payment
  *   before the supply has to be invoiced when it arrives (I11).
@@ -47,6 +48,8 @@ export interface CashStats {
     orders: { id: string; orderNumber: string; companyName: string | null; currency: string; amount: number }[];
   };
   customersCredit: CurrencyAmount[];
+  /** Who holds that credit, the largest first (ten): each to use on an invoice, or to give back. */
+  creditCustomers: { id: string; name: string | null; currency: string; amount: number }[];
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -92,47 +95,59 @@ export async function cashStats(db: AnyDb, input: { today: string; timeZone: str
   const from = `${months[0]}-01`;
   const tz = input.timeZone;
 
-  const [collectedRows, invoicedRows, owedRows, invoiced90Rows, rateRows, depositRows, creditRows] = await Promise.all([
-    // Receipts by the month they arrived, on the workspace's clock.
-    db.execute(sql`
+  const [collectedRows, invoicedRows, owedRows, invoiced90Rows, rateRows, depositRows, creditRows, creditorRows] =
+    await Promise.all([
+      // Receipts by the month they arrived, on the workspace's clock.
+      db.execute(sql`
       select currency, to_char(received_at at time zone 'UTC' at time zone ${tz}, 'YYYY-MM') as month, sum(amount) as amount
       from receipt
       where (received_at at time zone 'UTC' at time zone ${tz})::date >= ${from}::date
       group by 1, 2`),
-    // Invoices and deposit invoices by issue date, less the credit notes of the same month.
-    db.execute(sql`
+      // Invoices and deposit invoices by issue date, less the credit notes of the same month.
+      db.execute(sql`
       select currency, to_char(issue_date, 'YYYY-MM') as month,
              sum(case when document_type = 'TD04' then -total else total end) as amount
       from invoice
       where status = 'issued' and document_type in ('TD01', 'TD02', 'TD04') and issue_date >= ${from}::date
       group by 1, 2`),
-    // What customers owe today: what is due on each issued invoice, less what was paid on it.
-    db.execute(sql`
+      // What customers owe today: what is due on each issued invoice, less what was paid on it.
+      db.execute(sql`
       select i.currency, sum(greatest(0, i.total - i.credited_amount - coalesce(p.paid, 0))) as owed
       from invoice i
       left join (select invoice_id, sum(amount) as paid from order_payment where invoice_id is not null group by invoice_id) p
         on p.invoice_id = i.id
       where i.status = 'issued' and i.document_type in ('TD01', 'TD02')
       group by 1`),
-    db.execute(sql`
-      select currency, sum(total) as invoiced
+      db.execute(sql`
+      select currency, sum(case when document_type = 'TD04' then -total else total end) as invoiced
       from invoice
-      where status = 'issued' and document_type in ('TD01', 'TD02') and issue_date > ${input.today}::date - 90
+      -- Net of credit notes, like "invoiced": a cancelled invoice is not sales to divide by.
+      where status = 'issued' and document_type in ('TD01', 'TD02', 'TD04') and issue_date > ${input.today}::date - 90
       group by 1`),
-    // Invoices of the last twelve months already due: what they ask and what was paid, capped.
-    db.execute(sql`
-      select i.currency,
-             sum(i.total - i.credited_amount) as asked,
-             sum(least(i.total - i.credited_amount, greatest(0, coalesce(p.paid, 0)))) as paid
-      from invoice i
-      left join (select invoice_id, sum(amount) as paid from order_payment where invoice_id is not null group by invoice_id) p
-        on p.invoice_id = i.id
-      where i.status = 'issued' and i.document_type in ('TD01', 'TD02')
-        and i.issue_date > ${input.today}::date - 365
-        and coalesce(i.due_date, i.issue_date) < ${input.today}::date
+      // Invoices of the last twelve months already due: what they ask and what was paid, capped.
+      db.execute(sql`
+      -- ⚠️ Paid in installments, an invoice asks for the installments already due: its due date is
+      -- the last one, and twelve monthly installments left it out of the rate for a year.
+      with due as (
+        select i.currency,
+               case when jsonb_array_length(coalesce(i.installments, '[]'::jsonb)) > 1
+                    then least(i.total - i.credited_amount, coalesce((
+                      select sum((x->>'amount')::numeric) from jsonb_array_elements(i.installments) x
+                      where (x->>'dueDate')::date < ${input.today}::date), 0))
+                    when coalesce(i.due_date, i.issue_date) < ${input.today}::date then i.total - i.credited_amount
+                    else 0 end as asked,
+               coalesce(p.paid, 0) as paid
+        from invoice i
+        left join (select invoice_id, sum(amount) as paid from order_payment where invoice_id is not null group by invoice_id) p
+          on p.invoice_id = i.id
+        where i.status = 'issued' and i.document_type in ('TD01', 'TD02')
+          and i.issue_date > ${input.today}::date - 365
+      )
+      select currency, sum(asked) as asked, sum(least(asked, greatest(0, paid))) as paid
+      from due where asked > 0
       group by 1`),
-    // Money on orders that no invoice carries.
-    db.execute(sql`
+      // Money on orders that no invoice carries.
+      db.execute(sql`
       select o.id, o.order_number, o.currency, c.name as company_name, sum(p.amount) as amount
       from order_payment p
       join "order" o on o.id = p.order_id
@@ -141,13 +156,23 @@ export async function cashStats(db: AnyDb, input: { today: string; timeZone: str
       group by o.id, o.order_number, o.currency, c.name
       having sum(p.amount) > 0
       order by sum(p.amount) desc`),
-    db.execute(sql`
+      db.execute(sql`
       select r.currency, sum(r.amount - coalesce(a.allocated, 0)) as credit
       from receipt r
       left join (select receipt_id, sum(amount) as allocated from order_payment where receipt_id is not null group by receipt_id) a
         on a.receipt_id = r.id
       group by 1`),
-  ]);
+      db.execute(sql`
+      select r.company_id as id, c.name, r.currency, sum(r.amount - coalesce(a.allocated, 0)) as credit
+      from receipt r
+      left join (select receipt_id, sum(amount) as allocated from order_payment where receipt_id is not null group by receipt_id) a
+        on a.receipt_id = r.id
+      left join company c on c.id = r.company_id
+      group by 1, 2, 3
+      having sum(r.amount - coalesce(a.allocated, 0)) >= 0.01
+      order by 4 desc
+      limit 10`),
+    ]);
 
   const collected = series(rowsOf(collectedRows), months);
   const thisMonth = months[11];
@@ -204,5 +229,8 @@ export async function cashStats(db: AnyDb, input: { today: string; timeZone: str
     customersCredit: rowsOf<{ currency: string; credit: string }>(creditRows)
       .map((r) => ({ currency: r.currency, amount: round2(Number(r.credit)) }))
       .filter((c) => c.amount >= 0.01),
+    creditCustomers: rowsOf<{ id: string; name: string | null; currency: string; credit: string }>(creditorRows).map(
+      (r) => ({ id: r.id, name: r.name, currency: r.currency, amount: round2(Number(r.credit)) }),
+    ),
   };
 }

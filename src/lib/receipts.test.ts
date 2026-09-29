@@ -24,6 +24,7 @@ import {
   openCredits,
   recordReceipt,
   recordRefund,
+  releaseOverpayment,
   removeAllocation,
   unallocatedOf,
   updateReceipt,
@@ -324,17 +325,184 @@ describe("⚠️⚠️ a deposit paid on the order, with deposit and balance inv
     );
     await recordReceipt(db, { amount: 244, receivedAt: DAY, by: "u1", allocations: [{ orderId: "o1", amount: 244 }] });
     await invoice("dep", { type: "TD02", total: "244", order: "o1" });
-    expect(await linkOrderPayments(db, "o1")).toBe(1);
+    expect(await linkOrderPayments(db, "o1", "dep")).toBe(1);
     expect(await owes("dep")).toBe(0);
-    // The balance, issued after: the order now has two receivables, and nothing is guessed.
+    // The balance, issued after: nothing is left on the order, so nothing reaches it.
     await invoice("bal", { total: "976", order: "o1" });
-    expect(await linkOrderPayments(db, "o1")).toBe(0);
+    expect(await linkOrderPayments(db, "o1", "bal")).toBe(0);
     expect(await owes("bal")).toBe(976);
+  });
+
+  it("⚠️ an order's deposits never reach another order's invoice", async () => {
+    await db.execute(
+      sql`insert into "order" (id, order_number, status, total_amount, company_id) values ('o1', 'ORD-1', 'confirmed', '500', 'acme'), ('o2', 'ORD-2', 'confirmed', '500', 'acme')`,
+    );
+    await recordReceipt(db, { amount: 200, receivedAt: DAY, by: "u1", allocations: [{ orderId: "o1", amount: 200 }] });
+    await invoice("other", { total: "500", order: "o2" });
+    expect(await linkOrderPayments(db, "o1", "other")).toBe(0);
+    expect(await owes("other")).toBe(500);
+  });
+
+  it("⚠️⚠️ a deposit larger than the deposit invoice is split: the rest waits on the order for the balance", async () => {
+    await db.execute(
+      sql`insert into "order" (id, order_number, status, total_amount, company_id) values ('o1', 'ORD-1', 'confirmed', '1000', 'acme')`,
+    );
+    await recordReceipt(db, {
+      amount: 1000,
+      receivedAt: DAY,
+      by: "u1",
+      allocations: [{ orderId: "o1", amount: 1000 }],
+    });
+    await invoice("dep", { type: "TD02", total: "300", order: "o1" });
+    expect(await linkOrderPayments(db, "o1", "dep")).toBe(1);
+    expect(await owes("dep")).toBe(0);
+    await invoice("bal", { total: "700", order: "o1" });
+    expect(await linkOrderPayments(db, "o1", "bal")).toBe(1);
+    expect(await owes("bal")).toBe(0);
+    expect(await collected()).toBe(1000);
   });
 
   it("⚠️ a deposit invoice is owed like any invoice: it is on the receivables schedule", async () => {
     await invoice("dep", { type: "TD02", total: "244" });
     const schedule = await receivables(db, { today: "2026-09-28" });
     expect(schedule.invoices.map((i) => i.id)).toEqual(["dep"]);
+  });
+});
+
+describe("⚠️⚠️ audit of 29 September 2026: money is never lost, counted twice, or given to an invoice beyond what it owes", () => {
+  const credit = async () => (await customerCredit(db, "acme")).find((c) => c.currency === "EUR")?.credit ?? 0;
+
+  it("⚠️⚠️ taking back a part of a transfer leaves the rest as credit, never deletes the transfer", async () => {
+    await invoice("a", { total: "600" });
+    const r = await recordReceipt(db, {
+      companyId: "acme",
+      amount: 1000,
+      receivedAt: DAY,
+      by: "u1",
+      allocations: [{ invoiceId: "a", amount: 600 }],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    expect(await removeAllocation(db, r.allocationIds[0])).toMatchObject({ removed: "allocation" });
+    expect(await collected()).toBe(1000);
+    expect(await credit()).toBe(1000);
+  });
+
+  it("⚠️⚠️ taking back a payment from the bank keeps the receipt: the bank line stays explained", async () => {
+    await invoice("a", { total: "500" });
+    await db.execute(sql`insert into bank_account (id, name) values ('acc', 'Conto') on conflict do nothing`);
+    await db.execute(sql`insert into bank_transaction (id, account_id, booked_on, amount, fingerprint)
+      values ('line', 'acc', '2026-09-20', '500', 'fp-line') on conflict do nothing`);
+    const r = await recordReceipt(db, {
+      amount: 500,
+      receivedAt: DAY,
+      by: "u1",
+      source: "bank",
+      bankTransactionId: "line",
+      allocations: [{ invoiceId: "a", amount: 500 }],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    expect(await removeAllocation(db, r.allocationIds[0])).toMatchObject({ removed: "allocation" });
+    expect(await collected()).toBe(500);
+    await db.execute(sql`delete from receipt`);
+    await db.execute(sql`delete from bank_transaction`);
+  });
+
+  it("⚠️⚠️ an invoice never receives more than it owes: the rest is refused, or the caller sends it to credit", async () => {
+    await invoice("a", { total: "100" });
+    expect(
+      await recordReceipt(db, {
+        amount: 150,
+        receivedAt: DAY,
+        by: "u1",
+        allocations: [{ invoiceId: "a", amount: 150 }],
+      }),
+    ).toEqual({ ok: false, reason: "overpays" });
+    expect(await collected()).toBe(0);
+  });
+
+  it("⚠️⚠️ credit refunded to the customer cannot be spent again", async () => {
+    await invoice("b", { total: "400" });
+    const r = await recordReceipt(db, { companyId: "acme", amount: 400, receivedAt: DAY, by: "u1", allocations: [] });
+    if (!r.ok) throw new Error(r.reason);
+    expect(await recordRefund(db, { companyId: "acme", amount: 400, receivedAt: DAY, by: "u1" })).toMatchObject({
+      ok: true,
+    });
+    expect(await credit()).toBe(0);
+    expect(await openCredits(db, "acme")).toEqual([]);
+    expect(await allocateCredit(db, { receiptId: r.receiptId, invoiceId: "b", amount: 400, by: "u1" })).toEqual({
+      ok: false,
+      reason: "no_credit",
+    });
+    // And a second refund of the same credit is refused by the database, not by a read.
+    expect(await recordRefund(db, { companyId: "acme", amount: 1, receivedAt: DAY, by: "u1" })).toEqual({
+      ok: false,
+      reason: "no_credit",
+    });
+  });
+
+  it("⚠️⚠️ two refunds of one overpayment: the second is refused", async () => {
+    await invoice("a", { total: "100" });
+    await db.execute(
+      sql`insert into receipt (id, company_id, amount, currency, received_at) values ('r', 'acme', '150', 'EUR', now())`,
+    );
+    await db.execute(
+      sql`insert into order_payment (id, receipt_id, invoice_id, amount, paid_at) values ('p', 'r', 'a', '150', now())`,
+    );
+    const refund = () => recordRefund(db, { invoiceId: "a", amount: 50, receivedAt: DAY, by: "u1" });
+    expect(await refund()).toMatchObject({ ok: true });
+    expect(await refund()).toEqual({ ok: false, reason: "not_overpaid" });
+    expect(await owes("a")).toBe(0);
+  });
+
+  it("⚠️⚠️ what a credit note leaves paid beyond the invoice moves to the customer's credit", async () => {
+    await invoice("a", { total: "1000" });
+    await recordReceipt(db, {
+      amount: 1000,
+      receivedAt: DAY,
+      by: "u1",
+      allocations: [{ invoiceId: "a", amount: 1000 }],
+    });
+    await db.execute(sql`update invoice set credited_amount = '1000' where id = 'a'`);
+    expect(await releaseOverpayment(db, "a")).toBe(1000);
+    expect(await credit()).toBe(1000);
+    expect(await collected()).toBe(1000);
+    expect(await releaseOverpayment(db, "a")).toBe(0);
+  });
+
+  it("⚠️ a receipt from the bank keeps the bank's amount; a refund's amount is not edited, its note is", async () => {
+    await db.execute(sql`insert into receipt (id, company_id, amount, currency, received_at, bank_transaction_id, source)
+      values ('bank', 'acme', '100', 'EUR', ${DAY}, 'some-line', 'bank')`);
+    expect(await updateReceipt(db, { receiptId: "bank", amount: 120, by: "u1" })).toEqual({
+      ok: false,
+      reason: "reconciled",
+    });
+    expect(await updateReceipt(db, { receiptId: "bank", note: "ok", by: "u1" })).toMatchObject({ ok: true });
+    await db.execute(
+      sql`insert into receipt (id, company_id, amount, currency, received_at) values ('ref', 'acme', '-30', 'EUR', ${DAY})`,
+    );
+    expect(await updateReceipt(db, { receiptId: "ref", amount: 40, by: "u1" })).toEqual({
+      ok: false,
+      reason: "refund_fixed",
+    });
+    expect(await updateReceipt(db, { receiptId: "ref", amount: 30, reference: "CRO-9", by: "u1" })).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("⚠️ a receipt is not shrunk below what it already paid", async () => {
+    await invoice("a", { total: "400" });
+    await invoice("b", { total: "300" });
+    const r = await recordReceipt(db, {
+      amount: 1000,
+      receivedAt: DAY,
+      by: "u1",
+      allocations: [{ invoiceId: "a", amount: 400 }],
+    });
+    if (!r.ok) throw new Error(r.reason);
+    await allocateCredit(db, { receiptId: r.receiptId, invoiceId: "b", amount: 300, by: "u1" });
+    expect(await updateReceipt(db, { receiptId: r.receiptId, amount: 500, by: "u1" })).toEqual({
+      ok: false,
+      reason: "over_allocated",
+    });
   });
 });

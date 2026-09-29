@@ -46,5 +46,11 @@
     "description": "⚠️⚠️ «oggi» torna a essere il giorno del server (UTC sui Worker)",
     "find": "  const day = toWallDate(now, timeZone);",
     "replace": "  const day = now.toISOString().slice(0, 10);"
+  },
+  {
+    "file": "src/lib/metrics.ts",
+    "description": "⚠️⚠️ il periodo di un report torna in UTC: in Roma una vendita delle 00:30 del primo del mese finisce nel mese prima",
+    "find": "  const start = from ? fromWallValue(from, timeZone) : null;",
+    "replace": "  const start = from ? new Date(from) : null;"
   }
 ]

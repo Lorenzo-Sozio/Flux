@@ -102,7 +102,12 @@ export function xmlInputOf(
     issuer: (invoice.issuerSnapshot ?? {}) as XmlParty,
     customer: (invoice.customerSnapshot ?? {}) as XmlParty,
     lines: (invoice.linesSnapshot ?? []) as InvoiceLine[],
-    transmissionId: transmissionIdFor(invoice.fiscalYear ?? 0, invoice.number ?? 0, invoice.series),
+    transmissionId: transmissionIdFor(
+      invoice.fiscalYear ?? 0,
+      invoice.number ?? 0,
+      invoice.series,
+      invoice.sdiProgressive,
+    ),
     originalInvoice,
     depositInvoices,
   };

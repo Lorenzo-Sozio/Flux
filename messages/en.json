@@ -1288,7 +1288,8 @@
       "assigned": "{count, plural, one {# company assigned} other {# companies assigned}}",
       "deleteFailed": "Failed to delete companies",
       "updateFailed": "Failed to update companies",
-      "assignFailed": "Failed to assign companies"
+      "assignFailed": "Failed to assign companies",
+      "keptWithAccounts": "{count, plural, one {One customer was not deleted: it has invoices or payments} other {# customers were not deleted: they have invoices or payments}}. Merge them into their duplicates instead."
     },
     "form": {
       "newTitle": "New Company",
@@ -1678,7 +1679,8 @@
         "invoicedDesc": "Issued, VAT excluded",
         "sinceYearStart": "Year to date:",
         "unavailable": "Unavailable",
-        "unavailableHint": "This figure did not load: no value in place of a wrong one."
+        "unavailableHint": "This figure did not load: no value in place of a wrong one.",
+        "commissionsAccruing": "Accruing: the month is not over yet"
       },
       "desk": {
         "open": "Open tickets",
@@ -2076,7 +2078,7 @@
       "electricity": "Electricity bill",
       "creditCard": "Credit card payment"
     },
-    "ordersThisMonth": "Orders completed this month",
+    "ordersThisMonth": "Completed orders dated this month",
     "ordersThisMonthDesc": "{count, plural, one {# order} other {# orders}}",
     "ordersThisMonthUnconverted": "{count, plural, one {# order} other {# orders}}, {unconverted} in a currency with no known rate left out",
     "receivables": {
@@ -2104,6 +2106,7 @@
       }
     },
     "cash": {
+      "creditList": "Customers with credit to use or refund",
       "title": "Cash",
       "subtitle": "Money in and money to come. Every figure says what it counts.",
       "collected": "Collected this month",
@@ -2122,7 +2125,7 @@
       "credit": "Customers' credit",
       "creditDef": "Receipts allocated to no document.",
       "chartTitle": "Collected and invoiced, by month",
-      "chartDesc": "Collected: credits by the day they arrived. Invoiced: invoices and deposit invoices by issue date, less credit notes. Last 12 months.",
+      "chartDesc": "Collected: credits by the day they arrived. Invoiced: invoices and deposit invoices by issue date, VAT included, less credit notes. Last 12 months.",
       "collectedLabel": "Collected",
       "invoicedLabel": "Invoiced",
       "otherCurrencies": "The chart is in {currency}: other currencies are not added to it.",
@@ -2131,11 +2134,14 @@
       "unavailable": "Unavailable",
       "loadError": "The cash figures did not load. No number is shown in place of a wrong one: try again shortly.",
       "receivablesError": "The receivables schedule did not load: try again shortly.",
-      "chartEmpty": "Nothing collected or invoiced in the last 12 months."
+      "chartEmpty": "Nothing collected or invoiced in the last 12 months.",
+      "inCurrency": "Computed on the figures in {currency}."
     },
     "salesTitle": "Sales: won and orders",
     "salesSubtitle": "Deals won and orders completed: what was sold, not what was collected.",
-    "wonThisMonth": "Won this month"
+    "wonThisMonth": "Won this month",
+    "overdueInvoices": "Overdue invoices",
+    "bank": "Bank"
   },
   "leads": {
     "title": "Leads",
@@ -3111,6 +3117,11 @@
       "noInvoices": "Not invoiced yet."
     },
     "payments": {
+      "method": "Method",
+      "recorded": "Payment recorded.",
+      "recordedRestOnOrder": "Payment recorded: {amount} beyond what the invoice owed stays as a deposit on the order.",
+      "removed": "Payment deleted.",
+      "removedToCredit": "Payment taken back: the amount returned to the customer's credit.",
       "title": "Payment",
       "paid": "Paid",
       "outstanding": "Outstanding",
@@ -3118,7 +3129,6 @@
       "addPayment": "Record a payment",
       "amount": "Amount",
       "date": "Date",
-      "method": "How",
       "methodPlaceholder": "Bank transfer, card, cash…",
       "record": "Record",
       "cancel": "Cancel",
@@ -3144,7 +3154,8 @@
       "linkToInvoice": "Link to an invoice…",
       "goesToInvoice": "Goes to invoice {number}.",
       "goesToOrder": "No invoice issued: it stays as a deposit on the order and reaches the invoice once issued."
-    }
+    },
+    "toInvoiceFilter": "To invoice"
   },
   "record": {
     "sectionsLabel": "Record sections",
@@ -6544,7 +6555,9 @@
       "credit_exceeds_residual": "the credit note exceeds what is left to credit on the invoice",
       "credit_without_original": "the invoice to credit is missing or no longer issued",
       "deduction_exceeds": "A deposit taken off exceeds the taxable of a VAT rate: the order changed after the deposit invoice.",
-      "installments_total": "The installments do not add up to the invoice total"
+      "installments_total": "The installments do not add up to the invoice total",
+      "installment_before_issue": "An installment falls due before the invoice date",
+      "currency_not_eur": "Invoice in a currency other than the euro: the exchange rate is needed, issue it in euros"
     },
     "lines": "Lines",
     "description": "Description",
@@ -6633,7 +6646,8 @@
       "draftAnyway": "You can still save it as a draft and finish it later.",
       "readyToIssue": "Ready to issue.",
       "readyNoPermission": "Complete. Issuing needs an administrator: save it as a draft.",
-      "savedNotIssued": "Draft saved but not issued: the invoice page lists what is missing."
+      "savedNotIssued": "Draft saved but not issued: the invoice page lists what is missing.",
+      "balanceNotice": "The order has {count, plural, one {a deposit invoice} other {# deposit invoices}} to take off: save the draft, check the deductions and the total, then issue it from its page."
     },
     "searchPlaceholder": "Search by number or customer…",
     "allInvoices": "All",
@@ -6680,6 +6694,13 @@
       "noteNumber": "Credit note no. {number}"
     },
     "payments": {
+      "recorded": "Payment recorded.",
+      "recordedWithCredit": "Payment recorded: {amount} beyond what was owed stays as the customer's credit.",
+      "removed": "Payment deleted.",
+      "removedToCredit": "Payment taken back: the amount returned to the customer's credit.",
+      "overpaidHint": "The invoice received more than it owes. Keep the difference as the customer's credit, for their next invoices, or record what you gave back.",
+      "moveToCredit": "Move {amount} to credit",
+      "movedToCredit": "{amount} moved to the customer's credit.",
       "due": "Due after credit notes",
       "partOf": "part of a {amount} payment",
       "creditAvailable": "The customer has {amount} of credit.",
@@ -6689,6 +6710,7 @@
       "recordRefund": "Record the refund"
     },
     "deposit": {
+      "created": "Deposit invoice draft created: check it and issue it.",
       "numberTitle": "Deposit invoice no. {number}",
       "draftTitle": "Draft deposit invoice",
       "rate": "VAT {rate}%",
@@ -6709,6 +6731,11 @@
       "receivedNotInvoiced": "A deposit of {amount} was received and is not invoiced yet: a payment received in advance is invoiced when it arrives."
     },
     "terms": {
+      "installmentOf": "Installment {n} of {count} · {amount}",
+      "installmentPaid": "paid",
+      "installmentLate": "overdue, {amount} left",
+      "installmentPartly": "{amount} left",
+      "installmentOpen": "to pay",
       "label": "Payment terms",
       "single": "One payment (date above)",
       "custom": "Custom installments",
@@ -6737,6 +6764,48 @@
         "p30_70": "30% on invoice, 70% at 30 days",
         "p50_50": "50% on invoice, 50% at 30 days"
       }
+    },
+    "filters": {
+      "draft": "Drafts",
+      "issued": "Issued",
+      "unpaid": "To collect",
+      "overdue": "Overdue"
+    },
+    "paymentColumn": "Payment",
+    "paymentState": {
+      "overdue": "{days} days overdue · {amount}",
+      "open": "{amount} · due {date}",
+      "paid": "Paid",
+      "overpaid": "Paid beyond what is owed",
+      "credited": "Credited"
+    },
+    "issuedInMonth": "Issued in {month}",
+    "paymentBadge": {
+      "overdue": "{days} days overdue"
+    },
+    "nextInstallment": "Next installment",
+    "sdiReminder": "Invoice issued: the XML file now has to reach SDI. Download it and upload it to the Fatture e Corrispettivi portal, or send a copy to your intermediary.",
+    "downloadXml": "Download the XML",
+    "issueSummary": {
+      "document": "Document",
+      "series": "series {series}",
+      "date": "Issue date",
+      "customer": "Customer",
+      "total": "Document total",
+      "fromTerms": "From the payment terms, counted from today"
+    },
+    "reminder": {
+      "overdue": "{days} days overdue: {amount} to collect.",
+      "lastReminder": "Last reminder on {when} ({count, plural, one {# sent} other {# sent}})",
+      "button": "Send reminder",
+      "title": "Payment reminder",
+      "description": "The customer receives a polite reminder for {amount} overdue, in their language, with the courtesy copy attached and, for bank transfers, the IBAN. It says to disregard it if they have already paid.",
+      "recipient": "Recipient",
+      "noCustomerEmail": "The company has no main email: type the accounts department's address.",
+      "cancel": "Cancel",
+      "send": "Send reminder",
+      "sent": "Reminder sent to {to}.",
+      "failed": "The reminder could not be sent."
     }
   },
   "entities": {
@@ -7891,14 +7960,26 @@
         "mixed_currency": "A payment pays only documents in its own currency.",
         "not_overpaid": "Only what the invoice received beyond what it owes can be refunded.",
         "no_credit": "The customer does not have enough credit for this refund.",
-        "already_reconciled": "The movement is already reconciled or ignored."
+        "already_reconciled": "The movement is already reconciled or ignored.",
+        "overpays": "The invoice would receive more than it owes: record the difference as the customer's credit.",
+        "reconciled": "The receipt comes from the bank statement: amount and day are corrected by undoing the match in Bank.",
+        "refund_fixed": "A refund's amount is not edited: delete it and record it again."
       },
       "depositAmount": "Enter the deposit, above zero, on an order that has lines.",
       "depositExceedsOrder": "The deposit is more than is left to invoice on the order ({left}).",
       "depositGone": "A deposit invoice to deduct is no longer issued: create the balance invoice again.",
       "depositTakenOff": "A deposit was already deducted by another invoice: this one was not issued.",
       "depositStillDraft": "Issue or delete this order's draft deposit invoice first.",
-      "depositAfterInvoice": "The order already has its invoice: a deposit now would be invoiced twice."
+      "depositAfterInvoice": "The order already has its invoice: a deposit now would be invoiced twice.",
+      "orderAlreadyInvoiced": "The order already has an issued invoice not credited back: to redo it, first issue a full credit note.",
+      "depositLeftOut": "The order has a deposit invoice this invoice does not take off: create the balance invoice again from the order so the deposit is taken off.",
+      "depositOverOrder": "With this deposit invoice the deposits would exceed the order's total.",
+      "orderNotFound": "The order no longer exists.",
+      "orderOtherCustomer": "The order belongs to another customer: choose the order's customer.",
+      "currencyInvalid": "The currency is not valid.",
+      "reminderNotOwed": "Only an issued invoice can be chased.",
+      "reminderNotOverdue": "The invoice has nothing overdue to chase.",
+      "reminderJustSent": "A reminder for this invoice went out less than an hour ago."
     },
     "contracts": {
       "notFound": "This contract no longer exists."
@@ -8006,6 +8087,9 @@
       "mixed_currency": "The documents are in another currency than the movement.",
       "not_overpaid": "There is no overpayment to refund.",
       "no_credit": "The customer does not have enough credit."
+    },
+    "companies": {
+      "hasAccounts": "The customer has issued invoices or payments: it cannot be deleted. If it is a duplicate, merge it into the other customer."
     }
   },
   "validation": {
@@ -8050,7 +8134,9 @@
       "quoteHasNoLines": "This quote has no lines to order.",
       "paymentPositive": "A payment has to be a positive amount.",
       "paymentDate": "Enter the day the payment arrived: today or earlier.",
-      "paymentChooseInvoice": "The order has several issued invoices: choose which one this payment pays."
+      "paymentChooseInvoice": "The order has several issued invoices: choose which one this payment pays.",
+      "lineInvalid": "Invalid quantity, price or discount.",
+      "linesFrozen": "The order has issued invoices: its lines no longer change. To change them, credit the invoices first."
     },
     "products": {
       "nameRequired": "Name is required.",
@@ -8949,7 +9035,17 @@
     "edit": "Correct the payment",
     "editTitle": "Correct the payment",
     "save": "Save",
-    "saved": "Payment corrected."
+    "saved": "Payment corrected.",
+    "currency": "Currency",
+    "recordedWithCredit": "Receipt recorded: {amount} stays as the customer's credit.",
+    "refund": "Refund",
+    "refundAmount": "Amount to give back ({currency})",
+    "refundDate": "Refund date",
+    "refundHint": "The refund reduces the customer's credit and shows on the statement as money going out.",
+    "refundConfirm": "Record the refund",
+    "refunded": "Refund of {amount} recorded.",
+    "refundFailed": "The refund could not be recorded.",
+    "refundOverCredit": "The refund exceeds the customer's credit ({amount})."
   },
   "bank": {
     "title": "Bank reconciliation",
@@ -9024,7 +9120,9 @@
       "other_payer": "The IBAN belongs to another customer",
       "contested": "Another movement proposes the same document",
       "recorded_already": "A receipt of this amount is already recorded",
-      "installment_exact": "Amount equals the next installment"
+      "installment_exact": "Amount equals the next installment",
+      "possible_duplicate": "Same day and amount as a line of another file: perhaps a duplicate",
+      "reversal": "Payment returned: undo the match of the original receipt"
     },
     "bulkDone": "{confirmed, plural, one {# movement reconciled} other {# movements reconciled}}.",
     "bulkChanged": "{changed, plural, one {# proposal has} other {# proposals have}} changed meanwhile: check them.",
@@ -9065,7 +9163,8 @@
       "description": "Description",
       "counterparty": "Payer / payee",
       "iban": "IBAN",
-      "reference": "Reference"
+      "reference": "Reference",
+      "sign": "Sign (D/C)"
     },
     "none": "—",
     "amountMode": "Amounts",
@@ -9080,7 +9179,19 @@
     "noMovements": "No movements read from the file.",
     "startImport": "Import {count, plural, one {# movement} other {# movements}}",
     "importing": "Importing… {done} of {total}",
-    "imported": "{created} new, {skipped} already in, {rejected} rejected."
+    "imported": "{created} new, {skipped} already in, {rejected} rejected.",
+    "recordedByHand": "Receipts already recorded by hand",
+    "recordedByHandHint": "If the movement is one of these, link it: recording it again would count the same money twice.",
+    "linkReceipt": "Link",
+    "depositOnOrder": "Deposit on an order",
+    "creditNow": "Customer's credit now: {amount}",
+    "amountInvalid": "An amount is not valid: write it as 1,234.56.",
+    "confirmWeak": "The proposal is weak: confirm this match anyway?",
+    "otherAccount": "{count, plural, one {One movement is} other {# movements are}} on another account and will not be imported.",
+    "balanceRows": "{count, plural, one {One balance row left out} other {# balance rows left out}}.",
+    "headerRow": "Header row",
+    "confirmSureTitle": "Confirm {count, plural, one {the sure proposal} other {the # sure proposals}}?",
+    "confirmSureText": "Receipts for {total} will be recorded. Proposals changed meanwhile stay for you to check."
   },
   "statement": {
     "date": "Date",
@@ -9101,5 +9212,14 @@
       "receipt": "Payment received",
       "refund": "Refund"
     }
+  },
+  "paymentRemove": {
+    "button": "Take this payment back",
+    "title": "Take back the payment of {amount}?",
+    "deleted": "The payment of {amount} on {date} is deleted and the document owes it again.",
+    "shared": "Only this share of {amount} goes, part of a receipt of {receipt}: the share returns to the customer's credit, the rest of the receipt is unchanged.",
+    "bankLinked": "The money comes from the bank statement and stays recorded: {amount} returns to the customer's credit, to use on another invoice or refund. To undo the match with the bank line, use the Bank page.",
+    "cancel": "Cancel",
+    "confirm": "Take the payment back"
   }
 }

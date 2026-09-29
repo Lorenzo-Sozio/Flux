@@ -16,7 +16,7 @@
  * ⚠️ Nothing is confirmed automatically. `sure` proposals are confirmed in bulk by a person, and
  * only while they still say what that person saw (`key`).
  */
-import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 
 import {
   bankAccounts,
@@ -30,7 +30,7 @@ import {
   receipts,
 } from "@/db/schema";
 import { chunk, INSERT_CHUNK } from "@/lib/api-import-batch";
-import { paymentDay } from "@/lib/order-payment";
+import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import {
   type AllocationInput,
   guardBankTransaction,
@@ -60,7 +60,8 @@ export const BULK_MAX = 50;
 /** Lines the queue shows at once, newest first. */
 const QUEUE_LIMIT = 300;
 /** How far back a hand-typed receipt is looked for, in days. */
-const LOOSE_RECEIPT_DAYS = 90;
+/** How far from a line's day a receipt typed by hand is looked for, either way. */
+const LOOSE_RECEIPT_DAYS = 20;
 
 // ─── Accounts ────────────────────────────────────────────────────────────────
 
@@ -183,7 +184,7 @@ export interface ImportResult {
   created: number;
   /** Already in: the same line from an earlier import. */
   skipped: number;
-  rejected: { index: number; problem: MovementProblem | "other_currency" }[];
+  rejected: { index: number; problem: MovementProblem | "other_currency" | "other_account" }[];
 }
 
 /**
@@ -204,10 +205,26 @@ export async function importMovements(
 ): Promise<ImportResult | { ok: false; reason: "not_found" | "too_many" }> {
   if (input.movements.length > IMPORT_MAX) return { ok: false, reason: "too_many" };
   const [account] = await db
-    .select({ id: bankAccounts.id, currency: bankAccounts.currency })
+    .select({ id: bankAccounts.id, currency: bankAccounts.currency, iban: bankAccounts.iban })
     .from(bankAccounts)
     .where(and(eq(bankAccounts.id, input.accountId), isNull(bankAccounts.archivedAt)));
   if (!account) return { ok: false, reason: "not_found" };
+
+  // ⚠️⚠️ A line of another account never enters this one. An account with no IBAN yet takes the
+  // statement's, when the statement names one account only; after that, the IBAN decides.
+  let iban: string | null = account.iban;
+  if (!iban) {
+    const named = new Set(
+      input.movements.flatMap((raw) => {
+        const v = normalizeIban((raw as { accountIban?: unknown })?.accountIban);
+        return v ? [v] : [];
+      }),
+    );
+    if (named.size === 1) {
+      iban = [...named][0];
+      await db.update(bankAccounts).set({ iban }).where(eq(bankAccounts.id, account.id));
+    }
+  }
 
   const rejected: ImportResult["rejected"] = [];
   const rows: (typeof bankTransactions.$inferInsert)[] = [];
@@ -222,6 +239,10 @@ export async function importMovements(
       rejected.push({ index, problem: "other_currency" });
       continue;
     }
+    if (iban && m.accountIban && m.accountIban !== iban) {
+      rejected.push({ index, problem: "other_account" });
+      continue;
+    }
     rows.push({
       id: crypto.randomUUID(),
       accountId: account.id,
@@ -233,6 +254,7 @@ export async function importMovements(
       counterpartyIban: m.counterpartyIban ?? null,
       remittance: m.remittance ?? null,
       bankReference: m.bankReference ?? null,
+      reversal: m.reversal === true,
       fingerprint: await sha256Hex(fingerprintOf(m)),
     });
   }
@@ -291,6 +313,10 @@ export interface Line {
   bankReference: string | null;
   /** What receipts already explain of it. */
   linked: number;
+  /** A payment returned unpaid: money going back, never ignored with the charges. */
+  reversal: boolean;
+  /** Same day and amount as a line of another import: perhaps the same money twice. */
+  possibleDuplicate: boolean;
 }
 
 export interface QueueLine extends Line {
@@ -324,13 +350,19 @@ const lineColumns = {
   bankReference: bankTransactions.bankReference,
   ignoredAt: bankTransactions.ignoredAt,
   linked: linkedSql,
+  reversal: bankTransactions.reversal,
+  // Same day and amount as a line of another import: perhaps the same money from another file
+  // (a CSV and a CAMT of one period have different references and texts).
+  possibleDuplicate: sql<boolean>`exists (select 1 from bank_transaction o where o.account_id = "bank_transaction"."account_id" and o.id <> "bank_transaction"."id" and o.booked_on = "bank_transaction"."booked_on" and o.amount = "bank_transaction"."amount" and o.import_id is distinct from "bank_transaction"."import_id")`,
 };
 type LineRow = {
-  [K in keyof typeof lineColumns]: K extends "amount" | "linked"
-    ? string
-    : K extends "ignoredAt"
-      ? Date | null
-      : string;
+  [K in keyof typeof lineColumns]: K extends "reversal" | "possibleDuplicate"
+    ? boolean
+    : K extends "amount" | "linked"
+      ? string
+      : K extends "ignoredAt"
+        ? Date | null
+        : string;
 };
 const toLine = (r: LineRow): Line => ({
   id: r.id,
@@ -343,6 +375,8 @@ const toLine = (r: LineRow): Line => ({
   remittance: r.remittance ?? null,
   bankReference: r.bankReference ?? null,
   linked: round2(Number(r.linked)),
+  reversal: Boolean(r.reversal),
+  possibleDuplicate: Boolean(r.possibleDuplicate),
 });
 
 // Whether a line still has something to explain: not ignored, receipts short of its amount.
@@ -351,9 +385,14 @@ const openSql = sql`${bankTransactions.ignoredAt} is null and abs(${linkedSql}) 
 /** Everything a line can be matched against, loaded once for the whole queue. */
 export async function matchContext(
   db: AnyDb,
-  input: { today: string; timeZone: string; ibans: string[] },
+  input: { today: string; timeZone: string; ibans: string[]; from?: string; to?: string },
 ): Promise<MatchContext> {
-  const since = new Date(Date.parse(`${input.today}T00:00:00Z`) - LOOSE_RECEIPT_DAYS * 86_400_000);
+  // ⚠️⚠️ Around the lines' own days, not back from today: a June statement imported in September
+  // looked for hand-typed receipts from July on, missed the one typed in June, and proposed the
+  // same money again as sure.
+  const day = 86_400_000;
+  const since = new Date(Date.parse(`${input.from ?? input.today}T00:00:00Z`) - LOOSE_RECEIPT_DAYS * day);
+  const until = new Date(Date.parse(`${input.to ?? input.today}T00:00:00Z`) + (LOOSE_RECEIPT_DAYS + 1) * day);
   const [owed, openOrders, loose, ibanRows, companyRows] = await Promise.all([
     receivables(db, { today: input.today }),
     db
@@ -383,19 +422,29 @@ export async function matchContext(
         receivedAt: receipts.receivedAt,
       })
       .from(receipts)
-      .where(and(isNull(receipts.bankTransactionId), sql`${receipts.receivedAt} >= ${since}`))
-      .limit(2000),
+      .where(
+        and(
+          isNull(receipts.bankTransactionId),
+          sql`${receipts.receivedAt} >= ${since}`,
+          sql`${receipts.receivedAt} < ${until}`,
+        ),
+      )
+      .orderBy(receipts.receivedAt)
+      .limit(20_000),
     input.ibans.length > 0
       ? db
-          .select({ iban: companyIbans.iban, companyId: companyIbans.companyId })
+          .select({ iban: companyIbans.iban, companyId: companyIbans.companyId, seen: companyIbans.seen })
           .from(companyIbans)
           .where(inArray(companyIbans.iban, input.ibans))
       : [],
     db.select({ id: companies.id, name: companies.name }).from(companies).limit(10_000),
   ]);
   const ibans = new Map<string, string[]>();
-  for (const r of ibanRows as { iban: string; companyId: string }[])
+  const ibanSeen = new Map<string, number>();
+  for (const r of ibanRows as { iban: string; companyId: string; seen: number }[]) {
     ibans.set(r.iban, [...(ibans.get(r.iban) ?? []), r.companyId]);
+    ibanSeen.set(`${r.iban}|${r.companyId}`, Number(r.seen));
+  }
   return {
     invoices: owed.invoices.map((i) => ({
       id: i.id,
@@ -428,6 +477,7 @@ export async function matchContext(
       receivedOn: toWallDate(r.receivedAt, input.timeZone),
     })),
     ibans,
+    ibanSeen,
     companies: companyRows,
   };
 }
@@ -487,13 +537,18 @@ export async function bankQueue(
   db: AnyDb,
   input: { accountId: string; today: string; timeZone: string },
 ): Promise<Queue> {
-  const [rows, [counts]] = await Promise.all([
+  // Money in and money out each have their own page of lines, oldest first: a year of charges
+  // used to fill the page and hide the oldest payments, which could then never be confirmed.
+  const page = (direction: SQL) =>
     db
       .select(lineColumns)
       .from(bankTransactions)
-      .where(and(eq(bankTransactions.accountId, input.accountId), openSql))
-      .orderBy(desc(bankTransactions.bookedOn), desc(bankTransactions.createdAt))
-      .limit(QUEUE_LIMIT) as Promise<LineRow[]>,
+      .where(and(eq(bankTransactions.accountId, input.accountId), openSql, direction))
+      .orderBy(asc(bankTransactions.bookedOn), asc(bankTransactions.createdAt))
+      .limit(QUEUE_LIMIT) as Promise<LineRow[]>;
+  const [incoming, outgoingRows, [counts]] = await Promise.all([
+    page(sql`${bankTransactions.amount} > 0`),
+    page(sql`${bankTransactions.amount} < 0`),
     db
       .select({
         open: sql<number>`count(*) filter (where ${openSql} and ${bankTransactions.amount} > 0)::int`,
@@ -504,8 +559,11 @@ export async function bankQueue(
       .from(bankTransactions)
       .where(eq(bankTransactions.accountId, input.accountId)),
   ]);
-  const lines = rows.map(toLine);
+  const lines = [...incoming, ...outgoingRows].map(toLine);
+  const days = lines.map((l) => l.bookedOn).sort();
   const ctx = await matchContext(db, {
+    from: days[0],
+    to: days[days.length - 1],
     today: input.today,
     timeZone: input.timeZone,
     ibans: [...new Set(lines.flatMap((l) => (l.counterpartyIban ? [l.counterpartyIban] : [])))],
@@ -525,6 +583,12 @@ export async function bankQueue(
     ),
   }));
   const open = withProposals.filter((l) => l.amount > 0);
+  // ⚠️ Perhaps the same money imported twice, or money going back: a person looks, bulk does not.
+  for (const l of withProposals)
+    if ((l.possibleDuplicate || l.reversal) && l.proposals[0]?.confidence === "sure") {
+      l.proposals[0].confidence = "likely";
+      l.proposals[0].reasons = [...l.proposals[0].reasons, { code: l.reversal ? "reversal" : "possible_duplicate" }];
+    }
   markContested(open);
   return {
     open,
@@ -626,7 +690,15 @@ export async function doneLines(
 
 // ─── Confirming, ignoring, undoing ───────────────────────────────────────────
 
-export type ConfirmRefusal = ReceiptRefusal | "mixed" | "no_customer" | "overpays" | "outgoing" | "invalid_date";
+export type ConfirmRefusal =
+  | ReceiptRefusal
+  | "mixed"
+  | "no_customer"
+  | "overpays"
+  | "outgoing"
+  | "invalid_date"
+  // Money typed by hand for this customer, of this amount, near this day: it is linked, not received again.
+  | "recorded_already";
 
 async function lineFor(db: AnyDb, id: string) {
   const [row]: LineRow[] = await db.select(lineColumns).from(bankTransactions).where(eq(bankTransactions.id, id));
@@ -733,16 +805,45 @@ export async function confirmLine(db: AnyDb, input: ConfirmInput): Promise<Confi
 
   // A new receipt: money in only — money out is a refund, written from the invoice or the customer.
   if (left < 0) return { ok: false, reason: "outgoing" };
-  const allocated = allocations.reduce((s, a) => s + cents(Number(a.amount)), 0);
+  // Every amount read once, strictly ("150,00" was NaN here and 150 in the receipt, so every
+  // check below was skipped), and the shares of one invoice added up before they are compared.
+  const perInvoice = new Map<string, number>();
+  let allocated = 0;
+  for (const a of allocations) {
+    const share = parsePaymentAmount(
+      typeof a.amount === "string" ? a.amount.replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".") : a.amount,
+    );
+    if (share === null) return { ok: false, reason: "invalid_allocation" };
+    allocated += cents(share);
+    if (a.invoiceId) perInvoice.set(a.invoiceId, (perInvoice.get(a.invoiceId) ?? 0) + cents(share));
+    a.amount = share;
+  }
   if (allocated > cents(left)) return { ok: false, reason: "over_allocated" };
   if (allocated < cents(left) && !input.companyId) return { ok: false, reason: "no_customer" };
   // ⚠️ The bank never pays an invoice beyond what it owes: the rest belongs in credit, where a
-  // person can see it. Typed by hand, an overpayment is somebody's decision; proposed, a mistake.
-  for (const a of allocations) {
-    if (!a.invoiceId) continue;
-    const balance = await balanceOf(db, a.invoiceId);
+  // person can see it. Said here in words; the database refuses it anyway (recordReceipt).
+  for (const [invoiceId, share] of perInvoice) {
+    const balance = await balanceOf(db, invoiceId);
     if (!balance) return { ok: false, reason: "not_found" };
-    if (cents(Number(a.amount)) > cents(balance.outstanding)) return { ok: false, reason: "overpays" };
+    if (share > cents(balance.outstanding)) return { ok: false, reason: "overpays" };
+  }
+  // ⚠️⚠️ Money already typed by hand for this customer, of this amount, near this day, is this
+  // line: it is linked, not received a second time. Whatever the screen proposed.
+  if (input.companyId) {
+    const near = await db
+      .select({ id: receipts.id })
+      .from(receipts)
+      .where(
+        and(
+          eq(receipts.companyId, input.companyId),
+          isNull(receipts.bankTransactionId),
+          eq(receipts.currency, line.currency),
+          sql`${receipts.amount} = ${String(left)}::numeric`,
+          sql`abs(extract(epoch from ${receipts.receivedAt} - ${line.bookedOn}::date)) <= ${LOOSE_RECEIPT_DAYS * 86_400}`,
+        ),
+      )
+      .limit(1);
+    if (near.length > 0) return { ok: false, reason: "recorded_already" };
   }
   const receivedAt = paymentDay(line.bookedOn, input.timeZone);
   if (!receivedAt) return { ok: false, reason: "invalid_date" };
@@ -849,18 +950,29 @@ export async function ignoreLines(
   input: { accountId: string; ids: string[]; by: string | null },
 ): Promise<number> {
   if (input.ids.length === 0) return 0;
-  const updated = await db
-    .update(bankTransactions)
-    .set({ ignoredAt: new Date(), ignoredById: input.by })
-    .where(
-      and(
-        eq(bankTransactions.accountId, input.accountId),
-        inArray(bankTransactions.id, input.ids.slice(0, IMPORT_MAX)),
-        isNull(bankTransactions.ignoredAt),
-        sql`not exists (select 1 from receipt r where r.bank_transaction_id = "bank_transaction"."id")`,
-      ),
-    )
-    .returning({ id: bankTransactions.id });
+  // Locked first, in a statement of its own: the "no receipt names it" check below then reads
+  // after any confirmation of the same line has committed — never both ignored and reconciled.
+  const ids = input.ids.slice(0, IMPORT_MAX);
+  if (ids.length === 0) return 0;
+  const [, updated] = (await together(db, (h) => [
+    h
+      .select({ id: bankTransactions.id })
+      .from(bankTransactions)
+      .where(and(eq(bankTransactions.accountId, input.accountId), inArray(bankTransactions.id, ids)))
+      .for("update"),
+    h
+      .update(bankTransactions)
+      .set({ ignoredAt: new Date(), ignoredById: input.by })
+      .where(
+        and(
+          eq(bankTransactions.accountId, input.accountId),
+          inArray(bankTransactions.id, ids),
+          isNull(bankTransactions.ignoredAt),
+          sql`not exists (select 1 from receipt r where r.bank_transaction_id = "bank_transaction"."id")`,
+        ),
+      )
+      .returning({ id: bankTransactions.id }),
+  ])) as [unknown, { id: string }[]];
   return updated.length;
 }
 

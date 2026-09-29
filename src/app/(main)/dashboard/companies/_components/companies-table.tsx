@@ -107,8 +107,9 @@ export function CompaniesTable({
     const ids = Array.from(selected);
     startTransition(async () => {
       try {
-        await bulkDeleteCompanies(ids);
-        toast.success(t("bulk.deleted", { count: ids.length }));
+        const result = await bulkDeleteCompanies(ids);
+        if (result.deleted > 0) toast.success(t("bulk.deleted", { count: result.deleted }));
+        if (result.kept > 0) toast.warning(t("bulk.keptWithAccounts", { count: result.kept }));
         clearSelection();
       } catch {
         toast.error(t("bulk.deleteFailed"));

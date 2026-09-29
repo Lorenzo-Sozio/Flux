@@ -11,7 +11,6 @@ import { toast } from "sonner";
 
 import { importBankChunkAction, saveBankMappingAction } from "@/actions/bank";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -76,7 +75,6 @@ export function BankImportDialog({
   const [file, setFile] = useState<File | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [anyway, setAnyway] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [pending, start] = useTransition();
 
@@ -84,7 +82,6 @@ export function BankImportDialog({
     setFile(null);
     setLoaded(null);
     setError(null);
-    setAnyway(false);
     setProgress(null);
   }
 
@@ -123,7 +120,16 @@ export function BankImportDialog({
     loaded?.kind === "csv" && loaded.mapping
       ? readCsv(loaded.rows, loaded.headerRow, loaded.mapping, account.currency)
       : null;
-  const movements: Movement[] = loaded?.kind === "camt" ? loaded.statement.movements : (csv?.movements ?? []);
+  const read: Movement[] = loaded?.kind === "camt" ? loaded.statement.movements : (csv?.movements ?? []);
+  // ⚠️⚠️ A file can hold several accounts: only this account's lines are sent (the server refuses
+  // the others anyway), and the person is told how many were left out.
+  const accountIban = account.iban ? normalizeIban(account.iban) : null;
+  const ibansInFile = [...new Set(read.flatMap((m) => (m.accountIban ? [normalizeIban(m.accountIban)] : [])))];
+  const ownIban = accountIban ?? (ibansInFile.length === 1 ? ibansInFile[0] : null);
+  const movements = ownIban ? read.filter((m) => !m.accountIban || normalizeIban(m.accountIban) === ownIban) : read;
+  const otherAccount = read.length - movements.length;
+  const balanceRows = csv?.problems.filter((p) => p.problem === "balance").length ?? 0;
+  const unreadRows = csv?.problems.filter((p) => p.problem !== "balance") ?? [];
   const summary = useMemo(() => {
     if (movements.length === 0) return null;
     const days = movements.map((m) => m.bookedOn).sort();
@@ -138,10 +144,11 @@ export function BankImportDialog({
     format.dateTime(new Date(`${d}T12:00:00Z`), { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 
   const statementIban = loaded?.kind === "camt" ? normalizeIban(loaded.statement.accountIban) : null;
-  const mismatch = Boolean(statementIban && account.iban && statementIban !== account.iban);
+  // Every line of the file on another account: nothing of this account in it.
+  const mismatch = Boolean(accountIban && read.length > 0 && movements.length === 0);
 
   function send() {
-    if (movements.length === 0 || (mismatch && !anyway)) return;
+    if (movements.length === 0) return;
     const all = numberRepeats(movements);
     start(async () => {
       let importId: string | null = null;
@@ -209,6 +216,9 @@ export function BankImportDialog({
           <MappingEditor
             rows={loaded.rows}
             headerRow={loaded.headerRow}
+            onHeaderRow={(headerRow) =>
+              setLoaded({ ...loaded, headerRow, mapping: guessMapping(loaded.rows.slice(headerRow)).mapping })
+            }
             mapping={loaded.mapping}
             onChange={(mapping) => setLoaded({ ...loaded, mapping })}
           />
@@ -230,16 +240,20 @@ export function BankImportDialog({
                 {t("pendingSkipped", { count: loaded.statement.skipped.pending })}
               </p>
             )}
-            {csv && csv.problems.length > 0 && (
+            {unreadRows.length > 0 && (
               <p className="text-amber-800 dark:text-amber-300">
                 {t("csvProblems", {
-                  count: csv.problems.length,
-                  lines: csv.problems
+                  count: unreadRows.length,
+                  lines: unreadRows
                     .slice(0, 8)
                     .map((p) => p.line)
                     .join(", "),
                 })}
               </p>
+            )}
+            {balanceRows > 0 && <p className="text-muted-foreground">{t("balanceRows", { count: balanceRows })}</p>}
+            {otherAccount > 0 && (
+              <p className="text-amber-800 dark:text-amber-300">{t("otherAccount", { count: otherAccount })}</p>
             )}
             <ul className="divide-y text-xs">
               {movements.slice(0, 5).map((m, i) => (
@@ -261,15 +275,7 @@ export function BankImportDialog({
         {mismatch && (
           <div className="flex items-start gap-2 rounded-md border border-amber-500/40 p-3 text-sm">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
-            <div className="space-y-2">
-              <p>{t("ibanMismatch", { iban: statementIban ?? "" })}</p>
-              <div className="flex items-center gap-2">
-                <Checkbox id="bank-import-anyway" checked={anyway} onCheckedChange={(v) => setAnyway(v === true)} />
-                <Label htmlFor="bank-import-anyway" className="font-normal">
-                  {t("importAnyway")}
-                </Label>
-              </div>
-            </div>
+            <p>{t("ibanMismatch", { iban: statementIban ?? ibansInFile[0] ?? "" })}</p>
           </div>
         )}
 
@@ -277,11 +283,7 @@ export function BankImportDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
             {t("cancel")}
           </Button>
-          <Button
-            onClick={send}
-            disabled={pending || movements.length === 0 || (mismatch && !anyway)}
-            className="gap-1.5"
-          >
+          <Button onClick={send} disabled={pending || movements.length === 0} className="gap-1.5">
             {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
             {progress && pending
               ? t("importing", { done: progress.done, total: progress.total })
@@ -293,7 +295,7 @@ export function BankImportDialog({
   );
 }
 
-const FIELDS = ["date", "valueDate", "counterparty", "iban", "reference"] as const;
+const FIELDS = ["date", "valueDate", "counterparty", "iban", "reference", "sign"] as const;
 
 /** Which column is what, corrected on screen; the preview reads the file again at each change. */
 function MappingEditor({
@@ -301,11 +303,14 @@ function MappingEditor({
   headerRow,
   mapping,
   onChange,
+  onHeaderRow,
 }: {
   rows: string[][];
   headerRow: number;
   mapping: CsvMapping | null;
   onChange: (m: CsvMapping) => void;
+  /** The header was guessed; a file with an odd preamble picks it by hand. */
+  onHeaderRow: (row: number) => void;
 }) {
   const t = useTranslations("bank");
   const headers = (rows[headerRow] ?? []).map((h) => String(h ?? "").trim()).filter(Boolean);
@@ -343,6 +348,28 @@ function MappingEditor({
   return (
     <fieldset className="space-y-3 rounded-md border p-3">
       <legend className="px-1 font-medium text-sm">{t("csvMapping")}</legend>
+      <div className="space-y-1">
+        <Label className="text-xs">{t("headerRow")}</Label>
+        <NativeSelect
+          size="sm"
+          className="w-full"
+          value={String(headerRow)}
+          onChange={(e) => onHeaderRow(Number(e.target.value))}
+        >
+          {rows.slice(0, 30).map((r, i) =>
+            r.some((c) => String(c ?? "").trim()) ? (
+              // biome-ignore lint/suspicious/noArrayIndexKey: the rows of the file, by position
+              <NativeSelectOption key={i} value={String(i)}>
+                {`${i + 1}: ${r
+                  .map((c) => String(c ?? "").trim())
+                  .filter(Boolean)
+                  .join(" · ")
+                  .slice(0, 80)}`}
+              </NativeSelectOption>
+            ) : null,
+          )}
+        </NativeSelect>
+      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {FIELDS.map((f) =>
           column(t(`col.${f}`), m[f] as string | null, (v) => set({ [f]: f === "date" ? (v ?? "") : v }), f !== "date"),

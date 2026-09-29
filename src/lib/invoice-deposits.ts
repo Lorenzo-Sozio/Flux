@@ -33,6 +33,10 @@ export interface IssuedDeposit {
   issueDate: string | null;
   discountPercent: number;
   lines: InvoiceLine[];
+  /** What its credit notes gave back, as issued: taken off what the balance deducts. */
+  credits?: { discountPercent: number; lines: InvoiceLine[] }[];
+  /** Its credited amount when this was read: the issue refuses if it changed meanwhile. */
+  creditedAmount?: number;
 }
 
 /**
@@ -72,21 +76,36 @@ export function depositLines(
 
 /**
  * The lines a balance invoice takes off for these deposit invoices: each deposit's taxable per
- * (rate, Natura), negative, citing the deposit. A deposit's stamp duty recharge is its own
- * charge and is not taken off.
+ * (rate, Natura), less what its credit notes gave back, negative, citing the deposit. A deposit's
+ * stamp duty recharge is its own charge and is not taken off.
+ *
+ * ⚠️⚠️ A deposit partly credited is taken off for what is left of it. Leaving it out — the first
+ * version did — invoiced the rest of it a second time in the balance.
  */
 export function deductionLines(
   deposits: readonly IssuedDeposit[],
   describe: (documentNumber: string, issueDate: string) => string,
 ): DeductionLine[] {
+  const key = (rate: number, nature: string | null) => `${rate}|${nature ?? ""}`;
   return deposits.flatMap((d) => {
-    const own = d.lines.filter((l) => !l.isStampRecharge);
-    return invoiceTotals(own, d.discountPercent)
-      .summary.filter((g) => g.taxable > 0)
+    const own = invoiceTotals(
+      d.lines.filter((l) => !l.isStampRecharge),
+      d.discountPercent,
+    ).summary;
+    const given = new Map<string, number>();
+    for (const c of d.credits ?? [])
+      for (const g of invoiceTotals(
+        c.lines.filter((l) => !l.isStampRecharge),
+        c.discountPercent,
+      ).summary)
+        given.set(key(g.rate, g.nature), (given.get(key(g.rate, g.nature)) ?? 0) + g.taxable);
+    return own
+      .map((g) => ({ ...g, left: round2(g.taxable - (given.get(key(g.rate, g.nature)) ?? 0)) }))
+      .filter((g) => g.left > 0)
       .map((g) => ({
         description: describe(d.documentNumber ?? "", d.issueDate ?? ""),
         quantity: 1,
-        unitPrice: -g.taxable,
+        unitPrice: -g.left,
         discountPercent: 0,
         taxPercent: g.rate,
         nature: g.nature,

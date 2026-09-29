@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { Building2, Loader2, X } from "lucide-react";
+import { Building2, Link2, Loader2, X } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCurrency } from "@/hooks/use-currency";
-import { parsePaymentAmount } from "@/lib/order-payment";
+import { cn } from "@/lib/utils";
 
 import type { OpenLine } from "./bank-view";
 
@@ -30,9 +30,22 @@ type OpenItems = Awaited<ReturnType<typeof getCompanyOpenItems>>;
 const cents = (n: number) => Math.round(n * 100);
 
 /**
- * Where a line goes, chosen by hand: a customer, the invoices it pays and how much of each.
- * What is not given to an invoice stays as the customer's credit — never paid beyond what an
- * invoice owes, which the server refuses anyway.
+ * An amount as a person types it here: "1.234,56", "1234,56" or "1234.56". Null when it is not
+ * one — which marks the field and holds the confirmation, rather than counting it as nothing and
+ * writing the whole line as credit.
+ */
+export function readAmount(raw: string): number | null {
+  const v = raw.trim().replace(/\s|€/g, "");
+  if (!v) return 0;
+  const normalized = v.includes(",") ? v.replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", ".") : v;
+  if (!/^\d+(\.\d{1,2})?$/.test(normalized)) return null;
+  return Number(normalized);
+}
+
+/**
+ * Where a line goes, chosen by hand: money already typed by hand for it, or a customer, the
+ * invoices it pays and the orders it is a deposit on. What goes to none of them stays as the
+ * customer's credit — never paid beyond what an invoice owes, which the server refuses anyway.
  */
 export function BankChooseDialog({
   open,
@@ -55,11 +68,14 @@ export function BankChooseDialog({
   const [hits, setHits] = useState<Hit[]>([]);
   const [searching, setSearching] = useState(false);
   const [items, setItems] = useState<OpenItems | null>(null);
+  // Shares typed per document: `i:<invoice>` or `o:<order>`.
   const [shares, setShares] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
   const request = useRef(0);
 
   const left = Math.round((line.amount - line.linked) * 100) / 100;
+  const day = (d: string) =>
+    format.dateTime(new Date(`${d}T12:00:00Z`), { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 
   useEffect(() => {
     const q = query.trim();
@@ -95,30 +111,41 @@ export function BankChooseDialog({
   }, [company, t]);
 
   const invoices = (items?.invoices ?? []).filter((i) => i.currency === line.currency);
-  const allocated = Object.values(shares).reduce((s, v) => s + cents(parsePaymentAmount(v) ?? 0), 0);
+  const orderRows = (items?.orders ?? []).filter((o) => o.currency === line.currency);
+  const loose = (items?.receipts ?? []).filter((r) => r.currency === line.currency && cents(r.amount) <= cents(left));
+  const credit = (items?.credit ?? []).find((c) => c.currency === line.currency)?.credit ?? 0;
+
+  const parsed = Object.entries(shares).map(([key, raw]) => ({ key, amount: readAmount(raw) }));
+  const invalid = new Set(parsed.filter((p) => p.amount === null).map((p) => p.key));
+  const allocated = parsed.reduce((s, p) => s + cents(p.amount ?? 0), 0);
   const toCredit = (cents(left) - allocated) / 100;
   const over = toCredit < 0;
 
-  function toggle(id: string, outstanding: number, on: boolean) {
+  function toggle(key: string, owed: number, on: boolean) {
     setShares((s) => {
       const next = { ...s };
-      if (!on) delete next[id];
+      if (!on) delete next[key];
       else {
         const room =
-          cents(left) -
-          Object.entries(s).reduce((sum, [k, v]) => sum + (k === id ? 0 : cents(parsePaymentAmount(v) ?? 0)), 0);
-        next[id] = (Math.max(0, Math.min(cents(outstanding), room)) / 100).toFixed(2);
+          cents(left) - Object.entries(s).reduce((sum, [k, v]) => sum + (k === key ? 0 : cents(readAmount(v) ?? 0)), 0);
+        next[key] = (Math.max(0, Math.min(cents(owed), room)) / 100).toFixed(2).replace(".", ",");
       }
       return next;
     });
   }
 
   function submit() {
-    if (!company || over) return;
+    if (!company || over || invalid.size > 0) return;
     start(async () => {
       const r = await confirmBankLineAction(line.id, {
         companyId: company.id,
-        allocations: Object.entries(shares).map(([invoiceId, amount]) => ({ invoiceId, amount })),
+        allocations: parsed
+          .filter((p) => (p.amount ?? 0) > 0)
+          .map((p) =>
+            p.key.startsWith("i:")
+              ? { invoiceId: p.key.slice(2), amount: p.amount ?? 0 }
+              : { orderId: p.key.slice(2), amount: p.amount ?? 0 },
+          ),
       }).catch(() => null);
       if (!r?.ok) {
         toast.error(r && !r.ok ? r.error : t("failed"));
@@ -128,6 +155,29 @@ export function BankChooseDialog({
       onDone();
     });
   }
+
+  function link(receiptId: string) {
+    start(async () => {
+      const r = await confirmBankLineAction(line.id, { receiptIds: [receiptId] }).catch(() => null);
+      if (!r?.ok) {
+        toast.error(r && !r.ok ? r.error : t("failed"));
+        return;
+      }
+      toast.success(t("confirmed"));
+      onDone();
+    });
+  }
+
+  const shareInput = (key: string, label: string) => (
+    <Input
+      aria-label={label}
+      aria-invalid={invalid.has(key)}
+      className={cn("h-8 w-28 text-right tabular-nums", invalid.has(key) && "border-destructive")}
+      inputMode="decimal"
+      value={shares[key]}
+      onChange={(e) => setShares((s) => ({ ...s, [key]: e.target.value }))}
+    />
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -192,53 +242,110 @@ export function BankChooseDialog({
           )}
         </div>
 
-        {company && (
-          <div className="space-y-2">
-            <p className="font-medium text-sm">{t("openInvoices")}</p>
-            {!items ? (
-              <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-            ) : invoices.length === 0 ? (
-              <p className="text-muted-foreground text-sm">{t("noOpenInvoices")}</p>
-            ) : (
-              <ul className="max-h-64 space-y-1 overflow-y-auto">
-                {invoices.map((i) => {
-                  const on = i.id in shares;
-                  return (
-                    <li key={i.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
-                      <Checkbox
-                        id={`inv-${i.id}`}
-                        checked={on}
-                        onCheckedChange={(v) => toggle(i.id, i.outstanding, v === true)}
-                      />
-                      <label htmlFor={`inv-${i.id}`} className="min-w-0 flex-1 text-sm">
-                        <span className="font-medium">{t("proposal.invoice", { number: i.number ?? "—" })}</span>
-                        <span className="block text-muted-foreground text-xs">
-                          {t("owes", { amount: formatMoney(i.outstanding, i.currency) })} ·{" "}
-                          {t("dueOn", {
-                            date: format.dateTime(new Date(`${i.dueDate}T12:00:00Z`), {
-                              day: "2-digit",
-                              month: "short",
-                              timeZone: "UTC",
-                            }),
-                          })}
+        {company && !items && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />}
+
+        {company && items && (
+          <div className="max-h-[50dvh] space-y-4 overflow-y-auto">
+            {/* Money already typed by hand is linked first: a new receipt beside it counts it twice. */}
+            {loose.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="font-medium text-sm">{t("recordedByHand")}</p>
+                <p className="text-muted-foreground text-xs">{t("recordedByHandHint")}</p>
+                <ul className="space-y-1">
+                  {loose.map((r) => (
+                    <li
+                      key={r.id}
+                      className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm"
+                    >
+                      <span className="min-w-0">
+                        <span className="tabular-nums">{formatMoney(r.amount, r.currency)}</span>
+                        <span className="text-muted-foreground text-xs">
+                          {" · "}
+                          {day(r.receivedOn)}
+                          {r.reference ? ` · ${r.reference}` : ""}
                         </span>
-                      </label>
-                      {on && (
-                        <Input
-                          aria-label={t("proposal.invoice", { number: i.number ?? "—" })}
-                          className="h-8 w-28 text-right tabular-nums"
-                          inputMode="decimal"
-                          value={shares[i.id]}
-                          onChange={(e) => setShares((s) => ({ ...s, [i.id]: e.target.value }))}
-                        />
-                      )}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1"
+                        disabled={pending}
+                        onClick={() => link(r.id)}
+                      >
+                        <Link2 className="size-3.5" aria-hidden /> {t("linkReceipt")}
+                      </Button>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+              </div>
             )}
-            <p className={over ? "text-destructive text-sm" : "text-muted-foreground text-sm"}>
-              {over ? t("overAllocated") : t("toCredit", { amount: formatMoney(toCredit, line.currency) })}
+
+            <div className="space-y-2">
+              <p className="font-medium text-sm">{t("openInvoices")}</p>
+              {invoices.length === 0 ? (
+                <p className="text-muted-foreground text-sm">{t("noOpenInvoices")}</p>
+              ) : (
+                <ul className="space-y-1">
+                  {invoices.map((i) => {
+                    const key = `i:${i.id}`;
+                    const on = key in shares;
+                    return (
+                      <li key={i.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
+                        <Checkbox
+                          id={key}
+                          checked={on}
+                          onCheckedChange={(v) => toggle(key, i.outstanding, v === true)}
+                        />
+                        <label htmlFor={key} className="min-w-0 flex-1 text-sm">
+                          <span className="font-medium">{t("proposal.invoice", { number: i.number ?? "—" })}</span>
+                          <span className="block text-muted-foreground text-xs">
+                            {t("owes", { amount: formatMoney(i.outstanding, i.currency) })} ·{" "}
+                            {t("dueOn", { date: day(i.dueDate) })}
+                          </span>
+                        </label>
+                        {on && shareInput(key, t("proposal.invoice", { number: i.number ?? "—" }))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {orderRows.length > 0 && (
+              <div className="space-y-2">
+                <p className="font-medium text-sm">{t("depositOnOrder")}</p>
+                <ul className="space-y-1">
+                  {orderRows.map((o) => {
+                    const key = `o:${o.id}`;
+                    const on = key in shares;
+                    return (
+                      <li key={o.id} className="flex items-center gap-2 rounded-md border px-2 py-1.5">
+                        <Checkbox id={key} checked={on} onCheckedChange={(v) => toggle(key, o.owed, v === true)} />
+                        <label htmlFor={key} className="min-w-0 flex-1 text-sm">
+                          <span className="font-medium">{t("proposal.order", { number: o.number })}</span>
+                          <span className="block text-muted-foreground text-xs">
+                            {t("owes", { amount: formatMoney(o.owed, o.currency) })}
+                          </span>
+                        </label>
+                        {on && shareInput(key, t("proposal.order", { number: o.number }))}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {credit > 0 && (
+              <p className="text-muted-foreground text-xs">
+                {t("creditNow", { amount: formatMoney(credit, line.currency) })}
+              </p>
+            )}
+            <p className={over || invalid.size > 0 ? "text-destructive text-sm" : "text-muted-foreground text-sm"}>
+              {invalid.size > 0
+                ? t("amountInvalid")
+                : over
+                  ? t("overAllocated")
+                  : t("toCredit", { amount: formatMoney(toCredit, line.currency) })}
             </p>
           </div>
         )}
@@ -247,7 +354,7 @@ export function BankChooseDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
             {t("cancel")}
           </Button>
-          <Button onClick={submit} disabled={!company || over || pending} className="gap-1.5">
+          <Button onClick={submit} disabled={!company || over || invalid.size > 0 || pending} className="gap-1.5">
             {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
             {t("confirm")}
           </Button>

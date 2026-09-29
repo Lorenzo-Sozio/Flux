@@ -2,6 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
+
+import { orders, receipts } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import {
   type AccountRefusal,
@@ -63,6 +66,8 @@ function announcePaid(settled: Settled[], actor: string) {
 function refresh(input: { invoiceIds?: string[]; companyIds?: (string | null)[] } = {}) {
   revalidatePath("/dashboard/sales/bank");
   revalidatePath("/dashboard/sales/finance");
+  // A deposit confirmed or undone changes its order's page; which order is not worth a read.
+  revalidatePath("/dashboard/sales/orders/[id]", "page");
   for (const id of new Set(input.invoiceIds ?? [])) revalidatePath(`/dashboard/sales/invoices/${id}`);
   for (const id of new Set(input.companyIds ?? [])) if (id) revalidatePath(`/dashboard/companies/${id}`);
 }
@@ -93,9 +98,34 @@ export async function getBankOverview(accountId: string | null) {
 export async function getCompanyOpenItems(companyId: string) {
   await guard();
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
-  const [owed, credit] = await Promise.all([
+  const [owed, credit, loose, openOrders] = await Promise.all([
     receivables(db, { today: toWallDate(new Date(), timeZone), companyId }),
     customerCredit(db, companyId),
+    // Money typed by hand and not yet tied to a bank line, at any date: what a line may already be.
+    db
+      .select({
+        id: receipts.id,
+        amount: receipts.amount,
+        currency: receipts.currency,
+        receivedAt: receipts.receivedAt,
+        reference: receipts.reference,
+      })
+      .from(receipts)
+      .where(and(eq(receipts.companyId, companyId), isNull(receipts.bankTransactionId), sql`${receipts.amount} > 0`))
+      .orderBy(desc(receipts.receivedAt))
+      .limit(50),
+    // Orders still to pay, for a deposit that arrives before any invoice.
+    db
+      .select({
+        id: orders.id,
+        number: orders.orderNumber,
+        currency: orders.currency,
+        owed: sql<string>`${orders.totalAmount} - coalesce((select sum(p.amount) from order_payment p where p.order_id = "order"."id"), 0)`,
+      })
+      .from(orders)
+      .where(and(eq(orders.companyId, companyId), sql`${orders.status} <> 'cancelled'`))
+      .orderBy(desc(orders.createdAt))
+      .limit(50),
   ]);
   return {
     invoices: owed.invoices.map((i) => ({
@@ -106,6 +136,21 @@ export async function getCompanyOpenItems(companyId: string) {
       outstanding: i.outstanding,
     })),
     credit,
+    receipts: loose.map(
+      (r: { id: string; amount: string; currency: string; receivedAt: Date; reference: string | null }) => ({
+        id: r.id,
+        amount: Number(r.amount),
+        currency: r.currency,
+        receivedOn: toWallDate(r.receivedAt, timeZone),
+        reference: r.reference,
+      }),
+    ),
+    orders: openOrders
+      .map((o: { id: string; number: string; currency: string; owed: string }) => ({
+        ...o,
+        owed: Math.round(Number(o.owed) * 100) / 100,
+      }))
+      .filter((o: { owed: number }) => o.owed > 0),
   };
 }
 
@@ -178,8 +223,10 @@ export async function confirmBankLineAction(
     transactionId,
     receiptIds: Array.isArray(choice.receiptIds) ? choice.receiptIds.filter((x) => typeof x === "string") : [],
     companyId: typeof choice.companyId === "string" ? choice.companyId : null,
+    // Only shares left empty are dropped: one that is not a number is refused by the server, not
+    // quietly left out — which wrote the whole line as credit and left the invoice unpaid.
     allocations: Array.isArray(choice.allocations)
-      ? choice.allocations.filter((a) => Number(String(a.amount).replace(",", ".")) > 0)
+      ? choice.allocations.filter((a) => String(a.amount ?? "").trim() !== "")
       : [],
     timeZone,
     by: actor.userId,

@@ -8,14 +8,14 @@
   {
     "file": "src/lib/invoice-deposits.ts",
     "description": "⚠️ il saldo storna anche la rivalsa del bollo dell'acconto",
-    "find": "    const own = d.lines.filter((l) => !l.isStampRecharge);",
-    "replace": "    const own = d.lines;"
+    "find": "      d.lines.filter((l) => !l.isStampRecharge),",
+    "replace": "      d.lines,"
   },
   {
     "file": "src/lib/invoice-deposits.ts",
     "description": "⚠️⚠️ lo storno dell'acconto viene aggiunto invece che tolto",
-    "find": "        unitPrice: -g.taxable,",
-    "replace": "        unitPrice: g.taxable,"
+    "find": "        unitPrice: -g.left,",
+    "replace": "        unitPrice: g.left,"
   },
   {
     "file": "src/lib/fatturapa/totals.ts",
@@ -32,14 +32,14 @@
   {
     "file": "src/lib/invoice-issue.ts",
     "description": "⚠️⚠️ lo stesso acconto viene detratto da due saldi",
-    "find": "        AND deducted_in_invoice_id IS NULL\n        -- A deposit a credit note touched",
-    "replace": "        -- A deposit a credit note touched"
+    "find": "        AND i.deducted_in_invoice_id IS NULL\n        AND i.credited_amount = d.credited",
+    "replace": "        AND i.credited_amount = d.credited"
   },
   {
     "file": "src/lib/invoice-issue.ts",
-    "description": "⚠️⚠️ il saldo prende il numero anche se un acconto non è stato detratto",
-    "find": "        AND (SELECT count(*) FROM deduct) = ${deducts.length}\n",
-    "replace": "\n"
+    "description": "⚠️⚠️ il saldo prende il numero anche se un acconto non si può detrarre, e gli altri restano segnati come detratti",
+    "find": "      WHERE (SELECT count(*) FROM eligible) = ${deducts.length}\n",
+    "replace": "      WHERE true\n"
   },
   {
     "file": "src/lib/invoice-issue.ts",
@@ -48,21 +48,57 @@
     "replace": "        AND total - credited_amount"
   },
   {
-    "file": "src/lib/invoice-issue.ts",
-    "description": "⚠️ un acconto toccato da una nota di credito viene detratto per intero",
-    "find": "        AND credited_amount = 0\n",
-    "replace": "\n"
+    "file": "src/lib/invoice-deposits.ts",
+    "description": "⚠️⚠️ un acconto stornato in parte viene detratto per intero: il saldo toglie anche quanto già restituito",
+    "find": "      .map((g) => ({ ...g, left: round2(g.taxable - (given.get(key(g.rate, g.nature)) ?? 0)) }))",
+    "replace": "      .map((g) => ({ ...g, left: g.taxable }))"
   },
   {
-    "file": "src/lib/receivables.ts",
+    "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ l'acconto pagato sull'ordine non arriva alla fattura d'acconto, e poi finisce sul saldo",
-    "find": "      where i.status = 'issued' and i.document_type in ('TD01', 'TD02') and i.order_id = ${orderId}",
-    "replace": "      where i.status = 'issued' and i.document_type in ('TD01') and i.order_id = ${orderId}"
+    "find": "  if (!doc || doc.orderId !== orderId || doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))",
+    "replace": "  if (!doc || doc.orderId !== orderId || doc.status !== \"issued\" || doc.documentType !== \"TD01\")"
   },
   {
     "file": "src/lib/invoice-rules.ts",
     "description": "⚠️⚠️ la fattura d'acconto non è un credito verso il cliente: sparisce dallo scadenzario",
     "find": "export const RECEIVABLE_TYPES: readonly string[] = [\"TD01\", \"TD02\"];",
     "replace": "export const RECEIVABLE_TYPES: readonly string[] = [\"TD01\"];"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ un acconto stornato nel frattempo viene detratto con la cifra vecchia",
+    "find": "        AND i.credited_amount = d.credited\n",
+    "replace": "\n"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ lo stesso ordine si fattura due volte",
+    "find": "            AND ((o.document_type = 'TD01' AND o.credited_amount < o.total)",
+    "replace": "            AND ((false)"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ un saldo che dimentica un acconto dell'ordine viene emesso: l'acconto è fatturato due volte",
+    "find": "                  AND o.credited_amount < o.total AND o.id NOT IN (SELECT id FROM eligible)))))",
+    "replace": "                  AND false))))"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ gli acconti superano l'ordine",
+    "find": "          <= (SELECT total_amount FROM \"order\" WHERE id = ${orderId}) + ${money(ORDER_ROUNDING)}::numeric)",
+    "replace": "          <= 1e12)"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ lo storno totale di un saldo lascia gli acconti detratti: l'ordine non si può più rifatturare",
+    "find": "        AND EXISTS (SELECT 1 FROM credit c WHERE c.credited_amount >= c.total)",
+    "replace": "        AND false"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ una fattura prende la data di ieri e un numero di oggi",
+    "find": "        AND ${input.issueDate}::date = (now() AT TIME ZONE 'Europe/Rome')::date",
+    "replace": "        AND true"
   }
 ]

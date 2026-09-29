@@ -35,7 +35,9 @@ function formatIn(amount: number, currency: string, locale: string) {
   return new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
     style: "currency",
     currency,
-    maximumFractionDigits: 0,
+    // Cents shown: "0 €" overdue under a red border was 40 cents.
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
     useGrouping: "always",
   }).format(amount);
 }
@@ -124,7 +126,7 @@ export async function MoneyDashboard() {
           {headline && `${t("sinceYearStart")} ${amounts(headline.collected.year)}`}
         </HeadlineKpi>
         <HeadlineKpi
-          href="/dashboard/sales/invoices?status=issued"
+          href={`/dashboard/sales/invoices?issued=${thisMonth}`}
           title={t("invoiced")}
           icon={<ReceiptTextIcon className="h-4 w-4 shrink-0 text-violet-600" />}
           value={headline ? amounts(headline.invoiced.month) : na}
@@ -159,7 +161,7 @@ export async function MoneyDashboard() {
           <p className="mt-1 text-muted-foreground text-xs">{t("overdueDesc")}</p>
         </Kpi>
         <Kpi
-          href="/dashboard/sales/orders?status=completed"
+          href="/dashboard/sales/orders?status=to_invoice"
           accent={figures && figures.ordersToInvoice > 0 ? "border-l-amber-500" : "border-l-slate-300"}
           title={t("toInvoice")}
           icon={<PackageCheckIcon className="h-4 w-4 shrink-0 text-amber-500" />}
@@ -182,13 +184,19 @@ export async function MoneyDashboard() {
           title={t("commissions")}
           icon={<PercentIcon className="h-4 w-4 shrink-0 text-emerald-500" />}
         >
-          <div className={KPI_VALUE}>{failed(commissionsO) ? na : <Money value={report?.totals.amount ?? 0} />}</div>
+          {/* In euros, never converted to a display currency: what the commissions page shows. */}
+          <div className={KPI_VALUE}>
+            {failed(commissionsO) ? na : formatIn(report?.totals.amount ?? 0, "EUR", locale)}
+          </div>
           <p className="mt-1 text-muted-foreground text-xs">
             {!report || report.totals.amount === 0
               ? t("commissionsNone")
               : approved
                 ? t("commissionsApproved")
-                : t("commissionsToApprove")}
+                : // This month is not over, and a month is approved only once it is.
+                  report.months.some((m) => !m.approvedAt && m.month >= thisMonth)
+                  ? t("commissionsAccruing")
+                  : t("commissionsToApprove")}
           </p>
         </Kpi>
         <Kpi
@@ -241,7 +249,8 @@ export async function MoneyDashboard() {
                       </p>
                     </div>
                     <p className="shrink-0 font-semibold text-sm tabular-nums">
-                      {formatIn(inv.outstanding, inv.currency, locale)}
+                      {/* What is late: in installments, only the installments due, not the whole balance. */}
+                      {formatIn(inv.overdueAmount > 0 ? inv.overdueAmount : inv.outstanding, inv.currency, locale)}
                     </p>
                   </Link>
                 </li>

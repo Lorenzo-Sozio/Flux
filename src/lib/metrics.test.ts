@@ -32,6 +32,7 @@ vi.mock("next-intl/server", () => ({
 }));
 
 const { getReportKPIs, getSalesReport } = await import("@/actions/reports");
+const { periodOf } = await import("@/lib/metrics");
 const { getFinanceDashboard } = await import("@/actions/finance");
 const { getDashboardStats } = await import("@/actions/dashboard");
 
@@ -86,6 +87,22 @@ describe("⚠️⚠️ the month a win belongs to", () => {
     await deal("mezzanotte", "won", 700, "2026-09-30T22:30:00Z", "2026-09-30T22:30:00Z");
     const sales = await getSalesReport({ from: "2026-09-01", to: "2026-10-31" });
     expect(sales.monthlyRevenue).toEqual([{ month: "2026-10", revenue: 700, count: 1 }]);
+  });
+
+  it("⚠️⚠️ a period is bounded on the workspace's clock: 00:30 on 1 October in Rome is not September", async () => {
+    await deal("mezzanotte", "won", 700, "2026-09-30T22:30:00Z", "2026-09-30T22:30:00Z");
+    await deal("primo", "won", 300, "2026-08-31T22:30:00Z", "2026-08-31T22:30:00Z");
+    const sales = await getSalesReport(september);
+    // 00:30 on 1 September in Rome is in; 00:30 on 1 October is out.
+    expect(sales.dealsWon).toEqual({ count: 1, revenue: 300 });
+  });
+
+  it("periodOf gives the first and last instant of the days in the zone", () => {
+    const p = periodOf("2026-09-01", "2026-09-30", "Europe/Rome");
+    expect(p.from?.toISOString()).toBe("2026-08-31T22:00:00.000Z");
+    expect(p.to?.toISOString()).toBe("2026-09-30T21:59:59.999Z");
+    // Across the change of hour: 25 October is 25 hours long.
+    expect(periodOf("2026-10-25", "2026-10-25", "Europe/Rome").to?.toISOString()).toBe("2026-10-25T22:59:59.999Z");
   });
 });
 

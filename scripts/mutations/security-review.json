@@ -90,10 +90,10 @@
     "replace": "      .where(eq(orderPayments.orderId, \"never\")),"
   },
   {
-    "file": "src/lib/receivables.ts",
-    "description": "⚠️ con più fatture sull'ordine, l'emissione aggancia gli acconti a una a caso",
-    "find": "      having count(*) = 1",
-    "replace": "      having count(*) >= 1"
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ gli acconti di un ordine si agganciano alla fattura di un altro ordine",
+    "find": "  if (!doc || doc.orderId !== orderId || doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))",
+    "replace": "  if (!doc || doc.status !== \"issued\" || !RECEIVABLE_TYPES.includes(doc.documentType))"
   },
   {
     "file": "src/lib/mail-sync.ts",

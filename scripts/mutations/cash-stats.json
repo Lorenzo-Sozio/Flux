@@ -20,14 +20,14 @@
   {
     "file": "src/lib/cash-stats.ts",
     "description": "⚠️ la riscossione conta anche quanto pagato oltre il dovuto",
-    "find": "             sum(least(i.total - i.credited_amount, greatest(0, coalesce(p.paid, 0)))) as paid",
-    "replace": "             sum(greatest(0, coalesce(p.paid, 0))) as paid"
+    "find": "      select currency, sum(asked) as asked, sum(least(asked, greatest(0, paid))) as paid",
+    "replace": "      select currency, sum(asked) as asked, sum(greatest(0, paid)) as paid"
   },
   {
     "file": "src/lib/cash-stats.ts",
     "description": "⚠️⚠️ la riscossione conta anche le fatture non ancora scadute: sembra peggiore di quella che è",
-    "find": "        and coalesce(i.due_date, i.issue_date) < ${input.today}::date",
-    "replace": ""
+    "find": "                    when coalesce(i.due_date, i.issue_date) < ${input.today}::date then i.total - i.credited_amount",
+    "replace": "                    when true then i.total - i.credited_amount"
   },
   {
     "file": "src/lib/customer-statement.ts",

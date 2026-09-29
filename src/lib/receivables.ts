@@ -22,9 +22,9 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { companies, invoices, orderPayments, receipts } from "@/db/schema";
 import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
-import { type PaymentState, paymentSummary } from "@/lib/order-payment";
+import { type PaymentState, parsePaymentAmount, paymentSummary } from "@/lib/order-payment";
 import { type Installment, type InstallmentState, installmentStates } from "@/lib/payment-terms";
-import { recordReceipt } from "@/lib/receipts";
+import { linkOrderDeposits, recordReceipt } from "@/lib/receipts";
 
 import { AGING_BUCKETS, type AgingBucket, agingBucket } from "./receivables-aging";
 
@@ -195,7 +195,14 @@ export async function receivables(
 }
 
 export type RecordPaymentResult =
-  | { ok: true; paymentId: string; balance: ReturnType<typeof invoiceBalance>; becamePaid: boolean }
+  | {
+      ok: true;
+      paymentId: string | null;
+      balance: ReturnType<typeof invoiceBalance>;
+      becamePaid: boolean;
+      /** What went to the customer's credit: paid beyond what the invoice owed. */
+      toCredit: number;
+    }
   | { ok: false; reason: "invalid_amount" | "not_found" | "not_receivable" };
 
 /**
@@ -218,15 +225,27 @@ export async function recordInvoicePayment(
     by: string | null;
   },
 ): Promise<RecordPaymentResult> {
-  // A receipt with one allocation, all of it to this invoice (src/lib/receipts.ts).
+  // A receipt with one allocation to this invoice, never beyond what it owes (src/lib/receipts.ts):
+  // what the customer paid on top is their credit, which the next invoice can use.
+  const amount = parsePaymentAmount(input.amount);
+  if (amount === null) return { ok: false, reason: "invalid_amount" };
+  const [invoice] = await db
+    .select({ companyId: invoices.companyId, currency: invoices.currency })
+    .from(invoices)
+    .where(eq(invoices.id, input.invoiceId));
+  if (!invoice) return { ok: false, reason: "not_found" };
+  const before = await balanceOf(db, input.invoiceId);
+  const share = Math.min(amount, before?.outstanding ?? 0);
   const result = await recordReceipt(db, {
-    amount: input.amount,
+    companyId: invoice.companyId,
+    currency: invoice.currency,
+    amount,
     receivedAt: input.paidAt ?? new Date(),
     method: input.method,
     reference: input.reference,
     note: input.note,
     by: input.by,
-    allocations: [{ invoiceId: input.invoiceId, amount: input.amount }],
+    allocations: share > 0 ? [{ invoiceId: input.invoiceId, amount: share }] : [],
   });
   if (!result.ok) {
     const reason = result.reason === "invalid_allocation" ? "invalid_amount" : result.reason;
@@ -236,9 +255,10 @@ export async function recordInvoicePayment(
   if (!balance) return { ok: false, reason: "not_found" };
   return {
     ok: true,
-    paymentId: result.allocationIds[0],
+    paymentId: result.allocationIds[0] ?? null,
     balance,
     becamePaid: result.settled.some((x) => x.invoiceId === input.invoiceId),
+    toCredit: Math.round((amount - share) * 100) / 100,
   };
 }
 
@@ -254,6 +274,8 @@ export interface InvoicePayment {
   receiptId: string | null;
   reference: string | null;
   receiptAmount: string | null;
+  /** The money came from a bank line: taking the payment back leaves it as credit, never deletes it. */
+  bankLinked: boolean;
 }
 
 export async function invoicePayments(db: AnyDb, invoiceId: string): Promise<InvoicePayment[]> {
@@ -268,6 +290,7 @@ export async function invoicePayments(db: AnyDb, invoiceId: string): Promise<Inv
       receiptId: orderPayments.receiptId,
       reference: receipts.reference,
       receiptAmount: receipts.amount,
+      bankLinked: sql<boolean>`${receipts.bankTransactionId} is not null`,
     })
     .from(orderPayments)
     .leftJoin(receipts, eq(receipts.id, orderPayments.receiptId))
@@ -276,24 +299,11 @@ export async function invoicePayments(db: AnyDb, invoiceId: string): Promise<Inv
 }
 
 /**
- * When an order's invoice is issued, the money already recorded on the order (a deposit)
- * reaches it — by the rule migration 0053 applied to the past: only while the order has
- * exactly one issued invoice, since with two nobody can say which one it paid. One
- * statement, so an invoice issued beside it cannot slip between the count and the link.
+ * The deposits left on an order, given to the invoice of it just issued, never beyond what it
+ * owes (src/lib/receipts.ts, `linkOrderDeposits`).
  */
-export async function linkOrderPayments(db: AnyDb, orderId: string): Promise<number> {
-  const result = await db.execute(sql`
-    update order_payment p set invoice_id = only_one.id
-    from (
-      select i.order_id, min(i.id) as id
-      from invoice i
-      where i.status = 'issued' and i.document_type in ('TD01', 'TD02') and i.order_id = ${orderId}
-      group by i.order_id
-      having count(*) = 1
-    ) only_one
-    where p.invoice_id is null and p.order_id = only_one.order_id
-    returning p.id`);
-  return (result.rows ?? result).length;
+export async function linkOrderPayments(db: AnyDb, orderId: string, invoiceId: string): Promise<number> {
+  return linkOrderDeposits(db, orderId, invoiceId);
 }
 
 /** An invoice's balance now, read from its rows. */

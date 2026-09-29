@@ -425,6 +425,8 @@ export async function sendInvoiceCopyEmail(data: {
   issueDate: string;
   total: string;
   dueDate: string | null;
+  /** Paid in parts (I12): each installment's day and amount, already formatted in the document's currency. */
+  installments?: { dueDate: string; amount: string }[] | null;
   pdf: { filename: string; bytes: Uint8Array };
   replyTo?: string | null;
   lang: DocumentLanguage;
@@ -439,11 +441,25 @@ export async function sendInvoiceCopyEmail(data: {
       number: `<strong>${esc(data.documentNumber)}</strong>`,
       date: day(data.issueDate),
       total: `<strong>${esc(data.total)}</strong>`,
-    }) + (data.dueDate ? fill(tx.emailDue, { date: esc(day(data.dueDate)) }) : "");
+    }) +
+    // In installments the last day is not "the" due date: the schedule follows, one line each.
+    (data.dueDate && !(data.installments && data.installments.length > 1)
+      ? fill(tx.emailDue, { date: esc(day(data.dueDate)) })
+      : "");
+  const schedule =
+    data.installments && data.installments.length > 1
+      ? `<p>${esc(tx.emailInstallments)}</p><ul>${data.installments
+          .map(
+            (i, k) =>
+              `<li>${esc(tx.installment)} ${k + 1}: ${esc(day(i.dueDate))} — <strong>${esc(i.amount)}</strong></li>`,
+          )
+          .join("")}</ul>`
+      : "";
   const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
         <p>${esc(tx.emailGreeting)}</p>
         <p>${body}.</p>
+        ${schedule}
         <p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>
         <p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">
           ${esc(tx.emailNotice)}
@@ -456,6 +472,66 @@ export async function sendInvoiceCopyEmail(data: {
     html,
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],
+  });
+}
+
+// ─── Payment reminder ─────────────────────────────────────────────────────────
+
+/**
+ * A reminder that an invoice is overdue, in the customer's language, with the courtesy PDF.
+ *
+ * ⚠️ Polite by construction: it says what is owed and since when, how to pay, and that a
+ * payment already made makes it void — a reminder crossing a transfer in the post is the
+ * common case, not the exception.
+ */
+export async function sendPaymentReminderEmail(data: {
+  to: string;
+  issuerName: string;
+  documentType: "TD01" | "TD02";
+  documentNumber: string;
+  issueDate: string;
+  dueDate: string;
+  amount: string;
+  iban?: string | null;
+  pdf: { filename: string; bytes: Uint8Array } | null;
+  replyTo?: string | null;
+  lang: DocumentLanguage;
+}) {
+  const tx = INVOICE_TEXT[data.lang];
+  const day = (iso: string) => iso.split("-").reverse().join("/");
+  const label = data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
+  const body = fill(tx.reminderBody, {
+    label: esc(data.lang === "it" ? label.toLowerCase() : label),
+    number: `<strong>${esc(data.documentNumber)}</strong>`,
+    date: day(data.issueDate),
+    due: day(data.dueDate),
+    amount: `<strong>${esc(data.amount)}</strong>`,
+  });
+  const iban = (data.iban ?? "").replace(/\s+/g, "").toUpperCase();
+  const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        <p>${esc(tx.emailGreeting)}</p>
+        <p>${body}.</p>
+        ${iban ? `<p>${fill(tx.reminderIban, { iban: `<strong>${esc(iban)}</strong>` })}</p>` : ""}
+        <p>${esc(tx.reminderPaid)}</p>
+        <p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>
+        ${
+          data.pdf
+            ? `<p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">${esc(tx.emailNotice)}</p>`
+            : ""
+        }
+      </div>`;
+
+  return sendEmail({
+    to: sanitizeHeader(data.to),
+    subject: sanitizeHeader(
+      `${tx.reminderSubject} — ${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
+    ),
+    html,
+    ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
+    ...(data.pdf
+      ? { attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }] }
+      : {}),
   });
 }
 

@@ -88,5 +88,23 @@
     "description": "⚠️ due fatture diverse ricevono lo stesso progressivo di invio",
     "find": "  return `${seriesPart}${((fiscalYear % 100) * 100000 + number).toString(36).toUpperCase()}`.slice(-10);",
     "replace": "  return `${seriesPart}INVIO`.slice(-10);"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ due fatture di un sezionale hanno lo stesso nome file: lo SDI scarta la seconda",
+    "find": "  if (series && sdiProgressive) return (SERIES_PROGRESSIVE_BASE + sdiProgressive).toString(36).toUpperCase();",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ la fattura di un sezionale non prende il progressivo del file",
+    "find": "      sdi_progressive = (SELECT last_value FROM progressive),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️ un cliente di San Marino riceve il codice dell'estero",
+    "find": "  if (nation === \"SM\") return { code: \"2R4GTO8\", pec: null };",
+    "replace": ""
   }
 ]

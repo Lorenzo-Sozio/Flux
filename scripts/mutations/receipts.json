@@ -32,26 +32,26 @@
   {
     "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ cancellare un pagamento lascia l'incasso: l'incassato conta soldi mai arrivati",
-    "find": "  if (row.receiptId && Number(row.siblings) <= 1) {",
-    "replace": "  if (false) {"
+    "find": "            delete from receipt r\n            where r.id = ${receiptId}\n",
+    "replace": "            delete from receipt r\n            where false\n"
   },
   {
     "file": "src/lib/receipts.ts",
     "description": "⚠️ correggere l'importo di un pagamento non corregge ciò che la fattura ha ricevuto",
-    "find": "  const whole = allocations.length === 1 && cents(Number(allocations[0].amount)) === cents(Number(receipt.amount));",
+    "find": "  const whole = stored > 0 && allocations.length === 1 && cents(Number(allocations[0].amount)) === cents(stored);",
     "replace": "  const whole = false;"
   },
   {
     "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ si rimborsa su una fattura più di quanto è stato pagato in eccesso",
-    "find": "    if (cents(over) < cents(amount)) return { ok: false, reason: \"not_overpaid\" };",
-    "replace": ""
+    "find": "        guardInvoiceNotUnderpaid(h, doc.id),\n",
+    "replace": "\n"
   },
   {
     "file": "src/lib/receipts.ts",
     "description": "⚠️⚠️ si rimborsa un credito che il cliente non ha",
-    "find": "  if (cents(credit) < cents(amount)) return { ok: false, reason: \"no_credit\" };",
-    "replace": ""
+    "find": "      guardCustomerCredit(h, companyId),\n",
+    "replace": "\n"
   },
   {
     "file": "src/lib/receipts.ts",
@@ -82,5 +82,71 @@
     "description": "⚠️ la riparazione crea l'incasso ma non lo collega al pagamento",
     "find": "    update order_payment set receipt_id = order_payment.id",
     "replace": "    update order_payment set receipt_id = null"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ togliere una parte di un bonifico cancella tutto il bonifico, credito compreso",
+    "find": "              and r.amount = ${row.amount}::numeric\n",
+    "replace": "\n"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ togliere un pagamento arrivato dalla banca cancella l'incasso e riapre il movimento",
+    "find": "              and r.bank_transaction_id is null\n",
+    "replace": "\n"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ una fattura riceve più di quanto deve: l'eccedenza sparisce da ogni totale",
+    "find": "                      > i.total - i.credited_amount + 0.005",
+    "replace": "                      > 1e12"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ il credito già rimborsato si spende di nuovo",
+    "find": "      having sum(r.amount) - coalesce(sum((select sum(p.amount) from order_payment p where p.receipt_id = r.id)), 0) < -0.005",
+    "replace": "      having false"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ due rimborsi della stessa eccedenza passano entrambi",
+    "find": "                      < i.total - i.credited_amount - 0.005",
+    "replace": "                      < -1e12"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ un incasso dalla banca si modifica da fuori e non torna più con il movimento",
+    "find": "    receipt.bankTransactionId &&\n",
+    "replace": "    false &&\n"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ l'importo di un rimborso si modifica e diventa un incasso",
+    "find": "      if (cents(parsed) !== cents(-stored)) return { ok: false, reason: \"refund_fixed\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ la nota di credito lascia l'eccedenza sulla fattura invece di renderla credito",
+    "find": "  let over = cents(Number(paidRow?.paid ?? 0)) - cents(Number(invoice.total) - Number(invoice.credited));",
+    "replace": "  let over = 0;"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️ lo schermo offre di spendere credito già rimborsato",
+    "find": "      const take = Math.min(left, toTake.get(r.currency) ?? 0);",
+    "replace": "      const take = 0;"
+  },
+  {
+    "file": "src/lib/receipts.ts",
+    "description": "⚠️⚠️ un acconto più grande della fattura d'acconto non si divide: il saldo resta non pagato",
+    "find": "    const share = Math.min(room, cents(Number(d.amount)));",
+    "replace": "    const share = cents(Number(d.amount));"
+  },
+  {
+    "file": "src/lib/receivables.ts",
+    "description": "⚠️⚠️ un pagamento oltre il dovuto resta sulla fattura invece di andare a credito",
+    "find": "  const share = Math.min(amount, before?.outstanding ?? 0);",
+    "replace": "  const share = amount;"
   }
 ]

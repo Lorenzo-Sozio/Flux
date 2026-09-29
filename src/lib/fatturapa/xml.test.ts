@@ -340,4 +340,19 @@ describe("delivery, names and identifiers", () => {
     expect(transmissionIdFor(2026, 12, "")).not.toBe(transmissionIdFor(2027, 12, ""));
     expect(transmissionIdFor(2026, 12, "B")).not.toBe(transmissionIdFor(2026, 12, ""));
   });
+
+  it("⚠️⚠️ two invoices of a series other than the main one get two file names (audit, 29/09/2026)", () => {
+    const name = (n: number, progressive: number) =>
+      fatturaPaFileName({ ...base, transmissionId: transmissionIdFor(2026, n, "B", progressive) });
+    expect(name(12, 1)).not.toBe(name(13, 2));
+    expect(name(12, 1)).toMatch(/^IT00905811006_[A-Z0-9]{5}\.xml$/);
+    // Above every main-series progressive, and still five characters at the thirty-millionth.
+    const main = Number.parseInt(transmissionIdFor(2099, 99_999, ""), 36);
+    expect(Number.parseInt(transmissionIdFor(2026, 1, "B", 1), 36)).toBeGreaterThan(main);
+    expect(transmissionIdFor(2026, 1, "B", 30_000_000)).toHaveLength(5);
+  });
+
+  it("San Marino is delivered with its own code", () => {
+    expect(delivery({ ...base.customer, country: "SM" })).toEqual({ code: "2R4GTO8", pec: null });
+  });
 });

@@ -33,6 +33,7 @@ import { getCustomerMoney } from "@/actions/receipts";
 import { deleteTask, getAllUsers, getTasksByCompany } from "@/actions/tasks";
 import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
 import { DealAmount } from "@/app/(main)/dashboard/pipeline/[id]/_components/deal-amount";
+import { CashError } from "@/app/(main)/dashboard/sales/finance/_components/cash-card";
 import { auth } from "@/auth";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { CustomerMoneyCard } from "@/components/crm/customer-money-card";
@@ -65,6 +66,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts, deals, tickets } from "@/db/schema";
 import { customerGaps } from "@/lib/fiscal-ids";
+import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { getDb } from "@/lib/tenant-context";
@@ -142,7 +144,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     priceLists,
     people,
     [figures],
-    money,
+    moneyOutcome,
     t,
     tD,
     tI,
@@ -152,6 +154,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     tP,
     tS,
     format,
+    tFinance,
   ] = await Promise.all([
     // What the timeline holds — the company's own, its contacts' and its deals' — for the
     // tab's count and the last contact, so neither disagrees with the list.
@@ -203,7 +206,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       .where(eq(deals.companyId, companyId)),
     // What the customer paid, what it paid, and what is left as their credit (I10). Absent
     // without the sales module, or before the migration: the card is then not drawn.
-    getCustomerMoney(companyId).catch(() => null),
+    // ⚠️ A load that failed is said to have failed; a plan without sales has no card (I14).
+    loadOutcome("company money", () => getCustomerMoney(companyId)),
     getTranslations("companies"),
     getTranslations("entityDetail"),
     getTranslations("invoicing"),
@@ -213,6 +217,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     getTranslations("pipeline"),
     getTranslations("companies.detail"),
     getFormatter(),
+    getTranslations("finance"),
   ]);
 
   // ── Server actions scoped to this company ──
@@ -847,17 +852,29 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               />
             ),
           },
-          ...(money
+          ...(loadedValue(moneyOutcome)
             ? [
                 {
                   tab: "sales",
                   column: "side" as const,
                   node: (
-                    <CustomerMoneyCard companyId={companyId} data={money} canWrite={can(tenantRole, "invoice:write")} />
+                    <CustomerMoneyCard
+                      companyId={companyId}
+                      data={loadedValue(moneyOutcome) as NonNullable<Awaited<ReturnType<typeof getCustomerMoney>>>}
+                      canWrite={can(tenantRole, "invoice:write")}
+                    />
                   ),
                 },
               ]
-            : []),
+            : failed(moneyOutcome)
+              ? [
+                  {
+                    tab: "sales",
+                    column: "side" as const,
+                    node: <CashError text={tFinance("cash.loadError")} />,
+                  },
+                ]
+              : []),
           { tab: "sales", column: "side", node: <DocumentPanel entityType="company" entityId={companyId} /> },
         ]}
       />

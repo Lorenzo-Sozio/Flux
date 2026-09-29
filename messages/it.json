@@ -1288,7 +1288,8 @@
       "assigned": "{count, plural, one {# azienda assegnata} other {# aziende assegnate}}",
       "deleteFailed": "Impossibile eliminare le aziende",
       "updateFailed": "Impossibile aggiornare le aziende",
-      "assignFailed": "Impossibile assegnare le aziende"
+      "assignFailed": "Impossibile assegnare le aziende",
+      "keptWithAccounts": "{count, plural, one {Un cliente non è stato eliminato: ha fatture o incassi} other {# clienti non sono stati eliminati: hanno fatture o incassi}}. Uniscili ai doppioni invece di eliminarli."
     },
     "form": {
       "newTitle": "Nuova azienda",
@@ -1678,7 +1679,8 @@
         "invoicedDesc": "Emesso, IVA esclusa",
         "sinceYearStart": "Da inizio anno:",
         "unavailable": "Non disponibile",
-        "unavailableHint": "Questa cifra non si è caricata: nessun valore al posto di uno sbagliato."
+        "unavailableHint": "Questa cifra non si è caricata: nessun valore al posto di uno sbagliato.",
+        "commissionsAccruing": "In maturazione: il mese non è ancora chiuso"
       },
       "desk": {
         "open": "Ticket aperti",
@@ -2076,7 +2078,7 @@
       "electricity": "Bolletta della luce",
       "creditCard": "Pagamento della carta di credito"
     },
-    "ordersThisMonth": "Ordini completati nel mese",
+    "ordersThisMonth": "Ordini completati, datati questo mese",
     "ordersThisMonthDesc": "{count, plural, one {# ordine} other {# ordini}}",
     "ordersThisMonthUnconverted": "{count, plural, one {# ordine} other {# ordini}}, esclusi {unconverted} in una valuta senza cambio noto",
     "receivables": {
@@ -2104,6 +2106,7 @@
       }
     },
     "cash": {
+      "creditList": "Clienti con credito da usare o rimborsare",
       "title": "Cassa",
       "subtitle": "Soldi arrivati e da arrivare. Ogni cifra dice cosa conta.",
       "collected": "Incassato nel mese",
@@ -2122,7 +2125,7 @@
       "credit": "Credito dei clienti",
       "creditDef": "Incassi non imputati a nessun documento.",
       "chartTitle": "Incassato e fatturato, per mese",
-      "chartDesc": "Incassato: accrediti per data di arrivo. Fatturato: fatture e acconti per data di emissione, meno le note di credito. Ultimi 12 mesi.",
+      "chartDesc": "Incassato: accrediti per data di arrivo. Fatturato: fatture e acconti per data di emissione, IVA inclusa, meno le note di credito. Ultimi 12 mesi.",
       "collectedLabel": "Incassato",
       "invoicedLabel": "Fatturato",
       "otherCurrencies": "Il grafico è in {currency}: le altre valute non si sommano.",
@@ -2131,11 +2134,14 @@
       "unavailable": "Non disponibile",
       "loadError": "Le cifre di cassa non si sono caricate. Nessun numero è mostrato al posto di uno sbagliato: riprova tra poco.",
       "receivablesError": "Lo scadenzario non si è caricato: riprova tra poco.",
-      "chartEmpty": "Niente incassato né fatturato negli ultimi 12 mesi."
+      "chartEmpty": "Niente incassato né fatturato negli ultimi 12 mesi.",
+      "inCurrency": "Calcolato sulle cifre in {currency}."
     },
     "salesTitle": "Vendite: vinto e ordini",
     "salesSubtitle": "Trattative vinte e ordini completati: cosa è stato venduto, non cosa è stato incassato.",
-    "wonThisMonth": "Vinto questo mese"
+    "wonThisMonth": "Vinto questo mese",
+    "overdueInvoices": "Fatture scadute",
+    "bank": "Banca"
   },
   "leads": {
     "title": "Lead",
@@ -3111,6 +3117,11 @@
       "noInvoices": "Non ancora fatturato."
     },
     "payments": {
+      "method": "Metodo",
+      "recorded": "Pagamento registrato.",
+      "recordedRestOnOrder": "Pagamento registrato: {amount} oltre quanto dovuto dalla fattura restano come acconto sull'ordine.",
+      "removed": "Pagamento eliminato.",
+      "removedToCredit": "Pagamento tolto: l'importo è tornato a credito del cliente.",
       "title": "Pagamento",
       "paid": "Incassato",
       "outstanding": "Da incassare",
@@ -3118,7 +3129,6 @@
       "addPayment": "Registra un pagamento",
       "amount": "Importo",
       "date": "Data",
-      "method": "Come",
       "methodPlaceholder": "Bonifico, carta, contanti…",
       "record": "Registra",
       "cancel": "Annulla",
@@ -3144,7 +3154,8 @@
       "linkToInvoice": "Collega a una fattura…",
       "goesToInvoice": "Va sulla fattura {number}.",
       "goesToOrder": "Nessuna fattura emessa: resta come acconto sull'ordine e passa alla fattura quando la emetti."
-    }
+    },
+    "toInvoiceFilter": "Da fatturare"
   },
   "record": {
     "sectionsLabel": "Sezioni della scheda",
@@ -6549,7 +6560,9 @@
       "credit_exceeds_residual": "la nota di credito supera il residuo stornabile della fattura",
       "credit_without_original": "la fattura da stornare non è più emessa o non esiste",
       "deduction_exceeds": "Lo storno di un acconto supera l'imponibile di un'aliquota: l'ordine è cambiato dopo la fattura d'acconto.",
-      "installments_total": "Le rate non fanno il totale della fattura"
+      "installments_total": "Le rate non fanno il totale della fattura",
+      "installment_before_issue": "Una rata scade prima della data della fattura",
+      "currency_not_eur": "Fattura in valuta diversa dall'euro: serve il cambio, emettila in euro"
     },
     "lines": "Righe",
     "description": "Descrizione",
@@ -6638,7 +6651,8 @@
       "draftAnyway": "Puoi comunque salvarla come bozza e completarla dopo.",
       "readyToIssue": "Pronta per l'emissione.",
       "readyNoPermission": "Completa. Per emetterla serve un amministratore: salvala come bozza.",
-      "savedNotIssued": "Bozza salvata, ma non emessa: nella pagina della fattura trovi cosa manca."
+      "savedNotIssued": "Bozza salvata, ma non emessa: nella pagina della fattura trovi cosa manca.",
+      "balanceNotice": "L'ordine ha {count, plural, one {una fattura d'acconto} other {# fatture d'acconto}} da detrarre: salva la bozza, controlla detrazioni e totale, poi emettila dalla sua pagina."
     },
     "searchPlaceholder": "Cerca per numero o cliente…",
     "allInvoices": "Tutte",
@@ -6685,6 +6699,13 @@
       "noteNumber": "Nota di credito n. {number}"
     },
     "payments": {
+      "recorded": "Pagamento registrato.",
+      "recordedWithCredit": "Pagamento registrato: {amount} oltre il dovuto restano come credito del cliente.",
+      "removed": "Pagamento eliminato.",
+      "removedToCredit": "Pagamento tolto: l'importo è tornato a credito del cliente.",
+      "overpaidHint": "La fattura ha ricevuto più del dovuto. Tieni la differenza come credito del cliente, per le prossime fatture, oppure registra quanto gli hai restituito.",
+      "moveToCredit": "Sposta {amount} a credito",
+      "movedToCredit": "{amount} spostati a credito del cliente.",
       "due": "Dovuto al netto delle note di credito",
       "partOf": "parte di un incasso di {amount}",
       "creditAvailable": "Il cliente ha {amount} di credito.",
@@ -6694,6 +6715,7 @@
       "recordRefund": "Registra il rimborso"
     },
     "deposit": {
+      "created": "Bozza della fattura d'acconto creata: controllala ed emettila.",
       "numberTitle": "Fattura d'acconto n. {number}",
       "draftTitle": "Bozza di fattura d'acconto",
       "rate": "IVA {rate}%",
@@ -6714,6 +6736,11 @@
       "receivedNotInvoiced": "Acconto di {amount} incassato e non ancora fatturato: un pagamento anticipato va fatturato quando arriva."
     },
     "terms": {
+      "installmentOf": "Rata {n} di {count} · {amount}",
+      "installmentPaid": "pagata",
+      "installmentLate": "scaduta, restano {amount}",
+      "installmentPartly": "restano {amount}",
+      "installmentOpen": "da pagare",
       "label": "Condizioni di pagamento",
       "single": "Scadenza unica (data qui sopra)",
       "custom": "Rate personalizzate",
@@ -6742,6 +6769,48 @@
         "p30_70": "30% alla fattura, 70% a 30 gg",
         "p50_50": "50% alla fattura, 50% a 30 gg"
       }
+    },
+    "filters": {
+      "draft": "Bozze",
+      "issued": "Emesse",
+      "unpaid": "Da incassare",
+      "overdue": "Scadute"
+    },
+    "paymentColumn": "Incasso",
+    "paymentState": {
+      "overdue": "Scaduta da {days} gg · {amount}",
+      "open": "{amount} · scade il {date}",
+      "paid": "Pagata",
+      "overpaid": "Pagata oltre il dovuto",
+      "credited": "Stornata"
+    },
+    "issuedInMonth": "Emesse a {month}",
+    "paymentBadge": {
+      "overdue": "Scaduta da {days} gg"
+    },
+    "nextInstallment": "Prossima rata",
+    "sdiReminder": "Fattura emessa: ora il file XML deve arrivare allo SDI. Scaricalo e caricalo sul portale Fatture e Corrispettivi o inviane una copia al tuo intermediario.",
+    "downloadXml": "Scarica l'XML",
+    "issueSummary": {
+      "document": "Documento",
+      "series": "serie {series}",
+      "date": "Data di emissione",
+      "customer": "Cliente",
+      "total": "Totale documento",
+      "fromTerms": "Dalle condizioni di pagamento, a partire da oggi"
+    },
+    "reminder": {
+      "overdue": "Scaduta da {days} gg: {amount} da incassare.",
+      "lastReminder": "Ultimo sollecito il {when} ({count, plural, one {# inviato} other {# inviati}})",
+      "button": "Invia sollecito",
+      "title": "Sollecito di pagamento",
+      "description": "Il cliente riceve un promemoria cortese per {amount} scaduti, nella sua lingua, con la copia di cortesia in allegato e, per i bonifici, l'IBAN. Il messaggio dice di ignorarlo se ha già pagato.",
+      "recipient": "Destinatario",
+      "noCustomerEmail": "L'azienda non ha un'email principale: scrivi l'indirizzo dell'amministrazione.",
+      "cancel": "Annulla",
+      "send": "Invia sollecito",
+      "sent": "Sollecito inviato a {to}.",
+      "failed": "Non è stato possibile inviare il sollecito."
     }
   },
   "entities": {
@@ -7896,14 +7965,26 @@
         "mixed_currency": "Un incasso paga solo documenti nella sua stessa valuta.",
         "not_overpaid": "Si può rimborsare solo quanto la fattura ha ricevuto oltre il dovuto.",
         "no_credit": "Il cliente non ha abbastanza credito per questo rimborso.",
-        "already_reconciled": "Il movimento è già stato riconciliato o ignorato."
+        "already_reconciled": "Il movimento è già stato riconciliato o ignorato.",
+        "overpays": "La fattura riceverebbe più di quanto deve: registra la differenza come credito del cliente.",
+        "reconciled": "L'incasso viene dall'estratto conto: importo e data si correggono annullando l'abbinamento in Banca.",
+        "refund_fixed": "L'importo di un rimborso non si modifica: eliminalo e registralo di nuovo."
       },
       "depositAmount": "Inserisci l'importo dell'acconto, maggiore di zero, su un ordine con delle righe.",
       "depositExceedsOrder": "L'acconto supera quanto resta da fatturare sull'ordine ({left}).",
       "depositGone": "Una fattura d'acconto da detrarre non è più emessa: ricrea la fattura di saldo.",
       "depositTakenOff": "Un acconto è già stato detratto da un'altra fattura: questa non è stata emessa.",
       "depositStillDraft": "Emetti o elimina prima la fattura d'acconto in bozza di questo ordine.",
-      "depositAfterInvoice": "L'ordine ha già la sua fattura: un acconto ora verrebbe fatturato due volte."
+      "depositAfterInvoice": "L'ordine ha già la sua fattura: un acconto ora verrebbe fatturato due volte.",
+      "orderAlreadyInvoiced": "L'ordine ha già una fattura emessa non stornata: per rifarla, prima emetti una nota di credito per intero.",
+      "depositLeftOut": "L'ordine ha una fattura d'acconto non detratta da questa fattura: ricrea la fattura di saldo dall'ordine, così l'acconto viene detratto.",
+      "depositOverOrder": "Con questa fattura d'acconto gli acconti supererebbero il totale dell'ordine.",
+      "orderNotFound": "L'ordine non esiste più.",
+      "orderOtherCustomer": "L'ordine è di un altro cliente: scegli il cliente dell'ordine.",
+      "currencyInvalid": "La valuta non è valida.",
+      "reminderNotOwed": "Si sollecita solo una fattura emessa.",
+      "reminderNotOverdue": "La fattura non ha importi scaduti da sollecitare.",
+      "reminderJustSent": "Un sollecito per questa fattura è partito meno di un'ora fa."
     },
     "contracts": {
       "notFound": "Questo contratto non esiste più."
@@ -8011,6 +8092,9 @@
       "mixed_currency": "I documenti sono in una valuta diversa dal movimento.",
       "not_overpaid": "Non c'è un pagamento in eccesso da rimborsare.",
       "no_credit": "Il cliente non ha abbastanza credito."
+    },
+    "companies": {
+      "hasAccounts": "Il cliente ha fatture emesse o incassi: non si elimina. Se è un doppione, uniscilo all'altro cliente."
     }
   },
   "validation": {
@@ -8055,7 +8139,9 @@
       "quoteHasNoLines": "Questo preventivo non ha righe da ordinare.",
       "paymentPositive": "Un pagamento deve avere un importo positivo.",
       "paymentDate": "Inserisci il giorno in cui è arrivato il pagamento: oggi o prima.",
-      "paymentChooseInvoice": "L'ordine ha più fatture emesse: scegli quale paga questo incasso."
+      "paymentChooseInvoice": "L'ordine ha più fatture emesse: scegli quale paga questo incasso.",
+      "lineInvalid": "Quantità, prezzo o sconto non validi.",
+      "linesFrozen": "L'ordine ha fatture emesse: le sue righe non si modificano più. Per cambiarle, storna prima le fatture."
     },
     "products": {
       "nameRequired": "Il nome è obbligatorio.",
@@ -8954,7 +9040,17 @@
     "edit": "Correggi l'incasso",
     "editTitle": "Correggi l'incasso",
     "save": "Salva",
-    "saved": "Incasso corretto."
+    "saved": "Incasso corretto.",
+    "currency": "Valuta",
+    "recordedWithCredit": "Incasso registrato: {amount} restano come credito del cliente.",
+    "refund": "Rimborsa",
+    "refundAmount": "Importo da restituire ({currency})",
+    "refundDate": "Data del rimborso",
+    "refundHint": "Il rimborso riduce il credito del cliente e compare nell'estratto conto come uscita.",
+    "refundConfirm": "Registra il rimborso",
+    "refunded": "Rimborso di {amount} registrato.",
+    "refundFailed": "Non è stato possibile registrare il rimborso.",
+    "refundOverCredit": "Il rimborso supera il credito del cliente ({amount})."
   },
   "bank": {
     "title": "Riconciliazione bancaria",
@@ -9029,7 +9125,9 @@
       "other_payer": "L'IBAN è di un altro cliente",
       "contested": "Un altro movimento propone lo stesso documento",
       "recorded_already": "Un incasso di questo importo è già registrato",
-      "installment_exact": "Importo uguale alla prossima rata"
+      "installment_exact": "Importo uguale alla prossima rata",
+      "possible_duplicate": "Stesso giorno e importo di una riga di un altro file: forse è un doppione",
+      "reversal": "Pagamento tornato indietro: annulla l'abbinamento dell'incasso originale"
     },
     "bulkDone": "{confirmed, plural, one {# movimento riconciliato} other {# movimenti riconciliati}}.",
     "bulkChanged": "{changed, plural, one {# proposta è cambiata} other {# proposte sono cambiate}} nel frattempo: controlla.",
@@ -9070,7 +9168,8 @@
       "description": "Descrizione",
       "counterparty": "Ordinante / beneficiario",
       "iban": "IBAN",
-      "reference": "Riferimento (CRO/TRN)"
+      "reference": "Riferimento (CRO/TRN)",
+      "sign": "Segno (D/A)"
     },
     "none": "—",
     "amountMode": "Importi",
@@ -9085,7 +9184,19 @@
     "noMovements": "Nessun movimento letto dal file.",
     "startImport": "Importa {count, plural, one {# movimento} other {# movimenti}}",
     "importing": "Importazione… {done} di {total}",
-    "imported": "{created} nuovi, {skipped} già presenti, {rejected} scartati."
+    "imported": "{created} nuovi, {skipped} già presenti, {rejected} scartati.",
+    "recordedByHand": "Incassi già registrati a mano",
+    "recordedByHandHint": "Se il movimento è uno di questi, collegalo: registrarlo di nuovo conterebbe due volte lo stesso incasso.",
+    "linkReceipt": "Collega",
+    "depositOnOrder": "Acconto su un ordine",
+    "creditNow": "Credito attuale del cliente: {amount}",
+    "amountInvalid": "Un importo non è valido: scrivilo come 1.234,56.",
+    "confirmWeak": "La proposta è debole: confermi comunque questo abbinamento?",
+    "otherAccount": "{count, plural, one {Un movimento è} other {# movimenti sono}} di un altro conto e non {count, plural, one {verrà importato} other {verranno importati}}.",
+    "balanceRows": "{count, plural, one {Una riga di saldo esclusa} other {# righe di saldo escluse}}.",
+    "headerRow": "Riga delle intestazioni",
+    "confirmSureTitle": "Confermare {count, plural, one {la proposta sicura} other {le # proposte sicure}}?",
+    "confirmSureText": "Verranno registrati incassi per {total}. Le proposte cambiate nel frattempo restano da controllare."
   },
   "statement": {
     "date": "Data",
@@ -9106,5 +9217,14 @@
       "receipt": "Incasso",
       "refund": "Rimborso"
     }
+  },
+  "paymentRemove": {
+    "button": "Togli questo pagamento",
+    "title": "Togliere il pagamento di {amount}?",
+    "deleted": "Il pagamento di {amount} del {date} viene eliminato e il documento torna a doverlo.",
+    "shared": "Viene tolta solo questa quota di {amount}, parte di un incasso di {receipt}: la quota torna a credito del cliente, il resto dell'incasso non cambia.",
+    "bankLinked": "Il denaro viene dall'estratto conto e resta registrato: {amount} tornano a credito del cliente, da usare su un'altra fattura o da rimborsare. Per sciogliere l'abbinamento con il movimento usa la pagina Banca.",
+    "cancel": "Annulla",
+    "confirm": "Togli il pagamento"
   }
 }

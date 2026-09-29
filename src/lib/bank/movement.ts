@@ -24,6 +24,10 @@ export interface Movement {
    * each chunk would call the second of two payments the first.
    */
   repeat?: number;
+  /** The IBAN of the account the statement line is on, when the file says (CAMT). */
+  accountIban?: string | null;
+  /** A payment returned unpaid (CAMT RvslInd): money going back the way it came. */
+  reversal?: boolean;
 }
 
 export type MovementProblem = "date" | "amount" | "currency";
@@ -74,6 +78,8 @@ export function cleanMovement(
       counterpartyIban: normalizeIban(m.counterpartyIban),
       remittance: text(m.remittance, 1000),
       bankReference: text(m.bankReference, 120),
+      accountIban: normalizeIban(m.accountIban),
+      reversal: m.reversal === true,
       repeat:
         Number.isInteger(m.repeat) && (m.repeat as number) >= 1 && (m.repeat as number) <= 100_000
           ? (m.repeat as number)
@@ -94,7 +100,11 @@ export function fingerprintBase(m: Movement): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
-  return [m.bookedOn, Math.round(m.amount * 100), (m.bankReference ?? "").toLowerCase(), words].join("|");
+  // ⚠️ The payer too: two people paying the same amount the same day with no reference were one
+  // line to the fingerprint, and a file listing them in another order dropped one and doubled
+  // the other.
+  const payer = m.counterpartyIban ?? (m.counterpartyName ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return [m.bookedOn, Math.round(m.amount * 100), (m.bankReference ?? "").toLowerCase(), words, payer].join("|");
 }
 
 /** Numbers identical lines over a whole file, in its order: 1, 2, 3 for each repeat. */

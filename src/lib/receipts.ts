@@ -17,9 +17,10 @@
  * queue by the database, and the second one fails instead of spending the money twice. A
  * check read before the write, or a stored "allocated" figure, would each let one through.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { bankTransactions, companies, invoices, orderPayments, orders, receipts } from "@/db/schema";
+import { together } from "@/lib/db-together";
 import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
 import { parsePaymentAmount, paymentSummary } from "@/lib/order-payment";
 
@@ -40,7 +41,13 @@ export type ReceiptRefusal =
   | "not_overpaid"
   | "no_credit"
   /** The bank line is explained already, or ignored (I13). */
-  | "already_reconciled";
+  | "already_reconciled"
+  /** An invoice would receive more than it owes: the rest is the customer's credit. */
+  | "overpays"
+  /** The receipt came from the bank statement: its amount and day are the bank's (I13). */
+  | "reconciled"
+  /** A refund's amount is corrected by taking it back and recording it again. */
+  | "refund_fixed";
 
 export interface AllocationInput {
   /** An issued invoice. Its order is named too, so the order's balance keeps counting it. */
@@ -79,16 +86,6 @@ export type ReceiptResult =
 
 const cents = (n: number) => Math.round(n * 100);
 const clean = (s: string | null | undefined, max = 300) => s?.trim().slice(0, max) || null;
-
-/** Statements that must land together: a batch on the HTTP driver, a transaction elsewhere. */
-async function together(db: AnyDb, statements: (h: AnyDb) => unknown[]): Promise<unknown[]> {
-  if (typeof db.batch === "function") return db.batch(statements(db));
-  return db.transaction(async (tx: AnyDb) => {
-    const out: unknown[] = [];
-    for (const statement of statements(tx)) out.push(await statement);
-    return out;
-  });
-}
 
 /**
  * Fails the transaction when a receipt's allocations exceed it — the check that decides, read
@@ -130,6 +127,69 @@ export function guardBankTransaction(h: AnyDb, transactionId: string) {
     })
     .from(bankTransactions)
     .where(eq(bankTransactions.id, transactionId));
+}
+
+/** Payments to one invoice queue behind each other here. */
+function lockInvoices(h: AnyDb, ids: readonly string[]) {
+  return h
+    .select({ id: invoices.id })
+    .from(invoices)
+    .where(inArray(invoices.id, [...ids]))
+    .for("update");
+}
+
+/** Credit operations of one customer queue behind each other here. */
+function lockCompany(h: AnyDb, companyId: string) {
+  return h.select({ id: companies.id }).from(companies).where(eq(companies.id, companyId)).for("update");
+}
+
+/**
+ * ⚠️⚠️ Fails the transaction when an invoice would be paid more than it owes (its total less its
+ * credit notes). What a customer pays beyond an invoice is their credit, never an overpaid invoice
+ * that no total shows and no later invoice can use. Read after the write, under the invoices'
+ * locks; a failed cast rather than a division, so the error says which rule refused.
+ */
+function guardInvoicesNotOverpaid(h: AnyDb, ids: readonly string[]) {
+  const list = JSON.stringify([...ids]);
+  return h.execute(sql`
+    select (case when coalesce((select sum(p.amount) from order_payment p where p.invoice_id = i.id), 0)
+                      > i.total - i.credited_amount + 0.005
+                 then 'overpays:' || i.id else '1' end)::int as ok
+    from invoice i where i.id in (select jsonb_array_elements_text(${list}::jsonb))`);
+}
+
+/** Fails when a refund on an invoice would give back more than was paid beyond what it owes. */
+function guardInvoiceNotUnderpaid(h: AnyDb, invoiceId: string) {
+  return h.execute(sql`
+    select (case when coalesce((select sum(p.amount) from order_payment p where p.invoice_id = i.id), 0)
+                      < i.total - i.credited_amount - 0.005
+                 then 'not_overpaid:' || i.id else '1' end)::int as ok
+    from invoice i where i.id = ${invoiceId}`);
+}
+
+/** Fails when a customer's credit in any currency would go below nothing. */
+function guardCustomerCredit(h: AnyDb, companyId: string) {
+  return h.execute(sql`
+    select (case when exists (
+      select 1 from receipt r
+      where r.company_id = ${companyId}
+      group by r.currency
+      having sum(r.amount) - coalesce(sum((select sum(p.amount) from order_payment p where p.receipt_id = r.id)), 0) < -0.005
+    ) then 'no_credit:' || ${companyId} else '1' end)::int as ok`);
+}
+
+function errorText(error: unknown): string {
+  const e = error as { message?: string; cause?: { message?: string } };
+  return `${e?.message ?? ""} ${e?.cause?.message ?? ""}`;
+}
+
+/** Which of the guards above refused, if one did. */
+export function guardRefusal(error: unknown): "overpays" | "not_overpaid" | "no_credit" | null {
+  const text = errorText(error);
+  if (text.includes("overpays:")) return "overpays";
+  if (text.includes("not_overpaid:")) return "not_overpaid";
+  if (text.includes("no_credit:")) return "no_credit";
+  return null;
 }
 
 export function isOverAllocation(error: unknown): boolean {
@@ -251,6 +311,7 @@ export async function recordReceipt(db: AnyDb, input: ReceiptInput): Promise<Rec
   try {
     await together(db, (h) => [
       ...(line ? [lockBankTransaction(h, line)] : []),
+      ...(invoiceIds.length > 0 ? [lockInvoices(h, invoiceIds)] : []),
       h.insert(receipts).values({
         id: receiptId,
         companyId: [...customerIds][0] ?? null,
@@ -284,8 +345,10 @@ export async function recordReceipt(db: AnyDb, input: ReceiptInput): Promise<Rec
           ]
         : []),
       ...(line ? [guardBankTransaction(h, line)] : []),
+      ...(invoiceIds.length > 0 ? [guardInvoicesNotOverpaid(h, invoiceIds)] : []),
     ]);
   } catch (error) {
+    if (guardRefusal(error) === "overpays") return { ok: false, reason: "overpays" };
     if (line && isOverAllocation(error)) return { ok: false, reason: "already_reconciled" };
     throw error;
   }
@@ -345,14 +408,14 @@ export async function allocateCredit(
   if (receipt.currency !== doc.currency) return { ok: false, reason: "mixed_currency" };
 
   const allocationId = crypto.randomUUID();
+  const credit = receipt.companyId ?? doc.companyId;
   try {
     await together(db, (h) => [
-      // The row lock: a second allocation of the same credit waits here for the first.
-      h
-        .select({ id: receipts.id })
-        .from(receipts)
-        .where(eq(receipts.id, receipt.id))
-        .for("update"),
+      // The row locks: a second allocation of the same credit — or a refund of it, or a second
+      // payment of the same invoice — waits here for the first.
+      ...(credit ? [lockCompany(h, credit)] : []),
+      h.select({ id: receipts.id }).from(receipts).where(eq(receipts.id, receipt.id)).for("update"),
+      lockInvoices(h, [doc.id]),
       h.insert(orderPayments).values({
         id: allocationId,
         receiptId: receipt.id,
@@ -364,8 +427,15 @@ export async function allocateCredit(
         recordedById: input.by,
       }),
       guardNotOverAllocated(h, receipt.id),
+      guardInvoicesNotOverpaid(h, [doc.id]),
+      // ⚠️⚠️ A refund out of credit is a negative receipt of its own: this receipt still has room
+      // for it, and only the customer's whole credit says the money is gone.
+      ...(credit ? [guardCustomerCredit(h, credit)] : []),
     ]);
   } catch (error) {
+    const refused = guardRefusal(error);
+    if (refused === "overpays") return { ok: false, reason: "overpays" };
+    if (refused === "no_credit") return { ok: false, reason: "no_credit" };
     if (isOverAllocation(error)) return { ok: false, reason: "over_allocated" };
     throw error;
   }
@@ -379,6 +449,10 @@ export async function allocateCredit(
 /**
  * Gives a deposit recorded on an order to one of the order's issued invoices — the payments
  * that stayed on an order with several invoices, which nothing could link before I10.
+ *
+ * ⚠️⚠️ Never beyond what the invoice owes: a deposit larger than that is split, the invoice's
+ * share linked and the rest left on the order as a deposit. Linking it whole overpaid the
+ * invoice, and the next invoice of the order read unpaid.
  */
 export async function linkAllocation(
   db: AnyDb,
@@ -387,9 +461,14 @@ export async function linkAllocation(
   const [allocation] = await db
     .select({
       id: orderPayments.id,
+      receiptId: orderPayments.receiptId,
       orderId: orderPayments.orderId,
       invoiceId: orderPayments.invoiceId,
       amount: orderPayments.amount,
+      paidAt: orderPayments.paidAt,
+      method: orderPayments.method,
+      note: orderPayments.note,
+      recordedById: orderPayments.recordedById,
     })
     .from(orderPayments)
     .where(eq(orderPayments.id, input.allocationId));
@@ -400,20 +479,139 @@ export async function linkAllocation(
     return { ok: false, reason: "not_receivable" };
   if (!allocation.orderId || doc.orderId !== allocation.orderId) return { ok: false, reason: "other_customer" };
 
-  // Conditional: two people linking the same deposit to two invoices link it once.
-  const updated = await db
-    .update(orderPayments)
-    .set({ invoiceId: doc.id })
-    .where(and(eq(orderPayments.id, allocation.id), sql`${orderPayments.invoiceId} is null`))
-    .returning({ id: orderPayments.id });
-  if (updated.length === 0) return { ok: false, reason: "not_found" };
-  const settled = await settledBy(db, [doc], new Map([[doc.id, Number(allocation.amount)]]));
+  const owed = await outstandingOf(db, doc.id);
+  const share = Math.min(cents(Number(allocation.amount)), cents(owed));
+  if (share <= 0) return { ok: false, reason: "overpays" };
+  const rest = cents(Number(allocation.amount)) - share;
+  try {
+    const [, linked] = (await together(db, (h) => [
+      lockInvoices(h, [doc.id]),
+      // Conditional: two people linking the same deposit to two invoices link it once.
+      h
+        .update(orderPayments)
+        .set({ invoiceId: doc.id, amount: String(share / 100) })
+        .where(and(eq(orderPayments.id, allocation.id), sql`${orderPayments.invoiceId} is null`))
+        .returning({ id: orderPayments.id }),
+      ...(rest > 0
+        ? [
+            h.insert(orderPayments).values({
+              receiptId: allocation.receiptId,
+              orderId: allocation.orderId,
+              invoiceId: null,
+              amount: String(rest / 100),
+              paidAt: allocation.paidAt,
+              method: allocation.method,
+              note: allocation.note,
+              recordedById: allocation.recordedById,
+            }),
+          ]
+        : []),
+      guardInvoicesNotOverpaid(h, [doc.id]),
+    ])) as [unknown, { id: string }[]];
+    if (linked.length === 0) return { ok: false, reason: "not_found" };
+  } catch (error) {
+    if (guardRefusal(error) === "overpays") return { ok: false, reason: "overpays" };
+    throw error;
+  }
+  const settled = await settledBy(db, [doc], new Map([[doc.id, share / 100]]));
   return { ok: true, settled };
 }
 
 /**
- * Takes a payment back. The receipt goes with it when this was its only allocation — money
- * recorded by mistake; otherwise only this share goes, and returns to the customer's credit.
+ * Gives the deposits left on an order to one of its invoices, just issued: oldest first, never
+ * beyond what the invoice owes — the last one split, its rest left on the order for the next
+ * invoice. Returns how many were linked, whole or in part.
+ *
+ * ⚠️⚠️ It used to link every deposit whole, and only when the order had one invoice: a deposit
+ * of 10,000 paid on the order went entirely to a deposit invoice of 3,000, and the balance of
+ * 7,000 read unpaid and overdue while the customer had paid it.
+ */
+export async function linkOrderDeposits(db: AnyDb, orderId: string, invoiceId: string): Promise<number> {
+  const doc = (await invoiceDocs(db, [invoiceId])).get(invoiceId);
+  if (!doc || doc.orderId !== orderId || doc.status !== "issued" || !RECEIVABLE_TYPES.includes(doc.documentType))
+    return 0;
+  const deposits: {
+    id: string;
+    receiptId: string | null;
+    amount: string;
+    paidAt: Date;
+    method: string | null;
+    note: string | null;
+    recordedById: string | null;
+  }[] = await db
+    .select({
+      id: orderPayments.id,
+      receiptId: orderPayments.receiptId,
+      amount: orderPayments.amount,
+      paidAt: orderPayments.paidAt,
+      method: orderPayments.method,
+      note: orderPayments.note,
+      recordedById: orderPayments.recordedById,
+    })
+    .from(orderPayments)
+    .where(and(eq(orderPayments.orderId, orderId), isNull(orderPayments.invoiceId), sql`${orderPayments.amount} > 0`))
+    .orderBy(orderPayments.paidAt, orderPayments.createdAt);
+  let room = cents(await outstandingOf(db, invoiceId));
+  const plan: { deposit: (typeof deposits)[number]; share: number; rest: number }[] = [];
+  for (const d of deposits) {
+    if (room <= 0) break;
+    const share = Math.min(room, cents(Number(d.amount)));
+    plan.push({ deposit: d, share, rest: cents(Number(d.amount)) - share });
+    room -= share;
+  }
+  if (plan.length === 0) return 0;
+  try {
+    await together(db, (h) => [
+      lockInvoices(h, [invoiceId]),
+      ...plan.flatMap(({ deposit, share, rest }) => [
+        h
+          .update(orderPayments)
+          .set({ invoiceId, amount: String(share / 100) })
+          .where(and(eq(orderPayments.id, deposit.id), isNull(orderPayments.invoiceId))),
+        ...(rest > 0
+          ? [
+              h.insert(orderPayments).values({
+                receiptId: deposit.receiptId,
+                orderId,
+                invoiceId: null,
+                amount: String(rest / 100),
+                paidAt: deposit.paidAt,
+                method: deposit.method,
+                note: deposit.note,
+                recordedById: deposit.recordedById,
+              }),
+            ]
+          : []),
+      ]),
+      guardInvoicesNotOverpaid(h, [invoiceId]),
+    ]);
+  } catch (error) {
+    // Something paid the invoice meanwhile: the deposits stay on the order, nothing is lost.
+    if (guardRefusal(error) === "overpays") return 0;
+    throw error;
+  }
+  return plan.length;
+}
+
+/** What an invoice still owes: its total, less credit notes, less what names it. */
+async function outstandingOf(db: AnyDb, invoiceId: string): Promise<number> {
+  const [row] = await db
+    .select({
+      owed: sql<string>`"invoice"."total" - "invoice"."credited_amount" - coalesce((select sum(p.amount) from order_payment p where p.invoice_id = "invoice"."id"), 0)`,
+    })
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId));
+  return row ? Math.max(0, Math.round(Number(row.owed) * 100) / 100) : 0;
+}
+
+/**
+ * Takes a payment back. The receipt goes with it only when this allocation was all of it and it
+ * did not come from the bank — money recorded by mistake; otherwise only this share goes, and
+ * the money returns to the customer's credit.
+ *
+ * ⚠️⚠️ The first version deleted the receipt whenever this was its only allocation, whatever the
+ * receipt held: a transfer of 1,000 with 600 on an invoice and 400 left as credit lost all 1,000
+ * — from "collected", from the credit, and from its bank line, which quietly reopened.
  */
 export async function removeAllocation(
   db: AnyDb,
@@ -429,25 +627,52 @@ export async function removeAllocation(
       receiptId: orderPayments.receiptId,
       invoiceId: orderPayments.invoiceId,
       orderId: orderPayments.orderId,
+      amount: orderPayments.amount,
       companyId: receipts.companyId,
-      siblings: sql<number>`(select count(*)::int from order_payment s where s.receipt_id = "order_payment"."receipt_id")`,
     })
     .from(orderPayments)
     .leftJoin(receipts, eq(receipts.id, orderPayments.receiptId))
     .where(eq(orderPayments.id, allocationId));
   if (!row) return { removed: null, invoiceId: null, orderId: null, companyId: null };
-  if (row.receiptId && Number(row.siblings) <= 1) {
-    await db.delete(receipts).where(eq(receipts.id, row.receiptId));
-    return { removed: "receipt", invoiceId: row.invoiceId, orderId: row.orderId, companyId: row.companyId };
-  }
-  await db.delete(orderPayments).where(eq(orderPayments.id, allocationId));
-  return { removed: "allocation", invoiceId: row.invoiceId, orderId: row.orderId, companyId: row.companyId };
+  const receiptId = row.receiptId;
+  await together(db, (h) => [
+    ...(receiptId
+      ? [h.select({ id: receipts.id }).from(receipts).where(eq(receipts.id, receiptId)).for("update")]
+      : []),
+    h.delete(orderPayments).where(eq(orderPayments.id, allocationId)),
+    // Read after the allocation went, under the receipt's lock: the receipt goes only when nothing
+    // else names it, it was exactly this allocation, and no bank line explains it.
+    ...(receiptId
+      ? [
+          h.execute(sql`
+            delete from receipt r
+            where r.id = ${receiptId}
+              and r.bank_transaction_id is null
+              and r.amount = ${row.amount}::numeric
+              and not exists (select 1 from order_payment p where p.receipt_id = r.id)`),
+        ]
+      : []),
+  ]);
+  const [still] = receiptId
+    ? await db.select({ id: receipts.id }).from(receipts).where(eq(receipts.id, receiptId))
+    : [undefined];
+  return {
+    removed: receiptId && !still ? "receipt" : "allocation",
+    invoiceId: row.invoiceId,
+    orderId: row.orderId,
+    companyId: row.companyId,
+  };
 }
 
 /**
  * Corrects a receipt: its day, amount, method, reference or note. A receipt with one
  * allocation of all of it — a payment typed on an invoice or an order — moves that allocation
  * with it; any other may not shrink below what it has already paid.
+ *
+ * ⚠️⚠️ Under the receipt's and its invoices' locks, and checked by the database after the write:
+ * the "not below what it paid" read before it let a credit allocation land in between.
+ * ⚠️ A receipt from the bank statement keeps the bank's amount and day — the reconciliation page
+ * undoes it; a refund's amount is corrected by taking it back and recording it again.
  */
 export async function updateReceipt(
   db: AnyDb,
@@ -460,7 +685,9 @@ export async function updateReceipt(
     note?: string | null;
     by: string | null;
   },
-): Promise<{ ok: true; invoiceIds: string[]; orderIds: string[] } | { ok: false; reason: ReceiptRefusal }> {
+): Promise<
+  { ok: true; invoiceIds: string[]; orderIds: string[]; settled: Settled[] } | { ok: false; reason: ReceiptRefusal }
+> {
   const [receipt] = await db.select().from(receipts).where(eq(receipts.id, input.receiptId));
   if (!receipt) return { ok: false, reason: "not_found" };
   const allocations: { id: string; amount: string; invoiceId: string | null; orderId: string | null }[] = await db
@@ -473,50 +700,73 @@ export async function updateReceipt(
     .from(orderPayments)
     .where(eq(orderPayments.receiptId, receipt.id));
 
-  let amount = Number(receipt.amount);
+  const stored = Number(receipt.amount);
+  let amount = stored;
   if (input.amount !== undefined) {
     const parsed = parsePaymentAmount(input.amount);
-    if (parsed === null || amount < 0) return { ok: false, reason: "invalid_amount" };
-    amount = parsed;
+    if (parsed === null) return { ok: false, reason: "invalid_amount" };
+    if (stored < 0) {
+      // A refund: the amount shown is its size, and it does not change here.
+      if (cents(parsed) !== cents(-stored)) return { ok: false, reason: "refund_fixed" };
+    } else amount = parsed;
   }
-  const whole = allocations.length === 1 && cents(Number(allocations[0].amount)) === cents(Number(receipt.amount));
-  const allocated = allocations.reduce((s, a) => s + Number(a.amount), 0);
-  if (!whole && cents(amount) < cents(allocated)) return { ok: false, reason: "over_allocated" };
-
   const receivedAt = input.receivedAt ?? receipt.receivedAt;
+  if (
+    receipt.bankTransactionId &&
+    (cents(amount) !== cents(stored) || receivedAt.getTime() !== receipt.receivedAt.getTime())
+  )
+    return { ok: false, reason: "reconciled" };
+  const whole = stored > 0 && allocations.length === 1 && cents(Number(allocations[0].amount)) === cents(stored);
+  const invoiceIds = [...new Set(allocations.flatMap((a) => (a.invoiceId ? [a.invoiceId] : [])))];
+
   const method = input.method !== undefined ? clean(input.method, 100) : receipt.method;
   const note = input.note !== undefined ? clean(input.note, 1000) : receipt.note;
-  await together(db, (h) => [
-    h
-      .update(receipts)
-      .set({
-        amount: String(amount),
-        receivedAt,
-        method,
-        reference: input.reference !== undefined ? clean(input.reference) : receipt.reference,
-        note,
-        updatedAt: new Date(),
-        updatedById: input.by,
-      })
-      .where(eq(receipts.id, receipt.id)),
-    // The allocations show the day and the method of their receipt.
-    h
-      .update(orderPayments)
-      .set({ paidAt: receivedAt, method, note })
-      .where(eq(orderPayments.receiptId, receipt.id)),
-    ...(whole
-      ? [
-          h
-            .update(orderPayments)
-            .set({ amount: String(amount) })
-            .where(eq(orderPayments.id, allocations[0].id)),
-        ]
-      : []),
-  ]);
+  try {
+    await together(db, (h) => [
+      h.select({ id: receipts.id }).from(receipts).where(eq(receipts.id, receipt.id)).for("update"),
+      ...(invoiceIds.length > 0 ? [lockInvoices(h, invoiceIds)] : []),
+      h
+        .update(receipts)
+        .set({
+          amount: String(amount),
+          receivedAt,
+          method,
+          reference: input.reference !== undefined ? clean(input.reference) : receipt.reference,
+          note,
+          updatedAt: new Date(),
+          updatedById: input.by,
+        })
+        .where(eq(receipts.id, receipt.id)),
+      // The allocations show the day and the method of their receipt.
+      h
+        .update(orderPayments)
+        .set({ paidAt: receivedAt, method, note })
+        .where(eq(orderPayments.receiptId, receipt.id)),
+      ...(whole
+        ? [
+            h
+              .update(orderPayments)
+              .set({ amount: String(amount) })
+              .where(eq(orderPayments.id, allocations[0].id)),
+          ]
+        : []),
+      guardNotOverAllocated(h, receipt.id),
+      ...(invoiceIds.length > 0 ? [guardInvoicesNotOverpaid(h, invoiceIds)] : []),
+    ]);
+  } catch (error) {
+    if (guardRefusal(error) === "overpays") return { ok: false, reason: "overpays" };
+    if (isOverAllocation(error)) return { ok: false, reason: "over_allocated" };
+    throw error;
+  }
+  // A correction can settle an invoice as surely as a payment can: the integration is told.
+  const docs = [...(await invoiceDocs(db, invoiceIds)).values()];
+  const moved = whole && allocations[0].invoiceId ? amount - Number(allocations[0].amount) : 0;
+  const settled = moved > 0 ? await settledBy(db, docs, new Map([[allocations[0].invoiceId as string, moved]])) : [];
   return {
     ok: true,
-    invoiceIds: allocations.flatMap((a) => (a.invoiceId ? [a.invoiceId] : [])),
+    invoiceIds,
     orderIds: allocations.flatMap((a) => (a.orderId ? [a.orderId] : [])),
+    settled,
   };
 }
 
@@ -525,6 +775,10 @@ export async function updateReceipt(
  * after the payment, or a payment twice), or out of their credit. A negative receipt, with a
  * negative allocation on the invoice when there is one — so the invoice reads settled and the
  * month's cash reads what really stayed.
+ *
+ * ⚠️⚠️ Each under a lock and checked by the database after the write: on the invoice, never more
+ * than it was overpaid; out of credit, never more than the customer's credit. Checked in a read
+ * before the write, a double click refunded twice.
  */
 export async function recordRefund(
   db: AnyDb,
@@ -554,38 +808,90 @@ export async function recordRefund(
     updatedById: input.by,
   };
 
-  if (input.invoiceId) {
-    const doc = (await invoiceDocs(db, [input.invoiceId])).get(input.invoiceId);
-    if (!doc) return { ok: false, reason: "not_found" };
-    const [sum] = await db
-      .select({ paid: sql<string>`coalesce(sum(${orderPayments.amount}), 0)` })
-      .from(orderPayments)
-      .where(eq(orderPayments.invoiceId, doc.id));
-    const due = Number(doc.total) - Number(doc.credited);
-    const over = Number(sum.paid) - due;
-    if (cents(over) < cents(amount)) return { ok: false, reason: "not_overpaid" };
+  try {
+    if (input.invoiceId) {
+      const doc = (await invoiceDocs(db, [input.invoiceId])).get(input.invoiceId);
+      if (!doc) return { ok: false, reason: "not_found" };
+      if (doc.status !== "issued" || !RECEIVABLE_TYPES.includes(doc.documentType))
+        return { ok: false, reason: "not_receivable" };
+      await together(db, (h) => [
+        lockInvoices(h, [doc.id]),
+        h.insert(receipts).values({ ...base, companyId: doc.companyId, currency: doc.currency }),
+        h.insert(orderPayments).values({
+          receiptId,
+          orderId: doc.orderId,
+          invoiceId: doc.id,
+          amount: String(-amount),
+          paidAt: input.receivedAt,
+          method: base.method,
+          note: base.note,
+          recordedById: input.by,
+        }),
+        guardInvoiceNotUnderpaid(h, doc.id),
+      ]);
+      return { ok: true, receiptId };
+    }
+
+    const companyId = input.companyId;
+    if (!companyId) return { ok: false, reason: "not_found" };
+    const currency = (input.currency ?? "EUR").toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) return { ok: false, reason: "mixed_currency" };
     await together(db, (h) => [
-      h.insert(receipts).values({ ...base, companyId: doc.companyId, currency: doc.currency }),
-      h.insert(orderPayments).values({
-        receiptId,
-        orderId: doc.orderId,
-        invoiceId: doc.id,
-        amount: String(-amount),
-        paidAt: input.receivedAt,
-        method: base.method,
-        note: base.note,
-        recordedById: input.by,
-      }),
+      lockCompany(h, companyId),
+      h.insert(receipts).values({ ...base, companyId, currency }),
+      guardCustomerCredit(h, companyId),
     ]);
     return { ok: true, receiptId };
+  } catch (error) {
+    const refused = guardRefusal(error);
+    if (refused === "not_overpaid" || refused === "no_credit") return { ok: false, reason: refused };
+    throw error;
   }
+}
 
-  if (!input.companyId) return { ok: false, reason: "not_found" };
-  const currency = input.currency ?? "EUR";
-  const credit = (await customerCredit(db, input.companyId)).find((c) => c.currency === currency)?.credit ?? 0;
-  if (cents(credit) < cents(amount)) return { ok: false, reason: "no_credit" };
-  await db.insert(receipts).values({ ...base, companyId: input.companyId, currency });
-  return { ok: true, receiptId };
+/**
+ * Moves what an invoice was paid beyond what it owes back to the customer's credit: its most
+ * recent allocations are reduced, newest first, and their receipts keep the money. For an invoice
+ * a credit note brought below what was already paid, and for payments recorded twice.
+ * Returns what was moved.
+ */
+export async function releaseOverpayment(db: AnyDb, invoiceId: string): Promise<number> {
+  const [invoice] = await db
+    .select({ total: invoices.total, credited: invoices.creditedAmount })
+    .from(invoices)
+    .where(eq(invoices.id, invoiceId));
+  if (!invoice) return 0;
+  const shares: { id: string; amount: string }[] = await db
+    .select({ id: orderPayments.id, amount: orderPayments.amount })
+    .from(orderPayments)
+    .where(and(eq(orderPayments.invoiceId, invoiceId), sql`${orderPayments.amount} > 0`))
+    .orderBy(sql`${orderPayments.paidAt} desc`, sql`${orderPayments.createdAt} desc`);
+  const [paidRow] = await db
+    .select({ paid: sql<string>`coalesce(sum(${orderPayments.amount}), 0)` })
+    .from(orderPayments)
+    .where(eq(orderPayments.invoiceId, invoiceId));
+  let over = cents(Number(paidRow?.paid ?? 0)) - cents(Number(invoice.total) - Number(invoice.credited));
+  if (over <= 0) return 0;
+  const moved = over;
+  const writes: { id: string; keep: number }[] = [];
+  for (const s of shares) {
+    if (over <= 0) break;
+    const take = Math.min(over, cents(Number(s.amount)));
+    writes.push({ id: s.id, keep: cents(Number(s.amount)) - take });
+    over -= take;
+  }
+  await together(db, (h) => [
+    lockInvoices(h, [invoiceId]),
+    ...writes.map((w) =>
+      w.keep > 0
+        ? h
+            .update(orderPayments)
+            .set({ amount: String(w.keep / 100) })
+            .where(eq(orderPayments.id, w.id))
+        : h.delete(orderPayments).where(eq(orderPayments.id, w.id)),
+    ),
+  ]);
+  return (moved - over) / 100;
 }
 
 /** A customer's credit per currency: what they paid that no document has used yet. */
@@ -627,14 +933,31 @@ export async function openCredits(
     .from(receipts)
     .where(and(eq(receipts.companyId, companyId), sql`${receipts.amount} > 0`))
     .orderBy(receipts.receivedAt);
+  // ⚠️⚠️ Credit refunded to the customer is a negative receipt of its own, with no allocation:
+  // it is taken off the oldest credits here, or the screen offered to spend money already given
+  // back (the database refuses it anyway: guardCustomerCredit).
+  const refunded: { currency: string; amount: string }[] = await db
+    .select({ currency: receipts.currency, amount: sql<string>`sum(${receipts.amount})` })
+    .from(receipts)
+    .where(
+      and(
+        eq(receipts.companyId, companyId),
+        sql`${receipts.amount} < 0`,
+        sql`not exists (select 1 from order_payment p where p.receipt_id = "receipt"."id")`,
+      ),
+    )
+    .groupBy(receipts.currency);
+  const toTake = new Map(refunded.map((r) => [r.currency, -cents(Number(r.amount))]));
   return rows
-    .map((r) => ({
-      id: r.id,
-      receivedAt: r.receivedAt,
-      currency: r.currency,
-      reference: r.reference,
-      left: Math.round((Number(r.amount) - Number(r.allocated)) * 100) / 100,
-    }))
+    .map((r) => {
+      let left = cents(Number(r.amount) - Number(r.allocated));
+      const take = Math.min(left, toTake.get(r.currency) ?? 0);
+      if (take > 0) {
+        left -= take;
+        toTake.set(r.currency, (toTake.get(r.currency) ?? 0) - take);
+      }
+      return { id: r.id, receivedAt: r.receivedAt, currency: r.currency, reference: r.reference, left: left / 100 };
+    })
     .filter((r) => r.left >= 0.01);
 }
 

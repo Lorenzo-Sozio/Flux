@@ -42,8 +42,32 @@ describe("⚠️ reading a bank's CSV", () => {
       ["2026-09-17", -12, "2026-09-17"],
     ]);
     expect(read.movements[0].remittance).toBe("BONIFICO DA RISTORANTE IL GLICINE SRL SALDO FT 12/2026 48");
-    // The footer has no date: reported, never read as a movement.
-    expect(read.problems).toEqual([{ line: 8, problem: "date" }]);
+    // The footer is a balance: reported, never read as a movement.
+    expect(read.problems).toEqual([{ line: 8, problem: "balance" }]);
+  });
+
+  it("⚠️⚠️ a sign column turns Dare into money out; balance rows are never movements (audit, 29/09/2026)", () => {
+    const rows = [
+      ["Data", "Descrizione", "Importo", "Segno"],
+      ["01/09/2026", "Saldo iniziale", "10.000,00", "A"],
+      ["15/09/2026", "STIPENDI SETTEMBRE", "3.000,00", "D"],
+      ["16/09/2026", "BONIFICO DA ACME", "1.220,00", "A"],
+      ["30/09/2026", "Saldo finale", "8.220,00", "A"],
+    ];
+    const { headerRow, mapping } = guessMapping(rows);
+    expect(mapping?.sign).toBe("Segno");
+    const read = readCsv(rows, headerRow, mapping ?? ({} as never));
+    expect(read.movements.map((m) => m.amount)).toEqual([-3000, 1220]);
+    expect(read.problems.map((p) => p.problem)).toEqual(["balance", "balance"]);
+  });
+
+  it("⚠️ a preamble with a date in it is not taken for the header", () => {
+    const rows = [
+      ["Intestatario", "ROSSI SRL", "Data estrazione", "30/09/2026"],
+      ["Data contabile", "Data valuta", "Descrizione", "Importo"],
+      ["15/09/2026", "16/09/2026", "BONIFICO", "100,00"],
+    ];
+    expect(guessMapping(rows)).toMatchObject({ headerRow: 1, mapping: { date: "Data contabile", amount: "Importo" } });
   });
 
   it("⚠️ asks for the mapping again when a column it names is gone, instead of reading the wrong one", () => {

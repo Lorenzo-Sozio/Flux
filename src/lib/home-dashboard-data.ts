@@ -5,10 +5,11 @@
  * Grouped statements, a few per dashboard, and each read only when its dashboard is on
  * screen. Every figure here has a list behind it that the page links to.
  */
-import { and, asc, eq, gte, inArray, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { deals, invoices, orders, receipts, tickets, users } from "@/db/schema";
 import { closedBetween, dealEur } from "@/lib/metrics";
+import { stillToInvoice } from "@/lib/orders-to-invoice";
 import { OPEN_TICKET_STATUSES } from "@/lib/support-metrics";
 import { fromWallValue, toWallDate } from "@/lib/wall-clock";
 import { monthStart } from "@/lib/workspace-day";
@@ -119,19 +120,8 @@ export async function moneyFigures(db: AnyDb): Promise<MoneyFigures> {
     db
       .select({ n: sql<number>`count(*)::int` })
       .from(orders)
-      .where(
-        and(
-          eq(orders.status, "completed"),
-          // A draft counts as started: it is somebody's work in progress, not a forgotten order. Only an
-          // invoice (TD01) invoices the order: a deposit invoice alone leaves the rest to invoice (I11).
-          notExists(
-            db
-              .select({ one: sql`1` })
-              .from(invoices)
-              .where(and(eq(invoices.orderId, orders.id), eq(invoices.documentType, "TD01"))),
-          ),
-        ),
-      ),
+      // ⚠️ The orders list's "to invoice" filter reads the same condition: the figure opens its list.
+      .where(stillToInvoice(db)),
   ]);
   return { draftInvoices: Number(drafts?.n ?? 0), ordersToInvoice: Number(toInvoice?.n ?? 0) };
 }

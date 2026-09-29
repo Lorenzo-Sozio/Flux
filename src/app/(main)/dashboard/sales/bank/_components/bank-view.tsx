@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
 
 import { BankAccountDialog } from "./bank-account-dialog";
@@ -45,6 +46,7 @@ type Tab = "open" | "outgoing" | "reconciled" | "ignored";
  */
 export function BankView({ data }: { data: Overview | null }) {
   const t = useTranslations("bank");
+  const { formatMoney } = useCurrency();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("open");
   const [gone, setGone] = useState<Set<string>>(new Set());
@@ -84,6 +86,16 @@ export function BankView({ data }: { data: Overview | null }) {
 
   function confirmSure() {
     if (!account) return;
+    // Receipts written in one click: the person sees how many and how much before they are.
+    const total = sure.reduce((sum, l) => sum + (l.amount - l.linked), 0);
+    const currency = sure[0]?.currency ?? "EUR";
+    if (
+      !window.confirm(
+        `${t("confirmSureTitle", { count: sure.length })}
+${t("confirmSureText", { total: formatMoney(total, currency) })}`,
+      )
+    )
+      return;
     const picks = sure.map((l) => ({ transactionId: l.id, key: l.proposals[0].key }));
     startBulk(async () => {
       let confirmed = 0;
@@ -105,9 +117,11 @@ export function BankView({ data }: { data: Overview | null }) {
   }
 
   function ignoreAllOutgoing() {
-    if (!account || outgoing.length === 0) return;
-    if (!window.confirm(t("ignoreAllConfirm", { count: outgoing.length }))) return;
-    const ids = outgoing.map((l) => l.id);
+    // A payment returned unpaid is not a charge: it stays for a person to deal with.
+    const plain = outgoing.filter((l) => !l.reversal);
+    if (!account || plain.length === 0) return;
+    if (!window.confirm(t("ignoreAllConfirm", { count: plain.length }))) return;
+    const ids = plain.map((l) => l.id);
     setGone((g) => new Set([...g, ...ids]));
     startBulk(async () => {
       const r = await ignoreBankLinesAction(account.id, ids).catch(() => null);

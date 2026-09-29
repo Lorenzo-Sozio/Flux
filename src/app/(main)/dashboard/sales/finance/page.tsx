@@ -42,9 +42,18 @@ export default async function FinancePage() {
           <h1 className="font-bold text-2xl tracking-tight">{t("overviewTitle")}</h1>
           <p className="mt-1 text-muted-foreground">{t("overviewSubtitle")}</p>
         </div>
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/pipeline">{t("viewPipeline")}</Link>
-        </Button>
+        {/* Where the work on this page continues: chasing what is late, and the bank statement. */}
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/sales/invoices?status=overdue">{t("overdueInvoices")}</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/sales/bank">{t("bank")}</Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/pipeline">{t("viewPipeline")}</Link>
+          </Button>
+        </div>
       </div>
 
       {cash && <CashCard stats={cash} />}
