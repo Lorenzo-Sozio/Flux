@@ -7,6 +7,7 @@ import Link from "next/link";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import {
   ArrowRightLeft,
+  Building2,
   CalendarCheck,
   CalendarIcon,
   CalendarPlus,
@@ -21,7 +22,9 @@ import {
   NotebookPen,
   PencilIcon,
   PlusIcon,
+  Scale,
   Settings2,
+  TimerIcon,
   Trophy,
   XCircle,
 } from "lucide-react";
@@ -35,7 +38,6 @@ import { PlanFollowUpDialog } from "@/components/crm/plan-follow-up-dialog";
 import { useWorkspaceScope } from "@/components/crm/workspace-scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -222,6 +224,9 @@ export function PipelineBoard({
   };
 
   if (!isMounted) return null;
+
+  // Read once per render, so every card on the board agrees on what "overdue" means.
+  const now = Date.now();
 
   return (
     // Fills the height the section gives it (see the section layout) rather than
@@ -455,11 +460,17 @@ export function PipelineBoard({
                     "max-md:w-[85%] max-md:min-w-0 max-md:max-w-80 max-md:flex-none max-md:snap-start",
                   )}
                 >
-                  <div className="flex shrink-0 flex-col gap-1 border-b bg-background/50 p-4 backdrop-blur-sm">
-                    <div className="flex items-center justify-between gap-1">
+                  {/* ⚠️ Two lines of fixed height, neither of which may wrap. "· € 12.345,00
+                    ponderato" wrapped onto a third line in most columns, so the headers
+                    stood at different heights and the cards under them started at
+                    different heights too. The weighted figure is now an icon and a
+                    rounded amount, and its words are in the tooltip and for screen readers. */}
+                  <div className="flex shrink-0 flex-col gap-1 border-b bg-background/50 px-3 py-2.5 backdrop-blur-sm">
+                    <div className="flex h-6 items-center justify-between gap-1">
                       <h3
                         className="min-w-0 truncate font-bold text-sm uppercase tracking-tight"
                         style={{ color: stage.color || "inherit" }}
+                        title={stageLabel(stage)}
                       >
                         {stageLabel(stage)}
                       </h3>
@@ -478,17 +489,24 @@ export function PipelineBoard({
                         </button>
                       </div>
                     </div>
-                    <p className="flex items-center gap-1 font-semibold text-muted-foreground text-xs">
-                      <CoinsIcon className="h-3 w-3" />
+                    <div className="flex h-5 items-center justify-between gap-2 whitespace-nowrap text-muted-foreground text-xs tabular-nums">
                       {/* A bare number with no currency symbol: money that does not say
                         what it is. Amounts are stored in EUR. */}
-                      {formatAmount(totalAmount)}
+                      <span className="flex min-w-0 items-center gap-1 font-semibold" title={formatAmount(totalAmount)}>
+                        <CoinsIcon className="size-3.5 shrink-0" aria-hidden />
+                        <span className="truncate">{formatAmount(totalAmount, { noDecimals: true })}</span>
+                      </span>
                       {!stage.isWon && !stage.isLost && weightedAmount > 0 && (
-                        <span className="font-normal" title={t("weightedHelp")}>
-                          · {t("weighted", { amount: formatAmount(weightedAmount) })}
+                        <span
+                          className="flex shrink-0 items-center gap-1"
+                          title={`${t("weighted", { amount: formatAmount(weightedAmount) })} — ${t("weightedHelp")}`}
+                        >
+                          <Scale className="size-3.5 shrink-0" aria-hidden />
+                          <span className="sr-only">{t("list.weighted")}: </span>
+                          {formatAmount(weightedAmount, { noDecimals: true })}
                         </span>
                       )}
-                    </p>
+                    </div>
                   </div>
 
                   <Droppable droppableId={stage.id}>
@@ -496,7 +514,7 @@ export function PipelineBoard({
                       <div
                         {...provided.droppableProps}
                         ref={provided.innerRef}
-                        className={`scrollbar-slim flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 transition-colors ${
+                        className={`scrollbar-slim flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 transition-colors ${
                           snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
                         }`}
                       >
@@ -510,188 +528,204 @@ export function PipelineBoard({
                                 style={{ ...provided.draggableProps.style }}
                                 className="group"
                               >
-                                <Card
-                                  className={`relative border-l-4 transition-all ${
+                                {/* ⚠️ Not the `Card` primitive: its 24px of vertical padding and
+                                  24px gap are a panel's, and on a 13rem column they left the
+                                  figures at 9px in a box that was mostly margin. One padding,
+                                  one gap, and every line readable at 12px or more. */}
+                                <div
+                                  className={cn(
+                                    "relative flex flex-col gap-2 rounded-lg border border-l-[3px] bg-card p-3 text-card-foreground shadow-xs transition-all",
                                     snapshot.isDragging
                                       ? "rotate-1 scale-[1.02] shadow-xl ring-2 ring-primary/20"
-                                      : "hover:shadow-md"
-                                  }`}
+                                      : "hover:border-foreground/20 hover:shadow-md",
+                                  )}
                                   style={{ borderLeftColor: stage.color || "#3b82f6" }}
                                 >
-                                  <CardHeader className="p-3 pb-1">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <CardTitle className="min-w-0 break-words font-bold text-sm leading-tight">
-                                        <Link
-                                          href={`/dashboard/pipeline/${deal.id}`}
-                                          className="transition-colors hover:text-primary"
-                                          onClick={(e) => e.stopPropagation()}
+                                  {/* Who: the deal, and the customer under it. */}
+                                  <div className="flex items-start gap-1">
+                                    <div className="min-w-0 flex-1">
+                                      <Link
+                                        href={`/dashboard/pipeline/${deal.id}`}
+                                        className="line-clamp-2 break-words font-semibold text-sm leading-snug transition-colors hover:text-primary"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {deal.name}
+                                      </Link>
+                                      {deal.companyName && (
+                                        <p className="mt-0.5 flex min-w-0 items-center gap-1 text-muted-foreground text-xs">
+                                          <Building2 className="size-3 shrink-0" aria-hidden />
+                                          <span className="truncate">{deal.companyName}</span>
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="-mt-1 -mr-1.5 flex shrink-0 items-center">
+                                      {canEdit && (
+                                        <DealModal
+                                          deal={deal}
+                                          stages={initialStages}
+                                          companies={companies}
+                                          contacts={contacts}
                                         >
-                                          {deal.name}
-                                        </Link>
-                                      </CardTitle>
-                                      <div className="flex shrink-0 items-center gap-1">
-                                        {/* ⚠️ Not a score: an open deal with nothing planned is the one
-                                          that quietly dies, and this says so where it is dragged. */}
-                                        {canEdit && deal.status === "open" && (
-                                          // Always drawn: a phone has no hover to reveal it.
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-6 w-6 max-md:size-9"
-                                                aria-label={t("quickActions", { name: deal.name })}
-                                                onClick={(e) => e.stopPropagation()}
-                                              >
-                                                <MoreHorizontal className="h-3.5 w-3.5" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                              {/* A drag is a long press on a touchscreen; this is
-                                                the same move, one tap and a list away. */}
-                                              <DropdownMenuItem onSelect={() => setMoving(deal)}>
-                                                <ArrowRightLeft className="size-4" aria-hidden />
-                                                {t("list.move")}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem onSelect={() => setLogging(deal.id)}>
-                                                <NotebookPen className="size-4" aria-hidden />
-                                                {t("quick.log")}
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem
-                                                onSelect={() => setAskNextStep({ id: deal.id, name: deal.name })}
-                                              >
-                                                <CalendarPlus className="size-4" aria-hidden />
-                                                {t("quick.plan")}
-                                              </DropdownMenuItem>
-                                              {(wonStage || lostStage) && <DropdownMenuSeparator />}
-                                              {wonStage && (
-                                                <DropdownMenuItem
-                                                  onSelect={() => void commitMove(deal.id, wonStage.id)}
-                                                >
-                                                  <Trophy className="size-4" aria-hidden />
-                                                  {t("quick.won")}
-                                                </DropdownMenuItem>
-                                              )}
-                                              {lostStage && (
-                                                <DropdownMenuItem
-                                                  onSelect={() =>
-                                                    setPendingLoss({
-                                                      dealId: deal.id,
-                                                      dealName: deal.name,
-                                                      stageId: lostStage.id,
-                                                    })
-                                                  }
-                                                >
-                                                  <XCircle className="size-4" aria-hidden />
-                                                  {t("quick.lost")}
-                                                </DropdownMenuItem>
-                                              )}
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        )}
-                                        {canEdit && (
-                                          <DealModal
-                                            deal={deal}
-                                            stages={initialStages}
-                                            companies={companies}
-                                            contacts={contacts}
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="size-7 opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 max-md:size-9"
+                                            title={t("editDealTitle")}
+                                            aria-label={t("editDealTitle")}
                                           >
+                                            <PencilIcon className="size-3.5" />
+                                          </Button>
+                                        </DealModal>
+                                      )}
+                                      {canEdit && deal.status === "open" && (
+                                        // Always drawn: a phone has no hover to reveal it.
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
                                             <Button
                                               variant="ghost"
                                               size="icon"
-                                              className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100 max-md:size-9"
-                                              title={t("editDealTitle")}
-                                              aria-label={t("editDealTitle")}
+                                              className="size-7 text-muted-foreground max-md:size-9"
+                                              aria-label={t("quickActions", { name: deal.name })}
+                                              onClick={(e) => e.stopPropagation()}
                                             >
-                                              <PencilIcon className="h-3 w-3" />
+                                              <MoreHorizontal className="size-4" />
                                             </Button>
-                                          </DealModal>
-                                        )}
-                                      </div>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end">
+                                            {/* A drag is a long press on a touchscreen; this is
+                                              the same move, one tap and a list away. */}
+                                            <DropdownMenuItem onSelect={() => setMoving(deal)}>
+                                              <ArrowRightLeft className="size-4" aria-hidden />
+                                              {t("list.move")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => setLogging(deal.id)}>
+                                              <NotebookPen className="size-4" aria-hidden />
+                                              {t("quick.log")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              onSelect={() => setAskNextStep({ id: deal.id, name: deal.name })}
+                                            >
+                                              <CalendarPlus className="size-4" aria-hidden />
+                                              {t("quick.plan")}
+                                            </DropdownMenuItem>
+                                            {(wonStage || lostStage) && <DropdownMenuSeparator />}
+                                            {wonStage && (
+                                              <DropdownMenuItem onSelect={() => void commitMove(deal.id, wonStage.id)}>
+                                                <Trophy className="size-4" aria-hidden />
+                                                {t("quick.won")}
+                                              </DropdownMenuItem>
+                                            )}
+                                            {lostStage && (
+                                              <DropdownMenuItem
+                                                onSelect={() =>
+                                                  setPendingLoss({
+                                                    dealId: deal.id,
+                                                    dealName: deal.name,
+                                                    stageId: lostStage.id,
+                                                  })
+                                                }
+                                              >
+                                                <XCircle className="size-4" aria-hidden />
+                                                {t("quick.lost")}
+                                              </DropdownMenuItem>
+                                            )}
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      )}
                                     </div>
-                                  </CardHeader>
-                                  <CardContent className="flex flex-col gap-1.5 p-3 pt-0">
-                                    {deal.companyName && (
-                                      <p className="truncate text-[11px] text-muted-foreground max-md:text-xs">
-                                        {deal.companyName}
-                                      </p>
+                                  </div>
+
+                                  {/* How much, and on what odds: the figure the column adds up. */}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="min-w-0 truncate font-semibold text-base tabular-nums tracking-tight">
+                                      {/* What was typed, in its currency — `amount` is the EUR
+                                        figure, and printing it with `deal.currency`
+                                        put a dollar sign on a euro number. */}
+                                      {(() => {
+                                        const shown = dealAmountForDisplay(deal);
+                                        return formatMoney(shown.value, shown.currency);
+                                      })()}
+                                    </span>
+                                    {(deal.probability ?? 0) > 0 && (
+                                      <span
+                                        className="shrink-0 rounded-full bg-muted px-2 py-0.5 font-medium text-muted-foreground text-xs tabular-nums"
+                                        title={t("probability")}
+                                      >
+                                        <span className="sr-only">{t("probability")}: </span>
+                                        {deal.probability}%
+                                      </span>
                                     )}
-                                    <div className="mt-1 flex items-center justify-between">
-                                      <p className="font-bold text-[11px] text-foreground/80 max-md:text-xs">
-                                        {/* What was typed, in its currency — `amount` is the EUR
-                                          figure, and printing it with `deal.currency`
-                                          put a dollar sign on a euro number. */}
-                                        {(() => {
-                                          const shown = dealAmountForDisplay(deal);
-                                          return formatMoney(shown.value, shown.currency);
-                                        })()}
-                                      </p>
-                                      {(deal.probability ?? 0) > 0 && (
-                                        <span className="font-medium text-[9px] text-muted-foreground max-md:text-[11px]">
-                                          {deal.probability}%
+                                  </div>
+
+                                  {/* When, and whatever is wrong — in words, not only in colour. */}
+                                  {(deal.expectedCloseDate || deal.status === "open") && (
+                                    <div className="flex flex-col gap-1 border-t pt-2 text-muted-foreground text-xs">
+                                      {(deal.expectedCloseDate || typeof deal.daysInStage === "number") && (
+                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                          {deal.expectedCloseDate && (
+                                            <span
+                                              className={cn(
+                                                "flex items-center gap-1",
+                                                deal.status === "open" &&
+                                                  new Date(deal.expectedCloseDate).getTime() < now &&
+                                                  "font-medium text-red-600 dark:text-red-400",
+                                              )}
+                                              title={t("expectedClose")}
+                                            >
+                                              <CalendarIcon className="size-3.5 shrink-0" aria-hidden />
+                                              <span className="sr-only">{t("expectedClose")}: </span>
+                                              {format.dateTime(new Date(deal.expectedCloseDate), {
+                                                month: "short",
+                                                day: "numeric",
+                                              })}
+                                            </span>
+                                          )}
+                                          {deal.status === "open" && typeof deal.daysInStage === "number" && (
+                                            // Past the stage's threshold: stuck, and said so.
+                                            <span
+                                              className={cn(
+                                                "flex items-center gap-1",
+                                                deal.stale && "font-medium text-amber-700 dark:text-amber-400",
+                                              )}
+                                            >
+                                              <TimerIcon className="size-3.5 shrink-0" aria-hidden />
+                                              {deal.stale
+                                                ? t("stuckInStage", { days: deal.daysInStage })
+                                                : t("daysInStage", { days: deal.daysInStage })}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      {deal.status === "open" &&
+                                        (deal.signals.hasNextStep ? (
+                                          <span className="flex items-center gap-1">
+                                            <CalendarCheck className="size-3.5 shrink-0" aria-hidden />
+                                            {deal.signals.nextStepAt
+                                              ? t("nextStepOn", {
+                                                  date: format.dateTime(new Date(deal.signals.nextStepAt), {
+                                                    month: "short",
+                                                    day: "numeric",
+                                                  }),
+                                                })
+                                              : t("nextStepUndated")}
+                                          </span>
+                                        ) : (
+                                          // ⚠️ In words and in red: an open deal with nothing planned is
+                                          // the one that quietly dies (§6.3).
+                                          <span className="flex items-center gap-1 font-medium text-red-600 dark:text-red-400">
+                                            <CalendarX2 className="size-3.5 shrink-0" aria-hidden />
+                                            {t("signals.noNextStep")}
+                                          </span>
+                                        ))}
+                                      {deal.status === "open" && deal.signals.stalled && (
+                                        <span className="flex items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+                                          <HourglassIcon className="size-3.5 shrink-0" aria-hidden />
+                                          {t("signals.idle", { days: deal.signals.idleDays })}
                                         </span>
                                       )}
                                     </div>
-                                    {deal.expectedCloseDate && (
-                                      <div className="flex items-center gap-1 text-[9px] text-muted-foreground max-md:text-[11px]">
-                                        <CalendarIcon className="h-2.5 w-2.5" />
-                                        <span
-                                          className={
-                                            new Date(deal.expectedCloseDate) < new Date()
-                                              ? "font-medium text-red-500"
-                                              : ""
-                                          }
-                                        >
-                                          {format.dateTime(new Date(deal.expectedCloseDate), {
-                                            month: "short",
-                                            day: "numeric",
-                                          })}
-                                        </span>
-                                      </div>
-                                    )}
-                                    {deal.status === "open" &&
-                                      (deal.signals.hasNextStep ? (
-                                        <div className="flex items-center gap-1 text-[9px] text-muted-foreground max-md:text-[11px]">
-                                          <CalendarCheck className="h-2.5 w-2.5" aria-hidden />
-                                          {deal.signals.nextStepAt
-                                            ? t("nextStepOn", {
-                                                date: format.dateTime(new Date(deal.signals.nextStepAt), {
-                                                  month: "short",
-                                                  day: "numeric",
-                                                }),
-                                              })
-                                            : t("nextStepUndated")}
-                                        </div>
-                                      ) : (
-                                        // ⚠️ In words and in red: an open deal with nothing planned is
-                                        // the one that quietly dies (§6.3).
-                                        <div className="flex items-center gap-1 font-medium text-[9px] text-red-600 max-md:text-[11px] dark:text-red-400">
-                                          <CalendarX2 className="h-2.5 w-2.5" aria-hidden />
-                                          {t("signals.noNextStep")}
-                                        </div>
-                                      ))}
-                                    {deal.status === "open" && typeof deal.daysInStage === "number" && (
-                                      // Past the stage's threshold: stuck, and said in words, not only in colour.
-                                      <div
-                                        className={
-                                          deal.stale
-                                            ? "font-medium text-[9px] text-amber-600 max-md:text-[11px] dark:text-amber-400"
-                                            : "text-[9px] text-muted-foreground max-md:text-[11px]"
-                                        }
-                                      >
-                                        {deal.stale
-                                          ? t("stuckInStage", { days: deal.daysInStage })
-                                          : t("daysInStage", { days: deal.daysInStage })}
-                                      </div>
-                                    )}
-                                    {deal.status === "open" && deal.signals.stalled && (
-                                      <div className="flex items-center gap-1 font-medium text-[9px] text-amber-600 max-md:text-[11px] dark:text-amber-400">
-                                        <HourglassIcon className="h-2.5 w-2.5" aria-hidden />
-                                        {t("signals.idle", { days: deal.signals.idleDays })}
-                                      </div>
-                                    )}
-                                  </CardContent>
-                                </Card>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </Draggable>
