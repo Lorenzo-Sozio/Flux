@@ -753,6 +753,13 @@ statements before it applied and records nothing — and re-running repeats them
 COLUMN`, `CREATE TABLE IF NOT EXISTS` and guarded `UPDATE`s are safe; a destructive or
 order-dependent statement is not.
 
+⚠️⚠️ **A migration, once embedded, is never edited — the next change is a new one.** A dev
+server started from this machine talks to the production databases (`.env` points at Railway)
+and migrates them the moment `npm run generate:migrations` rewrites the embedded file; the
+migration is recorded by its timestamp, and a recorded one is never read again. On 29
+September 2026 two columns added to `0065` after it had run were never created, and every
+invoice page failed on them in development and in production alike (`0066` carries them).
+
 `src/db/migrations-rerun.test.ts` holds that line: it applies every embedded
 migration to a real Postgres (PGlite, in-process) and then runs each one a second
 time. `0002_odd_ulik` predates the rule and is the one named exception.
@@ -1370,11 +1377,12 @@ the rule (`'overpays:' || id` cast to int, or a row-dependent division by zero).
   `?issued=YYYY-MM` for "invoiced this month", `?status=to_invoice` for orders — one condition,
   [src/lib/orders-to-invoice.ts](src/lib/orders-to-invoice.ts); an invoice credited in full
   invoices nothing.
-- **Reminders** (`sendPaymentReminder`, migration `0065_the_file_went_out`): what is overdue, from
+- **Reminders** (`sendPaymentReminder`, migration `0066_a_reminder_sent`): what is overdue, from
   the first installment still owed, in the customer's language, with the IBAN for a transfer.
   Claimed by a conditional update (once an hour); a failed send gives the claim back.
 - **SDI**: issuing numbers an invoice, it does not send it. Until its XML is downloaded once
-  (`xml_downloaded_at`, stamped by the download route) the page says it must reach SDI.
+  (`xml_downloaded_at`, migration `0065_the_file_went_out`, stamped by the download route) the
+  page says it must reach SDI.
 - ⚠️ Report periods (`periodOf`) and days are on the workspace's clock: `new Date("2026-09-01")`
   is UTC midnight, and on Workers `T23:59:59` is UTC too.
 

@@ -885,11 +885,18 @@ export const tenantMigrations: EmbeddedMigration[] = [
   {
     tag: "0065_the_file_went_out",
     folderMillis: 1793577600000,
-    hash: "7943feb57ff5d6aed2398166a9a2a0c24b1a9b198ae35416cb50429c4078fdd4",
+    hash: "1988f4d215fba493082eb1539bef59e20cc24fea570dbec9fb1fa3bc35c21d69",
     sql: [
-      '-- When the FatturaPA file of an issued invoice was first downloaded: until then the invoice\r\n-- page reminds whoever issued it that the file still has to reach SDI. An invoice that is\r\n-- numbered and never transmitted is one the customer\'s accountant never receives.\r\n--\r\n-- Additive and re-runnable, like every tenant migration.\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "xml_downloaded_at" timestamp;\r\n',
-      '\r\n-- The last payment reminder sent for an overdue invoice, and how many: the page says when the\r\n-- customer was last reminded, and a second click within the hour sends nothing.\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminded_at" timestamp;\r\n',
-      '\r\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminder_count" integer DEFAULT 0 NOT NULL;\r\n',
+      '-- When the FatturaPA file of an issued invoice was first downloaded: until then the invoice\n-- page reminds whoever issued it that the file still has to reach SDI. An invoice that is\n-- numbered and never transmitted is one the customer\'s accountant never receives.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "xml_downloaded_at" timestamp;\n',
+    ],
+  },
+  {
+    tag: "0066_a_reminder_sent",
+    folderMillis: 1793664000000,
+    hash: "c2b49f9e634e08f36c9fd6f3d6bef02a1fe8f680aa953fdf31bfc131831a7317",
+    sql: [
+      '-- The last payment reminder sent for an overdue invoice, and how many: the page says when the\n-- customer was last reminded, and a second click within the hour sends nothing.\n--\n-- ⚠️ Its own migration, not two more lines in 0065: 0065 had already run — a dev server on the\n-- shared database applies a migration the moment it is embedded — and a migration that is\n-- recorded is never read again. The columns were missing and the invoice page failed.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminded_at" timestamp;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "reminder_count" integer DEFAULT 0 NOT NULL;\n',
     ],
   },
 ];

@@ -1253,7 +1253,7 @@ export const invoices = pgTable(
     emailedTo: text("emailed_to"),
     /** First download of the XML (migration 0065): until then the page says it must reach SDI. */
     xmlDownloadedAt: timestamp("xml_downloaded_at", { mode: "date" }),
-    /** The last payment reminder sent, and how many were (migration 0065). */
+    /** The last payment reminder sent, and how many were (migration 0066). */
     remindedAt: timestamp("reminded_at", { mode: "date" }),
     reminderCount: integer("reminder_count").default(0).notNull(),
     createdBy: text("created_by"),
