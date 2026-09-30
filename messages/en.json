@@ -2638,7 +2638,8 @@
       "previewHint": "The fields are filled with the recipient's, your own and the document's details; below the text is what the CRM adds automatically. Links open in a new tab.",
       "previewAttachments": "Attachments",
       "previewUnfilled": "Still to fill in before sending: {list}",
-      "previewFailed": "The preview could not be prepared."
+      "previewFailed": "The preview could not be prepared.",
+      "writeWithAiShort": "AI"
     },
     "emailBuilder": {
       "blocks": {
@@ -9694,7 +9695,8 @@
       "team": "Team",
       "campaign": "Marketing",
       "shared": "Shared",
-      "manage": "Manage templates"
+      "manage": "Manage templates",
+      "title": "Choose a template"
     },
     "saveAs": {
       "trigger": "Save as template",

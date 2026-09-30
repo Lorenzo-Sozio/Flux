@@ -810,7 +810,8 @@ export function SendEmailModal({
         </div>
 
         {/* ── Tools ──────────────────────────────────────────────────────── */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-2 md:px-5">
+        {/* One row on a phone too: short labels below sm, and "save as template" as an icon. */}
+        <div className="flex shrink-0 flex-nowrap items-center gap-2 border-b bg-muted/30 px-4 py-2 md:px-5">
           {aiEntry && aiSubject && (
             <Button
               type="button"
@@ -818,13 +819,15 @@ export function SendEmailModal({
               size="sm"
               onClick={() => setAiOpen((v) => !v)}
               aria-expanded={aiOpen}
+              aria-label={t("writeWithAi")}
             >
               <SparklesIcon className="text-primary" />
-              {t("writeWithAi")}
+              <span className="sm:hidden">{t("writeWithAiShort")}</span>
+              <span className="hidden sm:inline">{t("writeWithAi")}</span>
             </Button>
           )}
           <EmailTemplatePicker templates={safeTemplates} onPick={pickTemplate} />
-          <div className="ml-auto">
+          <div className="ml-auto shrink-0">
             <SaveAsTemplateButton
               subject={subject}
               body={currentHtml}
@@ -1044,9 +1047,9 @@ export function SendEmailModal({
         <div className="flex shrink-0 items-center gap-3 border-t bg-background px-4 py-3 md:px-5">
           <p className="hidden min-w-0 flex-1 text-muted-foreground text-xs sm:block">{t("footerHint")}</p>
           <div className="ml-auto flex items-center gap-2">
-            <Button type="button" variant="ghost" size="sm" onClick={discard}>
+            <Button type="button" variant="ghost" size="sm" onClick={discard} aria-label={t("discard")}>
               <Trash2Icon />
-              {t("discard")}
+              <span className="hidden sm:inline">{t("discard")}</span>
             </Button>
             <Button
               type="button"

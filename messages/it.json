@@ -2638,7 +2638,8 @@
       "previewHint": "I campi sono compilati con i dati del destinatario, i tuoi e quelli del documento; sotto il testo c'è quello che il CRM aggiunge in automatico. I link si aprono in una nuova scheda.",
       "previewAttachments": "Allegati",
       "previewUnfilled": "Da completare prima di inviare: {list}",
-      "previewFailed": "Non è stato possibile preparare l'anteprima."
+      "previewFailed": "Non è stato possibile preparare l'anteprima.",
+      "writeWithAiShort": "IA"
     },
     "emailBuilder": {
       "blocks": {
@@ -9699,7 +9700,8 @@
       "team": "Del team",
       "campaign": "Marketing",
       "shared": "Condiviso",
-      "manage": "Gestisci modelli"
+      "manage": "Gestisci modelli",
+      "title": "Scegli un modello"
     },
     "saveAs": {
       "trigger": "Salva come modello",

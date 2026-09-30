@@ -76,9 +76,17 @@ export function SaveAsTemplateButton({
 
   return (
     <>
-      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(true)} disabled={disabled}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        aria-label={t("saveAs.trigger")}
+        title={t("saveAs.trigger")}
+      >
         <BookmarkPlusIcon className="text-muted-foreground" />
-        {t("saveAs.trigger")}
+        <span className="hidden sm:inline">{t("saveAs.trigger")}</span>
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">

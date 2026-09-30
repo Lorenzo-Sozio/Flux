@@ -7,6 +7,7 @@ import Link from "next/link";
 import { FileTextIcon, Settings2Icon, UsersIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { FullScreenPanel } from "@/components/crm/full-screen-panel";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -18,6 +19,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type { ComposerTemplate } from "@/lib/email-template-rules";
 
 /**
@@ -34,6 +36,7 @@ export function EmailTemplatePicker({
   const t = useTranslations("emailTemplates.picker");
   const tc = useTranslations("emailTemplates.categories");
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const mine = templates.filter((tpl) => tpl.kind === "personal" && tpl.mine);
   const team = templates.filter((tpl) => tpl.kind === "personal" && !tpl.mine);
@@ -70,32 +73,63 @@ export function EmailTemplatePicker({
       </CommandGroup>
     ) : null;
 
+  // Opened by hand on a phone, where no popover trigger does it; by the popover everywhere else.
+  const trigger = (onClick?: () => void) => (
+    <Button type="button" variant="outline" size="sm" aria-expanded={open} onClick={onClick}>
+      <FileTextIcon className="text-muted-foreground" />
+      {t("trigger")}
+    </Button>
+  );
+
+  const manage = (
+    <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
+      <Link href="/dashboard/settings/email-templates">
+        <Settings2Icon />
+        {t("manage")}
+      </Link>
+    </Button>
+  );
+
+  const list = (
+    <>
+      <CommandEmpty>{templates.length === 0 ? t("none") : t("noMatch")}</CommandEmpty>
+      {group(t("mine"), mine)}
+      {group(t("team"), team)}
+      {group(t("campaign"), campaign)}
+    </>
+  );
+
+  // ⚠️ On a phone a popover is a box of five rows under the keyboard: the list takes the screen, as
+  // the search and the notifications do, with the search at the top and room for a thumb.
+  if (isMobile) {
+    return (
+      <>
+        {trigger(() => setOpen(true))}
+        <FullScreenPanel
+          open={open}
+          onOpenChange={setOpen}
+          title={t("title")}
+          description={t("title")}
+          footer={<div className="p-2">{manage}</div>}
+        >
+          <Command className="h-auto rounded-none [&_[cmdk-item]]:py-3">
+            <CommandInput placeholder={t("search")} />
+            <CommandList className="max-h-none">{list}</CommandList>
+          </Command>
+        </FullScreenPanel>
+      </>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" aria-expanded={open}>
-          <FileTextIcon className="text-muted-foreground" />
-          {t("trigger")}
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{trigger()}</PopoverTrigger>
       <PopoverContent align="start" className="w-[min(26rem,calc(100vw-2rem))] p-0">
         <Command>
           <CommandInput placeholder={t("search")} />
-          <CommandList className="max-h-80">
-            <CommandEmpty>{templates.length === 0 ? t("none") : t("noMatch")}</CommandEmpty>
-            {group(t("mine"), mine)}
-            {group(t("team"), team)}
-            {group(t("campaign"), campaign)}
-          </CommandList>
+          <CommandList className="max-h-80">{list}</CommandList>
           <CommandSeparator />
-          <div className="p-1">
-            <Button asChild variant="ghost" size="sm" className="w-full justify-start text-muted-foreground">
-              <Link href="/dashboard/settings/email-templates">
-                <Settings2Icon />
-                {t("manage")}
-              </Link>
-            </Button>
-          </div>
+          <div className="p-1">{manage}</div>
         </Command>
       </PopoverContent>
     </Popover>
