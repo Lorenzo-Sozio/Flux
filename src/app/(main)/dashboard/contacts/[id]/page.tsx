@@ -30,15 +30,17 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { createActivity } from "@/actions/activities";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getCustomerRecord } from "@/actions/customer-record";
-import { getEmailTemplates } from "@/actions/marketing";
+import { getComposerTemplates } from "@/actions/email-templates";
 import { deleteTask, getAllUsers, getTasksByContact } from "@/actions/tasks";
 import { ContactModal } from "@/app/(main)/dashboard/contacts/_components/contact-modal";
 import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { ConsentDetail } from "@/components/crm/consent-detail";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { CustomerRecordPanel } from "@/components/crm/customer-record";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { EnrollInSequence } from "@/components/crm/enroll-in-sequence";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { PrivacyCard } from "@/components/crm/privacy-card";
@@ -69,6 +71,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts } from "@/db/schema";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
@@ -127,13 +130,14 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   // "forbidden" are not drawn for them.
   const tenantRole = session?.user?.tenantRole ?? null;
   const canWrite = can(tenantRole, "record:write");
+  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
   const db = await getDb();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
   const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
 
   let contactRow: Awaited<ReturnType<typeof loadContact>>;
-  let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
+  let templates: Awaited<ReturnType<typeof getComposerTemplates>> = [];
 
   const loadContact = () =>
     db
@@ -144,7 +148,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
       .then((rows) => rows[0]);
 
   try {
-    [contactRow, templates] = await Promise.all([loadContact(), getEmailTemplates().catch(() => [])]);
+    [contactRow, templates] = await Promise.all([loadContact(), getComposerTemplates().catch(() => [])]);
   } catch (error) {
     console.error("Error loading contact:", error);
     return notFound();
@@ -435,10 +439,19 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
           <FieldList>
             <Field label={tD("fieldEmail")}>
               {cData.email && (
-                <a href={`mailto:${cData.email}`} className={TAP_LINK}>
+                <EmailAddressButton
+                  email={cData.email}
+                  entity={cData}
+                  entityType="contact"
+                  templates={templates}
+                  ownerId={userId}
+                  ai={ai.draft ?? null}
+                  canSend={canWrite}
+                  className={TAP_LINK}
+                >
                   <MailIcon className="size-3.5 shrink-0" aria-hidden />
                   <span className="break-all">{cData.email}</span>
-                </a>
+                </EmailAddressButton>
               )}
             </Field>
             <Field label={tD("fieldMobile")}>
@@ -637,7 +650,13 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
             {/* Sending logs an activity and needs write access; without an address
                 the dialog could only answer that there is nowhere to send it. */}
             {canWrite && cData.email && (
-              <SendEmailModal entity={cData} entityType="contact" templates={templates} ownerId={userId} />
+              <SendEmailModal
+                entity={cData}
+                entityType="contact"
+                templates={templates}
+                ownerId={userId}
+                ai={ai.draft}
+              />
             )}
             {canWrite && (
               <ContactModal contact={cData}>
@@ -713,6 +732,15 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         sections={[
           { tab: "next", column: "main", node: nextSteps },
           { tab: "activity", column: "main", node: activity },
+          ...(ai.summary
+            ? [
+                {
+                  tab: "activity",
+                  column: "side" as const,
+                  node: <AiSummaryCard subject={{ type: "contact", id: contactId }} entry={ai.summary} />,
+                },
+              ]
+            : []),
           { tab: "details", column: "side", node: contactInfo },
           { tab: "details", column: "side", node: details },
           {

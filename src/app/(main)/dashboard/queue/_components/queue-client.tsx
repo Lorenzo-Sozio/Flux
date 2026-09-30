@@ -11,8 +11,9 @@ import { toast } from "sonner";
 import { logContactAction } from "@/actions/activities";
 import { snoozeNextActionAction } from "@/actions/next-actions";
 import { updateTaskStatus } from "@/actions/tasks";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { TaskTypePicker } from "@/components/crm/task-type-picker";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
@@ -150,12 +151,15 @@ export function QueueClient({ items, canWrite }: { items: Item[]; canWrite: bool
               </Button>
             )}
             {item.reach?.email && (
-              <Button asChild size="lg" variant="outline" className="max-sm:flex-1">
-                <a href={`mailto:${item.reach.email}`}>
-                  <Mail className="mr-2 size-4" aria-hidden />
-                  {t("email")}
-                </a>
-              </Button>
+              <EmailAddressButton
+                email={item.reach.email}
+                {...reachRecipient(item.reach)}
+                canSend={canWrite}
+                className={buttonVariants({ size: "lg", variant: "outline", className: "max-sm:flex-1" })}
+              >
+                <Mail className="mr-2 size-4" aria-hidden />
+                {t("email")}
+              </EmailAddressButton>
             )}
             <Button asChild size="lg" variant="ghost" className="max-sm:flex-1">
               <Link href={item.href}>
@@ -258,6 +262,21 @@ export function QueueClient({ items, canWrite }: { items: Item[]; canWrite: bool
       </div>
     </div>
   );
+}
+
+/**
+ * Who the email dialog writes to from a row: the record the contact is logged on, and the name
+ * split so that {{nome}} fills. A deal's contact is logged on the deal.
+ */
+function reachRecipient(reach: Reach) {
+  const [firstName, ...rest] = (reach.name ?? "").split(/\s+/);
+  const person = { firstName: firstName || null, lastName: rest.join(" ") || null };
+  const target = reach.target;
+  if (!target) return { entity: { id: "", ...person } };
+  if (target.entity === "deal") return { entity: { id: "", ...person }, dealId: target.id };
+  if (target.entity === "company")
+    return { entity: { id: target.id, name: reach.name }, entityType: "company" as const };
+  return { entity: { id: target.id, ...person }, entityType: target.entity };
 }
 
 /** The verb each kind is read as, shared with the home's list. */

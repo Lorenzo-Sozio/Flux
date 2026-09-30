@@ -14,10 +14,10 @@ const keyOf = (feature: WorkspaceFeature) => `feature.${feature}`;
  * What a new workspace starts with: the core of a CRM, and nothing to step over.
  * `seedWorkspace` writes these; an existing workspace, which has no row, keeps everything on.
  */
-export const NEW_WORKSPACE_FEATURES: WorkspaceFeatures = { projects: false, chat: false };
+export const NEW_WORKSPACE_FEATURES: WorkspaceFeatures = { projects: false, chat: false, ai: true };
 
 /** Everything on: what a workspace has when nobody has decided otherwise. */
-export const ALL_FEATURES_ON: WorkspaceFeatures = { projects: true, chat: true };
+export const ALL_FEATURES_ON: WorkspaceFeatures = { projects: true, chat: true, ai: true };
 
 /**
  * The workspace's switches. A missing row is on — every workspace had these before they

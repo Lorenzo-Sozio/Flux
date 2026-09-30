@@ -4,6 +4,8 @@ export {
   accounts,
   activities,
   activitiesRelations,
+  // What the AI copilot proposed
+  aiSuggestions,
   // Notifications
   // API idempotency
   apiIdempotency,

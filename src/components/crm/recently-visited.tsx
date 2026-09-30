@@ -4,31 +4,24 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 
-import { History, Trash2 } from "lucide-react";
+import { ChevronRight, History, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ENTITY_GROUPS, ENTITY_TYPES, type EntityGroup, entityDef } from "@/lib/entities";
 import { clearRecentRecords, RECENT_EVENT, type RecentRecord, readRecentRecords } from "@/lib/recent-records";
+import { relativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
 import { EntityBadgeIcon } from "./entity-icon";
+import { FullScreenPanel } from "./full-screen-panel";
 import { useWorkspaceScope } from "./workspace-scope";
 
 type Tab = "all" | EntityGroup;
 const TAB_KEY = "flux.recent.tab";
 const ALL_LIMIT = 12;
-
-/** "3 min ago", "yesterday", in the interface language. */
-function relative(at: number, locale: string): string {
-  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-  const mins = Math.round((at - Date.now()) / 60_000);
-  if (Math.abs(mins) < 60) return rtf.format(mins, "minute");
-  const hours = Math.round(mins / 60);
-  if (Math.abs(hours) < 24) return rtf.format(hours, "hour");
-  return rtf.format(Math.round(hours / 24), "day");
-}
 
 /**
  * The records opened most recently, by section.
@@ -99,12 +92,18 @@ export function RecentlyVisited() {
     load();
   };
 
+  const isMobile = useIsMobile();
+
   const row = (item: RecentRecord, showType: boolean) => (
     <Link
       key={`${item.type}:${item.id}`}
       href={item.url}
       onClick={() => setOpen(false)}
-      className="flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted/60"
+      className={cn(
+        "flex items-center gap-3 transition-colors",
+        // A phone: a thumb's height, edge to edge, and a chevron that says it opens.
+        isMobile ? "min-h-14 px-4 py-2.5 active:bg-muted/70" : "rounded-md px-2 py-2 hover:bg-muted/60",
+      )}
     >
       <EntityBadgeIcon type={item.type} />
       <span className="min-w-0 flex-1">
@@ -113,93 +112,132 @@ export function RecentlyVisited() {
           {[showType ? t(`types.${item.type}.one` as never) : null, item.sub].filter(Boolean).join(" · ")}
         </span>
       </span>
-      <span className="shrink-0 text-[11px] text-muted-foreground">{relative(item.at, locale)}</span>
+      <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(item.at, locale)}</span>
+      {isMobile && <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />}
     </Link>
   );
 
+  const clearButton = items.length > 0 && (
+    <Button
+      variant="ghost"
+      size="sm"
+      className={cn("shrink-0 gap-1 text-muted-foreground", isMobile ? "h-9 text-sm" : "h-7 text-xs")}
+      onClick={clear}
+    >
+      <Trash2 className={isMobile ? "size-4" : "h-3 w-3"} aria-hidden />
+      {current === "all" ? t("recents.clear") : t("recents.clearGroup")}
+    </Button>
+  );
+
+  const trigger = (
+    <Button
+      variant="ghost"
+      size="icon"
+      // On a phone the same 40px target as the search beside it.
+      className="relative h-8 w-8 max-md:size-10"
+      aria-label={t("recents.button")}
+      title={t("recents.button")}
+      onClick={isMobile ? () => setOpen(true) : undefined}
+    >
+      <History className="h-4 w-4 max-md:size-5" />
+    </Button>
+  );
+
+  const body =
+    items.length === 0 ? (
+      <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
+        <History className="h-8 w-8 text-muted-foreground/40" />
+        <p className="text-muted-foreground text-sm">{t("recents.empty")}</p>
+      </div>
+    ) : (
+      <>
+        {/* Sections that have something, as chips: they wrap rather than scroll, so none is hidden. */}
+        <div
+          role="tablist"
+          aria-label={t("recents.title")}
+          className={cn("flex flex-wrap border-b", isMobile ? "gap-2 px-4 py-2.5" : "gap-1 px-3 py-2")}
+        >
+          {(["all", ...groups] as Tab[]).map((g) => {
+            const count = g === "all" ? items.length : (byGroup.get(g)?.length ?? 0);
+            return (
+              <button
+                key={g}
+                type="button"
+                role="tab"
+                aria-selected={current === g}
+                onClick={() => choose(g)}
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border transition-colors",
+                  isMobile ? "h-9 px-3.5 font-medium text-sm" : "px-2.5 py-0.5 text-xs",
+                  current === g ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
+                )}
+              >
+                {g === "all" ? t("recents.all") : t(`groups.${g}` as never)}
+                <span className={cn("tabular-nums", current === g ? "opacity-80" : "text-muted-foreground")}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* On a phone the list is the screen; in the popover a box that scrolls. */}
+        <div className={isMobile ? "divide-y" : "max-h-[min(24rem,60dvh)] overflow-y-auto p-1.5"}>
+          {current === "all"
+            ? items.slice(0, isMobile ? ALL_LIMIT * 2 : ALL_LIMIT).map((item) => row(item, true))
+            : ENTITY_TYPES.filter((type) => entityDef(type)?.group === current).map((type) => {
+                const ofType = (byGroup.get(current) ?? []).filter((r) => r.type === type);
+                if (ofType.length === 0) return null;
+                return (
+                  <div key={type} className="mb-1">
+                    <p
+                      className={cn(
+                        "pt-2 pb-1 font-medium text-[11px] text-muted-foreground uppercase tracking-wide",
+                        isMobile ? "bg-muted/60 px-4 py-1.5" : "px-2",
+                      )}
+                    >
+                      {t(`types.${type}.other` as never)}
+                    </p>
+                    {ofType.map((item) => row(item, false))}
+                  </div>
+                );
+              })}
+        </div>
+      </>
+    );
+
+  // ⚠️ On a phone the whole screen, as the search: the popover was a box over the page, its list
+  // capped at a third of the screen and its rows a fingertip tall.
+  if (isMobile) {
+    return (
+      <>
+        {trigger}
+        <FullScreenPanel
+          open={open}
+          onOpenChange={setOpen}
+          title={t("recents.title")}
+          description={t("recents.hint")}
+          action={clearButton}
+          footer={<p className="px-4 py-2.5 text-muted-foreground text-xs">{t("recents.hint")}</p>}
+        >
+          {body}
+        </FullScreenPanel>
+      </>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          // On a phone the same 40px target as the search beside it.
-          className="relative h-8 w-8 max-md:size-10"
-          aria-label={t("recents.button")}
-          title={t("recents.button")}
-        >
-          <History className="h-4 w-4 max-md:size-5" />
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] p-0">
         <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
           <div className="min-w-0">
             <p className="font-semibold text-sm">{t("recents.title")}</p>
             <p className="truncate text-muted-foreground text-xs">{t("recents.hint")}</p>
           </div>
-          {items.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 shrink-0 gap-1 text-muted-foreground text-xs"
-              onClick={clear}
-            >
-              <Trash2 className="h-3 w-3" />
-              {current === "all" ? t("recents.clear") : t("recents.clearGroup")}
-            </Button>
-          )}
+          {clearButton}
         </div>
-
-        {items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 px-4 py-10 text-center">
-            <History className="h-8 w-8 text-muted-foreground/40" />
-            <p className="text-muted-foreground text-sm">{t("recents.empty")}</p>
-          </div>
-        ) : (
-          <>
-            {/* Sections that have something, as chips: they wrap rather than scroll, so none is hidden. */}
-            <div role="tablist" aria-label={t("recents.title")} className="flex flex-wrap gap-1 border-b px-3 py-2">
-              {(["all", ...groups] as Tab[]).map((g) => {
-                const count = g === "all" ? items.length : (byGroup.get(g)?.length ?? 0);
-                return (
-                  <button
-                    key={g}
-                    type="button"
-                    role="tab"
-                    aria-selected={current === g}
-                    onClick={() => choose(g)}
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                      current === g ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
-                    )}
-                  >
-                    {g === "all" ? t("recents.all") : t(`groups.${g}` as never)}
-                    <span className={cn("tabular-nums", current === g ? "opacity-80" : "text-muted-foreground")}>
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="max-h-[min(24rem,60dvh)] overflow-y-auto p-1.5">
-              {current === "all"
-                ? items.slice(0, ALL_LIMIT).map((item) => row(item, true))
-                : ENTITY_TYPES.filter((type) => entityDef(type)?.group === current).map((type) => {
-                    const ofType = (byGroup.get(current) ?? []).filter((r) => r.type === type);
-                    if (ofType.length === 0) return null;
-                    return (
-                      <div key={type} className="mb-1">
-                        <p className="px-2 pt-2 pb-1 font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
-                          {t(`types.${type}.other` as never)}
-                        </p>
-                        {ofType.map((item) => row(item, false))}
-                      </div>
-                    );
-                  })}
-            </div>
-          </>
-        )}
+        {body}
       </PopoverContent>
     </Popover>
   );

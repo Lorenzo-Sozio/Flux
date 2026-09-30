@@ -49,6 +49,7 @@ import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
 import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
 import { WeekCurrentTimeLine } from "@/components/crm/week-current-time-line";
 import { Button } from "@/components/ui/button";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { DAY_LAYOUT_COOKIE, type DayLayout, resolveDayLayout } from "@/lib/calendar-day-layout";
 import { PERSON_STYLES, parseCalendarFilter, peopleOf, personIndexFor } from "@/lib/calendar-filter";
 import { can } from "@/lib/permissions";
@@ -275,6 +276,7 @@ export default async function CalendarPage({
   // ⚠️ The workspace role, never the platform one.
   const tenantRole = session?.user?.tenantRole ?? null;
   const canWrite = can(tenantRole, "record:write");
+  const aiBriefing = canWrite ? (await aiEntries(["briefing"], aiViewer(session?.user))).briefing : undefined;
   const canDelete = can(tenantRole, "record:delete");
 
   const currentView: View = (VIEWS as readonly string[]).includes(viewParam ?? "") ? (viewParam as View) : "week";
@@ -1610,7 +1612,7 @@ export default async function CalendarPage({
       </div>
 
       {/* ── Appointment detail sheet ── */}
-      <AppointmentDetailSheet canWrite={canWrite} canDelete={canDelete} timeZone={timeZone} />
+      <AppointmentDetailSheet canWrite={canWrite} canDelete={canDelete} timeZone={timeZone} aiBriefing={aiBriefing} />
     </div>
   );
 }

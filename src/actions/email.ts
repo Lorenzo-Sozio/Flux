@@ -2,95 +2,85 @@
 
 import { revalidatePath } from "next/cache";
 
-import { eq } from "drizzle-orm";
-
-import { activities, users } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
-import { sendEmail } from "@/lib/email-provider";
-import { inboundEmailConfigured, replyToFor } from "@/lib/inbound-sales-reply";
-import { sendFromOwnMailbox } from "@/lib/mailbox-send";
+import { composeEmail, deliverEmail, type EmailPreview, type SendEmailResult } from "@/lib/email-deliver";
 import { getDb } from "@/lib/tenant-context";
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export type { EmailPreview, SendEmailResult };
 
+/**
+ * An email a person wrote from a record — a contact, a lead, a company, a deal. The sending
+ * itself is `deliverEmail` (src/lib/email-deliver.ts), the path every email from the CRM takes.
+ */
 export async function sendEmailAction({
   to,
+  cc,
+  bcc,
   subject,
   body,
   leadId,
   contactId,
+  companyId,
+  dealId,
   ownerId,
+  templateId,
 }: {
   to: string;
+  /** Copies, as typed: comma, semicolon or space separated (src/lib/email-addresses.ts). */
+  cc?: string;
+  bcc?: string;
   subject: string;
   body: string;
   leadId?: string;
   contactId?: string;
+  /** Written to a company's own address: logged on the company. */
+  companyId?: string;
+  /** Sent from a deal's page: logged on the deal as well as on its contact. */
+  dealId?: string;
   ownerId?: string;
-}) {
+  /** The template the email started from: counted, so the ones in use come first. */
+  templateId?: string;
+}): Promise<SendEmailResult> {
   const actor = await requireWriteAccess();
   const db = await getDb();
-  const [me] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, actor.user.id));
-
-  // From the person's own mailbox when they connected one (V3.2): it goes out as them, and
-  // the answer comes back where the sync reads it. Otherwise the workspace's sender.
-  const own = await sendFromOwnMailbox(db, actor.user.id, { to: [to], subject, html: body, fromName: me?.name });
-  if (own.used && !own.ok) {
-    throw new Error(`Your mailbox did not send it: ${own.error}`);
-  }
-  const messageId: string | null = own.used ? own.messageId : null;
-  if (!own.used) {
-    const replyTo = replyToFor(inboundEmailConfigured(), me?.email);
-    const result = await sendEmail({ to, subject, html: body, ...(replyTo ? { replyTo } : {}) });
-    if (!result.success) {
-      throw new Error(result.error ?? "Failed to send email.");
-    }
-  }
-
-  // ⚠️ From here on the email has gone. Recording it is worth doing and not worth failing
-  // over: an error now would tell the person the send failed, and the obvious next move —
-  // sending again — delivers it twice.
-  const bodyText = stripHtml(body);
-  await db
-    .insert(activities)
-    .values({
-      type: "email",
-      content: JSON.stringify({
-        _type: "email_v2",
-        direction: "out",
-        ...(own.used ? { from: own.from } : {}),
-        subject,
-        to,
-        snippet: bodyText.substring(0, 300),
-        bodyText: bodyText.substring(0, 5000),
-      }),
-      leadId,
-      contactId,
-      ownerId,
-      date: new Date(),
-      // The copy the mailbox sync reads back from Sent is the same message: this id makes it
-      // one entry on the timeline, not two.
-      messageId,
-    })
-    .catch((err) => {
-      console.error("[sendEmailAction] sent, but not logged on the record:", err);
-    });
+  const result = await deliverEmail(
+    db,
+    { userId: actor.user.id },
+    {
+      to,
+      cc,
+      bcc,
+      subject,
+      html: body,
+      sender: "person",
+      dealId,
+      log: { leadId, contactId, companyId, dealId, ownerId },
+      templateId,
+    },
+  );
+  if (!result.success) return result;
 
   if (leadId) revalidatePath(`/dashboard/leads/${leadId}`);
   if (contactId) revalidatePath(`/dashboard/contacts/${contactId}`);
-
+  if (companyId) revalidatePath(`/dashboard/companies/${companyId}`);
+  if (dealId) revalidatePath(`/dashboard/pipeline/${dealId}`);
   return { success: true };
+}
+
+/**
+ * What the customer will receive from `sendEmailAction`, without sending it: the dialog has filled
+ * the recipient's fields, this fills the sender's and the deal's the way the send does.
+ */
+export async function previewEmailAction({
+  subject,
+  body,
+  dealId,
+}: {
+  subject: string;
+  body: string;
+  dealId?: string;
+}): Promise<EmailPreview> {
+  const actor = await requireWriteAccess();
+  const email = await composeEmail(await getDb(), { userId: actor.user.id }, { subject, html: body, dealId });
+  return { ok: true, subject: email.subject, html: email.html };
 }

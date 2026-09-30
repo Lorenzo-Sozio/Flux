@@ -13,9 +13,10 @@ import { appUrl } from "@/lib/app-url";
 import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { documentLanguage, fill, formatDocumentDate, formatDocumentMoney, QUOTE_TEXT } from "@/lib/document-language";
 import { computeDocument } from "@/lib/document-totals";
-import { sendEmail } from "@/lib/email-provider";
+import { composeEmail, deliverEmail, type EmailPreview } from "@/lib/email-deliver";
 import { getExchangeRates } from "@/lib/exchange-rates";
 import { getTenantById } from "@/lib/get-tenant";
+import { serverT } from "@/lib/i18n-server";
 import { notify, notifyMany } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
@@ -525,91 +526,149 @@ export async function deleteQuoteAction(quoteId: string) {
   }
 }
 
-export async function sendQuoteEmailAction(quoteId: string, toEmail: string, subject: string, message: string) {
-  try {
-    const actor = await requireCapability("quote:write");
-    await requirePlanModule("sales");
-    const db = await getDb();
+/**
+ * A quote sent to the customer from the email dialog (src/components/crm/send-email-modal.tsx):
+ * the person's text, then the quote's summary and the button that opens it. The first send moves
+ * the quote to "sent"; a later one is a reminder.
+ *
+ * ⚠️ Returns its failures, never throws them: a thrown message never reaches the screen in
+ * production, and a refused send must say why (an approval pending, a status that cannot be sent).
+ */
+/**
+ * What the quote itself adds under the person's text: its number, its total, until when, and the
+ * button that opens it — so no version of the email can leave without them.
+ */
+function quoteEmailFinish(
+  quote: Pick<typeof quotes.$inferSelect, "publicToken" | "quoteNumber" | "totalAmount" | "currency" | "expiresAt"> & {
+    company: { language?: string | null; country?: string | null } | null;
+  },
+): (body: string) => string {
+  // ⚠️ The link used a fresh hash of the id and the time, saved nowhere, so every
+  // customer received a "View quote" button that opened a not-found page. The
+  // public page looks quotes up by `publicToken`; that is the link.
+  const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);
 
-    const quote = await db.query.quotes.findFirst({
-      where: eq(quotes.id, quoteId),
-      with: {
-        company: true,
-        contact: true,
-      },
-    });
-
-    if (!quote) {
-      throw new Error("Quote not found");
-    }
-
-    // Check permission
-    if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) {
-      throw new Error("Unauthorized");
-    }
-
-    // Decided before anything leaves: see decideQuoteSend. A refusal here costs nothing; a
-    // refusal after the send is an email the customer has and the salesperson thinks failed.
-    const tenantId = await getCurrentTenantId();
-    const tenant = tenantId ? await getTenantById(tenantId) : null;
-    const lines = await db
-      .select({ discountPercent: quoteItems.discountPercent })
-      .from(quoteItems)
-      .where(eq(quoteItems.quoteId, quoteId));
-    const decision = decideQuoteSend(
-      quote.status,
-      approvalRequiredReason(quote, await readApprovalPolicy(db, tenant?.settings), lines),
-    );
-    if (decision.kind === "refuse") throw new Error(decision.reason);
-
-    // ⚠️ The link used a fresh hash of the id and the time, saved nowhere, so every
-    // customer received a "View quote" button that opened a not-found page. The
-    // public page looks quotes up by `publicToken`; that is the link.
-    const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);
-
-    // In the customer's language and the quote's currency, whoever sends it.
-    const lang = documentLanguage(quote.company);
-    const tx = QUOTE_TEXT[lang];
-    const escapeHtml = (v: string) =>
-      v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-    const summary = fill(tx.emailBody, {
-      number: escapeHtml(quote.quoteNumber),
-      total: escapeHtml(formatDocumentMoney(quote.totalAmount, quote.currency, lang)),
-    });
-    const validity = quote.expiresAt
-      ? ` ${fill(tx.emailValidUntil, { date: escapeHtml(formatDocumentDate(quote.expiresAt, lang)) })}`
-      : "";
-
-    // The message is what the salesperson typed: escaped, because it was pasted
-    // into HTML as it was, and a stray "<" broke the email.
-    const html = `
+  // In the customer's language and the quote's currency, whoever sends it.
+  const lang = documentLanguage(quote.company);
+  const tx = QUOTE_TEXT[lang];
+  const escapeHtml = (v: string) =>
+    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const summary = fill(tx.emailBody, {
+    number: escapeHtml(quote.quoteNumber),
+    total: escapeHtml(formatDocumentMoney(quote.totalAmount, quote.currency, lang)),
+  });
+  const validity = quote.expiresAt
+    ? ` ${fill(tx.emailValidUntil, { date: escapeHtml(formatDocumentDate(quote.expiresAt, lang)) })}`
+    : "";
+  return (body) => `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827;line-height:1.5">
-        <p style="white-space:pre-wrap">${escapeHtml(message)}</p>
+        ${body}
         <div style="margin:20px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
           <p style="margin:0">${summary}${validity}</p>
         </div>
         <p><a href="${quoteViewUrl}" style="display:inline-block;padding:10px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">${escapeHtml(tx.emailCta)}</a></p>
       </div>
     `;
+}
 
-    // ⚠️ `sendEmail` reports a failure, it does not throw: unchecked, a quote whose email
-    // never left was marked sent, and the follow-up engine then waited on a customer who
-    // had received nothing.
-    const result = await sendEmail({ to: toEmail, subject, html });
-    if (!result.success) throw new Error(result.error ?? "The email could not be sent.");
+/** The quote's email as the customer will receive it, without sending it or moving the quote. */
+export async function previewQuoteEmailAction(
+  quoteId: string,
+  email: { subject: string; bodyHtml: string },
+): Promise<EmailPreview> {
+  const actor = await requireCapability("quote:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId), with: { company: true } });
+  if (!quote) return { ok: false, error: (await serverT("serverErrors.quotes"))("notFound") };
+  const composed = await composeEmail(
+    db,
+    { userId: actor.userId },
+    {
+      subject: email.subject,
+      html: email.bodyHtml,
+      dealId: quote.dealId ?? undefined,
+      finish: quoteEmailFinish(quote),
+    },
+  );
+  return { ok: true, subject: composed.subject, html: composed.html };
+}
 
-    if (decision.kind === "first") {
-      await updateQuoteAction(quoteId, { status: "sent" });
-      await logQuoteActivity(quoteId, "sent", actor.userId, toEmail);
-    } else {
-      await logQuoteActivity(quoteId, "reminded", actor.userId, toEmail);
-    }
+export async function sendQuoteEmailAction(
+  quoteId: string,
+  email: { to: string; cc?: string; bcc?: string; subject: string; bodyHtml: string; templateId?: string },
+): Promise<{ success: true } | { success: false; error: string }> {
+  const actor = await requireCapability("quote:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const t = await serverT("serverErrors.quotes");
 
-    return { success: true };
-  } catch (error) {
-    console.error("[sendQuoteEmailAction]", error);
-    throw error;
+  const quote = await db.query.quotes.findFirst({
+    where: eq(quotes.id, quoteId),
+    with: { company: true, contact: true },
+  });
+  if (!quote) return { success: false, error: t("notFound") };
+
+  // Check permission
+  if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) {
+    return { success: false, error: t("forbidden") };
   }
+
+  // Decided before anything leaves: see decideQuoteSend. A refusal here costs nothing; a
+  // refusal after the send is an email the customer has and the salesperson thinks failed.
+  const tenantId = await getCurrentTenantId();
+  const tenant = tenantId ? await getTenantById(tenantId) : null;
+  const lines = await db
+    .select({ discountPercent: quoteItems.discountPercent })
+    .from(quoteItems)
+    .where(eq(quoteItems.quoteId, quoteId));
+  const decision = decideQuoteSend(
+    quote.status,
+    approvalRequiredReason(quote, await readApprovalPolicy(db, tenant?.settings), lines),
+  );
+  if (decision.kind === "refuse") {
+    console.warn(`[sendQuoteEmailAction] refused: ${decision.reason}`);
+    return { success: false, error: t("notSendable") };
+  }
+
+  const finish = quoteEmailFinish(quote);
+
+  // The person's text as written in the editor, then what the quote itself says: its number,
+  // its total, until when, and the button — so no version of the email can leave without them.
+  const sent = await deliverEmail(
+    db,
+    { userId: actor.userId },
+    {
+      to: email.to,
+      cc: email.cc,
+      bcc: email.bcc,
+      subject: email.subject,
+      html: email.bodyHtml,
+      sender: "person",
+      dealId: quote.dealId ?? undefined,
+      log: {
+        contactId: quote.contactId,
+        companyId: quote.companyId,
+        dealId: quote.dealId,
+        document: { type: "quote", id: quote.id, number: quote.quoteNumber },
+      },
+      templateId: email.templateId,
+      finish,
+    },
+  );
+  // ⚠️ A send that did not leave moves nothing: a quote whose email never went was marked sent,
+  // and the follow-up engine then waited on a customer who had received nothing.
+  if (!sent.success) return sent;
+
+  const to = email.to.trim().toLowerCase();
+  if (decision.kind === "first") {
+    await updateQuoteAction(quoteId, { status: "sent" });
+    await logQuoteActivity(quoteId, "sent", actor.userId, to);
+  } else {
+    await logQuoteActivity(quoteId, "reminded", actor.userId, to);
+  }
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
+  return { success: true };
 }
 
 export async function markQuoteAsViewedAction(quoteId: string, email?: string, ipAddress?: string) {

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "⚠️⚠️ il ragionamento interno del modello finisce nella bozza mostrata all'operatore",
+    "find": "    .filter((part) => !part.thought && typeof part.text === \"string\")",
+    "replace": "    .filter((part) => typeof part.text === \"string\")"
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "le risposte precedenti del modello vengono presentate come parole dell'utente",
+    "find": "      role: message.role === \"assistant\" ? \"model\" : \"user\",",
+    "replace": "      role: \"user\","
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "⚠️ la chiave non viene mandata: ogni chiamata fallisce come chiave rifiutata",
+    "find": "    headers: { \"Content-Type\": \"application/json\", \"x-goog-api-key\": context.apiKey },",
+    "replace": "    headers: { \"Content-Type\": \"application/json\" },"
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "una chiave inesistente (400 API_KEY_INVALID) viene detta richiesta non valida invece che chiave rifiutata",
+    "find": "  if (body.error?.details?.some((d) => d.reason === \"API_KEY_INVALID\")) return { reason: \"auth\", message };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "⚠️ un modello non disponibile per la chiave (i 2.5 riservati a chi li usava) non dice di cambiare AI_MODEL",
+    "find": "  if (status === 404) return { reason: \"model\", message };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "⚠️ un prompt rifiutato dai filtri diventa una risposta vuota riuscita",
+    "find": "  if (blockReason) return { ok: false, reason: \"blocked\", message: `Gemini refused the prompt: ${blockReason}` };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/gemini.ts",
+    "description": "⚠️ una risposta tagliata al limite di token non viene segnalata come incompleta",
+    "find": "  if (finishReason === \"MAX_TOKENS\") return { ok: true, truncated: true };",
+    "replace": "  if (finishReason === \"MAX_TOKENS\") return { ok: true, truncated: false };"
+  },
+  {
+    "file": "src/lib/ai/config.ts",
+    "description": "⚠️⚠️ un id di modello qualsiasi entra nel percorso della richiesta al fornitore",
+    "find": "const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9.-]{0,99}$/;",
+    "replace": "const MODEL_ID = /.+/;"
+  },
+  {
+    "file": "src/lib/ai/client.ts",
+    "description": "⚠️ un JSON troncato al limite di token viene passato come dato estratto",
+    "find": "  if (result.truncated) return fail(\"the answer was cut off at maxOutputTokens\");",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/client.ts",
+    "description": "⚠️⚠️ un JSON che non rispetta lo schema viene passato come dato estratto",
+    "find": "  if (parsed === null) return fail(\"the answer does not match the schema\");",
+    "replace": ""
+  }
+]

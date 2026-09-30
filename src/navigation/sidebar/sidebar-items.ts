@@ -168,6 +168,9 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
       { titleKey: "companies", url: "/dashboard/companies", icon: Building2 },
       { titleKey: "leads", url: "/dashboard/leads", icon: Users },
+      // The text an email to a customer starts from, beside the records it is written from —
+      // like the macros beside the tickets. For everybody: writing to customers needs no module.
+      { titleKey: "emailTemplates", url: "/dashboard/settings/email-templates", icon: FileText, need: "record:read" },
     ],
   },
   {

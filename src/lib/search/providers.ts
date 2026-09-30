@@ -433,7 +433,14 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     const rows = await db
       .select({ id: emailTemplates.id, name: emailTemplates.name, subject: emailTemplates.subject })
       .from(emailTemplates)
-      .where(or(matches(emailTemplates.name, like), matches(emailTemplates.subject, like)))
+      // ⚠️ Campaign templates only: a personal one may be private to its owner, and a search
+      // knows nothing about who is searching. They are found on their own page and in the dialog.
+      .where(
+        and(
+          eq(emailTemplates.kind, "campaign"),
+          or(matches(emailTemplates.name, like), matches(emailTemplates.subject, like)),
+        ),
+      )
       .orderBy(emailTemplates.name)
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; name: string; subject: string }) => ({

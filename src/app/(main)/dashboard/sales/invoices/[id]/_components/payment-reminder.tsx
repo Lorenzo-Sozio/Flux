@@ -1,38 +1,31 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { AlarmClockIcon, Loader2, MailIcon } from "lucide-react";
+import { AlarmClockIcon, MailIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { sendPaymentReminder } from "@/actions/invoices";
+import { getInvoiceEmailDraftAction, previewInvoiceEmailAction, sendPaymentReminder } from "@/actions/invoices";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 /**
  * An overdue invoice, said at the top of its page, with the reminder one click away (E4).
  *
- * The reminder goes to the customer in their language with the courtesy PDF; the server
- * decides what is overdue (the receivables schedule's figures) and refuses a second one within
- * the hour. When the customer was last reminded is shown, so nobody chases twice in a day.
+ * The reminder opens in the CRM's email dialog, in the customer's language, on the text the
+ * server writes from the receivables schedule's figures — editable, with the templates and the
+ * copilot like any email. The courtesy PDF goes with it, and the server still decides that
+ * something is overdue and refuses a second reminder within the hour, whatever the text says. When the customer was last reminded is shown, so nobody chases twice in a day.
  */
 export function OverdueBanner({
   invoiceId,
   daysLate,
   overdueText,
   customerEmail,
+  customer,
   remindedAt,
   reminderCount,
   canWrite,
@@ -42,6 +35,8 @@ export function OverdueBanner({
   /** "€ 500,00", formatted by the page in the invoice's currency. */
   overdueText: string;
   customerEmail: string | null;
+  /** The company the invoice is to: its fields fill the text, the email lands on its timeline. */
+  customer: { id: string | null; name: string | null };
   remindedAt: Date | string | null;
   reminderCount: number;
   canWrite: boolean;
@@ -50,21 +45,6 @@ export function OverdueBanner({
   const format = useFormatter();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [to, setTo] = useState(customerEmail ?? "");
-  const [pending, startTransition] = useTransition();
-
-  function send() {
-    startTransition(async () => {
-      const r = await sendPaymentReminder(invoiceId, to).catch(() => null);
-      if (!r?.ok) {
-        toast.error(r && !r.ok ? r.error : t("failed"));
-        return;
-      }
-      toast.success(t("sent", { to }));
-      setOpen(false);
-      router.refresh();
-    });
-  }
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/40 bg-red-500/5 p-3 text-sm">
@@ -81,38 +61,34 @@ export function OverdueBanner({
         )}
       </div>
       {canWrite && (
-        <Button size="sm" variant="outline" className="shrink-0 gap-1.5" onClick={() => setOpen(true)}>
-          <MailIcon className="size-3.5" aria-hidden /> {t("button")}
-        </Button>
+        <>
+          <Button size="sm" variant="outline" className="shrink-0 gap-1.5" onClick={() => setOpen(true)}>
+            <MailIcon className="size-3.5" aria-hidden /> {t("button")}
+          </Button>
+          <SendEmailModal
+            entity={{ id: customer.id ?? "", name: customer.name, email: customerEmail }}
+            entityType="company"
+            trigger={null}
+            open={open}
+            onOpenChange={setOpen}
+            document={{
+              draftKey: `invoice-reminder:${invoiceId}`,
+              title: t("title"),
+              description: t("description", { amount: overdueText }),
+              parts: [{ label: t("partPdf"), kind: "file" }],
+              defaultTo: customerEmail,
+              load: () => getInvoiceEmailDraftAction(invoiceId, "reminder"),
+              send: (email) => sendPaymentReminder(invoiceId, email),
+              preview: (email) => previewInvoiceEmailAction(invoiceId, email),
+              submitLabel: t("send"),
+              onSent: (to) => {
+                toast.success(t("sent", { to }));
+                router.refresh();
+              },
+            }}
+          />
+        </>
       )}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("title")}</DialogTitle>
-            <DialogDescription>{t("description", { amount: overdueText })}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="reminder-to">{t("recipient")}</Label>
-            <Input
-              id="reminder-to"
-              type="email"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="amministrazione@cliente.it"
-            />
-            {!customerEmail && <p className="text-muted-foreground text-xs">{t("noCustomerEmail")}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={send} disabled={pending || !to.trim()} className="gap-1.5">
-              {pending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-              {t("send")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

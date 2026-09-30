@@ -484,6 +484,27 @@
       "when": 1793836800000,
       "tag": "0068_whatever_went_out",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793923200000,
+      "tag": "0069_what_the_copilot_proposed",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1794009600000,
+      "tag": "0070_a_draft_ready",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1794096000000,
+      "tag": "0071_on_its_way",
+      "breakpoints": true
     }
   ]
 }

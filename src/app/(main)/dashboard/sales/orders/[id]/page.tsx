@@ -19,6 +19,7 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { getOrderById, getOrderInvoicesToPay, getOrderPayments } from "@/actions/orders";
 import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import {
   EmptyHint,
   Field,
@@ -37,6 +38,8 @@ import { RecordVisit } from "@/components/crm/record-visit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { deals, invoices, orders, quotes } from "@/db/schema";
+import { documentLanguage, formatDocumentDate, formatDocumentMoney } from "@/lib/document-language";
+import { documentValues } from "@/lib/email-placeholders";
 import { paymentSummary } from "@/lib/order-payment";
 import { isTerminalStatus } from "@/lib/order-status";
 import { requirePageCapability } from "@/lib/page-guard";
@@ -51,6 +54,7 @@ import { AdvanceStatusButton, OrderMoreMenu } from "./_components/order-actions"
 import { OrderLines } from "./_components/order-lines";
 import { ORDER_STATUS_TONE, PAYMENT_TONE } from "./_components/order-tones";
 import { PaymentsCard } from "./_components/payments-card";
+import { ShippingCard } from "./_components/shipping-card";
 
 const DAY = 86_400_000;
 
@@ -108,6 +112,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     tR,
     tEntity,
     format,
+    tS,
   ] = await Promise.all([
     getOrderById(id),
     getOrderPayments(id),
@@ -160,6 +165,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     getTranslations("record"),
     getTranslations("entities.statuses"),
     getFormatter(),
+    getTranslations("orders.shipping"),
   ]);
 
   if (!order) {
@@ -186,6 +192,21 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const entityStatus = (s: string) => (tEntity.has(s as never) ? tEntity(s as never) : s);
 
   const contactName = [order.contactFirstName, order.contactLastName].filter(Boolean).join(" ");
+  // What an email written from the order knows about it: "[numero ordine]" is never typed by hand.
+  const orderLang = documentLanguage({ language: order.companyLanguage, country: order.companyCountry });
+  const orderFields = documentValues({
+    orderNumber: order.orderNumber,
+    deliveryDate: order.expectedDeliveryDate
+      ? formatDocumentDate(new Date(`${order.expectedDeliveryDate}T12:00:00Z`), orderLang)
+      : null,
+    carrier: order.carrier,
+    trackingCode: order.trackingCode,
+    amount: formatDocumentMoney(
+      order.totalAmount,
+      order.currency,
+      documentLanguage({ language: order.companyLanguage, country: order.companyCountry }),
+    ),
+  });
   const summary = paymentSummary(order.totalAmount, payments);
   const terminal = isTerminalStatus(order.status);
 
@@ -278,12 +299,20 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   <span>{contactName}</span>
                 )}
                 {order.contactEmail && (
-                  <a
-                    href={`mailto:${order.contactEmail}`}
+                  <EmailAddressButton
+                    email={order.contactEmail}
+                    entity={{
+                      id: order.contactId ?? "",
+                      firstName: order.contactFirstName,
+                      lastName: order.contactLastName,
+                      companyName: order.companyName,
+                    }}
+                    entityType="contact"
+                    dealId={order.dealId ?? undefined}
+                    fields={orderFields}
+                    canSend={canWrite}
                     className="block truncate text-muted-foreground text-xs hover:text-foreground"
-                  >
-                    {order.contactEmail}
-                  </a>
+                  />
                 )}
               </div>
             )}
@@ -507,6 +536,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           </Metric>
           {order.deliveredAt ? (
             <Metric label={tP("deliveredOn")}>{day(order.deliveredAt)}</Metric>
+          ) : order.expectedDeliveryDate ? (
+            // A calendar day, read as written: noon UTC keeps every zone on it.
+            <Metric label={tS("expectedDelivery")}>{day(new Date(`${order.expectedDeliveryDate}T12:00:00Z`))}</Metric>
           ) : (
             <Metric label={t("orderDate")}>{day(order.orderDate)}</Metric>
           )}
@@ -566,6 +598,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             ),
           },
           { tab: "details", column: "side", node: details },
+          {
+            tab: "details",
+            column: "side",
+            node: (
+              <ShippingCard
+                orderId={order.id}
+                expectedDeliveryDate={order.expectedDeliveryDate ?? null}
+                carrier={order.carrier ?? null}
+                trackingCode={order.trackingCode ?? null}
+                canWrite={canWrite}
+              />
+            ),
+          },
           { tab: "invoices", column: "side", node: invoicesCard },
           ...(ticketsCard ? [{ tab: "details", column: "side" as const, node: ticketsCard }] : []),
         ]}

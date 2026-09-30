@@ -928,4 +928,35 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "sdi_sent_xml" text;\n',
     ],
   },
+  {
+    tag: "0069_what_the_copilot_proposed",
+    folderMillis: 1793923200000,
+    hash: "85fcd7f926394d9ece690c00b24d454d65855299713000b7caa240a765f563e9",
+    sql: [
+      '-- What the AI copilot proposed, and what a person did with it (Fase 5, C0; src/lib/ai/run.ts).\n--\n-- One row per call, successful or not: the log of what reached the model, and the measure of\n-- whether a proposal was accepted as it came, edited or discarded. The prompt is never stored;\n-- the proposal\'s text is, and goes with the person in an erasure (src/lib/erasure.ts).\n--\n-- Additive and re-runnable, like every tenant migration.\nCREATE TABLE IF NOT EXISTS "ai_suggestion" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"task" text NOT NULL,\n\t"user_id" text NOT NULL,\n\t"entity_type" text,\n\t"entity_id" text,\n\t"provider" text,\n\t"model" text,\n\t"status" text NOT NULL,\n\t"failure_reason" text,\n\t"input_tokens" integer DEFAULT 0 NOT NULL,\n\t"output_tokens" integer DEFAULT 0 NOT NULL,\n\t"reasoning_tokens" integer DEFAULT 0 NOT NULL,\n\t"text" text,\n\t"outcome" text DEFAULT \'pending\' NOT NULL,\n\t"decided_at" timestamp,\n\t"created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE INDEX IF NOT EXISTS "ai_suggestion_entity_idx" ON "ai_suggestion" USING btree ("entity_type","entity_id");\n',
+      '\nCREATE INDEX IF NOT EXISTS "ai_suggestion_created_idx" ON "ai_suggestion" USING btree ("created_at");\n',
+    ],
+  },
+  {
+    tag: "0070_a_draft_ready",
+    folderMillis: 1794009600000,
+    hash: "62906f34ee03ce4a8639279bc5e93ef921d1ba5db97bf6e04b17d77d14b93bdc",
+    sql: [
+      '-- Email templates for one-to-one emails, beside the campaign ones (src/lib/email-templates.ts).\n--\n-- email_template.kind: "campaign" — built for a marketing campaign, often in the email designer —\n--   or "personal" — the text a salesperson starts a one-to-one email from. Every template that\n--   exists today was made in Marketing, so every one is a campaign template.\n-- email_template.use_count / last_used_at: how often a template was sent from a record, so the\n--   ones people actually use come first in the dialog.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "email_template" ADD COLUMN IF NOT EXISTS "kind" text DEFAULT \'campaign\' NOT NULL;\n',
+      '\nALTER TABLE "email_template" ADD COLUMN IF NOT EXISTS "use_count" integer DEFAULT 0 NOT NULL;\n',
+      '\nALTER TABLE "email_template" ADD COLUMN IF NOT EXISTS "last_used_at" timestamp;\n',
+      '\nCREATE INDEX IF NOT EXISTS "email_template_kind_idx" ON "email_template" USING btree ("kind");\n',
+    ],
+  },
+  {
+    tag: "0071_on_its_way",
+    folderMillis: 1794096000000,
+    hash: "e5c1b5619f437b1f8d6788d0c51bcc8ad54a4635cd7fbd502ced185e87dfc024",
+    sql: [
+      '-- Where an order is on its way to the customer (src/actions/orders.ts `setOrderShipping`).\n--\n-- order.expected_delivery_date: the day the customer was told to expect it. `delivered_at` is when\n--   it did arrive; the two are different questions and support needs both.\n-- order.carrier / order.tracking_code: who carries it and the code to follow it.\n--\n-- They are what the order emails say ("[data di consegna]", "[corriere]", "[codice di\n-- tracciamento]" in the basic templates), filled from the order instead of typed by hand.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "expected_delivery_date" date;\n',
+      '\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "carrier" text;\n',
+      '\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "tracking_code" text;\n',
+    ],
+  },
 ];

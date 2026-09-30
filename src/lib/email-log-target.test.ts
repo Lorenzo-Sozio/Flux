@@ -17,6 +17,14 @@ describe("⚠️⚠️ emailLogTarget", () => {
     expect(emailLogTarget({ id: "c1" }, "contact")).toEqual({ contactId: "c1" });
   });
 
+  it("logs on a company written to at its own address", () => {
+    expect(emailLogTarget({ id: "co1", isConverted: false }, "company")).toEqual({ companyId: "co1" });
+  });
+
+  it("logs on no person when there is no record of one: the deal logs it", () => {
+    expect(emailLogTarget({ id: "" }, "contact")).toEqual({});
+  });
+
   it("without being told, recognises a lead by the field only leads have", () => {
     expect(emailLogTarget({ id: "l1", isConverted: false })).toEqual({ leadId: "l1" });
     expect(emailLogTarget({ id: "c1" })).toEqual({ contactId: "c1" });

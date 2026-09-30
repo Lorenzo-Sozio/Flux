@@ -33,13 +33,15 @@ import { getFormatter, getTranslations } from "next-intl/server";
 import { createActivity, getActivitiesByLead } from "@/actions/activities";
 import { getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
-import { getEmailTemplates } from "@/actions/marketing";
+import { getComposerTemplates } from "@/actions/email-templates";
 import { deleteTask, getAllUsers, getTasksByLead } from "@/actions/tasks";
 import { DeleteLeadButton, LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
 import { auth } from "@/auth";
+import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { ConsentDetail } from "@/components/crm/consent-detail";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { EnrollInSequence } from "@/components/crm/enroll-in-sequence";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { PrivacyCard } from "@/components/crm/privacy-card";
@@ -70,6 +72,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts, deals, leads } from "@/db/schema";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
@@ -145,13 +148,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // viewer reads the lead; the controls that would only answer "forbidden" are
   // not drawn for them. See CLAUDE.md on the two role scales.
   const canWrite = can(session?.user?.tenantRole ?? null, "record:write");
+  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
   const db = await getDb();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
   const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
 
   let lead: typeof leads.$inferSelect | undefined;
-  let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
+  let templates: Awaited<ReturnType<typeof getComposerTemplates>> = [];
 
   try {
     [lead, templates] = await Promise.all([
@@ -160,7 +164,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         .from(leads)
         .where(eq(leads.id, leadId))
         .then((rows) => rows[0]),
-      getEmailTemplates().catch(() => []),
+      getComposerTemplates().catch(() => []),
     ]);
   } catch (error) {
     console.error("Error loading lead:", error);
@@ -464,9 +468,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <FieldList>
             <Field label={tD("fieldEmail")}>
               {lead.email && (
-                <a href={`mailto:${lead.email}`} className="break-all text-primary hover:underline">
-                  {lead.email}
-                </a>
+                <EmailAddressButton
+                  email={lead.email}
+                  entity={lead}
+                  entityType="lead"
+                  templates={templates}
+                  ownerId={userId}
+                  ai={ai.draft ?? null}
+                  canSend={canWrite}
+                  className="break-all text-primary hover:underline"
+                />
               )}
             </Field>
             <Field label={tD("fieldPhone")}>
@@ -693,7 +704,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {/* Sending records an activity, so it is a write; and with no
                 address the dialog can only refuse. */}
             {canWrite && lead.email && (
-              <SendEmailModal entity={lead} entityType="lead" templates={templates} ownerId={userId} />
+              <SendEmailModal entity={lead} entityType="lead" templates={templates} ownerId={userId} ai={ai.draft} />
             )}
             {canWrite &&
               (lead.isConverted ? (
@@ -840,6 +851,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         sections={[
           { tab: "next", column: "main", node: nextSteps },
           { tab: "activity", column: "main", node: activity },
+          ...(ai.summary
+            ? [
+                {
+                  tab: "activity",
+                  column: "side" as const,
+                  node: <AiSummaryCard subject={{ type: "lead", id: leadId }} entry={ai.summary} />,
+                },
+              ]
+            : []),
           { tab: "details", column: "side", node: contactCard },
           { tab: "details", column: "side", node: qualificationCard },
           {

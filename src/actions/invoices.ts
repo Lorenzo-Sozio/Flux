@@ -21,10 +21,21 @@ import {
   type DocumentLanguage,
   documentLanguage,
   fill,
+  formatDocumentDate,
   formatDocumentMoney,
   INVOICE_TEXT,
 } from "@/lib/document-language";
-import { sendInvoiceCopyEmail, sendPaymentReminderEmail } from "@/lib/email";
+import {
+  documentEmailFrame,
+  type InvoiceCopyData,
+  invoiceCopyContent,
+  type PaymentReminderData,
+  paymentReminderContent,
+  sendInvoiceCopyEmail,
+  sendPaymentReminderEmail,
+} from "@/lib/email";
+import { composeEmail, deliverEmail, type EmailPreview } from "@/lib/email-deliver";
+import { documentValues, type PlaceholderValues } from "@/lib/email-placeholders";
 import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { serverT } from "@/lib/i18n-server";
@@ -1303,15 +1314,164 @@ export async function archiveInvoiceAction(id: string): Promise<{ ok: boolean; e
 const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
 
 /**
+ * What the email dialog sends for an invoice: where, the copies, and the text the person left
+ * or wrote (src/components/crm/send-email-modal.tsx, document mode). A plain address instead
+ * sends the standard text.
+ */
+export interface InvoiceEmail {
+  to: string;
+  cc?: string;
+  bcc?: string;
+  subject: string;
+  bodyHtml: string;
+  /** The template the text started from: counted, so the ones in use come first. */
+  templateId?: string;
+}
+
+type InvoiceRow = typeof invoices.$inferSelect;
+type Issuer = { legalName?: string; email?: string; iban?: string | null };
+
+function invoiceLanguage(invoice: InvoiceRow) {
+  // The language frozen with the customer at issue, so the email matches the PDF it carries.
+  return documentLanguage(invoice.customerSnapshot as { language?: string | null; country?: string | null });
+}
+
+function copyContentOf(invoice: InvoiceRow): Omit<InvoiceCopyData, "to"> {
+  const issuer = (invoice.issuerSnapshot ?? {}) as Issuer;
+  const lang = invoiceLanguage(invoice);
+  return {
+    issuerName: issuer.legalName ?? "",
+    documentType: invoice.documentType as "TD01" | "TD04",
+    documentNumber: invoice.documentNumber ?? "",
+    issueDate: invoice.issueDate ?? "",
+    total: formatDocumentMoney(invoice.total, invoice.currency, lang),
+    dueDate: invoice.dueDate,
+    installments: (invoice.installments ?? []).map((i: { dueDate: string; amount: number }) => ({
+      dueDate: i.dueDate,
+      amount: formatDocumentMoney(i.amount, invoice.currency, lang),
+    })),
+    lang,
+  };
+}
+
+/**
+ * What a reminder says, from the receivables schedule (src/lib/receivables.ts): the first
+ * installment still owed and what is past due — never the invoice total, which a partial payment
+ * or a credit note has already reduced. An error key when nothing is overdue.
+ */
+async function reminderContentOf(
+  db: Awaited<ReturnType<typeof getDb>>,
+  invoice: InvoiceRow,
+  timeZone: string,
+): Promise<
+  { data: Omit<PaymentReminderData, "to" | "withPdf"> } | { error: "reminderNotOwed" | "reminderNotOverdue" }
+> {
+  if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate || !invoice.companyId)
+    return { error: "reminderNotOwed" };
+  const today = toWallDate(new Date(), timeZone);
+  const owed = (await receivables(db, { today, companyId: invoice.companyId })).invoices.find(
+    (r) => r.id === invoice.id,
+  );
+  if (!owed || owed.overdueAmount <= 0) return { error: "reminderNotOverdue" };
+  const issuer = (invoice.issuerSnapshot ?? {}) as Issuer;
+  const lang = invoiceLanguage(invoice);
+  return {
+    data: {
+      issuerName: issuer.legalName ?? "",
+      documentType: invoice.documentType as "TD01" | "TD02",
+      documentNumber: invoice.documentNumber,
+      issueDate: invoice.issueDate,
+      dueDate: owed.dueDate,
+      amount: formatDocumentMoney(owed.overdueAmount, invoice.currency, lang),
+      iban: invoice.paymentMethod === "MP05" ? issuer.iban : null,
+      lang,
+    },
+  };
+}
+
+/**
+ * The text the email dialog opens with for an invoice — its courtesy copy or a reminder — in the
+ * customer's language, from the same builders that send the standard text.
+ */
+export async function getInvoiceEmailDraftAction(
+  id: string,
+  kind: "copy" | "reminder",
+): Promise<
+  | { ok: true; subject: string; bodyHtml: string; documentNumber: string; fields: PlaceholderValues }
+  | { ok: false; error: string }
+> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const t = await serverT("serverErrors.invoices");
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  if (!invoice) return { ok: false, error: t("notFound") };
+  if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {
+    return { ok: false, error: t("sendOnlyIssued") };
+  }
+  // The invoice's own figures, for "[numero fattura]" and "[importo]" in a template picked instead.
+  if (kind === "copy") {
+    const copy = copyContentOf(invoice);
+    return {
+      ok: true,
+      documentNumber: invoice.documentNumber,
+      fields: documentValues({
+        invoiceNumber: copy.documentNumber,
+        amount: copy.total,
+        dueDate: copy.dueDate ? formatDocumentDate(copy.dueDate, copy.lang) : null,
+      }),
+      ...invoiceCopyContent({ to: "", ...copy }),
+    };
+  }
+  const reminder = await reminderContentOf(db, invoice, timeZone);
+  if ("error" in reminder) return { ok: false, error: t(reminder.error) };
+  const due = reminder.data;
+  return {
+    ok: true,
+    documentNumber: invoice.documentNumber,
+    // What is overdue and since when, as the reminder's own text says it — not the invoice total.
+    fields: documentValues({
+      invoiceNumber: due.documentNumber,
+      amount: due.amount,
+      dueDate: due.dueDate ? formatDocumentDate(due.dueDate, due.lang) : null,
+      iban: due.iban,
+    }),
+    ...paymentReminderContent({ to: "", withPdf: true, ...due }),
+  };
+}
+
+/** An invoice's email — its copy or a reminder — as the customer will receive it, without sending it. */
+export async function previewInvoiceEmailAction(
+  id: string,
+  email: { subject: string; bodyHtml: string },
+): Promise<EmailPreview> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id));
+  if (!invoice) return { ok: false, error: (await serverT("serverErrors.invoices"))("notFound") };
+  const composed = await composeEmail(
+    db,
+    { userId: actor.userId },
+    { subject: email.subject, html: email.bodyHtml, finish: documentEmailFrame },
+  );
+  return { ok: true, subject: composed.subject, html: composed.html };
+}
+
+/**
  * Emails the courtesy PDF to the customer, and records when and to whom.
  *
  * ⚠️ Only an issued invoice: a draft has no number, and a PDF of one would be a
  * document the customer could mistake for the invoice.
  */
-export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireCapability("invoice:write");
+export async function sendInvoiceCopy(
+  id: string,
+  to: string | InvoiceEmail,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
-  const address = to.trim();
+  const email = typeof to === "string" ? null : to;
+  const address = (email ? email.to : (to as string)).trim();
   if (!EMAIL.test(address)) return { ok: false, error: (await serverT("serverErrors.invoices"))("emailInvalid") };
 
   const db = await getDb();
@@ -1322,25 +1482,34 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
   }
 
   const pdf = await readInvoiceFile(db, invoice, "pdf");
-  const issuer = (invoice.issuerSnapshot ?? {}) as { legalName?: string; email?: string };
-  // The language frozen with the customer at issue, so the email matches the PDF it carries.
-  const lang = documentLanguage(invoice.customerSnapshot as { language?: string | null; country?: string | null });
-  const sent = await sendInvoiceCopyEmail({
-    to: address,
-    issuerName: issuer.legalName ?? "",
-    documentType: invoice.documentType as "TD01" | "TD04",
-    documentNumber: invoice.documentNumber,
-    issueDate: invoice.issueDate,
-    total: formatDocumentMoney(invoice.total, invoice.currency, lang),
-    dueDate: invoice.dueDate,
-    installments: (invoice.installments ?? []).map((i: { dueDate: string; amount: number }) => ({
-      dueDate: i.dueDate,
-      amount: formatDocumentMoney(i.amount, invoice.currency, lang),
-    })),
-    pdf: { filename: pdf.name, bytes: pdf.bytes },
-    replyTo: issuer.email,
-    lang,
-  });
+  const issuer = (invoice.issuerSnapshot ?? {}) as Issuer;
+  const attachment = { filename: pdf.name, content: pdf.bytes, contentType: "application/pdf" };
+  // From the business, with the issuer's address to answer to; the person's text when they wrote
+  // one in the dialog, the standard one otherwise.
+  const sent = email
+    ? await deliverEmail(
+        db,
+        { userId: actor.userId },
+        {
+          to: address,
+          cc: email.cc,
+          bcc: email.bcc,
+          subject: email.subject,
+          html: email.bodyHtml,
+          sender: "workspace",
+          replyTo: issuer.email,
+          attachments: [attachment],
+          log: { companyId: invoice.companyId, document: { type: "invoice", id, number: invoice.documentNumber } },
+          templateId: email.templateId,
+          finish: documentEmailFrame,
+        },
+      )
+    : await sendInvoiceCopyEmail({
+        to: address,
+        ...copyContentOf(invoice),
+        pdf: { filename: pdf.name, bytes: pdf.bytes },
+        replyTo: issuer.email,
+      });
   if (!sent.success)
     return { ok: false, error: sent.error ?? (await serverT("serverErrors.invoices"))("emailNotSent") };
 
@@ -1359,29 +1528,26 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
  * with the courtesy PDF: what is overdue and since when, how to pay, and that a payment already
  * made makes it void.
  *
- * ⚠️ The figures are the receivables schedule's (src/lib/receivables.ts): the first installment
- * still owed, and what is past due — never the invoice total, which a partial payment or a
- * credit note has already reduced.
+ * ⚠️ The figures are the receivables schedule's (`reminderContentOf`), and they are checked here
+ * whatever text the dialog sends: nothing overdue, no reminder.
  * ⚠️ Claimed before it is sent, with a conditional update: a second click within the hour, or
  * a colleague on the same invoice, sends nothing. A send that fails gives the claim back.
  */
 export async function sendPaymentReminder(
   id: string,
-  to: string,
+  to: string | InvoiceEmail,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireCapability("invoice:write");
+  const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const t = await serverT("serverErrors.invoices");
-  const address = to.trim();
+  const email = typeof to === "string" ? null : to;
+  const address = (email ? email.to : (to as string)).trim();
   if (!EMAIL.test(address)) return { ok: false, error: t("emailInvalid") };
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
   if (!invoice) return { ok: false, error: t("notFound") };
-  if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate || !invoice.companyId)
-    return { ok: false, error: t("reminderNotOwed") };
-  const today = toWallDate(new Date(), timeZone);
-  const owed = (await receivables(db, { today, companyId: invoice.companyId })).invoices.find((r) => r.id === id);
-  if (!owed || owed.overdueAmount <= 0) return { ok: false, error: t("reminderNotOverdue") };
+  const reminder = await reminderContentOf(db, invoice, timeZone);
+  if ("error" in reminder) return { ok: false, error: t(reminder.error) };
 
   const previous = invoice.remindedAt;
   const [claimed] = await db
@@ -1398,23 +1564,36 @@ export async function sendPaymentReminder(
     .returning({ id: invoices.id });
   if (!claimed) return { ok: false, error: t("reminderJustSent") };
 
-  const issuer = (invoice.issuerSnapshot ?? {}) as { legalName?: string; email?: string; iban?: string | null };
-  const lang = documentLanguage(invoice.customerSnapshot as { language?: string | null; country?: string | null });
+  const issuer = (invoice.issuerSnapshot ?? {}) as Issuer;
   // The PDF is a courtesy: a reminder still goes out when the file cannot be built.
   const pdf = await readInvoiceFile(db, invoice, "pdf").catch(() => null);
-  const sent = await sendPaymentReminderEmail({
-    to: address,
-    issuerName: issuer.legalName ?? "",
-    documentType: invoice.documentType as "TD01" | "TD02",
-    documentNumber: invoice.documentNumber,
-    issueDate: invoice.issueDate,
-    dueDate: owed.dueDate,
-    amount: formatDocumentMoney(owed.overdueAmount, invoice.currency, lang),
-    iban: invoice.paymentMethod === "MP05" ? issuer.iban : null,
-    pdf: pdf ? { filename: pdf.name, bytes: pdf.bytes } : null,
-    replyTo: issuer.email,
-    lang,
-  });
+  const sent = email
+    ? await deliverEmail(
+        db,
+        { userId: actor.userId },
+        {
+          to: address,
+          cc: email.cc,
+          bcc: email.bcc,
+          subject: email.subject,
+          html: email.bodyHtml,
+          sender: "workspace",
+          replyTo: issuer.email,
+          attachments: pdf ? [{ filename: pdf.name, content: pdf.bytes, contentType: "application/pdf" }] : [],
+          log: {
+            companyId: invoice.companyId,
+            document: { type: "invoice", id, number: invoice.documentNumber },
+          },
+          templateId: email.templateId,
+          finish: documentEmailFrame,
+        },
+      )
+    : await sendPaymentReminderEmail({
+        to: address,
+        ...reminder.data,
+        pdf: pdf ? { filename: pdf.name, bytes: pdf.bytes } : null,
+        replyTo: issuer.email,
+      });
   if (!sent.success) {
     await db
       .update(invoices)

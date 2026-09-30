@@ -12,9 +12,19 @@ export type PlanLimits = {
   maxRecords: number | null;
   maxWorkspaces: number;
   maxIntegrations: number | null;
+  /**
+   * Requests to the AI copilot a month (Fase 5), counted before each call. Only meaningful when
+   * the plan has the `ai` module. ⚠️ A plan stored before this existed has no value, which reads
+   * as 0 (licensing.ts): no copilot spend nobody chose.
+   */
+  aiRequestsPerMonth: number | null;
 };
 
-export type PlanModule = "crm" | "sales" | "marketing" | "support" | "automation" | "reporting" | "helpdesk";
+/**
+ * `ai` is the copilot (Fase 5): a flag on the plan, set in /admin/plans, stored with the modules so
+ * the existing gates (`requirePlanModule`, `requireModuleAccess`) apply to it unchanged.
+ */
+export type PlanModule = "crm" | "sales" | "marketing" | "support" | "automation" | "reporting" | "helpdesk" | "ai";
 
 export type SupportTier = "community" | "email" | "priority" | "dedicated";
 
@@ -68,6 +78,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
       maxRecords: 500,
       maxWorkspaces: 1,
       maxIntegrations: 1,
+      aiRequestsPerMonth: 0,
     },
     enabledModules: ["crm"],
     supportTier: "community",
@@ -98,6 +109,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
       maxRecords: 5_000,
       maxWorkspaces: 1,
       maxIntegrations: 3,
+      aiRequestsPerMonth: 0,
     },
     enabledModules: ["crm", "sales", "support"],
     supportTier: "email",
@@ -128,6 +140,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
       maxRecords: 50_000,
       maxWorkspaces: 3,
       maxIntegrations: 10,
+      aiRequestsPerMonth: 0,
     },
     enabledModules: ["crm", "sales", "marketing", "support", "automation", "reporting"],
     supportTier: "priority",
@@ -158,6 +171,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
       maxRecords: null,
       maxWorkspaces: 10,
       maxIntegrations: null,
+      aiRequestsPerMonth: 0,
     },
     enabledModules: ["crm", "sales", "marketing", "support", "automation", "reporting", "helpdesk"],
     supportTier: "dedicated",
@@ -210,3 +224,15 @@ export const USAGE_ALERT_THRESHOLDS = [80, 90, 100] as const;
 
 /** Days of non-payment before automatic downgrade to Free. */
 export const GRACE_PERIOD_DAYS = 7;
+
+/**
+ * The limits a stored plan grants, with what the stored JSON leaves out filled in the safe way.
+ *
+ * ⚠️ A limit added after a plan was saved is absent from its JSON. For a copilot request that
+ * absence is 0, not unlimited: nobody chose to let that plan spend on a model.
+ */
+export function effectiveLimits(stored: Partial<PlanLimits>, maxUsers: number | null): PlanLimits {
+  // ⚠️ `?? 0` would be wrong: null is "unlimited", chosen in /admin/plans; only absence is 0.
+  const ai = stored.aiRequestsPerMonth === undefined ? 0 : stored.aiRequestsPerMonth;
+  return { ...(stored as PlanLimits), maxUsers, aiRequestsPerMonth: ai };
+}

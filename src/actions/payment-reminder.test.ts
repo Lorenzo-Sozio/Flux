@@ -11,7 +11,11 @@ import { applyTenantMigrations } from "@/db/migrate-tenant";
 import * as schema from "@/db/schema";
 
 const db = drizzle(new PGlite(), { schema });
-const sent = vi.hoisted(() => ({ list: [] as Record<string, unknown>[], fail: false }));
+const sent = vi.hoisted(() => ({
+  list: [] as Record<string, unknown>[],
+  delivered: [] as Record<string, unknown>[],
+  fail: false,
+}));
 
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => db, getCurrentTenantId: async () => "t1" }));
 vi.mock("@/lib/workspace-time-zone", () => ({ getWorkspaceTimeZone: async () => "Europe/Rome" }));
@@ -28,7 +32,8 @@ vi.mock("@/lib/invoice-archive", () => ({
     throw new Error("no storage in tests");
   },
 }));
-vi.mock("@/lib/email", () => ({
+vi.mock("@/lib/email", async (original) => ({
+  ...(await original<typeof import("@/lib/email")>()),
   sendInvoiceCopyEmail: async () => ({ success: true }),
   sendPaymentReminderEmail: async (data: Record<string, unknown>) => {
     if (sent.fail) return { success: false, error: "smtp down" };
@@ -37,7 +42,16 @@ vi.mock("@/lib/email", () => ({
   },
 }));
 
-const { sendPaymentReminder } = await import("./invoices");
+// The email dialog's path: what the person wrote, sent through the one delivery path.
+vi.mock("@/lib/email-deliver", () => ({
+  deliverEmail: async (_db: unknown, _actor: unknown, input: Record<string, unknown>) => {
+    if (sent.fail) return { success: false, error: "smtp down" };
+    sent.delivered.push(input);
+    return { success: true };
+  },
+}));
+
+const { getInvoiceEmailDraftAction, sendPaymentReminder } = await import("./invoices");
 
 async function invoice(over: { dueDate?: string; installments?: { dueDate: string; amount: number }[] } = {}) {
   await db.execute(sql`insert into invoice
@@ -61,6 +75,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   sent.list.length = 0;
+  sent.delivered.length = 0;
   sent.fail = false;
   for (const t of ["order_payment", "receipt", "invoice"]) await db.execute(sql.raw(`delete from "${t}"`));
 });
@@ -125,5 +140,48 @@ describe("⚠️⚠️ a payment reminder", () => {
     expect(await state()).toEqual({ reminded_at: null, reminder_count: 0 });
     sent.fail = false;
     expect(await sendPaymentReminder("inv", "a@rossi.it")).toEqual({ ok: true });
+  });
+
+  it("from the email dialog: the person's text goes out from the business, and the claim is taken", async () => {
+    await invoice();
+    const email = { to: "a@rossi.it", subject: "Fattura 7", bodyHtml: "<p>Il mio testo</p>" };
+    expect(await sendPaymentReminder("inv", email)).toEqual({ ok: true });
+    expect(sent.list).toHaveLength(0);
+    expect(sent.delivered).toHaveLength(1);
+    expect(sent.delivered[0]).toMatchObject({
+      to: "a@rossi.it",
+      html: "<p>Il mio testo</p>",
+      sender: "workspace",
+      log: { companyId: "co", document: { type: "invoice", id: "inv", number: "7" } },
+    });
+    expect((await state()).reminder_count).toBe(1);
+  });
+
+  it("⚠️⚠️ from the email dialog too, a paid invoice is not chased, whatever the text says", async () => {
+    await invoice();
+    await db.execute(
+      sql`insert into order_payment (id, invoice_id, amount, paid_at) values ('p1', 'inv', '1000', now())`,
+    );
+    const email = { to: "a@rossi.it", subject: "Sollecito", bodyHtml: "<p>Paghi</p>" };
+    expect(await sendPaymentReminder("inv", email)).toEqual({ ok: false, error: "reminderNotOverdue" });
+    expect(sent.delivered).toHaveLength(0);
+  });
+});
+
+describe("the text the email dialog opens on", () => {
+  it("is the reminder of what is overdue, in the customer's language", async () => {
+    await invoice();
+    const draft = await getInvoiceEmailDraftAction("inv", "reminder");
+    expect(draft).toMatchObject({ ok: true, documentNumber: "7" });
+    // "[numero fattura]" and "[importo]" in a template picked instead are filled from these.
+    expect(draft).toMatchObject({ fields: { invoiceNumber: "7", iban: "IT60 X054 2811 1010 0000 0123 456" } });
+    expect(draft.ok && draft.fields.amount).toContain("1.000,00");
+    expect(draft.ok && draft.bodyHtml).toContain("1.000,00");
+  });
+
+  it("⚠️ offers no reminder for an invoice that is not overdue", async () => {
+    await invoice({ dueDate: "2099-01-01" });
+    expect(await getInvoiceEmailDraftAction("inv", "reminder")).toEqual({ ok: false, error: "reminderNotOverdue" });
+    expect(await getInvoiceEmailDraftAction("inv", "copy")).toMatchObject({ ok: true, documentNumber: "7" });
   });
 });

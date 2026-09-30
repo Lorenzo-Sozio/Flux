@@ -303,7 +303,13 @@ Publishing an app on either marketplace needs an account there and is not in thi
 
 #### Flux for the assistant (D-A)
 
-No language model runs inside Flux (decision D-A, 27 September 2026): the intelligence is
+⚠️ **D-A was revised on 30 September 2026.** Flux will get its own model as the operator's
+**copilot**: drafts, summaries, extraction and proposals, each confirmed by a person, and nothing
+sent to a customer by itself (Fase 5, C0–C9, in
+[docs/valutazione-prodotto-2026-09.md](docs/valutazione-prodotto-2026-09.md) §18; design in
+[docs/ia-copilota-in-flux-o-voipai-2026-09.md](docs/ia-copilota-in-flux-o-voipai-2026-09.md)).
+Only the provider layer is built ([src/lib/ai/](src/lib/ai/), see "The copilot's model" below):
+nothing calls it yet, so no model runs inside Flux until the first task lands. End-to-end autonomy stays with
 **VoipAI**, the owner's AI engine, which works with customers on voice, WhatsApp, SMS and email
 and writes here through this API. Flux is where that work is seen and controlled:
 
@@ -369,6 +375,193 @@ disappear.
 `/dashboard/assistant` reads it. Not under `/dashboard/reports`, which is behind
 the reporting module: whoever connects an integration needs to see what it does
 whether or not they bought a reports package.
+
+### The copilot's model: one shape, any provider
+
+[src/lib/ai/](src/lib/ai/) (Fase 5, C0). A task calls `aiGenerate("summary", request)`,
+`aiStream(...)` or `aiGenerateJson(...)` from [client.ts](src/lib/ai/client.ts) and never names a
+vendor. Each provider is one file implementing `AiProvider` ([types.ts](src/lib/ai/types.ts)) and one
+line in [registry.ts](src/lib/ai/registry.ts); Gemini ([gemini.ts](src/lib/ai/gemini.ts)) is the first.
+
+- ⚠️⚠️ **The model is configuration, not code** ([config.ts](src/lib/ai/config.ts)):
+  - `AI_PROVIDER` / `AI_MODEL` set every task; the defaults are `gemini` and `gemini-2.5-flash-lite`.
+  - `AI_MODEL_<TASK>` and `AI_PROVIDER_<TASK>` route one task elsewhere.
+  - `AI_MODEL` belongs to `AI_PROVIDER`: a task routed to another provider does not inherit it.
+  - No key means **off** (the copilot is not offered). Something configured wrongly means
+    **config**, which says what is wrong instead of passing it off as "not available".
+- ⚠️ **Google keeps the 2.5 models to keys that already used them.** A new key gets 404, reported
+  as `model`: the fix is `AI_MODEL` (e.g. `gemini-3.5-flash-lite`), not the code.
+- ⚠️ **Plain `fetch`, no SDK**, like SDI and the mailboxes: it runs on Workers, costs the bundle
+  nothing, and tests hand in their own. The fetch is called through a closure, because on Workers
+  a detached `fetch` throws.
+- ⚠️⚠️ **Failures come back in Flux's words** (`auth`, `model`, `blocked`, `rate_limited`,
+  `unavailable`, `output`…), never thrown, and **never carrying the request**, which holds a
+  customer's words.
+- ⚠️ **A structured answer is checked, not trusted.** `aiGenerateJson` parses and validates every
+  answer; one that does not fit or was cut at the token ceiling is an `output` failure.
+- **Every provider must drop its model's thinking from the text**; Gemini's comes back as parts marked
+  `thought`.
+- **Data:** a paid Gemini key (Google does not train on paid traffic). The Developer API cannot
+  choose where a request is processed; processing in the EU means Vertex AI, which would be one
+  more provider file.
+
+**Who may use it: four keys** ([access.ts](src/lib/ai/access.ts)). A task goes through `runAiTask` /
+`runAiJsonTask` ([run.ts](src/lib/ai/run.ts)), never `aiGenerate` directly, and it checks them in order:
+1. **The deployment:** a provider must be configured.
+2. **The plan:** active, with the **AI copilot flag** set in /admin/plans (Features tab). There is no
+   fixed plan that includes it: the flag is stored as the `ai` module in `enabled_modules`, so the
+   usual gates (`requirePlanModule("ai")`, `requireModuleAccess`) work on it unchanged.
+3. **The workspace:** its `ai` switch (Settings → Features), shown only when the plan offers the copilot.
+4. **The month:** `aiRequestsPerMonth` in the plan's limits, counted before the call in
+   `billing_usage_stat`.
+
+- ⚠️⚠️ **A plan saved before the copilot has no `aiRequestsPerMonth`: that reads as 0**
+  (`effectiveLimits`), while `null` is "unlimited", chosen explicitly. `?? 0` would erase that difference.
+- The caller needs `record:write`. Every call is logged in `ai_suggestion` (migration `0069`,
+  [suggestions.ts](src/lib/ai/suggestions.ts)): who asked, which record, model, tokens, the proposal as
+  shown (never the prompt) and its outcome.
+- The outcome (accepted, edited, discarded) is decided once, by whoever asked, through
+  `decideAiSuggestionAction`. That rate is the measure that may one day justify automation.
+- ⚠️ **The erasure deletes the person's proposals** (on their lead or contact), like their field history.
+
+**The first tasks** (C1–C3), in [src/actions/ai.ts](src/actions/ai.ts):
+- **Summary** of a record or a ticket: `AiSummaryCard`.
+- **Briefing** for an appointment: `AiBriefing`, in the calendar sheet.
+- **Email draft or rewrite**: `AiEmailDraft`, inside `SendEmailModal`, for contacts, leads and deals. On a
+  deal the dialog writes to its contact, drafts from the whole deal and logs the email on both.
+
+Pages ask `aiEntries([...], aiViewer(session.user))` what to show for each control, and nothing
+reaches the model until the person presses the button:
+- **ready**: everything is in place;
+- **disabled, with the reason**: the plan lacks the flag (the customer can upgrade), or — for Flux's
+  own staff only — the deployment has no provider or a wrong one (set `GEMINI_API_KEY`);
+- **hidden**: a workspace switched off by its administrator, an inactive subscription, or a
+  deployment without a provider seen by a customer (`entryFor`).
+
+⚠️ With no `GEMINI_API_KEY` the copilot is invisible to every customer, and that is by design. A
+person who cannot find the buttons is usually looking at a deployment without the key, or a plan
+without the flag.
+
+- ⚠️⚠️ **The record reaches the model through [context.ts](src/lib/ai/context.ts) only**, built from
+  what the person sees (the timeline, the fields). It is always inside `<record>` and declared to be
+  material, not instructions. Emails say who wrote them (`FROM`/`TO the customer`); an internal note
+  on a ticket is labelled as one. It must never be passed off as the agent's words, or it ends up in
+  a reply.
+- ⚠️⚠️ **A draft never carries a figure the model made up without saying so.**
+  - The prompt forbids prices, amounts, percentages and dates that are not in the record, and asks
+    for `[da completare]` instead.
+  - `unsupportedFigures` lists any that slip through, for the person to check before sending.
+  - The body comes back as escaped HTML paragraphs (`paragraphsToHtml`).
+- A draft is written in the **customer's** language (`documentLanguage`); summaries and briefings in
+  the reader's.
+
+**The email dialog** ([send-email-modal.tsx](src/components/crm/send-email-modal.tsx)) is the one
+way the CRM writes to a customer: record pages (contacts, leads, companies, deals), documents
+(a quote and its follow-up, an invoice's courtesy copy, a payment reminder) and every address shown
+on a page — the work queue, orders, a ticket's requester — through
+[EmailAddressButton](src/components/crm/email-address-button.tsx).
+- ⚠️⚠️ **A new place that sends an email opens this dialog, never a `mailto:` link or a dialog of its
+  own.** A `mailto:` email is on nobody's timeline; the old quote and invoice dialogs had no
+  templates, no copilot and no copies. `mailto:` stays only for whoever may not write (the plain
+  link `EmailAddressButton` falls back to) and for calendar attendees, who have no record.
+- **One delivery path**: [email-deliver.ts](src/lib/email-deliver.ts) `deliverEmail` checks copies,
+  fills the sender's and deal's fields, sends (the person's mailbox or the workspace), logs on the
+  timeline and counts the template. `sendEmailAction`, `sendQuoteEmailAction`, `sendInvoiceCopy` and
+  `sendPaymentReminder` all go through it.
+- **Document mode** (`document` prop, `EmailDocument`): the address is editable, the text opens on
+  what the server writes (`getInvoiceEmailDraftAction`, the quote's texts in the customer's
+  language), and the document's own action sends it, because that action also moves the document
+  (a quote becomes sent, a reminder is claimed). ⚠️⚠️ The document's parts — the quote's summary
+  and link, the invoice PDF — are added by the server (`finish`, attachments) after the text, so no
+  version of the text can leave without them; the dialog only names them. And the server still
+  decides: a paid invoice is not chased whatever the text says. A document's draft is kept only once
+  the person changed the text, so a reminder reopened tomorrow says tomorrow's figures.
+- **Preview** shows what the customer receives: the recipient's fields filled in the dialog, the
+  sender's and the deal's and the document's parts by `composeEmail` — the function `deliverEmail`
+  sends with (`previewEmailAction`, `previewQuoteEmailAction`, `previewInvoiceEmailAction`), so it
+  is not a copy that can drift. ⚠️ It is drawn unsanitised, to keep a designed template's `<style>`,
+  inside an `<iframe sandbox>` with no scripts and no same-origin; never outside one.
+- Invoices go out **from the workspace** (`sender: "workspace"`, reply to the issuer's address), with
+  the PDF; a connected mailbox cannot carry the attachment.
+- Opened by the page (`open`/`onOpenChange`, `trigger={null}`) or by its own button. Templates and
+  the copilot's entry are fetched on the first opening when the page did not pass them
+  (`getComposerTemplates`, `getDraftAiEntryAction`); `ai={null}` means hidden.
+- The copilot drafts to a company too (`draftEmailAction` takes `company`).
+- **Layout**: recipient chip, Cc/Bcc, subject; a tools bar with *Write with AI* and the templates;
+  the text editor in its `email` variant (`RichTextEditor variant="email"`: no headings or
+  alignment, fields in one menu).
+- **Designed templates** (tables, styles) are edited in their preview or as HTML, because the text
+  editor would flatten them (`isDesignedHtml`).
+- **Drafts** are kept in `localStorage` per record as they are typed, and restored on reopen, with
+  the copilot draft's id so its outcome is still recorded. Only *Discard* throws a draft away.
+- **Ctrl/Cmd+Enter** sends.
+- ⚠️ `sendEmailAction` **returns** its failures (`{ success: false, error }`), translated, instead of
+  throwing: a thrown message never reaches the screen in production.
+- ⚠️ Cc and Bcc go through `parseAddressList` ([email-addresses.ts](src/lib/email-addresses.ts)) on
+  both sides, and a wrong address refuses the send.
+- ⚠️ **Bcc is refused from a connected mailbox**, which cannot send it. Sending from the workspace
+  instead would switch the sender silently.
+
+**Email templates** ([src/lib/email-templates.ts](src/lib/email-templates.ts), migration `0070`). One
+table, two kinds:
+- **`campaign`**: made in Marketing (often in the designer), used by campaigns, sequences and
+  automations; `getEmailTemplates` returns only these.
+- **`personal`**: the text a one-to-one email starts from. Managed at Settings → Email templates
+  (also in the menu, under Customers) by anybody with `record:write`, **without the marketing
+  module**. Private to its owner until shared. The owner may change it; an administrator
+  (`record:manageAny`) may change a shared one (`canEditTemplate`).
+
+The dialog's picker (`getComposerTemplates`) offers mine, then the team's (most used first), then
+the campaign ones. It also has *Save as template*. A template's fields (`{{nome}}`) stay fields
+until the email is sent, and sending counts the template's use (`use_count`).
+
+- ⚠️ **Global search shows campaign templates only**: it does not know who is searching, and a
+  personal template may be private.
+- ⚠️ The rules a client component needs are in `email-template-rules.ts`. `email-templates.ts`
+  carries the schema, which must not reach the browser bundle.
+
+**Fields fill in two places** ([email-placeholders.ts](src/lib/email-placeholders.ts); each field has a `scope`):
+- **The dialog** fills the **recipient's** fields.
+- **`deliverEmail`** fills the **sender's** (`{{mittente}}`, `{{mittente_email}}`,
+  `{{azienda_mittente}}`, the last from `sellerIdentity`) and, from a deal's page, the **deal's**
+  (`{{trattativa}}`, `{{valore}}`, in the deal's currency and the customer's language).
+- ⚠️⚠️ So `renderPlaceholders` leaves a field it was **not given** as written, and blanks only one
+  given empty. Blanking both would send every email unsigned.
+- The campaign editors offer only recipient fields and the unsubscribe link: a campaign has no
+  sender or deal to fill the others with.
+
+**Parts to write by hand**, in square brackets (`[numero fattura]`), are asked about before sending
+(`pendingFields`). So are a deal's field outside a deal and a field nobody knows.
+
+⚠️⚠️ **What the document knows is never left to the person.** A quote's or an invoice's dialog fills
+the **document's** fields (scope `document`: `{{numero_preventivo}}`, `{{numero_fattura}}`,
+`{{importo}}`, `{{scadenza}}`, `{{iban}}`) from `documentValues`, handed over by `EmailDocument.load`
+on every opening — a restored draft too, so a reminder says today's figures. The same values fill the
+brackets the basic templates leave (`markers`: "[numero preventivo]", "[importo]", "[data di
+scadenza]", in both languages), including in templates already saved in a workspace. A bracket with no
+value (a quote with no expiry) stays, and the dialog asks. A reminder's amount and date are what is
+overdue, never the invoice total.
+
+**The basic templates** ([email-template-starters.ts](src/lib/email-template-starters.ts), texts in
+`emailTemplates.starters`): 25 of them, covering first contact, follow-ups, meetings, quotes, deals
+won and lost, orders, contracts, invoices and payments, support, reviews and reactivation.
+- Signed with the sender's fields.
+- ⚠️ What a record knows is written as its field, filled by the dialog opened from that record
+  (`documentValues`, handed as `EmailDocument.load` or the `fields` prop): quote and invoice
+  (`{{numero_preventivo}}`, `{{numero_fattura}}`, `{{importo}}`, `{{scadenza}}`, `{{iban}}`), order
+  (`{{numero_ordine}}`, `{{data_consegna}}`, `{{corriere}}`, `{{codice_tracciamento}}`, from the
+  contact's address on the order page — the last three are the order's Shipping card, migration
+  `0071_on_its_way`, `setOrderShipping`), contract
+  (`{{riferimento_contratto}}` = its title, `{{fine_contratto}}` = the current term's end, from the
+  contract's Email action), ticket (`{{oggetto_richiesta}}`, from the requester's address). Only what the
+  CRM does not store stays in brackets: meeting times, a signing deadline, what the person decides. Templates created before this keep their brackets, which the same values fill
+  (`markers`).
+- "Add basic templates" adds only the missing ones, by name.
+- ⚠️ A new starter needs its text in both languages and only known fields:
+  `email-template-starters.test.ts` renders every one.
+
+`src/lib/ai/*.test.ts` (recorded answers, PGlite); `scripts/mutations/ai-provider.json`, `ai-access.json`,
+`ai-copilot.json`.
 
 ### Deploy: Vercel e Cloudflare Workers
 
@@ -485,8 +678,9 @@ and a mismatch is a silent no-op.
 ⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
 schedules to fit; an eighth job on a new schedule needs Workers Paid.
 
-⚠️⚠️ **The bundle is 8.76 MB gzipped against a 10 MB limit** (measured on 29 September
-2026 with `npx wrangler deploy --dry-run`: 8,968 KiB of 10,240). It fits Workers Paid, never
+⚠️⚠️ **The bundle is 8.93 MB gzipped against a 10 MB limit** (measured on 30 September
+2026 with `npx wrangler deploy --dry-run`: 9,149 KiB of 10,240 — up 181 KiB with the copilot, the
+email dialog everywhere and the email templates). It fits Workers Paid, never
 Free (3 MB). ⚠️⚠️ **Next bundles per route, so an import is paid once per route that reaches
 it.** The SDI integration first took it to 9,977 KiB — 263 KiB from the limit — because the
 settings page and the job imported the sending module, which imported the invoice archive, which
@@ -1719,6 +1913,12 @@ auto-migration as everything else.
   settings page, a report under Pipeline) a back arrow to the entry above it.
   Installed, the app has no address bar, no tab title and — on iOS — no back
   gesture; this is all of them. Search is the icon beside it, then notifications.
+- **What opens from the top bar fills the screen**, as the search does: the bell and the recents
+  open a [FullScreenPanel](src/components/crm/full-screen-panel.tsx) below md (fixed header with
+  one action, list that scrolls, footer) and keep their dropdowns from md up. A notification row
+  is one target — tapping opens what it is about and marks it read — grouped by day, with "To
+  read" as a filter. A new panel in that bar uses the same component: a 320px dropdown on a phone
+  is a third of the screen with the page still under it to tap by mistake.
 - **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).
   A nine-column table does not become usable by scrolling sideways. Contacts,
   companies, leads, orders, quotes and tickets render cards below `md` and the

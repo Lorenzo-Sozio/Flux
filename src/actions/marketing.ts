@@ -59,10 +59,15 @@ const MarketingCampaignUpdateSchema = MarketingCampaignCreateSchema.partial();
 
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
+/**
+ * The campaign templates: what Marketing, campaigns, sequences and automations choose from.
+ * One-to-one templates (kind "personal", src/lib/email-templates.ts) are someone's own text and
+ * have their own page; the email dialog reads both through `getComposerTemplates`.
+ */
 export async function getEmailTemplates() {
   await requireCapability("record:read");
   const db = await getDb();
-  return db.select().from(emailTemplates).orderBy(emailTemplates.createdAt);
+  return db.select().from(emailTemplates).where(eq(emailTemplates.kind, "campaign")).orderBy(emailTemplates.createdAt);
 }
 
 export async function createEmailTemplate(data: unknown) {

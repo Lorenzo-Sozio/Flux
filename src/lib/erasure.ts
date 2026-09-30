@@ -34,6 +34,7 @@ import { and, eq, inArray, or, sql } from "drizzle-orm";
 
 import {
   activities,
+  aiSuggestions,
   appointmentAttendees,
   campaignLogs,
   contacts,
@@ -95,6 +96,10 @@ const CONSERVATI: Record<string, string> = {
     "internal discussion written by the team, which may mention the person. Not rewritten " +
     "automatically: an algorithm editing a conversation either destroys its meaning or " +
     "leaves the name in. They are listed here so a person can decide case by case.",
+  "ai_suggestion on other records":
+    "a proposal the AI copilot made about a deal, a company or a ticket may mention the person. " +
+    "Like the team's own comments, it is not rewritten automatically; the ones about the " +
+    "person's lead or contact are deleted above.",
   "deal, quote, order, opportunity":
     "the business's own commercial records. They survive without the person: the contact " +
     "they point at no longer identifies anybody.",
@@ -144,6 +149,25 @@ export async function eraseByContactPoint(
           .delete(fieldChanges)
           .where(or(...histories))
           .returning({ id: fieldChanges.id }),
+      )
+    : 0;
+
+  // ── 1c. ⚠️ What the AI copilot proposed about them: a derived copy of their data (a summary,
+  // a draft addressed to them), and like the history it has no foreign key to the record.
+  const proposals = [
+    ...(person.leadIds.length
+      ? [and(eq(aiSuggestions.entityType, "lead"), inArray(aiSuggestions.entityId, person.leadIds))]
+      : []),
+    ...(person.contactIds.length
+      ? [and(eq(aiSuggestions.entityType, "contact"), inArray(aiSuggestions.entityId, person.contactIds))]
+      : []),
+  ];
+  report.deleted.ai_suggestion = proposals.length
+    ? quanti(
+        await db
+          .delete(aiSuggestions)
+          .where(or(...proposals))
+          .returning({ id: aiSuggestions.id }),
       )
     : 0;
 

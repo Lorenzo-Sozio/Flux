@@ -9,7 +9,10 @@
  *
  *  - `projects` — the Gantt chart and the workload view.
  *  - `chat` — the internal chat: its page and the widget on every page.
+ *  - `ai` — the AI copilot (Fase 5). ⚠️ This switch only takes away: the copilot also needs the
+ *    `ai` module in the workspace's plan and a provider configured on the deployment
+ *    (src/lib/ai/access.ts). On by default, because the plan is what grants it.
  */
-export const WORKSPACE_FEATURES = ["projects", "chat"] as const;
+export const WORKSPACE_FEATURES = ["projects", "chat", "ai"] as const;
 export type WorkspaceFeature = (typeof WORKSPACE_FEATURES)[number];
 export type WorkspaceFeatures = Record<WorkspaceFeature, boolean>;

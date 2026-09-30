@@ -8,19 +8,15 @@ import { Archive, CheckCircle2, FileCode2, FileText, Loader2, Mail } from "lucid
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { archiveInvoiceAction, sendInvoiceCopy } from "@/actions/invoices";
+import {
+  archiveInvoiceAction,
+  getInvoiceEmailDraftAction,
+  previewInvoiceEmailAction,
+  sendInvoiceCopy,
+} from "@/actions/invoices";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 const when = (iso: string | null, locale: string) =>
   iso
@@ -40,68 +36,49 @@ const when = (iso: string | null, locale: string) =>
  */
 export function SendInvoiceCopyButton({
   invoiceId,
+  documentNumber,
   emailedTo,
   customerEmail,
+  customer,
 }: {
   invoiceId: string;
+  documentNumber: string | null;
   emailedTo: string | null;
   customerEmail: string | null;
+  /** The company the invoice is to: its fields fill the text, the email lands on its timeline. */
+  customer: { id: string | null; name: string | null };
 }) {
   const t = useTranslations("invoices.files");
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [to, setTo] = useState(emailedTo ?? customerEmail ?? "");
-  const [sending, setSending] = useState(false);
-
-  const send = async () => {
-    setSending(true);
-    try {
-      const result = await sendInvoiceCopy(invoiceId, to);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success(t("sent", { to: to.trim() }));
-      setOpen(false);
-      router.refresh();
-    } finally {
-      setSending(false);
-    }
-  };
 
   return (
     <>
       <Button size="sm" className="gap-1.5" onClick={() => setOpen(true)}>
         <Mail className="size-3.5" aria-hidden /> {t("send")}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("sendTitle")}</DialogTitle>
-            <DialogDescription>{t("sendDescription")}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="invoice-send-to">{t("recipient")}</Label>
-            <Input
-              id="invoice-send-to"
-              type="email"
-              value={to}
-              placeholder={t("recipientPlaceholder")}
-              onChange={(e) => setTo(e.target.value)}
-            />
-            {!customerEmail && <p className="text-muted-foreground text-xs">{t("noCustomerEmail")}</p>}
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={send} disabled={sending || !to.trim()} className="gap-1.5">
-              {sending && <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-              {t("sendButton")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SendEmailModal
+        entity={{ id: customer.id ?? "", name: customer.name, email: customerEmail }}
+        entityType="company"
+        trigger={null}
+        open={open}
+        onOpenChange={setOpen}
+        document={{
+          draftKey: `invoice-copy:${invoiceId}`,
+          title: t("sendTitle"),
+          description: t("sendDescription"),
+          parts: [{ label: t("partPdf", { number: documentNumber ?? "" }), kind: "file" }],
+          defaultTo: emailedTo ?? customerEmail,
+          load: () => getInvoiceEmailDraftAction(invoiceId, "copy"),
+          send: (email) => sendInvoiceCopy(invoiceId, email),
+          preview: (email) => previewInvoiceEmailAction(invoiceId, email),
+          submitLabel: t("sendButton"),
+          onSent: (to) => {
+            toast.success(t("sent", { to }));
+            router.refresh();
+          },
+        }}
+      />
     </>
   );
 }

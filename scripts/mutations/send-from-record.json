@@ -6,9 +6,9 @@
     "replace": "  const kind = \"companyName\" in entity ? \"lead\" : \"contact\";"
   },
   {
-    "file": "src/actions/email.ts",
+    "file": "src/lib/email-deliver.ts",
     "description": "⚠️ un errore nel registrare l'email già inviata torna a presentarsi come invio fallito",
-    "find": "    .catch((err) => {\n      console.error(\"[sendEmailAction] sent, but not logged on the record:\", err);\n    });",
+    "find": "    .catch((err: unknown) => {\n      console.error(\"[deliverEmail] sent, but not logged on the record:\", err);\n    });",
     "replace": ";"
   },
   {
@@ -26,7 +26,49 @@
   {
     "file": "src/actions/quotes.ts",
     "description": "⚠️⚠️ un'email non partita torna a segnare il preventivo come inviato",
-    "find": "    if (!result.success) throw new Error(result.error ?? \"The email could not be sent.\");",
-    "replace": "    void result;"
+    "find": "  if (!sent.success) return sent;",
+    "replace": "  void sent;"
+  },
+  {
+    "file": "src/lib/email-deliver.ts",
+    "description": "un'email inviata dalla trattativa non compare sulla sua cronologia, solo su quella del contatto",
+    "find": "      dealId: log.dealId ?? undefined,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-deliver.ts",
+    "description": "⚠️ un indirizzo in copia scritto male viene ignorato e l'email parte senza dirlo",
+    "find": "  if (wrong.length > 0) return { success: false, error: t(\"invalidCopies\", { list: wrong.join(\", \") }) };",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️ il sollecito scritto nel dialogo viene ignorato: parte il testo standard al posto di quello della persona",
+    "find": "  const pdf = await readInvoiceFile(db, invoice, \"pdf\").catch(() => null);\n  const sent = email\n",
+    "replace": "  const pdf = await readInvoiceFile(db, invoice, \"pdf\").catch(() => null);\n  const sent = false && email\n"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️ il dialogo apre un sollecito anche per una fattura non scaduta",
+    "find": "  if (\"error\" in reminder) return { ok: false, error: t(reminder.error) };\n  const due = reminder.data;\n",
+    "replace": "  const due = reminder.data;\n"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ l'email del preventivo scritta nel dialogo parte senza il link che lo apre",
+    "find": "        <p><a href=\"${quoteViewUrl}\" style=\"display:inline-block;padding:10px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600\">${escapeHtml(tx.emailCta)}</a></p>\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-log-target.ts",
+    "description": "⚠️ un'email al contatto di una trattativa dalla coda di lavoro registra un id vuoto sul contatto",
+    "find": "  if (!entity.id) return {};\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️ l'anteprima del preventivo non mostra il riquadro e il link che il cliente riceverà",
+    "find": "      finish: quoteEmailFinish(quote),\n",
+    "replace": ""
   }
 ]

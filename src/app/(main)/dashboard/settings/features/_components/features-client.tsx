@@ -10,7 +10,14 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Switch } from "@/components/ui/switch";
 import { WORKSPACE_FEATURES, type WorkspaceFeature, type WorkspaceFeatures } from "@/lib/workspace-feature-list";
 
-export function FeaturesClient({ initial }: { initial: WorkspaceFeatures }) {
+export function FeaturesClient({
+  initial,
+  offered = WORKSPACE_FEATURES,
+}: {
+  initial: WorkspaceFeatures;
+  /** The switches to show: one for something the plan does not include would say "on" about nothing. */
+  offered?: readonly WorkspaceFeature[];
+}) {
   const t = useTranslations("settings.features");
   const [features, setFeatures] = useState(initial);
   const [pending, startTransition] = useTransition();
@@ -31,7 +38,7 @@ export function FeaturesClient({ initial }: { initial: WorkspaceFeatures }) {
 
   return (
     <div className="grid gap-3">
-      {WORKSPACE_FEATURES.map((feature) => (
+      {offered.map((feature) => (
         <Card key={feature}>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">

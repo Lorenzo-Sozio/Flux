@@ -417,7 +417,7 @@ export async function sendAppointmentInviteEmail(
  * The body repeats that the PDF has no fiscal value, because the attachment is the
  * part that gets forwarded to an accountant on its own.
  */
-export async function sendInvoiceCopyEmail(data: {
+export interface InvoiceCopyData {
   to: string;
   issuerName: string;
   documentType: "TD01" | "TD02" | "TD04";
@@ -427,10 +427,15 @@ export async function sendInvoiceCopyEmail(data: {
   dueDate: string | null;
   /** Paid in parts (I12): each installment's day and amount, already formatted in the document's currency. */
   installments?: { dueDate: string; amount: string }[] | null;
-  pdf: { filename: string; bytes: Uint8Array };
-  replyTo?: string | null;
   lang: DocumentLanguage;
-}) {
+}
+
+/**
+ * The courtesy copy's subject and text, in the customer's language: what the email dialog opens
+ * with (actions/invoices.ts `getInvoiceEmailDraftAction`) and what `sendInvoiceCopyEmail` sends
+ * when nobody changed it. One source, so the two never say different things.
+ */
+export function invoiceCopyContent(data: InvoiceCopyData): { subject: string; bodyHtml: string } {
   const tx = INVOICE_TEXT[data.lang];
   const day = (iso: string) => iso.split("-").reverse().join("/");
   const label =
@@ -455,21 +460,33 @@ export async function sendInvoiceCopyEmail(data: {
           )
           .join("")}</ul>`
       : "";
-  const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
-        <p>${esc(tx.emailGreeting)}</p>
-        <p>${body}.</p>
-        ${schedule}
-        <p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>
-        <p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">
-          ${esc(tx.emailNotice)}
-        </p>
-      </div>`;
+  return {
+    subject: `${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
+    bodyHtml:
+      `<p>${esc(tx.emailGreeting)}</p><p>${body}.</p>${schedule}` +
+      `<p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p><p><em>${esc(tx.emailNotice)}</em></p>`,
+  };
+}
 
+/** A document's text inside the frame every email to a customer from the business carries. */
+export function documentEmailFrame(bodyHtml: string): string {
+  return `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        ${bodyHtml}
+      </div>`;
+}
+
+export async function sendInvoiceCopyEmail(
+  data: InvoiceCopyData & {
+    pdf: { filename: string; bytes: Uint8Array };
+    replyTo?: string | null;
+  },
+) {
+  const { subject, bodyHtml } = invoiceCopyContent(data);
   return sendEmail({
     to: sanitizeHeader(data.to),
-    subject: sanitizeHeader(`${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`),
-    html,
+    subject: sanitizeHeader(subject),
+    html: documentEmailFrame(bodyHtml),
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],
   });
@@ -484,7 +501,7 @@ export async function sendInvoiceCopyEmail(data: {
  * payment already made makes it void — a reminder crossing a transfer in the post is the
  * common case, not the exception.
  */
-export async function sendPaymentReminderEmail(data: {
+export interface PaymentReminderData {
   to: string;
   issuerName: string;
   documentType: "TD01" | "TD02";
@@ -493,10 +510,13 @@ export async function sendPaymentReminderEmail(data: {
   dueDate: string;
   amount: string;
   iban?: string | null;
-  pdf: { filename: string; bytes: Uint8Array } | null;
-  replyTo?: string | null;
+  /** Whether the courtesy PDF goes with it: the notice about it is said only then. */
+  withPdf: boolean;
   lang: DocumentLanguage;
-}) {
+}
+
+/** The reminder's subject and text, in the customer's language — the dialog's draft and the default send. */
+export function paymentReminderContent(data: PaymentReminderData): { subject: string; bodyHtml: string } {
   const tx = INVOICE_TEXT[data.lang];
   const day = (iso: string) => iso.split("-").reverse().join("/");
   const label = data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
@@ -508,26 +528,27 @@ export async function sendPaymentReminderEmail(data: {
     amount: `<strong>${esc(data.amount)}</strong>`,
   });
   const iban = (data.iban ?? "").replace(/\s+/g, "").toUpperCase();
-  const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
-        <p>${esc(tx.emailGreeting)}</p>
-        <p>${body}.</p>
-        ${iban ? `<p>${fill(tx.reminderIban, { iban: `<strong>${esc(iban)}</strong>` })}</p>` : ""}
-        <p>${esc(tx.reminderPaid)}</p>
-        <p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>
-        ${
-          data.pdf
-            ? `<p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">${esc(tx.emailNotice)}</p>`
-            : ""
-        }
-      </div>`;
+  return {
+    subject: `${tx.reminderSubject} — ${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
+    bodyHtml:
+      `<p>${esc(tx.emailGreeting)}</p><p>${body}.</p>` +
+      (iban ? `<p>${fill(tx.reminderIban, { iban: `<strong>${esc(iban)}</strong>` })}</p>` : "") +
+      `<p>${esc(tx.reminderPaid)}</p><p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>` +
+      (data.withPdf ? `<p><em>${esc(tx.emailNotice)}</em></p>` : ""),
+  };
+}
 
+export async function sendPaymentReminderEmail(
+  data: Omit<PaymentReminderData, "withPdf"> & {
+    pdf: { filename: string; bytes: Uint8Array } | null;
+    replyTo?: string | null;
+  },
+) {
+  const { subject, bodyHtml } = paymentReminderContent({ ...data, withPdf: Boolean(data.pdf) });
   return sendEmail({
     to: sanitizeHeader(data.to),
-    subject: sanitizeHeader(
-      `${tx.reminderSubject} — ${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
-    ),
-    html,
+    subject: sanitizeHeader(subject),
+    html: documentEmailFrame(bodyHtml),
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     ...(data.pdf
       ? { attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }] }

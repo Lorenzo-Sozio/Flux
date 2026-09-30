@@ -1,6 +1,7 @@
 import { getMacros, getTicketById } from "@/actions/support";
 import { auth } from "@/auth";
 import { RecordVisit } from "@/components/crm/record-visit";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { can } from "@/lib/permissions";
 
 import { TicketDetail } from "./_components/ticket-detail";
@@ -29,6 +30,11 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
   // ⚠️ The workspace role, never `session.user.role` — that is Flux's own staff
   // scale and reads "user" for every customer. See CLAUDE.md on the two scales.
   const tenantRole = session?.user?.tenantRole ?? null;
+  // The copilot runs as record:write (src/lib/ai/run.ts), whatever the ticket capabilities say.
+  const aiSummary =
+    can(tenantRole, "record:write") && can(tenantRole, "ticket:read")
+      ? (await aiEntries(["summary"], aiViewer(session?.user))).summary
+      : undefined;
   return (
     <>
       {ticket && <RecordVisit type="ticket" id={id} label={ticket.subject} sub={ticket.ticketNumber} />}
@@ -38,6 +44,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
         initialMacros={macros}
         canWrite={can(tenantRole, "ticket:write")}
         canDelete={can(tenantRole, "ticket:delete")}
+        aiSummary={aiSummary}
       />
     </>
   );

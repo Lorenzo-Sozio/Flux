@@ -40,6 +40,7 @@ import {
   updateTicketAction,
 } from "@/actions/support";
 import { getAllUsers, getTasksByTicketId } from "@/actions/tasks";
+import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import {
   MetaItem,
@@ -68,6 +69,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { AiEntry } from "@/lib/ai/types";
 import { canTransition } from "@/lib/ticket-state-machine";
 import { mergeThread, oldestOf } from "@/lib/ticket-thread";
 
@@ -162,7 +164,10 @@ export function TicketDetail({
   initialMacros,
   canWrite,
   canDelete,
+  aiSummary,
 }: {
+  /** Offer the copilot's summary of the thread, for whoever takes the ticket over (Fase 5, C2). */
+  aiSummary?: AiEntry;
   id: string;
   initialTicket: TicketRow | null;
   initialMacros: TicketMacro[];
@@ -802,7 +807,7 @@ export function TicketDetail({
             ),
           },
           { tab: "details", column: "side", node: <SlaCard ticket={ticket} /> },
-          { tab: "details", column: "side", node: <RequesterCard ticket={ticket} /> },
+          { tab: "details", column: "side", node: <RequesterCard ticket={ticket} canWrite={canWrite} /> },
           { tab: "details", column: "side", node: <CustomerHistoryCard ticket={ticket} /> },
           {
             tab: "details",
@@ -852,6 +857,15 @@ export function TicketDetail({
               />
             ),
           },
+          ...(aiSummary
+            ? [
+                {
+                  tab: "conversation",
+                  column: "side" as const,
+                  node: <AiSummaryCard subject={{ type: "ticket", id: ticket.id }} entry={aiSummary} />,
+                },
+              ]
+            : []),
           // The files the thread carries, beside it.
           { tab: "conversation", column: "side", node: <AttachmentsCard docs={Object.values(ticketDocs)} /> },
         ]}

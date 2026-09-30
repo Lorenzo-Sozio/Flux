@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import Link from "next/link";
 
-import { Bell, CheckCheck, ExternalLink, Settings2 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Bell, CheckCheck, ChevronRight, ExternalLink, Settings2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/actions/auth";
+import { FullScreenPanel } from "@/components/crm/full-screen-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +20,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLivePoll } from "@/hooks/use-live-poll";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { type DayBucket, dayBucket, relativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 
 type Notification = {
@@ -90,6 +93,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
     return { title: n.title, message: n.message };
   };
   const [isPending, startTransition] = useTransition();
+  const locale = useLocale();
 
   /**
    * Asks only for what arrived after the newest row already held.
@@ -151,18 +155,52 @@ export function NotificationCenter({ notifications: initial }: Props) {
     });
   };
 
+  const isMobile = useIsMobile();
+  const [panelOpen, setPanelOpen] = useState(false);
+
+  const bell = (
+    <Button
+      variant="ghost"
+      size="icon"
+      // On a phone the same 40px target as the search and the recents beside it.
+      className="relative h-8 w-8 max-md:size-10"
+      aria-label={t("title")}
+      title={t("title")}
+      onClick={isMobile ? () => setPanelOpen(true) : undefined}
+    >
+      <Bell className="h-4 w-4 max-md:size-5" />
+      {unreadCount > 0 && (
+        <Badge className="-right-1 -top-1 absolute flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px]">
+          {unreadCount > 9 ? "9+" : unreadCount}
+        </Badge>
+      )}
+    </Button>
+  );
+
+  // ⚠️ On a phone the bell opens the whole screen, as the search does: the dropdown was a 320px
+  // box whose list was 320px tall, a third of the screen, with the page still under it to tap by
+  // mistake and a link icon the size of a fingertip's edge.
+  if (isMobile) {
+    return (
+      <>
+        {bell}
+        <NotificationsPanel
+          open={panelOpen}
+          onOpenChange={setPanelOpen}
+          items={items}
+          unreadCount={unreadCount}
+          textOf={textOf}
+          onMarkRead={handleMarkRead}
+          onMarkAllRead={handleMarkAllRead}
+          pending={isPending}
+        />
+      </>
+    );
+  }
+
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative h-8 w-8">
-          <Bell className="h-4 w-4" />
-          {unreadCount > 0 && (
-            <Badge className="-right-1 -top-1 absolute flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px]">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild>{bell}</DropdownMenuTrigger>
       {/* 20rem is wider than the margin a 360px phone leaves, so the panel
           would be clipped at one edge. It takes what is there instead. */}
       <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-1.5rem))]">
@@ -217,7 +255,12 @@ export function NotificationCenter({ notifications: initial }: Props) {
                     {textOf(n).message && (
                       <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{textOf(n).message}</p>
                     )}
-                    <p className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</p>
+                    <p
+                      className="mt-1 text-[10px] text-muted-foreground"
+                      title={new Date(n.createdAt).toLocaleString()}
+                    >
+                      {relativeTime(n.createdAt, locale)}
+                    </p>
                   </button>
                   <div className="flex flex-col items-center gap-1">
                     {!n.isRead && (
@@ -249,5 +292,168 @@ export function NotificationCenter({ notifications: initial }: Props) {
         </Link>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+const BUCKETS: DayBucket[] = ["today", "yesterday", "week", "older"];
+
+/**
+ * The bell on a phone: the whole screen, like the search.
+ *
+ * - A row is one target, the height of a thumb: tapping it opens what the notification is about
+ *   (and marks it read), or only marks it read when it points nowhere. The small link icon beside
+ *   the text on the desktop was a miss waiting to happen.
+ * - "To read" filters the ones not seen yet; the rows are grouped by day, newest first, and say
+ *   how long ago rather than a date and a time to the second.
+ * - The notification settings stay one tap away, at the bottom, where the thumb is.
+ */
+function NotificationsPanel({
+  open,
+  onOpenChange,
+  items,
+  unreadCount,
+  textOf,
+  onMarkRead,
+  onMarkAllRead,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  items: Notification[];
+  unreadCount: number;
+  textOf: (n: Notification) => { title: string; message: string | null };
+  onMarkRead: (id: string) => void;
+  onMarkAllRead: () => void;
+  pending: boolean;
+}) {
+  const t = useTranslations("notificationCenter");
+  const locale = useLocale();
+  const [onlyUnread, setOnlyUnread] = useState(false);
+  const shown = onlyUnread ? items.filter((n) => !n.isRead) : items;
+  const grouped = useMemo(() => {
+    const map = new Map<DayBucket, Notification[]>();
+    for (const n of shown) {
+      const b = dayBucket(n.createdAt);
+      map.set(b, [...(map.get(b) ?? []), n]);
+    }
+    return BUCKETS.filter((b) => map.has(b)).map((b) => ({ bucket: b, rows: map.get(b) ?? [] }));
+  }, [shown]);
+
+  const row = (n: Notification) => {
+    const text = textOf(n);
+    const body = (
+      <>
+        <span className="mt-0.5 w-6 shrink-0 text-center text-lg leading-none" aria-hidden>
+          {TYPE_ICONS[n.type] ?? "📌"}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className={cn("block text-sm leading-snug", !n.isRead && "font-semibold")}>{text.title}</span>
+          {text.message && (
+            <span className="mt-0.5 line-clamp-3 block text-muted-foreground text-sm leading-snug">{text.message}</span>
+          )}
+          <span className="mt-1 block text-muted-foreground text-xs">{relativeTime(n.createdAt, locale)}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-2 self-center">
+          {!n.isRead && (
+            <>
+              <span className="size-2.5 rounded-full bg-primary" aria-hidden />
+              <span className="sr-only">{t("unread")}</span>
+            </>
+          )}
+          {n.link && <ChevronRight className="size-4 text-muted-foreground" aria-hidden />}
+        </span>
+      </>
+    );
+    const classes = cn(
+      "flex min-h-16 w-full items-start gap-3 px-4 py-3 text-left transition-colors active:bg-muted/70",
+      !n.isRead && "bg-primary/5",
+    );
+    return n.link ? (
+      <Link
+        key={n.id}
+        href={n.link}
+        className={classes}
+        onClick={() => {
+          if (!n.isRead) onMarkRead(n.id);
+          onOpenChange(false);
+        }}
+      >
+        {body}
+      </Link>
+    ) : (
+      <button
+        key={n.id}
+        type="button"
+        className={classes}
+        disabled={n.isRead}
+        onClick={() => onMarkRead(n.id)}
+        aria-label={n.isRead ? undefined : `${text.title} — ${t("markRead")}`}
+      >
+        {body}
+      </button>
+    );
+  };
+
+  return (
+    <FullScreenPanel
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t("title")}
+      description={t("description")}
+      action={
+        unreadCount > 0 && (
+          <Button variant="ghost" size="sm" className="h-9 shrink-0 gap-1.5" onClick={onMarkAllRead} disabled={pending}>
+            <CheckCheck className="size-4" aria-hidden />
+            {t("markAllReadShort")}
+          </Button>
+        )
+      }
+      footer={
+        <Link
+          href="/dashboard/settings/notifications"
+          onClick={() => onOpenChange(false)}
+          className="flex min-h-12 items-center gap-2 px-4 text-muted-foreground text-sm active:bg-muted/70"
+        >
+          <Settings2 className="size-4" aria-hidden />
+          <span className="flex-1">{t("settings")}</span>
+          <ChevronRight className="size-4" aria-hidden />
+        </Link>
+      }
+    >
+      {/* All, or only what has not been seen: two chips, never a second row. */}
+      <div className="flex gap-2 border-b px-4 py-2.5">
+        {([false, true] as const).map((unread) => (
+          <button
+            key={String(unread)}
+            type="button"
+            aria-pressed={onlyUnread === unread}
+            onClick={() => setOnlyUnread(unread)}
+            className={cn(
+              "inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 font-medium text-sm transition-colors",
+              onlyUnread === unread ? "border-primary bg-primary text-primary-foreground" : "active:bg-muted",
+            )}
+          >
+            {unread ? t("filterUnread") : t("filterAll")}
+            {unread && unreadCount > 0 && <span className="tabular-nums opacity-80">{unreadCount}</span>}
+          </button>
+        ))}
+      </div>
+
+      {shown.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+          <Bell className="size-10 text-muted-foreground/40" aria-hidden />
+          <p className="text-muted-foreground text-sm">{onlyUnread ? t("emptyUnread") : t("empty")}</p>
+        </div>
+      ) : (
+        grouped.map(({ bucket, rows }) => (
+          <section key={bucket} aria-label={t(`days.${bucket}`)}>
+            <h3 className="sticky top-14 bg-muted/60 px-4 py-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide backdrop-blur">
+              {t(`days.${bucket}`)}
+            </h3>
+            <div className="divide-y">{rows.map(row)}</div>
+          </section>
+        ))
+      )}
+    </FullScreenPanel>
   );
 }

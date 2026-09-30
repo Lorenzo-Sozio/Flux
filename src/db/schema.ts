@@ -421,6 +421,11 @@ export const orders = pgTable("order", {
   // When it actually reached the customer. `status` says completed, which is a
   // state somebody set; support answering "my order has not arrived" needs a date.
   deliveredAt: timestamp("delivered_at", { mode: "date" }),
+  // Where it is on its way (migration 0071): the day the customer was told to expect it, who
+  // carries it and the code to follow it. What the order emails say, filled rather than typed.
+  expectedDeliveryDate: date("expected_delivery_date", { mode: "string" }),
+  carrier: text("carrier"),
+  trackingCode: text("tracking_code"),
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" })
@@ -848,6 +853,14 @@ export const emailTemplates = pgTable("email_template", {
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   isPublic: boolean("is_public").default(false), // Share with team
   tags: text("tags").array().default([]), // e.g., ["sales", "onboarding", "q2-2026"]
+  /**
+   * "campaign" — made in Marketing for a campaign, often in the designer — or "personal", the
+   * text a one-to-one email from a record starts from (src/lib/email-templates.ts, migration 0070).
+   */
+  kind: text("kind").default("campaign").notNull(),
+  /** Sent from a record this many times: the dialog puts the used ones first. */
+  useCount: integer("use_count").default(0).notNull(),
+  lastUsedAt: timestamp("last_used_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -1909,6 +1922,52 @@ export const fieldChanges = pgTable(
     changedAt: timestamp("changed_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [index("field_change_entity_idx").on(t.entityType, t.entityId, t.changedAt)],
+);
+
+/**
+ * What the AI copilot proposed, and what a person did with it (Fase 5, C0; migration 0069).
+ *
+ * One row per call, successful or not: it is the log of what reached the model and the only
+ * measure of whether the copilot is worth its cost — how often a proposal is accepted as it
+ * came, edited, or thrown away.
+ *
+ * ⚠️ `text` is a derived copy of a customer's data. It goes with the person in an erasure
+ * (src/lib/erasure.ts), for suggestions on their lead or contact; how long it is kept for
+ * everything else is an open decision (docs/ia-copilota-in-flux-o-voipai-2026-09.md §11).
+ * The prompt itself is never stored.
+ */
+export const aiSuggestions = pgTable(
+  "ai_suggestion",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    /** An `AiTask` (src/lib/ai/types.ts). */
+    task: text("task").notNull(),
+    /** Who asked. */
+    userId: text("user_id").notNull(),
+    /** The record the proposal is about, when there is one. */
+    entityType: text("entity_type"),
+    entityId: text("entity_id"),
+    provider: text("provider"),
+    model: text("model"),
+    /** "ok" — an answer came back; "failed" — `failureReason` says why. */
+    status: text("status").notNull(),
+    failureReason: text("failure_reason"),
+    inputTokens: integer("input_tokens").notNull().default(0),
+    outputTokens: integer("output_tokens").notNull().default(0),
+    reasoningTokens: integer("reasoning_tokens").notNull().default(0),
+    /** The proposal as it was shown. Null for a failed call. */
+    text: text("text"),
+    /** "pending" until a person decides: "accepted" as it came, "edited", or "discarded". */
+    outcome: text("outcome").notNull().default("pending"),
+    decidedAt: timestamp("decided_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("ai_suggestion_entity_idx").on(t.entityType, t.entityId),
+    index("ai_suggestion_created_idx").on(t.createdAt),
+  ],
 );
 
 /**

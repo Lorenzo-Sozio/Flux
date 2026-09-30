@@ -26,6 +26,7 @@ import { toast } from "sonner";
 
 import { getCustomerTicketHistory, getOrdersForTicket, linkTicketToOrderAction } from "@/actions/support";
 import { createTask } from "@/actions/tasks";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { EmptyHint, Field, FieldList, RelatedRow, StatusBadge } from "@/components/crm/record/record-page";
 import { TaskModal } from "@/components/crm/task-modal";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
+import { documentValues } from "@/lib/email-placeholders";
 import { canTransition } from "@/lib/ticket-state-machine";
 import { cn } from "@/lib/utils";
 
@@ -265,7 +267,7 @@ export function SlaCard({ ticket }: { ticket: TicketRow }) {
 
 // ─── Requester ────────────────────────────────────────────────────────────────
 
-export function RequesterCard({ ticket }: { ticket: TicketRow }) {
+export function RequesterCard({ ticket, canWrite }: { ticket: TicketRow; canWrite: boolean }) {
   const t = useTranslations("support.tickets");
   const contact = ticket.contact;
   const name = contact ? `${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—" : null;
@@ -292,13 +294,18 @@ export function RequesterCard({ ticket }: { ticket: TicketRow }) {
                 {name}
               </Link>
               {contact.email && (
-                <a
-                  href={`mailto:${contact.email}`}
+                <EmailAddressButton
+                  email={contact.email}
+                  entity={contact}
+                  entityType="contact"
+                  // "[argomento]" in a support template is the request's own subject.
+                  fields={documentValues({ ticketNumber: ticket.ticketNumber, ticketSubject: ticket.subject })}
+                  canSend={canWrite}
                   className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs hover:text-foreground"
                 >
                   <Mail className="size-3 shrink-0" aria-hidden />
                   <span className="truncate">{contact.email}</span>
-                </a>
+                </EmailAddressButton>
               )}
               {contact.phone && (
                 <a

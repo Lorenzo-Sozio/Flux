@@ -26,15 +26,18 @@ import { createActivity, getActivitiesByDeal } from "@/actions/activities";
 import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getDealComments } from "@/actions/deal-comments";
+import { getComposerTemplates } from "@/actions/email-templates";
 import { getOrdersByDeal } from "@/actions/orders";
 import { getDealById, getLossReasons, getPipelineStages } from "@/actions/pipeline";
 import { getQuotesByDeal } from "@/actions/quotes";
 import { createTask, deleteTask, getAllUsers, getTasksByDeal } from "@/actions/tasks";
 import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import {
   ColourDot,
@@ -55,6 +58,7 @@ import {
 import { RecordComposer, RecordSections } from "@/components/crm/record/record-sections";
 import { RecordTimeline } from "@/components/crm/record-timeline";
 import { RecordVisit } from "@/components/crm/record-visit";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { TaskDoneButton } from "@/components/crm/task-done-button";
 import { TaskModal } from "@/components/crm/task-modal";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +66,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { getDb } from "@/lib/tenant-context";
@@ -118,6 +123,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   // A viewer reads the deal; the controls that would only answer "forbidden" are
   // not drawn for them.
   const canWrite = can(tenantRole, "record:write");
+  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
   const db = await getDb();
 
   const [
@@ -133,6 +139,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     commentsList,
     customFieldDefs,
     customFieldVals,
+    emailTemplates,
     t,
     tD,
     tX,
@@ -163,6 +170,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     // the picker — and there was nowhere to fill them in (audit rilievo U-09).
     getCustomFieldDefinitions("deal"),
     getCustomFieldValues("deal", dealId),
+    // The saved emails for the dialog, only for whoever may send one; outside the marketing
+    // module there are none, and the dialog works without.
+    canWrite ? getComposerTemplates().catch(() => []) : Promise.resolve([]),
     getTranslations("pipeline"),
     getTranslations("entityDetail"),
     getTranslations("pipeline.detail"),
@@ -498,12 +508,23 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                   <span>{contactName}</span>
                 )}
                 {contactEmail && (
-                  <a
-                    href={`mailto:${contactEmail}`}
+                  <EmailAddressButton
+                    email={contactEmail}
+                    entity={{
+                      id: deal.contactId ?? "",
+                      firstName: contactFirstName,
+                      lastName: contactLastName,
+                      phone: contactPhone ?? contactMobile,
+                      companyName,
+                    }}
+                    entityType="contact"
+                    dealId={dealId}
+                    templates={emailTemplates}
+                    ownerId={userId}
+                    ai={ai.draft ?? null}
+                    canSend={canWrite}
                     className="block truncate text-muted-foreground text-xs hover:text-foreground"
-                  >
-                    {contactEmail}
-                  </a>
+                  />
                 )}
                 {callNumber && (
                   <a href={`tel:${callNumber}`} className="block text-muted-foreground text-xs hover:text-foreground">
@@ -685,14 +706,32 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 </a>
               </Button>
             )}
-            {contactEmail && (
+            {/* Sent from Flux, it is logged on the deal and on its contact; a read-only member,
+                who cannot send from Flux, keeps the mail client. */}
+            {contactEmail && canWrite && deal.contactId ? (
+              <SendEmailModal
+                entity={{
+                  id: deal.contactId,
+                  firstName: contactFirstName,
+                  lastName: contactLastName,
+                  email: contactEmail,
+                  phone: contactPhone ?? contactMobile,
+                  companyName,
+                }}
+                entityType="contact"
+                dealId={dealId}
+                templates={emailTemplates}
+                ownerId={userId}
+                ai={ai.draft}
+              />
+            ) : contactEmail ? (
               <Button asChild size="sm" variant="outline">
                 <a href={`mailto:${contactEmail}`}>
                   <MailIcon className="size-3.5" aria-hidden />
                   {tX("email")}
                 </a>
               </Button>
-            )}
+            ) : null}
             {canWrite && (
               <DealEditButton deal={deal} stages={stages} companies={companiesList} contacts={contactsList} />
             )}
@@ -780,6 +819,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         sections={[
           { tab: "next", column: "main", node: nextSteps },
           { tab: "activity", column: "main", node: history },
+          ...(ai.summary
+            ? [
+                {
+                  tab: "activity",
+                  column: "side" as const,
+                  node: <AiSummaryCard subject={{ type: "deal", id: dealId }} entry={ai.summary} />,
+                },
+              ]
+            : []),
           { tab: "details", column: "side", node: details },
           {
             tab: "details",

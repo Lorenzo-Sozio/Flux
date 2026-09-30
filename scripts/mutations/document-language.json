@@ -38,8 +38,8 @@
   {
     "file": "src/actions/quotes.ts",
     "description": "⚠️⚠️ il link nell'email non apre il preventivo",
-    "find": "    const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);",
-    "replace": "    const quoteViewUrl = appUrl(`/q/${quote.id}`);"
+    "find": "  const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);",
+    "replace": "  const quoteViewUrl = appUrl(`/q/${quote.id}`);"
   },
   {
     "file": "src/lib/invoice-draft.ts",

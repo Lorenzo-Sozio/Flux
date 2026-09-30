@@ -8,10 +8,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  documentValues,
   ensureUnsubscribe,
   findUnknownPlaceholders,
   hasUnsubscribePlaceholder,
   PLACEHOLDERS,
+  pendingFields,
   renderPlaceholders,
   valuesForRecipient,
 } from "./email-placeholders";
@@ -108,5 +110,41 @@ describe("hasUnsubscribePlaceholder", () => {
 
   it("does not mistake another placeholder for the link", () => {
     expect(hasUnsubscribePlaceholder("{{email}}")).toBe(false);
+  });
+});
+
+describe("⚠️⚠️ a document's fields", () => {
+  const quote = documentValues({ quoteNumber: "P-2026-014", amount: "€ 1.220,00", dueDate: "31/10/2026" });
+
+  it("fill the parts a template left in brackets, in either language and any case", () => {
+    expect(
+      renderPlaceholders("Il preventivo [numero preventivo] vale [Importo], fino al [data di scadenza].", quote),
+    ).toBe("Il preventivo P-2026-014 vale € 1.220,00, fino al 31/10/2026.");
+    expect(renderPlaceholders("Quote [quote number], valid until [expiry date]", quote)).toBe(
+      "Quote P-2026-014, valid until 31/10/2026",
+    );
+    expect(renderPlaceholders("Preventivo {{numero_preventivo}}", quote)).toBe("Preventivo P-2026-014");
+  });
+
+  it("leave a bracket they have no value for, so the dialog still asks about it", () => {
+    const noExpiry = documentValues({ quoteNumber: "P-1" });
+    expect(renderPlaceholders("Valido fino al [data di scadenza]", noExpiry)).toBe("Valido fino al [data di scadenza]");
+    expect(renderPlaceholders("Fattura [numero fattura]", quote)).toBe("Fattura [numero fattura]");
+    expect(renderPlaceholders("Nel merito di [argomento]", quote)).toBe("Nel merito di [argomento]");
+  });
+
+  it("are not filled by a caller that was not given them: the sender's values leave them for the dialog", () => {
+    expect(renderPlaceholders("[numero preventivo] {{numero_preventivo}}", { senderName: "Marco" })).toBe(
+      "[numero preventivo] {{numero_preventivo}}",
+    );
+  });
+
+  it("filled, nothing is left to ask about; left, both spellings are", () => {
+    const text = "Preventivo [numero preventivo] di [importo]";
+    expect(pendingFields(renderPlaceholders(text, quote), { deal: false })).toEqual([]);
+    expect(pendingFields("Preventivo {{numero_preventivo}} [numero preventivo]", { deal: true })).toEqual([
+      "[numero preventivo]",
+      "{{numero_preventivo}}",
+    ]);
   });
 });

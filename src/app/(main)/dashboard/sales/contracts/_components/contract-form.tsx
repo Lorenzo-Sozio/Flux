@@ -100,7 +100,16 @@ const SECTION_OF = Object.fromEntries(
   Object.entries(FIELDS_OF).flatMap(([section, fields]) => fields.map((f) => [f, section])),
 ) as Partial<Record<keyof ContractFormValues, FormSection>>;
 
-export function ContractForm({ initial, data }: { initial: ContractInitial | null; data: FormData | null }) {
+export function ContractForm({
+  initial,
+  data,
+  emailAction,
+}: {
+  initial: ContractInitial | null;
+  data: FormData | null;
+  /** "Email the customer", with the contract's fields filled (page.tsx); absent for a new one. */
+  emailAction?: React.ReactNode;
+}) {
   const t = useTranslations("contracts");
   const tf = useTranslations("contracts.form");
   const tR = useTranslations("record");
@@ -308,6 +317,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
               <span>{tf("subtitle")}</span>
             )
           }
+          actions={saved ? emailAction : undefined}
         >
           <MetricStrip>
             <Metric

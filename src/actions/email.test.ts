@@ -5,12 +5,26 @@ import { describe, expect, it, vi } from "vitest";
 
 let insertFails = false;
 const sent: unknown[] = [];
+const logged: Record<string, unknown>[] = [];
 
 vi.mock("@/lib/tenant-context", () => ({
   getDb: async () => ({
-    select: () => ({ from: () => ({ where: async () => [{ email: "luca@firm.it" }] }) }),
+    select: () => ({
+      from: () => ({
+        where: async () => [{ email: "luca@firm.it", name: "Luca" }],
+        // The deal an email is sent from: its name and value fill {{trattativa}} and {{valore}}.
+        leftJoin: () => ({
+          where: async () => [
+            { name: "Rinnovo 2027", amount: "1000", amountOriginal: null, currency: "EUR", company: null },
+          ],
+        }),
+      }),
+    }),
     insert: () => ({
-      values: () => (insertFails ? Promise.reject(new Error("fk violation")) : Promise.resolve(undefined)),
+      values: (row: Record<string, unknown>) => {
+        logged.push(row);
+        return insertFails ? Promise.reject(new Error("fk violation")) : Promise.resolve(undefined);
+      },
     }),
   }),
 }));
@@ -60,5 +74,80 @@ describe("⚠️ where the customer's answer goes", () => {
 
     expect(sent[0]).not.toHaveProperty("replyTo");
     vi.unstubAllEnvs();
+  });
+});
+
+describe("an email sent from a deal", () => {
+  it("is logged on the deal as well as on its contact, so both timelines show it", async () => {
+    insertFails = false;
+    logged.length = 0;
+
+    await sendEmailAction({
+      to: "mario@rossi.it",
+      subject: "Offerta",
+      body: "<p>Ecco</p>",
+      contactId: "ct1",
+      dealId: "d1",
+    });
+
+    expect(logged[0]).toMatchObject({ type: "email", contactId: "ct1", dealId: "d1" });
+  });
+});
+
+describe("⚠️ copies", () => {
+  it("sends Cc and Bcc, cleaned, and records them on the record", async () => {
+    insertFails = false;
+    sent.length = 0;
+    logged.length = 0;
+
+    const result = await sendEmailAction({
+      to: "mario@rossi.it",
+      cc: "Anna <ANNA@x.it>; luca@y.com",
+      bcc: "capo@firm.it",
+      subject: "Offerta",
+      body: "<p>Ecco</p>",
+      contactId: "ct1",
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(sent[0]).toMatchObject({ cc: "anna@x.it, luca@y.com", bcc: "capo@firm.it" });
+    expect(JSON.parse(String(logged[0].content))).toMatchObject({
+      cc: ["anna@x.it", "luca@y.com"],
+      bcc: ["capo@firm.it"],
+    });
+  });
+
+  it("refuses an address that is not one, and sends nothing", async () => {
+    sent.length = 0;
+
+    const result = await sendEmailAction({
+      to: "mario@rossi.it",
+      cc: "anna@x.it, luca",
+      subject: "S",
+      body: "<p>B</p>",
+    });
+
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error).toContain("luca");
+    expect(sent).toHaveLength(0);
+  });
+});
+
+describe("⚠️ the fields only the server can fill", () => {
+  it("fills the sender's and, from a deal, the deal's — the recipient's were filled by the dialog", async () => {
+    insertFails = false;
+    sent.length = 0;
+
+    await sendEmailAction({
+      to: "mario@rossi.it",
+      subject: "{{trattativa}}: prossimi passi",
+      body: "<p>Valore {{valore}}.</p><p>{{mittente}}</p>",
+      contactId: "ct1",
+      dealId: "d1",
+    });
+
+    expect(sent[0]).toMatchObject({ subject: "Rinnovo 2027: prossimi passi" });
+    expect(String((sent[0] as { html: string }).html)).toContain("Luca");
+    expect(String((sent[0] as { html: string }).html)).toMatch(/Valore 1\.000,00\s€/);
   });
 });

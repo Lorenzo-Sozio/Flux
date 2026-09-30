@@ -27,9 +27,11 @@ import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { contactReach } from "@/lib/contact-reach";
 import { computeDocument } from "@/lib/document-totals";
 import { recordFieldChanges } from "@/lib/field-history";
+import { serverT } from "@/lib/i18n-server";
 import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
 import { nextOrderNumber } from "@/lib/order-number";
 import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
+import { cleanShipping } from "@/lib/order-shipping";
 import type { OrderStatus } from "@/lib/order-status";
 import { stillToInvoice } from "@/lib/orders-to-invoice";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
@@ -140,6 +142,9 @@ export async function getOrderById(id: string) {
       // What has to be known to prepare it: pickup or delivery, when, where.
       notes: orders.notes,
       deliveredAt: orders.deliveredAt,
+      expectedDeliveryDate: orders.expectedDeliveryDate,
+      carrier: orders.carrier,
+      trackingCode: orders.trackingCode,
       orderDate: orders.orderDate,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
@@ -149,6 +154,9 @@ export async function getOrderById(id: string) {
       dealId: orders.dealId,
       ownerId: orders.ownerId,
       companyName: companies.name,
+      // The customer's language, for what an email from the order says about it.
+      companyLanguage: companies.language,
+      companyCountry: companies.country,
       contactFirstName: contacts.firstName,
       contactLastName: contacts.lastName,
       contactEmail: contacts.email,
@@ -250,6 +258,12 @@ const createSchema = z.object({
   dealId: z.string().optional(),
   status: z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
   orderDate: z.string().optional(),
+  /** The day the customer is told to expect it (YYYY-MM-DD). */
+  expectedDeliveryDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .or(z.literal("")),
   currency: z.string().default("EUR"),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   notes: z.string().max(2000).optional(),
@@ -287,6 +301,9 @@ export async function createOrder(data: z.input<typeof createSchema>) {
       totalAmount: String(totals.total),
       notes: validated.notes?.trim() || null,
       orderDate: validated.orderDate ? new Date(validated.orderDate) : new Date(),
+      // A day that does not exist is not kept: it would reach the customer in an email.
+      expectedDeliveryDate:
+        cleanShipping({ expectedDeliveryDate: validated.expectedDeliveryDate })?.expectedDeliveryDate ?? null,
     })
     .returning();
 
@@ -1066,6 +1083,28 @@ export async function setOrderDelivered(orderId: string, deliveredAt: string | n
   await db
     .update(orders)
     .set({ deliveredAt: deliveredAt ? new Date(deliveredAt) : null, updatedAt: new Date() })
+    .where(eq(orders.id, orderId));
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
+  return { success: true };
+}
+
+/**
+ * Where the order is on its way: the day the customer was told to expect it, who carries it and the
+ * code to follow it (migration 0071). The order emails fill "[data di consegna]", "[corriere]" and
+ * "[codice di tracciamento]" from these.
+ */
+export async function setOrderShipping(
+  orderId: string,
+  input: { expectedDeliveryDate?: string | null; carrier?: string | null; trackingCode?: string | null },
+): Promise<{ success: true } | { success: false; error: string }> {
+  await requireCapability("order:write");
+  await requirePlanModule("sales");
+  const shipping = cleanShipping(input ?? {});
+  if (!shipping) return { success: false, error: (await serverT("serverErrors.orders"))("shippingDateInvalid") };
+  const db = await getDb();
+  await db
+    .update(orders)
+    .set({ ...shipping, updatedAt: new Date() })
     .where(eq(orders.id, orderId));
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
   return { success: true };

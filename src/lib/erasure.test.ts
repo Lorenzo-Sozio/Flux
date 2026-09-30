@@ -132,6 +132,15 @@ describe("the trails that survive anonymising a contact, and must not", () => {
     expect(report.deleted.activity).toBe(1);
   });
 
+  it("⚠️ removes what the AI copilot proposed about them, which is a copy of their data", async () => {
+    const { db, chiamate } = dbFinto();
+
+    const report = await eraseByContactPoint(db, EMAIL);
+
+    expect(chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella)).toContain("ai_suggestion");
+    expect(report.deleted.ai_suggestion).toBe(1);
+  });
+
   it("removes the sending queue, which carries the address and the body", async () => {
     const { db, chiamate } = dbFinto();
 

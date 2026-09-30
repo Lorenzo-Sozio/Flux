@@ -74,6 +74,8 @@ interface OrderFormValues {
   quoteId: string;
   status: "draft" | "processing" | "completed" | "cancelled";
   orderDate: string;
+  /** The day the customer is told to expect it; optional, and editable on the order. */
+  expectedDeliveryDate: string;
   discountPercent: number;
   currency: string;
   notes: string;
@@ -154,6 +156,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
       quoteId: params.get("quoteId") ?? "",
       status: "draft",
       orderDate: new Date().toISOString().slice(0, 10),
+      expectedDeliveryDate: "",
       discountPercent: 0,
       currency: "EUR",
       notes: "",
@@ -290,6 +293,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
         quoteId: values.quoteId || undefined,
         status: values.status,
         orderDate: values.orderDate || undefined,
+        expectedDeliveryDate: values.expectedDeliveryDate || undefined,
         discountPercent: values.discountPercent,
         currency: values.currency,
         notes: values.notes || undefined,
@@ -460,6 +464,11 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
               <div className="space-y-1.5">
                 <Label className="text-xs">{t("orderDate")}</Label>
                 <Input type="date" className="h-9" {...form.register("orderDate")} />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">{t("expectedDeliveryDate")}</Label>
+                <Input type="date" className="h-9" {...form.register("expectedDeliveryDate")} />
               </div>
 
               <div className="space-y-1.5 sm:col-span-2">

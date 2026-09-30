@@ -13,6 +13,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  Braces,
   Code2,
   Heading1,
   Heading2,
@@ -29,6 +30,15 @@ import {
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PLACEHOLDERS } from "@/lib/email-placeholders";
@@ -40,6 +50,14 @@ interface Props {
   placeholder?: string;
   className?: string;
   macroVariables?: boolean;
+  /**
+   * "email": the toolbar of an email written to one person — text formatting, lists, quote and
+   * link, with the recipient's fields in one menu. No headings, alignment or code block: an
+   * email with an H1 in it reads as a newsletter. Every other screen keeps "full".
+   */
+  variant?: "full" | "email";
+  /** Classes for the editable area, e.g. its height. */
+  editorClassName?: string;
 }
 
 type ToolbarButtonProps = {
@@ -76,10 +94,28 @@ function ToolbarButton({ onClick, active, disabled, label, children }: ToolbarBu
 // Three of the eight, hand-written here and nowhere documented, so anyone wanting
 // the other five had to guess — and a wrong guess ships to a customer verbatim
 // (audit rilievo S-08). The catalogue is the list now.
-const EMAIL_VARS = PLACEHOLDERS.map((p) => `{{${p.aliases[0]}}}`);
+// ⚠️ The recipient's and the unsubscribe link only: a campaign or a sequence has no sender or deal
+// to fill the others with, and would send them as typed.
+const EMAIL_VARS = PLACEHOLDERS.filter((p) => p.scope === "recipient" || p.scope === "campaign").map(
+  (p) => `{{${p.aliases[0]}}}`,
+);
+/** A one-to-one email's fields, grouped as the menu shows them; no unsubscribe link in one. */
+const ONE_TO_ONE_GROUPS = (["recipient", "sender", "deal", "document"] as const).map((scope) => ({
+  scope,
+  fields: PLACEHOLDERS.filter((p) => p.scope === scope),
+}));
 const MACRO_VARS = ["{ticket.number}", "{contact.firstName}", "{agent.name}"];
 
-export function RichTextEditor({ value, onChange, placeholder, className, macroVariables = false }: Props) {
+export function RichTextEditor({
+  value,
+  onChange,
+  placeholder,
+  className,
+  macroVariables = false,
+  variant = "full",
+  editorClassName,
+}: Props) {
+  const full = variant === "full";
   const t = useTranslations("marketing.richTextEditor");
   const editor = useEditor({
     extensions: [
@@ -93,7 +129,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class: "prose prose-sm dark:prose-invert max-w-none min-h-[200px] focus:outline-none p-4",
+        class: cn("prose prose-sm dark:prose-invert max-w-none min-h-[200px] focus:outline-none p-4", editorClassName),
       },
     },
     onUpdate({ editor: e }) {
@@ -165,46 +201,50 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
 
           <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            active={editor.isActive("heading", { level: 1 })}
-            label={t("heading1")}
-          >
-            <Heading1 className="h-3.5 w-3.5" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            active={editor.isActive("heading", { level: 2 })}
-            label={t("heading2")}
-          >
-            <Heading2 className="h-3.5 w-3.5" />
-          </ToolbarButton>
+          {full && (
+            <>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+                active={editor.isActive("heading", { level: 1 })}
+                label={t("heading1")}
+              >
+                <Heading1 className="h-3.5 w-3.5" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+                active={editor.isActive("heading", { level: 2 })}
+                label={t("heading2")}
+              >
+                <Heading2 className="h-3.5 w-3.5" />
+              </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
+              <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
 
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("left").run()}
-            active={editor.isActive({ textAlign: "left" })}
-            label={t("alignLeft")}
-          >
-            <AlignLeft className="h-3.5 w-3.5" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("center").run()}
-            active={editor.isActive({ textAlign: "center" })}
-            label={t("alignCenter")}
-          >
-            <AlignCenter className="h-3.5 w-3.5" />
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().setTextAlign("right").run()}
-            active={editor.isActive({ textAlign: "right" })}
-            label={t("alignRight")}
-          >
-            <AlignRight className="h-3.5 w-3.5" />
-          </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign("left").run()}
+                active={editor.isActive({ textAlign: "left" })}
+                label={t("alignLeft")}
+              >
+                <AlignLeft className="h-3.5 w-3.5" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign("center").run()}
+                active={editor.isActive({ textAlign: "center" })}
+                label={t("alignCenter")}
+              >
+                <AlignCenter className="h-3.5 w-3.5" />
+              </ToolbarButton>
+              <ToolbarButton
+                onClick={() => editor.chain().focus().setTextAlign("right").run()}
+                active={editor.isActive({ textAlign: "right" })}
+                label={t("alignRight")}
+              >
+                <AlignRight className="h-3.5 w-3.5" />
+              </ToolbarButton>
 
-          <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
+              <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
+            </>
+          )}
 
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
@@ -227,13 +267,15 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           >
             <Quote className="h-3.5 w-3.5" />
           </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-            active={editor.isActive("codeBlock")}
-            label={t("code")}
-          >
-            <Code2 className="h-3.5 w-3.5" />
-          </ToolbarButton>
+          {full && (
+            <ToolbarButton
+              onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+              active={editor.isActive("codeBlock")}
+              label={t("code")}
+            >
+              <Code2 className="h-3.5 w-3.5" />
+            </ToolbarButton>
+          )}
           <ToolbarButton onClick={handleLink} active={editor.isActive("link")} label={t("link")}>
             <Link2 className="h-3.5 w-3.5" />
           </ToolbarButton>
@@ -257,17 +299,50 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
 
           {/* Variable chip insertions */}
           <Separator orientation="vertical" className="mx-1 h-5 shrink-0" />
-          <span className="shrink-0 text-[10px] text-muted-foreground">{t("variables")}</span>
-          {(macroVariables ? MACRO_VARS : EMAIL_VARS).map((v) => (
-            <button
-              key={v}
-              type="button"
-              className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary hover:text-primary-foreground"
-              onClick={() => editor.chain().focus().insertContent(v).run()}
-            >
-              {v}
-            </button>
-          ))}
+          {full ? (
+            <>
+              <span className="shrink-0 text-[10px] text-muted-foreground">{t("variables")}</span>
+              {(macroVariables ? MACRO_VARS : EMAIL_VARS).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary hover:text-primary-foreground"
+                  onClick={() => editor.chain().focus().insertContent(v).run()}
+                >
+                  {v}
+                </button>
+              ))}
+            </>
+          ) : (
+            // One menu, not eight chips: an email toolbar stays one line.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="sm" className="h-9 shrink-0 gap-1 px-2 text-xs sm:h-7">
+                  <Braces className="h-3.5 w-3.5" />
+                  {t("insertField")}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel className="font-normal text-muted-foreground text-xs">
+                  {t("insertFieldHint")}
+                </DropdownMenuLabel>
+                {ONE_TO_ONE_GROUPS.map((group) => (
+                  <DropdownMenuGroup key={group.scope}>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs">{t(`fieldGroups.${group.scope}`)}</DropdownMenuLabel>
+                    {group.fields.map((p) => (
+                      <DropdownMenuItem
+                        key={p.key}
+                        onSelect={() => editor.chain().focus().insertContent(`{{${p.aliases[0]}}}`).run()}
+                      >
+                        <code className="font-mono text-xs">{`{{${p.aliases[0]}}}`}</code>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuGroup>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Editor area */}

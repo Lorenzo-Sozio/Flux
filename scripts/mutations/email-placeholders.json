@@ -34,5 +34,17 @@
     "description": "il nome completo non toglie piu' la meta' mancante: chi non ha cognome riceve un nome con uno spazio in coda",
     "find": "    fullName: [r.firstName, r.lastName].filter(Boolean).join(\" \"),",
     "replace": "    fullName: `${r.firstName ?? \"\"} ${r.lastName ?? \"\"}`,"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️⚠️ «[numero preventivo]» resta da scrivere a mano anche quando si invia il preventivo",
+    "find": "      return value ? value : whole;",
+    "replace": "      return whole;"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️ un campo del documento rimasto nel testo parte così com'è senza che nessuno lo chieda",
+    "find": " || spec.scope === \"document\"",
+    "replace": ""
   }
 ]

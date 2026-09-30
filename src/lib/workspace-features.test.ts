@@ -31,24 +31,24 @@ beforeEach(async () => {
 
 describe("⚠️⚠️ workspace features", () => {
   it("are all on for a workspace nobody has decided for — what every workspace had before", async () => {
-    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: true });
+    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: true, ai: true });
   });
 
   it("start off for a workspace being born", async () => {
     await db.execute(sql`delete from pipeline_stage`);
     await seedWorkspace(db as never);
-    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: false, chat: false });
+    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: false, chat: false, ai: true });
   });
 
   it("are not touched when an existing workspace is seeded again", async () => {
     // The admin panel's Migrate button seeds every workspace; one with a pipeline is not new.
     await seedWorkspace(db as never);
-    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: true });
+    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: true, ai: true });
   });
 
   it("switch one at a time, and back", async () => {
     await writeWorkspaceFeature(db as never, "chat", false);
-    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: false });
+    expect(await readWorkspaceFeatures(db as never)).toEqual({ projects: true, chat: false, ai: true });
     await writeWorkspaceFeature(db as never, "chat", true);
     expect((await readWorkspaceFeatures(db as never)).chat).toBe(true);
   });
@@ -58,11 +58,11 @@ describe("⚠️⚠️ what switching them off does", () => {
   const actor = { userId: "u1", tenantRole: "owner" as const, isPlatformStaff: false };
 
   it("hides their entries from the menu", () => {
-    const off = computeNavAccess(sidebarItems, { actor, features: { projects: false, chat: false } });
+    const off = computeNavAccess(sidebarItems, { actor, features: { projects: false, chat: false, ai: true } });
     expect(off.hidden).toEqual(
       expect.arrayContaining(["/dashboard/tasks/gantt", "/dashboard/tasks/workload", "/dashboard/chat"]),
     );
-    const on = computeNavAccess(sidebarItems, { actor, features: { projects: true, chat: true } });
+    const on = computeNavAccess(sidebarItems, { actor, features: { projects: true, chat: true, ai: true } });
     expect(on.hidden).not.toContain("/dashboard/chat");
     expect(on.hidden).not.toContain("/dashboard/tasks/gantt");
   });

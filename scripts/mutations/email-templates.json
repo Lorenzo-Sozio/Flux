@@ -1,0 +1,80 @@
+[
+  {
+    "file": "src/lib/email-templates.ts",
+    "description": "⚠️⚠️ la finestra email di un collega mostra i modelli privati di tutti",
+    "find": "    and(eq(emailTemplates.kind, \"personal\"), or(eq(emailTemplates.ownerId, userId), eq(emailTemplates.isPublic, true))),",
+    "replace": "    eq(emailTemplates.kind, \"personal\"),"
+  },
+  {
+    "file": "src/lib/email-templates.ts",
+    "description": "⚠️ la pagina dei modelli mostra le bozze private dei colleghi",
+    "find": "        or(eq(emailTemplates.ownerId, userId), eq(emailTemplates.isPublic, true)),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-templates.ts",
+    "description": "i modelli di campagna finiscono in cima alla finestra email, sopra quelli del commerciale",
+    "find": "      sql`case when ${emailTemplates.kind} = 'personal' then 0 else 1 end`,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-template-rules.ts",
+    "description": "⚠️ un modello privato risulta visibile a chiunque",
+    "find": "  return tpl.ownerId === userId || tpl.isPublic === true;",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/email-template-rules.ts",
+    "description": "⚠️⚠️ chiunque può riscrivere un modello condiviso che tutto il team invia ai clienti",
+    "find": "  return tpl.isPublic === true && actor.manageAny;",
+    "replace": "  return tpl.isPublic === true;"
+  },
+  {
+    "file": "src/lib/email-template-rules.ts",
+    "description": "un modello di campagna si può modificare dalla pagina dei modelli commerciali",
+    "find": "  if (tpl.kind !== \"personal\") return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️⚠️ la finestra svuota i campi del mittente prima che il server li compili: l'email parte senza firma",
+    "find": "    if (value === undefined) return whole;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️ un «[numero fattura]» dimenticato parte al cliente senza che nessuno lo chieda",
+    "find": "  for (const m of text.matchAll(MARKER)) out.add(m[0]);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "un {{trattativa}} scritto fuori da una trattativa parte vuoto senza avviso",
+    "find": "(spec.scope === \"deal\" && !opts.deal) || spec.scope === \"campaign\"",
+    "replace": "spec.scope === \"campaign\""
+  },
+  {
+    "file": "src/lib/email-template-starters.ts",
+    "description": "⚠️⚠️ i modelli di base tornano a chiedere a mano il numero del preventivo che il CRM conosce",
+    "find": "  quoteNumber: \"{{numero_preventivo}}\",",
+    "replace": "  quoteNumber: \"[numero preventivo]\","
+  },
+  {
+    "file": "src/lib/email-template-starters.ts",
+    "description": "⚠️ i modelli di base tornano a chiedere a mano il numero dell'ordine che il CRM conosce",
+    "find": "  orderNumber: \"{{numero_ordine}}\",",
+    "replace": "  orderNumber: \"[numero ordine]\","
+  },
+  {
+    "file": "src/lib/email-template-starters.ts",
+    "description": "⚠️ i modelli di base tornano a chiedere a mano corriere e codice di tracciamento che l'ordine conosce",
+    "find": "  trackingCode: \"{{codice_tracciamento}}\",",
+    "replace": "  trackingCode: \"[codice di tracciamento]\","
+  },
+  {
+    "file": "src/lib/order-shipping.ts",
+    "description": "⚠️ una data di consegna che non esiste (31 febbraio) arriva al cliente in un'email",
+    "find": "  return !Number.isNaN(time) && new Date(time).toISOString().slice(0, 10) === day;",
+    "replace": "  return !Number.isNaN(time);"
+  }
+]

@@ -44,6 +44,7 @@ const DEFAULT_LIMITS: PlanLimits = {
   maxRecords: 5000,
   maxWorkspaces: 1,
   maxIntegrations: 3,
+  aiRequestsPerMonth: 1000,
 };
 
 const DEFAULT_MODULES: PlanModule[] = ["crm", "sales", "support"];
@@ -83,6 +84,8 @@ interface LimitState {
   maxWorkspaces: string;
   maxIntegrations: string;
   maxIntegrationsUnlimited: boolean;
+  aiRequestsPerMonth: string;
+  aiRequestsUnlimited: boolean;
 }
 
 function toLimitState(l: PlanLimits): LimitState {
@@ -99,6 +102,8 @@ function toLimitState(l: PlanLimits): LimitState {
     maxWorkspaces: String(l.maxWorkspaces),
     maxIntegrations: l.maxIntegrations != null ? String(l.maxIntegrations) : "",
     maxIntegrationsUnlimited: l.maxIntegrations === null,
+    aiRequestsPerMonth: l.aiRequestsPerMonth != null ? String(l.aiRequestsPerMonth) : "",
+    aiRequestsUnlimited: l.aiRequestsPerMonth === null,
   };
 }
 
@@ -111,6 +116,7 @@ function toLimitsJson(s: LimitState): string {
     maxRecords: s.maxRecordsUnlimited ? null : Number(s.maxRecords) || 0,
     maxWorkspaces: Number(s.maxWorkspaces) || 1,
     maxIntegrations: s.maxIntegrationsUnlimited ? null : Number(s.maxIntegrations) || 0,
+    aiRequestsPerMonth: s.aiRequestsUnlimited ? null : Number(s.aiRequestsPerMonth) || 0,
   } satisfies PlanLimits);
 }
 
@@ -186,6 +192,9 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
   function patchLimit<K extends keyof LimitState>(k: K, v: LimitState[K]) {
     setLimits((p) => ({ ...p, [k]: v }));
   }
+
+  // The copilot is stored with the modules but set from the Features tab, as a flag.
+  const productModules = ALL_MODULES.filter((m) => modules.has(m.id)).length;
 
   function toggleModule(mod: PlanModule) {
     setModules((prev) => {
@@ -457,7 +466,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {modules.size} module{modules.size !== 1 ? "s" : ""} selected.
+              {productModules} module{productModules !== 1 ? "s" : ""} selected.
             </p>
           </TabsContent>
 
@@ -520,6 +529,14 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               onValue={(v) => patchLimit("maxIntegrations", v)}
               onUnlimited={(v) => patchLimit("maxIntegrationsUnlimited", v)}
             />
+            <LimitField
+              label="AI copilot requests / month"
+              value={limits.aiRequestsPerMonth}
+              unlimited={limits.aiRequestsUnlimited}
+              unit="requests"
+              onValue={(v) => patchLimit("aiRequestsPerMonth", v)}
+              onUnlimited={(v) => patchLimit("aiRequestsUnlimited", v)}
+            />
           </TabsContent>
 
           {/* ─── Features ────────────────────────────────────────────────── */}
@@ -553,6 +570,12 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
                 description="Isolated test instance mirroring the production tenant."
                 checked={hasSandbox}
                 onChange={setHasSandbox}
+              />
+              <ToggleRow
+                label="AI copilot"
+                description="Drafts, summaries and briefings for the workspace's people, each confirmed by a person. Needs an AI provider configured on the deployment; the monthly requests are set in Limits."
+                checked={modules.has("ai")}
+                onChange={() => toggleModule("ai")}
               />
             </div>
           </TabsContent>

@@ -14,7 +14,7 @@ import { platformDb } from "@/db";
 import { billingAuditLog, billingPlans, billingSubscriptions, billingTenantAddons } from "@/db/schema";
 import { serverT } from "@/lib/i18n-server";
 
-import type { PlanLimits, PlanModule, SubscriptionStatus } from "./plans-config";
+import { effectiveLimits, type PlanLimits, type PlanModule, type SubscriptionStatus } from "./plans-config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +81,7 @@ function freePlanEntitlements(tenantId: string): TenantEntitlements {
       maxRecords: 500,
       maxWorkspaces: 1,
       maxIntegrations: 1,
+      aiRequestsPerMonth: 0,
     },
     addons: [],
     isActive: true,
@@ -143,7 +144,7 @@ async function computeEntitlements(tenantId: string): Promise<TenantEntitlements
     hasWhiteLabel,
     hasSandbox,
     supportTier: plan.supportTier,
-    limits: { ...baseLimits, maxUsers: effectiveMaxUsers },
+    limits: effectiveLimits(baseLimits, effectiveMaxUsers),
     addons: addons.map((a) => ({ type: a.addonType, quantity: a.quantity })),
     isActive,
     isSuspended,

@@ -38,7 +38,7 @@ vi.mock("@/lib/app-url", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("next/server", () => ({ after: () => undefined }));
 
-const { sendQuoteEmailAction } = await import("./quotes");
+const { previewQuoteEmailAction, sendQuoteEmailAction } = await import("./quotes");
 
 beforeEach(() => {
   sendOk = true;
@@ -62,11 +62,12 @@ beforeEach(() => {
 
 describe("⚠️⚠️ sendQuoteEmailAction", () => {
   it("a follow-up on an opened quote is sent and logged as a reminder, with no error", async () => {
-    await expect(sendQuoteEmailAction("q1", "cliente@x.it", "Sollecito", "Domande?")).resolves.toEqual({
-      success: true,
-    });
+    await expect(
+      sendQuoteEmailAction("q1", { to: "cliente@x.it", subject: "Sollecito", bodyHtml: "<p>Domande?</p>" }),
+    ).resolves.toEqual({ success: true });
     expect(sent).toHaveLength(1);
-    expect(logged.map((l) => l.type)).toEqual(["reminded"]);
+    // On the customer's timeline as an email, and on the quote as a reminder.
+    expect(logged.map((l) => l.type)).toEqual(["email", "reminded"]);
     expect(updates).toEqual([]);
   });
 
@@ -75,7 +76,9 @@ describe("⚠️⚠️ sendQuoteEmailAction", () => {
     quote.status = "draft";
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(sendQuoteEmailAction("q1", "cliente@x.it", "Preventivo", "")).rejects.toThrow("smtp down");
+    const result = await sendQuoteEmailAction("q1", { to: "cliente@x.it", subject: "Preventivo", bodyHtml: "" });
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error).toContain("smtp down");
     expect(logged).toEqual([]);
     expect(updates).toEqual([]);
     error.mockRestore();
@@ -85,8 +88,39 @@ describe("⚠️⚠️ sendQuoteEmailAction", () => {
     quote.status = "accepted";
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(sendQuoteEmailAction("q1", "cliente@x.it", "Preventivo", "")).rejects.toThrow();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const result = await sendQuoteEmailAction("q1", { to: "cliente@x.it", subject: "Preventivo", bodyHtml: "" });
+    expect(result.success).toBe(false);
     expect(sent).toEqual([]);
+    warn.mockRestore();
     error.mockRestore();
+  });
+});
+
+describe("⚠️ what the customer receives", () => {
+  it("the person's text, then the quote's number, total and the link that opens it", async () => {
+    await sendQuoteEmailAction("q1", {
+      to: "cliente@x.it",
+      cc: "ufficio@x.it",
+      subject: "Il preventivo",
+      bodyHtml: "<p>Gentile cliente, ecco la proposta.</p>",
+    });
+    const email = sent[0] as { html: string; cc?: string };
+    expect(email.html.indexOf("ecco la proposta")).toBeLessThan(email.html.indexOf("P-2026-001"));
+    expect(email.html).toContain("https://crm.example.it/q/tok");
+    expect(email.cc).toBe("ufficio@x.it");
+  });
+
+  it("⚠️ the preview is the same email — quote box and link included — and sends nothing", async () => {
+    const shown = await previewQuoteEmailAction("q1", {
+      subject: "Il preventivo",
+      bodyHtml: "<p>Ecco la proposta.</p>",
+    });
+    expect(shown.ok).toBe(true);
+    const html = shown.ok ? shown.html : "";
+    expect(html.indexOf("Ecco la proposta")).toBeLessThan(html.indexOf("P-2026-001"));
+    expect(html).toContain("https://crm.example.it/q/tok");
+    expect(sent).toHaveLength(0);
+    expect(updates).toHaveLength(0);
   });
 });

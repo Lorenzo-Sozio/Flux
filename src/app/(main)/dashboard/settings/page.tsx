@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CreditCard,
   FileInput,
+  FileText,
   GitMerge,
   KeyRound,
   ListTree,
@@ -39,6 +40,7 @@ export default async function SettingsPage() {
 
   const t = await getTranslations("settings");
   const tMacros = await getTranslations("support.macros");
+  const tTemplates = await getTranslations("emailTemplates");
 
   // Pipeline stages and macros used to live only at their URL: absent from the
   // sidebar AND from this index, so configuring the pipeline — the first thing
@@ -128,6 +130,14 @@ export default async function SettingsPage() {
       title: t("customFields.title"),
       description: t("customFields.description"),
       need: "customField:manage",
+    },
+    {
+      // The text an email to a customer starts from: everybody's, since everybody writes them.
+      href: "/dashboard/settings/email-templates",
+      icon: FileText,
+      title: tTemplates("title"),
+      description: tTemplates("subtitle"),
+      need: "record:read",
     },
     {
       href: "/dashboard/settings/email",

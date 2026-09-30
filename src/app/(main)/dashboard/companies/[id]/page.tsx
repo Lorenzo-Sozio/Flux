@@ -35,10 +35,12 @@ import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/compa
 import { DealAmount } from "@/app/(main)/dashboard/pipeline/[id]/_components/deal-amount";
 import { CashError } from "@/app/(main)/dashboard/sales/finance/_components/cash-card";
 import { auth } from "@/auth";
+import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { CustomerMoneyCard } from "@/components/crm/customer-money-card";
 import { CustomerRecordPanel } from "@/components/crm/customer-record";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import {
@@ -61,10 +63,11 @@ import { RecordVisit } from "@/components/crm/record-visit";
 import { TaskDoneButton } from "@/components/crm/task-done-button";
 import { TaskModal } from "@/components/crm/task-modal";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts, deals, tickets } from "@/db/schema";
+import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { customerGaps } from "@/lib/fiscal-ids";
 import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { can } from "@/lib/permissions";
@@ -124,6 +127,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   // A viewer reads the account; controls that would only answer "forbidden" are
   // not drawn for them.
   const canWrite = can(tenantRole, "record:write");
+  const ai = canWrite ? await aiEntries(["summary"] as const, aiViewer(session?.user)) : {};
   const db = await getDb();
 
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
@@ -385,11 +389,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </Button>
           )}
           {person.email && (
-            <Button asChild size="icon" variant="ghost" className="size-9 max-md:size-11">
-              <a href={`mailto:${person.email}`} aria-label={tS("emailPerson", { name })} title={person.email}>
-                <MailIcon className="size-4" aria-hidden />
-              </a>
-            </Button>
+            <EmailAddressButton
+              email={person.email}
+              entity={{ ...person, companyName: company.name }}
+              entityType="contact"
+              canSend={canWrite}
+              label={tS("emailPerson", { name })}
+              title={person.email}
+              className={buttonVariants({ size: "icon", variant: "ghost", className: "size-9 max-md:size-11" })}
+            >
+              <MailIcon className="size-4" aria-hidden />
+            </EmailAddressButton>
           )}
         </div>
       </li>
@@ -523,9 +533,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           </Field>
           <Field label={tD("fieldEmail")}>
             {company.mainEmail && (
-              <a href={`mailto:${company.mainEmail}`} className="break-all text-primary hover:underline">
-                {company.mainEmail}
-              </a>
+              <EmailAddressButton
+                email={company.mainEmail}
+                entity={company}
+                entityType="company"
+                canSend={canWrite}
+                className="break-all text-primary hover:underline"
+              />
             )}
           </Field>
           <Field label={tD("fieldWebsite")}>
@@ -741,12 +755,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               </Button>
             )}
             {company.mainEmail ? (
-              <Button asChild size="sm" variant="outline">
-                <a href={`mailto:${company.mainEmail}`}>
-                  <MailIcon className="size-3.5" aria-hidden />
-                  {tR("email")}
-                </a>
-              </Button>
+              <EmailAddressButton
+                email={company.mainEmail}
+                entity={company}
+                entityType="company"
+                canSend={canWrite}
+                className={buttonVariants({ size: "sm", variant: "outline" })}
+              >
+                <MailIcon className="size-3.5" aria-hidden />
+                {tR("email")}
+              </EmailAddressButton>
             ) : (
               websiteHref && (
                 <Button asChild size="sm" variant="outline">
@@ -838,6 +856,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             column: "side",
             node: <CustomerRecordPanel record={record} companyId={companyId} canWrite={canWrite} />,
           },
+          ...(ai.summary
+            ? [
+                {
+                  tab: "activity",
+                  column: "side" as const,
+                  node: <AiSummaryCard subject={{ type: "company", id: companyId }} entry={ai.summary} />,
+                },
+              ]
+            : []),
           { tab: "details", column: "side", node: details },
           { tab: "details", column: "side", node: billing },
           {

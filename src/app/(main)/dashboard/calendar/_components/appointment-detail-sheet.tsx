@@ -49,6 +49,7 @@ import {
   setAppointmentCompleted,
   setAttendeeStatus,
 } from "@/actions/appointments";
+import { AiBriefing } from "@/components/crm/ai/ai-briefing";
 import { RecordVisit } from "@/components/crm/record-visit";
 import {
   AlertDialog,
@@ -71,6 +72,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { AiEntry } from "@/lib/ai/types";
 import { entityHref } from "@/lib/entities";
 import { parseRRule } from "@/lib/recurrence";
 import { describeRecurrence } from "@/lib/recurrence-text";
@@ -162,7 +164,10 @@ export function AppointmentDetailSheet({
   canWrite,
   canDelete,
   timeZone,
+  aiBriefing,
 }: {
+  /** Offer the copilot's briefing for an appointment linked to a record (Fase 5, C3). */
+  aiBriefing?: AiEntry;
   canWrite: boolean;
   canDelete: boolean;
   /** The workspace's zone: every time here is shown on its clock. */
@@ -800,6 +805,13 @@ export function AppointmentDetailSheet({
                     <p className="mt-2 text-muted-foreground text-xs">{t("detail.seriesAnswers")}</p>
                   )}
                 </section>
+
+                {/* The copilot's briefing: only with a record to brief from. */}
+                {aiBriefing && shown.link && (
+                  <div className="border-t px-5 py-4">
+                    <AiBriefing key={shown.id} appointmentId={shown.id} entry={aiBriefing} />
+                  </div>
+                )}
 
                 {/* Notes */}
                 {shown.description && (

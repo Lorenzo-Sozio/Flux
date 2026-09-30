@@ -2568,7 +2568,15 @@
       "link": "Link",
       "undo": "Undo",
       "redo": "Redo",
-      "variables": "Var:"
+      "variables": "Var:",
+      "insertField": "Insert field",
+      "insertFieldHint": "Filled in with the recipient's data when sent",
+      "fieldGroups": {
+        "recipient": "Recipient",
+        "sender": "Sender (you)",
+        "deal": "Deal (only from its page)",
+        "document": "Document (from a quote, an invoice, an order, a contract or a request)"
+      }
     },
     "sendEmailModal": {
       "emptyBody": "Email body cannot be empty.",
@@ -2590,7 +2598,47 @@
       "htmlComment": "Paste or write your HTML here",
       "htmlGreeting": "Hello {name},",
       "tip": "Tip: use <code>{first}</code>, <code>{last}</code>, <code>{company}</code> as placeholders",
-      "discard": "Discard"
+      "discard": "Discard",
+      "to": "To",
+      "cc": "Cc",
+      "bcc": "Bcc",
+      "copiesPlaceholder": "Addresses, separated by commas",
+      "writeWithAi": "Write with AI",
+      "savedAt": "Draft saved at {time}",
+      "restored": "Draft restored from {time}.",
+      "discardDraft": "Discard draft",
+      "designedHint": "Designed template: edit the text directly in the preview.",
+      "plainEmail": "Write a plain email instead",
+      "bodyPlaceholder": "Write your message…",
+      "footerHint": "Fields like '{{nome}}' are filled in when the email is sent · Ctrl+Enter to send",
+      "invalidCopies": "Not valid email addresses: {list}",
+      "tooManyCopies": "At most {max} addresses in copy.",
+      "bccNotFromMailbox": "Bcc is not available when sending from your connected mailbox: add those addresses in Cc, or send them separately.",
+      "mailboxFailed": "Your mailbox did not send it: {error}",
+      "providerFailed": "The email was not sent: {error}",
+      "replaceTitle": "Replace the text?",
+      "replaceDescription": "The template “{name}” will replace the subject and text you have already written.",
+      "replaceCancel": "Keep my text",
+      "replaceConfirm": "Use the template",
+      "unfilledTitle": "Some parts are still to be filled in",
+      "unfilledDescription": "These would reach the customer exactly as they are. Fill them in, or send anyway.",
+      "unfilledBack": "Go back and fill in",
+      "unfilledSendAnyway": "Send anyway",
+      "toPlaceholder": "address@customer.com",
+      "invalidTo": "Type a valid email address.",
+      "noDefaultTo": "The customer has no address: type the one to send it to.",
+      "partsLabel": "Added",
+      "partsHint": "automatically below your text when it is sent.",
+      "loadingText": "Preparing the text…",
+      "loadFailed": "The text could not be prepared: write it yourself or pick a template.",
+      "partsSeePreview": "See the preview",
+      "preview": "Preview",
+      "backToEdit": "Edit",
+      "previewTitle": "What the customer will receive",
+      "previewHint": "The fields are filled with the recipient's, your own and the document's details; below the text is what the CRM adds automatically. Links open in a new tab.",
+      "previewAttachments": "Attachments",
+      "previewUnfilled": "Still to fill in before sending: {list}",
+      "previewFailed": "The preview could not be prepared."
     },
     "emailBuilder": {
       "blocks": {
@@ -2896,7 +2944,8 @@
       "webForms": "Forms",
       "supportAgents": "Support by agent",
       "commissions": "Commissions",
-      "bank": "Bank"
+      "bank": "Bank",
+      "emailTemplates": "Email templates"
     },
     "user": {
       "profile": "Profile",
@@ -3076,7 +3125,8 @@
       "needALine": "Add at least one line: pick a product or describe what it is for.",
       "created": "Order {number} created.",
       "createFailed": "Could not create the order.",
-      "currency": "Currency"
+      "currency": "Currency",
+      "expectedDeliveryDate": "Expected delivery"
     },
     "detail": {
       "back": "Back to orders",
@@ -3155,7 +3205,22 @@
       "goesToInvoice": "Goes to invoice {number}.",
       "goesToOrder": "No invoice issued: it stays as a deposit on the order and reaches the invoice once issued."
     },
-    "toInvoiceFilter": "To invoice"
+    "toInvoiceFilter": "To invoice",
+    "shipping": {
+      "title": "Shipping",
+      "expectedDelivery": "Expected delivery",
+      "carrier": "Carrier",
+      "trackingCode": "Tracking code",
+      "carrierPlaceholder": "E.g. UPS, DHL, FedEx",
+      "trackingPlaceholder": "The code to follow the shipment",
+      "edit": "Edit",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Shipping updated.",
+      "saveFailed": "The shipping details could not be saved.",
+      "empty": "No shipping details.",
+      "hint": "Emails written from the order carry these details automatically."
+    }
   },
   "record": {
     "sectionsLabel": "Record sections",
@@ -3933,20 +3998,9 @@
     "sendEmail": {
       "title": "Send quote by email",
       "description": "Send this quote to your customer to review and accept",
-      "recipient": "Recipient email",
-      "recipientPlaceholder": "customer@example.com",
-      "subject": "Subject",
-      "subjectPlaceholder": "Your quote",
-      "message": "Message (optional)",
-      "messagePlaceholder": "Add a personal message to include in the email…",
-      "defaultSubject": "Your quote",
-      "defaultMessage": "Please review the attached quote and let me know if you have any questions.",
-      "invalidEmail": "Invalid email address",
-      "subjectRequired": "Subject is required",
-      "cancel": "Cancel",
       "submit": "Send quote",
       "sent": "Quote sent.",
-      "sendFailed": "Could not send the quote."
+      "partLink": "A box with the total and a button to open quote {number} online"
     },
     "list": {
       "printPdf": "Print / PDF",
@@ -4767,7 +4821,8 @@
           "automationRunsPerMonth": "Automation Runs",
           "maxUsers": "Users",
           "maxRecords": "Records",
-          "maxIntegrations": "Integrations"
+          "maxIntegrations": "Integrations",
+          "aiRequestsPerMonth": "AI copilot requests"
         }
       },
       "plans": {
@@ -4794,7 +4849,8 @@
           "support": "Support Tickets",
           "automation": "Automation",
           "reporting": "Advanced Reports",
-          "helpdesk": "Helpdesk"
+          "helpdesk": "Helpdesk",
+          "ai": "AI copilot"
         }
       },
       "addons": {
@@ -4963,6 +5019,10 @@
       "chat": {
         "label": "Internal chat",
         "help": "Direct and group messages between colleagues, with the window at the bottom of every page. Off, the page and the window disappear and stop polling the server every thirty seconds."
+      },
+      "ai": {
+        "label": "AI copilot",
+        "help": "Drafts, summaries and briefings prepared by an AI model from the workspace's records; every one is confirmed by a person, and nothing is sent or saved by itself. Off, nobody in the workspace sees it and nothing is sent to the model."
       },
       "saved": "Setting saved.",
       "failed": "The setting could not be saved. Please try again."
@@ -6225,7 +6285,19 @@
     "markAllRead": "Mark all read",
     "markRead": "Mark as read",
     "empty": "No notifications yet",
-    "settings": "Notification settings"
+    "settings": "Notification settings",
+    "description": "Alerts about tasks, deals, tickets, quotes and invoices.",
+    "markAllReadShort": "Mark read",
+    "filterAll": "All",
+    "filterUnread": "To read",
+    "emptyUnread": "You have read everything.",
+    "unread": "Unread",
+    "days": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "week": "Last 7 days",
+      "older": "Older"
+    }
   },
   "contracts": {
     "title": "Contracts",
@@ -6687,18 +6759,15 @@
       "send": "Send to customer",
       "sendTitle": "Send the courtesy copy",
       "sendDescription": "The customer receives the PDF as an attachment, from the sender set in Settings › Email. The message says the copy has no fiscal value.",
-      "recipient": "Recipient",
-      "recipientPlaceholder": "accounts@customer.com",
-      "noCustomerEmail": "The company has no main email: type the address to send it to.",
       "sendButton": "Send",
-      "cancel": "Cancel",
       "sent": "Courtesy copy sent to {to}.",
       "archivedOn": "XML and PDF archived on {when}",
       "notArchived": "Files not archived yet.",
       "archiveNow": "Archive now",
       "archivedToast": "XML and PDF archived.",
       "archiveFailed": "Archiving failed.",
-      "emailedOn": "Sent on {when} to {to}"
+      "emailedOn": "Sent on {when} to {to}",
+      "partPdf": "Invoice {number} as PDF (courtesy copy)"
     },
     "credit": {
       "button": "Credit note",
@@ -6830,12 +6899,9 @@
       "button": "Send reminder",
       "title": "Payment reminder",
       "description": "The customer receives a polite reminder for {amount} overdue, in their language, with the courtesy copy attached and, for bank transfers, the IBAN. It says to disregard it if they have already paid.",
-      "recipient": "Recipient",
-      "noCustomerEmail": "The company has no main email: type the accounts department's address.",
-      "cancel": "Cancel",
       "send": "Send reminder",
       "sent": "Reminder sent to {to}.",
-      "failed": "The reminder could not be sent."
+      "partPdf": "Invoice as PDF (courtesy copy)"
     },
     "sdi": {
       "failed": "The operation did not succeed.",
@@ -7968,7 +8034,8 @@
         "support": "Support",
         "automation": "Automation",
         "reporting": "Reporting",
-        "helpdesk": "Helpdesk"
+        "helpdesk": "Helpdesk",
+        "ai": "AI copilot"
       },
       "metrics": {
         "maxUsers": "users",
@@ -7977,7 +8044,8 @@
         "automationRunsPerMonth": "monthly automation runs",
         "maxRecords": "records",
         "maxWorkspaces": "workspaces",
-        "maxIntegrations": "integrations"
+        "maxIntegrations": "integrations",
+        "aiRequestsPerMonth": "monthly AI copilot requests"
       }
     },
     "auth": {
@@ -8176,6 +8244,14 @@
       "unavailable": "The intermediary is not answering: try again in a few minutes. {detail}",
       "rate_limited": "Too many requests to the intermediary: try again in a minute.",
       "account": "Choose the Fatture in Cloud company: the token reaches more than one (or none). {detail}"
+    },
+    "quotes": {
+      "notFound": "The quote no longer exists.",
+      "forbidden": "You can send only your own quotes, unless you manage everybody's.",
+      "notSendable": "The quote cannot be sent: it cannot be sent in its current status, or it is waiting for approval."
+    },
+    "orders": {
+      "shippingDateInvalid": "The expected delivery date is not a valid day."
     }
   },
   "validation": {
@@ -9327,5 +9403,312 @@
     "bankLinked": "The money comes from the bank statement and stays recorded: {amount} returns to the customer's credit, to use on another invoice or refund. To undo the match with the bank line, use the Bank page.",
     "cancel": "Cancel",
     "confirm": "Take the payment back"
+  },
+  "aiCopilot": {
+    "errors": {
+      "off": "The AI copilot is not configured on this installation.",
+      "config": "The AI copilot is configured incorrectly on this installation: ask whoever runs Flux.",
+      "no_workspace": "Open a workspace to use the AI copilot.",
+      "inactive": "Your subscription is not active, so the AI copilot is unavailable.",
+      "plan": "Your plan does not include the AI copilot.",
+      "workspace": "An administrator has switched the AI copilot off for this workspace.",
+      "limit": "This month's AI copilot requests are used up.",
+      "auth": "The AI provider refused this installation's key: ask whoever runs Flux.",
+      "model": "The configured AI model is not available: ask whoever runs Flux to change it.",
+      "invalid": "The AI provider refused the request.",
+      "blocked": "The AI provider's filters stopped this answer.",
+      "rate_limited": "The AI provider is busy. Try again in a minute.",
+      "unavailable": "The AI provider did not answer. Try again in a moment.",
+      "output": "The AI answer could not be used. Try again.",
+      "not_found": "This record no longer exists.",
+      "no_record": "This appointment is not linked to a deal, contact, lead or company, so there is nothing to brief from.",
+      "unknown": "The AI copilot could not answer. Try again."
+    },
+    "result": {
+      "disclaimer": "Written by AI from this record: check it before you rely on it.",
+      "useful": "Useful",
+      "notUseful": "Not useful",
+      "regenerate": "Try again",
+      "copy": "Copy",
+      "copied": "Copied",
+      "thanks": "Thanks, noted."
+    },
+    "summary": {
+      "title": "AI summary",
+      "hint": "Where things stand, what the customer wants, what is open — from this record's history.",
+      "generate": "Summarise with AI",
+      "generating": "Summarising…"
+    },
+    "briefing": {
+      "title": "AI briefing",
+      "hint": "Who you are meeting, where things stand and what to aim for, from the linked record.",
+      "generate": "Prepare a briefing",
+      "generating": "Preparing…"
+    },
+    "draft": {
+      "title": "Write with AI",
+      "instructionsLabel": "What should the email say?",
+      "instructionsPlaceholder": "e.g. thank them for the meeting and propose a demo next week",
+      "write": "Write a draft",
+      "rewrite": "Rewrite",
+      "writing": "Writing…",
+      "rewriteHint": "Rewrites the email in the editor following your request, keeping its facts.",
+      "inserted": "Draft inserted: read it through before you send it.",
+      "unverified": "Check these figures: they are not in this record's data — {figures}",
+      "placeholderHint": "Fill in every {placeholder} before sending.",
+      "titleRewrite": "Rewrite with AI",
+      "close": "Close",
+      "failed": "The AI copilot could not answer. Try again.",
+      "rewritePlaceholder": "How should it change? e.g. make it warmer and mention the demo",
+      "actions": {
+        "followUp": {
+          "label": "Follow-up",
+          "request": "A short follow-up on where things stand, asking about the next step."
+        },
+        "meeting": {
+          "label": "Propose a meeting",
+          "request": "Propose a short call or meeting to move things forward; leave the date to be completed."
+        },
+        "thanks": {
+          "label": "Thank you",
+          "request": "Thank them for the latest contact and sum up what was agreed, if anything."
+        },
+        "reply": {
+          "label": "Reply to last email",
+          "request": "Reply to the customer's most recent email."
+        },
+        "shorter": {
+          "label": "Shorter",
+          "request": "Make it shorter and more direct, keeping every fact."
+        },
+        "formal": {
+          "label": "More formal",
+          "request": "Make the tone more formal and professional."
+        },
+        "friendly": {
+          "label": "Warmer",
+          "request": "Make the tone warmer and more personal, still professional."
+        },
+        "proofread": {
+          "label": "Fix mistakes",
+          "request": "Only correct grammar, spelling and punctuation; change nothing else."
+        }
+      }
+    },
+    "unavailable": {
+      "off": "AI copilot not configured on this installation: set GEMINI_API_KEY on the server, then enable the AI copilot flag in the plan (/admin/plans).",
+      "config": "AI copilot configured incorrectly on the server: check AI_PROVIDER, AI_MODEL and the provider's key.",
+      "plan": "Your plan does not include the AI copilot."
+    }
+  },
+  "emailTemplates": {
+    "title": "Email templates",
+    "subtitle": "The text an email to a customer starts from: yours and the ones your team shares. Fields such as the recipient's name are filled in when the email is sent.",
+    "search": "Search by name, subject or text",
+    "new": "New template",
+    "newTitle": "New template",
+    "editTitle": "Edit template",
+    "editorHint": "Use “Insert field” for the recipient's details: they are filled in for each email.",
+    "allCategories": "All",
+    "mine": "My templates ({count})",
+    "team": "Shared by the team ({count})",
+    "noMatch": "No template matches the search.",
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "copyOf": "Copy of {name}",
+    "sharedBadge": "Shared",
+    "used": "Used {count, plural, one {# time} other {# times}} · {when}",
+    "neverUsed": "Never used",
+    "by": "By {name}",
+    "saved": "Template saved.",
+    "deleted": "Template deleted.",
+    "deleteTitle": "Delete the template?",
+    "deleteDescription": "“{name}” will be deleted. Emails already sent do not change.",
+    "deleteSharedDescription": "“{name}” is shared: it disappears for the rest of the team too. Emails already sent do not change.",
+    "categories": {
+      "followup": "Follow-up",
+      "quote": "Quote",
+      "meeting": "Meeting",
+      "thanks": "Thank you",
+      "intro": "Introduction",
+      "other": "Other",
+      "deal": "Deal",
+      "order": "Order",
+      "contract": "Contract",
+      "invoice": "Invoices and payments",
+      "support": "Support"
+    },
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "e.g. Follow-up after the demo",
+      "category": "Category",
+      "subject": "Subject",
+      "subjectPlaceholder": "The email's subject",
+      "body": "Text",
+      "bodyPlaceholder": "Write the template's text…",
+      "shared": "Share with the team",
+      "sharedHint": "Everyone in the workspace can use it; only you and administrators can change it."
+    },
+    "empty": {
+      "title": "No templates yet",
+      "description": "Create the emails you write most often and find them ready in the “Send email” dialog. The basic templates cover the whole cycle: first contact, meetings, quotes, deals, orders, contracts, invoices and payments, support.",
+      "starters": "Create the basic templates"
+    },
+    "starters": {
+      "created": "{count, plural, one {Created # template} other {Created # templates}}: edit them as you like.",
+      "introduction": {
+        "name": "First contact",
+        "subject": "{company} and {senderCompany}",
+        "body": "Dear {first},\n\nmy name is {sender} and I look after [area] at {senderCompany}. I am writing because we work with companies like {company} to [main benefit].\n\nWould you be open to a short 15-minute call to see whether we could help?\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "followup": {
+        "name": "Follow-up after a conversation",
+        "subject": "Following up on our conversation",
+        "body": "Dear {first},\n\nthank you for your time. As promised, here is a summary of what we discussed: [main points].\n\nLet me know if you have any questions, or if you would like to talk it through.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "noReply": {
+        "name": "No reply: second attempt",
+        "subject": "Picking up where we left off, {first}",
+        "body": "Dear {first},\n\nI wrote to you a few days ago about [topic], and I imagine it has been a busy time.\n\nIs this still something you are working on? If now is not the right moment, just let me know and I will get back in touch later.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "meeting": {
+        "name": "Asking for a meeting",
+        "subject": "Could we have a quick call?",
+        "body": "Dear {first},\n\nI would like to suggest a short meeting to understand the needs of {company} better and how we can help.\n\nWould you be available in the coming days? Let me know what suits you best, or I could suggest [day and time].\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "meetingConfirm": {
+        "name": "Meeting confirmation",
+        "subject": "Confirming our meeting",
+        "body": "Dear {first},\n\nI am confirming our meeting on [day and time], [place or video call link].\n\nIf you have any questions in the meantime, or need to move it, just write to me at {senderEmail}.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "meetingRecap": {
+        "name": "Recap after a meeting",
+        "subject": "Recap of our meeting",
+        "body": "Dear {first},\n\nthank you for today's meeting. Here is what we agreed:\n- [point 1]\n- [point 2]\n\nAs next steps, [who does what, by when]. Let me know if I have missed anything.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "quote": {
+        "name": "Sending a quote",
+        "subject": "Our proposal for {company}",
+        "body": "Dear {first},\n\nas agreed, please find our proposal for {company} (quote {quoteNumber}), valid until {dueDate}.\n\nI am happy to answer any questions and, if useful, to go through it together.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "quoteFollowup": {
+        "name": "Quote follow-up",
+        "subject": "Have you had a chance to look at our proposal?",
+        "body": "Dear {first},\n\nI wanted to check whether you have had a chance to review quote {quoteNumber} that I sent you.\n\nIf something does not work for you, or you would like to change any item, I would be glad to discuss it.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "quoteExpiring": {
+        "name": "Quote about to expire",
+        "subject": "Our proposal expires on {dueDate}",
+        "body": "Dear {first},\n\na quick reminder that quote {quoteNumber} is valid until {dueDate}.\n\nIf you would like to go ahead, or need more time to decide, just let me know.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "quoteAccepted": {
+        "name": "Quote accepted: next steps",
+        "subject": "Thank you for accepting our proposal",
+        "body": "Dear {first},\n\nthank you for accepting our proposal: we are delighted to be working with {company}.\n\nThe next steps are: [next steps]. I remain your point of contact for anything you need.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "dealWon": {
+        "name": "Welcome aboard",
+        "subject": "Welcome, {first}!",
+        "body": "Dear {first},\n\nit is a pleasure to get {deal} under way with {company}. Here is how we will proceed: [organisation and contacts].\n\nWe will be in touch by [date] for [first step]. In the meantime, you can reach me at {senderEmail}.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "dealLost": {
+        "name": "Deal not won: door open",
+        "subject": "Thank you for considering us",
+        "body": "Dear {first},\n\nthank you for considering us for {deal}. I understand your decision and wish you every success.\n\nIf the needs of {company} change in the future, I would be happy to pick up the conversation. Would it be all right if I got back in touch in a few months?\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "orderConfirm": {
+        "name": "Order confirmation",
+        "subject": "Confirming your order {orderNumber}",
+        "body": "Dear {first},\n\nI confirm that we have received order {orderNumber}. Delivery is expected on {deliveryDate}.\n\nI will keep you updated on its progress; let me know if you need anything.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "orderShipped": {
+        "name": "Order shipped",
+        "subject": "Your order {orderNumber} is on its way",
+        "body": "Dear {first},\n\norder {orderNumber} has been shipped with {carrier}; you can track it with code {trackingCode}.\n\nIf anything is not right when it arrives, please write to me straight away.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "contractSend": {
+        "name": "Contract to sign",
+        "subject": "The contract for signature",
+        "body": "Dear {first},\n\nas agreed, please find contract {contractReference} for {company}.\n\nCould you return it signed by [date]? If you would like to review any clause, I am happy to discuss it.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "contractRenewal": {
+        "name": "Contract up for renewal",
+        "subject": "Your contract expires on {contractEndDate}",
+        "body": "Dear {first},\n\ncontract {contractReference} with {company} expires on {contractEndDate}.\n\nI would like to set up a short meeting to review the past year and the renewal terms. When would suit you?\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "invoiceSend": {
+        "name": "Sending an invoice",
+        "subject": "Invoice {invoiceNumber}",
+        "body": "Dear {first},\n\nplease find attached a courtesy copy of invoice {invoiceNumber} for {amount}, due on {dueDate}.\n\nIf you have any questions about the invoice, I am at your disposal.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "paymentReminder": {
+        "name": "Payment reminder",
+        "subject": "Reminder: invoice {invoiceNumber} due soon",
+        "body": "Dear {first},\n\na friendly reminder that invoice {invoiceNumber} for {amount} is due on {dueDate}.\n\nIf you have already paid, please disregard this message. Thank you!\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "paymentOverdue": {
+        "name": "Overdue payment",
+        "subject": "Overdue: invoice {invoiceNumber}",
+        "body": "Dear {first},\n\nour records show that invoice {invoiceNumber} for {amount}, due on {dueDate}, is still unpaid.\n\nCould you please check and arrange payment as soon as possible (IBAN {iban})? If there is a problem, write to me and we will find a solution together.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "paymentReceived": {
+        "name": "Payment received",
+        "subject": "Payment received, thank you",
+        "body": "Dear {first},\n\nI confirm that we have received your payment of {amount} for invoice {invoiceNumber}. Thank you!\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "supportAck": {
+        "name": "Request received",
+        "subject": "We are looking into your request",
+        "body": "Dear {first},\n\nwe have received your report about {ticketSubject} and are working on it.\n\nWe will update you within [response time]. If you have any other useful details in the meantime, just reply to this email.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "supportResolved": {
+        "name": "Request resolved",
+        "subject": "Your request has been resolved",
+        "body": "Dear {first},\n\nyour request about {ticketSubject} has been resolved: [solution].\n\nIf the problem comes back, reply to this email and we will pick it up from here.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "reviewRequest": {
+        "name": "Asking for a review",
+        "subject": "Your opinion would mean a lot to us",
+        "body": "Dear {first},\n\nI hope you are happy working with {senderCompany}. If you have a minute, a review from you would help us a great deal: [review link].\n\nAnd if you know anyone we could help, we would be grateful for an introduction.\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "reactivation": {
+        "name": "Reconnecting with a customer",
+        "subject": "It has been a while, {first}",
+        "body": "Dear {first},\n\nit has been a while since we last spoke, and I wanted to see how things are going at {company}.\n\nWe have since introduced [what is new]. Would you be up for a quick catch-up?\n\nKind regards,\n{sender}\n{senderCompany}"
+      },
+      "thanks": {
+        "name": "Thank you",
+        "subject": "Thank you, {first}",
+        "body": "Dear {first},\n\nthank you for placing your trust in {senderCompany}.\n\nIf there is anything we can do for you, please do not hesitate to write to me.\n\nKind regards,\n{sender}\n{senderCompany}"
+      }
+    },
+    "picker": {
+      "trigger": "Templates",
+      "search": "Search a template…",
+      "none": "No templates yet: create one from “Manage templates” or with “Save as template”.",
+      "noMatch": "No template found.",
+      "mine": "Mine",
+      "team": "Team",
+      "campaign": "Marketing",
+      "shared": "Shared",
+      "manage": "Manage templates"
+    },
+    "saveAs": {
+      "trigger": "Save as template",
+      "title": "Save as template",
+      "description": "This email's subject and text become a template; the recipient's fields stay fields, filled in for each email."
+    },
+    "errors": {
+      "invalid": "Fill in the name, subject and text.",
+      "notFound": "The template no longer exists.",
+      "forbidden": "You can change only your own templates, or shared ones if you are an administrator.",
+      "saveFailed": "The template was not saved. Try again.",
+      "deleteFailed": "The template was not deleted. Try again."
+    },
+    "addStarters": "Add basic templates",
+    "startersNone": "You already have all the basic templates."
   }
 }

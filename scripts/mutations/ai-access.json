@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "⚠️⚠️ un piano senza il flag del copilota lo usa lo stesso",
+    "find": "  if (!input.entitlements.enabledModules.includes(\"ai\")) return \"plan\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "⚠️ un abbonamento sospeso o non attivo continua a usare il copilota",
+    "find": "  if (!input.entitlements.isActive || input.entitlements.isSuspended) return \"inactive\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "il copilota spento dall'amministratore del workspace resta acceso",
+    "find": "  if (!input.workspaceOn) return \"workspace\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "⚠️⚠️ il limite mensile di richieste non finisce mai",
+    "find": "  return limit === null || used <= limit;",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/billing/plans-config.ts",
+    "description": "⚠️⚠️ un piano salvato prima del copilota diventa illimitato invece che a zero richieste",
+    "find": "  const ai = stored.aiRequestsPerMonth === undefined ? 0 : stored.aiRequestsPerMonth;",
+    "replace": "  const ai = stored.aiRequestsPerMonth ?? null;"
+  },
+  {
+    "file": "src/lib/billing/plans-config.ts",
+    "description": "⚠️ un piano con richieste illimitate scelte in /admin/plans diventa a zero richieste",
+    "find": "  const ai = stored.aiRequestsPerMonth === undefined ? 0 : stored.aiRequestsPerMonth;",
+    "replace": "  const ai = stored.aiRequestsPerMonth ?? 0;"
+  },
+  {
+    "file": "src/lib/ai/suggestions.ts",
+    "description": "l'esito di una proposta lo decide un collega invece di chi l'ha chiesta, e falsa la misura",
+    "find": "        eq(aiSuggestions.userId, userId),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/suggestions.ts",
+    "description": "l'esito di una proposta già decisa viene riscritto",
+    "find": "        eq(aiSuggestions.outcome, \"pending\"),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "⚠️⚠️ le proposte del copilota su una persona cancellata restano, con i suoi dati dentro",
+    "find": "          .delete(aiSuggestions)",
+    "replace": "          .select()"
+  },
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "⚠️ ai clienti di un'installazione senza fornitore compare un pulsante IA che nessuno di loro può far funzionare",
+    "find": "  if ((refusal === \"off\" || refusal === \"config\") && isPlatformStaff) return { state: \"unavailable\", reason: refusal };",
+    "replace": "  if ((refusal === \"off\" || refusal === \"config\")) return { state: \"unavailable\", reason: refusal };"
+  },
+  {
+    "file": "src/lib/ai/access.ts",
+    "description": "un piano senza il copilota nasconde il pulsante invece di dire che serve un piano che lo include",
+    "find": "  if (refusal === \"plan\") return { state: \"unavailable\", reason: \"plan\" };",
+    "replace": ""
+  }
+]

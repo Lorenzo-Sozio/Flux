@@ -30,6 +30,7 @@ import {
   saveInvoiceDraft,
 } from "@/actions/invoices";
 import { PAYMENT_TONE } from "@/app/(main)/dashboard/sales/orders/[id]/_components/order-tones";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import { PaymentTermsField } from "@/components/crm/payment-terms-field";
 import {
   Field,
@@ -667,9 +668,13 @@ export function InvoiceView({
           )}
           <Field label={tI("fields.email")}>
             {data.customerEmail && (
-              <a href={`mailto:${data.customerEmail}`} className="break-all text-primary hover:underline">
-                {data.customerEmail}
-              </a>
+              <EmailAddressButton
+                email={data.customerEmail}
+                entity={{ id: invoice.companyId ?? "", name: customerName }}
+                entityType="company"
+                canSend={canWrite && Boolean(invoice.companyId)}
+                className="break-all text-primary hover:underline"
+              />
             )}
           </Field>
         </FieldList>
@@ -781,8 +786,10 @@ export function InvoiceView({
               {canWrite && (
                 <SendInvoiceCopyButton
                   invoiceId={invoice.id}
+                  documentNumber={invoice.documentNumber}
                   emailedTo={invoice.emailedTo}
                   customerEmail={data.customerEmail}
+                  customer={{ id: invoice.companyId, name: customerName }}
                 />
               )}
               {!isCredit && !data.deductedIn && canWrite && (
@@ -832,6 +839,7 @@ export function InvoiceView({
             daysLate={daysLate}
             overdueText={money(overdueAmount)}
             customerEmail={data.customerEmail}
+            customer={{ id: invoice.companyId, name: customerName }}
             remindedAt={invoice.remindedAt as unknown as string | null}
             reminderCount={invoice.reminderCount ?? 0}
             canWrite={canWrite}

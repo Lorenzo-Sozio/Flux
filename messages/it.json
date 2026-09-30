@@ -2568,7 +2568,15 @@
       "link": "Link",
       "undo": "Annulla",
       "redo": "Ripeti",
-      "variables": "Variabili:"
+      "variables": "Variabili:",
+      "insertField": "Inserisci campo",
+      "insertFieldHint": "Compilato con i dati del destinatario all'invio",
+      "fieldGroups": {
+        "recipient": "Destinatario",
+        "sender": "Mittente (tu)",
+        "deal": "Trattativa (solo dalla sua pagina)",
+        "document": "Documento (da un preventivo, una fattura, un ordine, un contratto o una richiesta)"
+      }
     },
     "sendEmailModal": {
       "emptyBody": "Il corpo dell'email non può essere vuoto.",
@@ -2590,7 +2598,47 @@
       "htmlComment": "Incolla o scrivi qui il tuo HTML",
       "htmlGreeting": "Ciao {name},",
       "tip": "Suggerimento: usa <code>{first}</code>, <code>{last}</code>, <code>{company}</code> come segnaposto",
-      "discard": "Scarta"
+      "discard": "Scarta",
+      "to": "A",
+      "cc": "Cc",
+      "bcc": "Ccn",
+      "copiesPlaceholder": "Indirizzi, separati da virgola",
+      "writeWithAi": "Scrivi con l'IA",
+      "savedAt": "Bozza salvata alle {time}",
+      "restored": "Bozza ripristinata del {time}.",
+      "discardDraft": "Scarta bozza",
+      "designedHint": "Modello grafico: modifica il testo direttamente nell'anteprima.",
+      "plainEmail": "Scrivi un'email semplice",
+      "bodyPlaceholder": "Scrivi il tuo messaggio…",
+      "footerHint": "I campi come '{{nome}}' vengono compilati all'invio · Ctrl+Invio per inviare",
+      "invalidCopies": "Indirizzi email non validi: {list}",
+      "tooManyCopies": "Al massimo {max} indirizzi in copia.",
+      "bccNotFromMailbox": "La copia nascosta non è disponibile quando invii dalla tua casella collegata: metti quegli indirizzi in Cc, oppure invia loro un'email a parte.",
+      "mailboxFailed": "La tua casella non l'ha inviata: {error}",
+      "providerFailed": "L'email non è stata inviata: {error}",
+      "replaceTitle": "Sostituire il testo?",
+      "replaceDescription": "Il modello «{name}» sostituirà l'oggetto e il testo che hai già scritto.",
+      "replaceCancel": "Mantieni il mio testo",
+      "replaceConfirm": "Usa il modello",
+      "unfilledTitle": "Ci sono parti da completare",
+      "unfilledDescription": "Queste parti arriverebbero al cliente così come sono. Completale nel testo, oppure invia comunque.",
+      "unfilledBack": "Torna a completare",
+      "unfilledSendAnyway": "Invia comunque",
+      "toPlaceholder": "indirizzo@cliente.it",
+      "invalidTo": "Scrivi un indirizzo email valido.",
+      "noDefaultTo": "Il cliente non ha un indirizzo: scrivi quello a cui inviarla.",
+      "partsLabel": "In automatico",
+      "partsHint": "aggiunto sotto il tuo testo all'invio.",
+      "loadingText": "Preparo il testo…",
+      "loadFailed": "Non è stato possibile preparare il testo: scrivilo tu o scegli un modello.",
+      "partsSeePreview": "Guarda l'anteprima",
+      "preview": "Anteprima",
+      "backToEdit": "Modifica",
+      "previewTitle": "Così la riceverà il cliente",
+      "previewHint": "I campi sono compilati con i dati del destinatario, i tuoi e quelli del documento; sotto il testo c'è quello che il CRM aggiunge in automatico. I link si aprono in una nuova scheda.",
+      "previewAttachments": "Allegati",
+      "previewUnfilled": "Da completare prima di inviare: {list}",
+      "previewFailed": "Non è stato possibile preparare l'anteprima."
     },
     "emailBuilder": {
       "blocks": {
@@ -2896,7 +2944,8 @@
       "webForms": "Moduli",
       "supportAgents": "Assistenza per agente",
       "commissions": "Provvigioni",
-      "bank": "Banca"
+      "bank": "Banca",
+      "emailTemplates": "Modelli email"
     },
     "user": {
       "profile": "Profilo",
@@ -3076,7 +3125,8 @@
       "needALine": "Aggiungi almeno una riga: scegli un prodotto oppure descrivi di cosa si tratta.",
       "created": "Ordine {number} creato.",
       "createFailed": "Non è stato possibile creare l'ordine.",
-      "currency": "Valuta"
+      "currency": "Valuta",
+      "expectedDeliveryDate": "Consegna prevista"
     },
     "detail": {
       "back": "Torna agli ordini",
@@ -3155,7 +3205,22 @@
       "goesToInvoice": "Va sulla fattura {number}.",
       "goesToOrder": "Nessuna fattura emessa: resta come acconto sull'ordine e passa alla fattura quando la emetti."
     },
-    "toInvoiceFilter": "Da fatturare"
+    "toInvoiceFilter": "Da fatturare",
+    "shipping": {
+      "title": "Spedizione",
+      "expectedDelivery": "Consegna prevista",
+      "carrier": "Corriere",
+      "trackingCode": "Codice di tracciamento",
+      "carrierPlaceholder": "Es. BRT, GLS, DHL",
+      "trackingPlaceholder": "Il codice per seguire la spedizione",
+      "edit": "Modifica",
+      "save": "Salva",
+      "cancel": "Annulla",
+      "saved": "Spedizione aggiornata.",
+      "saveFailed": "Non è stato possibile salvare la spedizione.",
+      "empty": "Nessun dato di spedizione.",
+      "hint": "Le email scritte dall'ordine riportano questi dati in automatico."
+    }
   },
   "record": {
     "sectionsLabel": "Sezioni della scheda",
@@ -3933,20 +3998,9 @@
     "sendEmail": {
       "title": "Invia il preventivo via email",
       "description": "Invia questo preventivo al cliente perché lo esamini e lo accetti",
-      "recipient": "Email del destinatario",
-      "recipientPlaceholder": "cliente@esempio.it",
-      "subject": "Oggetto",
-      "subjectPlaceholder": "Il tuo preventivo",
-      "message": "Messaggio (facoltativo)",
-      "messagePlaceholder": "Aggiungi un messaggio personale da includere nell'email…",
-      "defaultSubject": "Il tuo preventivo",
-      "defaultMessage": "In allegato il preventivo. Resto a disposizione per qualsiasi chiarimento.",
-      "invalidEmail": "Indirizzo email non valido",
-      "subjectRequired": "L'oggetto è obbligatorio",
-      "cancel": "Annulla",
       "submit": "Invia preventivo",
       "sent": "Preventivo inviato.",
-      "sendFailed": "Non è stato possibile inviare il preventivo."
+      "partLink": "Riquadro con il totale e il pulsante per aprire il preventivo {number} online"
     },
     "list": {
       "printPdf": "Stampa / PDF",
@@ -4772,7 +4826,8 @@
           "automationRunsPerMonth": "Esecuzioni Automazione",
           "maxUsers": "Utenti",
           "maxRecords": "Record",
-          "maxIntegrations": "Integrazioni"
+          "maxIntegrations": "Integrazioni",
+          "aiRequestsPerMonth": "Richieste al copilota IA"
         }
       },
       "plans": {
@@ -4799,7 +4854,8 @@
           "support": "Ticket di Supporto",
           "automation": "Automazione",
           "reporting": "Report Avanzati",
-          "helpdesk": "Helpdesk"
+          "helpdesk": "Helpdesk",
+          "ai": "Copilota IA"
         }
       },
       "addons": {
@@ -4968,6 +5024,10 @@
       "chat": {
         "label": "Chat interna",
         "help": "Messaggi diretti e di gruppo tra colleghi, con la finestra in basso su ogni pagina. Spenta, pagina e finestra spariscono e smettono di interrogare il server ogni trenta secondi."
+      },
+      "ai": {
+        "label": "Copilota IA",
+        "help": "Bozze, riassunti e briefing preparati da un modello di IA a partire dai record del workspace; ognuno lo conferma una persona, e niente viene inviato o salvato da solo. Spento, nessuno nel workspace lo vede e al modello non arriva nulla."
       },
       "saved": "Impostazione salvata.",
       "failed": "Non è stato possibile salvare. Riprova."
@@ -6230,7 +6290,19 @@
     "markAllRead": "Segna tutte come lette",
     "markRead": "Segna come letta",
     "empty": "Nessuna notifica",
-    "settings": "Impostazioni notifiche"
+    "settings": "Impostazioni notifiche",
+    "description": "Gli avvisi su attività, trattative, ticket, preventivi e fatture.",
+    "markAllReadShort": "Segna lette",
+    "filterAll": "Tutte",
+    "filterUnread": "Da leggere",
+    "emptyUnread": "Hai letto tutto.",
+    "unread": "Da leggere",
+    "days": {
+      "today": "Oggi",
+      "yesterday": "Ieri",
+      "week": "Ultimi 7 giorni",
+      "older": "Più vecchie"
+    }
   },
   "contracts": {
     "title": "Contratti",
@@ -6692,18 +6764,15 @@
       "send": "Invia al cliente",
       "sendTitle": "Invia la copia di cortesia",
       "sendDescription": "Il cliente riceve il PDF in allegato, dal mittente configurato in Impostazioni › Email. Il messaggio ricorda che la copia non ha valore fiscale.",
-      "recipient": "Destinatario",
-      "recipientPlaceholder": "amministrazione@cliente.it",
-      "noCustomerEmail": "L'azienda non ha un'email principale: scrivi l'indirizzo a cui mandarla.",
       "sendButton": "Invia",
-      "cancel": "Annulla",
       "sent": "Copia di cortesia inviata a {to}.",
       "archivedOn": "XML e PDF archiviati il {when}",
       "notArchived": "File non ancora archiviati.",
       "archiveNow": "Archivia ora",
       "archivedToast": "XML e PDF archiviati.",
       "archiveFailed": "Archiviazione non riuscita.",
-      "emailedOn": "Inviata il {when} a {to}"
+      "emailedOn": "Inviata il {when} a {to}",
+      "partPdf": "Fattura {number} in PDF (copia di cortesia)"
     },
     "credit": {
       "button": "Nota di credito",
@@ -6835,12 +6904,9 @@
       "button": "Invia sollecito",
       "title": "Sollecito di pagamento",
       "description": "Il cliente riceve un promemoria cortese per {amount} scaduti, nella sua lingua, con la copia di cortesia in allegato e, per i bonifici, l'IBAN. Il messaggio dice di ignorarlo se ha già pagato.",
-      "recipient": "Destinatario",
-      "noCustomerEmail": "L'azienda non ha un'email principale: scrivi l'indirizzo dell'amministrazione.",
-      "cancel": "Annulla",
       "send": "Invia sollecito",
       "sent": "Sollecito inviato a {to}.",
-      "failed": "Non è stato possibile inviare il sollecito."
+      "partPdf": "Fattura in PDF (copia di cortesia)"
     },
     "sdi": {
       "failed": "Operazione non riuscita.",
@@ -7973,7 +8039,8 @@
         "support": "Assistenza",
         "automation": "Automazione",
         "reporting": "Report",
-        "helpdesk": "Helpdesk"
+        "helpdesk": "Helpdesk",
+        "ai": "Copilota IA"
       },
       "metrics": {
         "maxUsers": "utenti",
@@ -7982,7 +8049,8 @@
         "automationRunsPerMonth": "esecuzioni di automazioni al mese",
         "maxRecords": "record",
         "maxWorkspaces": "spazi di lavoro",
-        "maxIntegrations": "integrazioni"
+        "maxIntegrations": "integrazioni",
+        "aiRequestsPerMonth": "richieste mensili al copilota IA"
       }
     },
     "auth": {
@@ -8181,6 +8249,14 @@
       "unavailable": "L'intermediario non risponde: riprova tra qualche minuto. {detail}",
       "rate_limited": "Troppe richieste all'intermediario: riprova tra un minuto.",
       "account": "Scegli l'azienda di Fatture in Cloud: il token ne vede più di una (o nessuna). {detail}"
+    },
+    "quotes": {
+      "notFound": "Il preventivo non esiste più.",
+      "forbidden": "Puoi inviare solo i tuoi preventivi, a meno che tu non gestisca quelli di tutti.",
+      "notSendable": "Il preventivo non può essere inviato: nel suo stato attuale non si invia, oppure attende un'approvazione."
+    },
+    "orders": {
+      "shippingDateInvalid": "La data di consegna prevista non è un giorno valido."
     }
   },
   "validation": {
@@ -9332,5 +9408,312 @@
     "bankLinked": "Il denaro viene dall'estratto conto e resta registrato: {amount} tornano a credito del cliente, da usare su un'altra fattura o da rimborsare. Per sciogliere l'abbinamento con il movimento usa la pagina Banca.",
     "cancel": "Annulla",
     "confirm": "Togli il pagamento"
+  },
+  "aiCopilot": {
+    "errors": {
+      "off": "Il copilota IA non è configurato su questa installazione.",
+      "config": "Il copilota IA è configurato in modo errato su questa installazione: chiedi a chi gestisce Flux.",
+      "no_workspace": "Apri un workspace per usare il copilota IA.",
+      "inactive": "L'abbonamento non è attivo, quindi il copilota IA non è disponibile.",
+      "plan": "Il tuo piano non include il copilota IA.",
+      "workspace": "Un amministratore ha spento il copilota IA per questo workspace.",
+      "limit": "Le richieste al copilota IA di questo mese sono esaurite.",
+      "auth": "Il fornitore IA ha rifiutato la chiave di questa installazione: chiedi a chi gestisce Flux.",
+      "model": "Il modello IA configurato non è disponibile: chiedi a chi gestisce Flux di cambiarlo.",
+      "invalid": "Il fornitore IA ha rifiutato la richiesta.",
+      "blocked": "I filtri del fornitore IA hanno bloccato questa risposta.",
+      "rate_limited": "Il fornitore IA è occupato. Riprova tra un minuto.",
+      "unavailable": "Il fornitore IA non ha risposto. Riprova tra poco.",
+      "output": "La risposta dell'IA non è utilizzabile. Riprova.",
+      "not_found": "Questo record non esiste più.",
+      "no_record": "Questo appuntamento non è collegato a una trattativa, un contatto, un lead o un'azienda: non c'è nulla da cui preparare il briefing.",
+      "unknown": "Il copilota IA non ha potuto rispondere. Riprova."
+    },
+    "result": {
+      "disclaimer": "Scritto dall'IA a partire da questa scheda: verificalo prima di fidarti.",
+      "useful": "Utile",
+      "notUseful": "Non utile",
+      "regenerate": "Riprova",
+      "copy": "Copia",
+      "copied": "Copiato",
+      "thanks": "Grazie, registrato."
+    },
+    "summary": {
+      "title": "Riassunto IA",
+      "hint": "A che punto siamo, cosa chiede il cliente, cosa è aperto — dalla storia di questa scheda.",
+      "generate": "Riassumi con l'IA",
+      "generating": "Sto riassumendo…"
+    },
+    "briefing": {
+      "title": "Briefing IA",
+      "hint": "Chi incontri, a che punto siamo e cosa puntare a ottenere, dal record collegato.",
+      "generate": "Prepara un briefing",
+      "generating": "Sto preparando…"
+    },
+    "draft": {
+      "title": "Scrivi con l'IA",
+      "instructionsLabel": "Cosa deve dire l'email?",
+      "instructionsPlaceholder": "es. ringrazia per l'incontro e proponi una demo la prossima settimana",
+      "write": "Scrivi una bozza",
+      "rewrite": "Riscrivi",
+      "writing": "Sto scrivendo…",
+      "rewriteHint": "Riscrive l'email nell'editor seguendo la tua richiesta, mantenendone i fatti.",
+      "inserted": "Bozza inserita: rileggila prima di inviarla.",
+      "unverified": "Controlla queste cifre, non sono nei dati di questa scheda: {figures}",
+      "placeholderHint": "Completa ogni {placeholder} prima di inviare.",
+      "titleRewrite": "Riscrivi con l'IA",
+      "close": "Chiudi",
+      "failed": "Il copilota IA non ha potuto rispondere. Riprova.",
+      "rewritePlaceholder": "Come deve cambiare? es. più cordiale e cita la demo",
+      "actions": {
+        "followUp": {
+          "label": "Follow-up",
+          "request": "Un breve follow-up su a che punto siamo, chiedendo il prossimo passo."
+        },
+        "meeting": {
+          "label": "Proponi un incontro",
+          "request": "Proponi una breve chiamata o un incontro per andare avanti; lascia la data da completare."
+        },
+        "thanks": {
+          "label": "Ringrazia",
+          "request": "Ringrazia per l'ultimo contatto e riassumi quanto concordato, se c'è."
+        },
+        "reply": {
+          "label": "Rispondi all'ultima email",
+          "request": "Rispondi all'email più recente del cliente."
+        },
+        "shorter": {
+          "label": "Più breve",
+          "request": "Rendila più breve e diretta, mantenendo tutti i fatti."
+        },
+        "formal": {
+          "label": "Più formale",
+          "request": "Rendi il tono più formale e professionale."
+        },
+        "friendly": {
+          "label": "Più cordiale",
+          "request": "Rendi il tono più cordiale e personale, restando professionale."
+        },
+        "proofread": {
+          "label": "Correggi errori",
+          "request": "Correggi solo grammatica, ortografia e punteggiatura; non cambiare nient'altro."
+        }
+      }
+    },
+    "unavailable": {
+      "off": "Copilota IA non configurato su questa installazione: imposta GEMINI_API_KEY sul server, poi attiva il flag «AI copilot» nel piano (/admin/plans).",
+      "config": "Copilota IA configurato in modo errato sul server: controlla AI_PROVIDER, AI_MODEL e la chiave del fornitore.",
+      "plan": "Il tuo piano non include il copilota IA."
+    }
+  },
+  "emailTemplates": {
+    "title": "Modelli email",
+    "subtitle": "Il testo da cui parte un'email a un cliente: i tuoi e quelli condivisi dal team. I campi come il nome del destinatario vengono compilati all'invio.",
+    "search": "Cerca per nome, oggetto o testo",
+    "new": "Nuovo modello",
+    "newTitle": "Nuovo modello",
+    "editTitle": "Modifica modello",
+    "editorHint": "Usa «Inserisci campo» per i dati del destinatario: vengono compilati per ogni email.",
+    "allCategories": "Tutti",
+    "mine": "I miei modelli ({count})",
+    "team": "Condivisi dal team ({count})",
+    "noMatch": "Nessun modello corrisponde alla ricerca.",
+    "edit": "Modifica",
+    "duplicate": "Duplica",
+    "delete": "Elimina",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "copyOf": "Copia di {name}",
+    "sharedBadge": "Condiviso",
+    "used": "Usato {count, plural, one {# volta} other {# volte}} · {when}",
+    "neverUsed": "Mai usato",
+    "by": "Di {name}",
+    "saved": "Modello salvato.",
+    "deleted": "Modello eliminato.",
+    "deleteTitle": "Eliminare il modello?",
+    "deleteDescription": "«{name}» verrà eliminato. Le email già inviate non cambiano.",
+    "deleteSharedDescription": "«{name}» è condiviso: sparirà anche per il resto del team. Le email già inviate non cambiano.",
+    "categories": {
+      "followup": "Follow-up",
+      "quote": "Offerta",
+      "meeting": "Appuntamento",
+      "thanks": "Ringraziamento",
+      "intro": "Presentazione",
+      "other": "Altro",
+      "deal": "Trattativa",
+      "order": "Ordine",
+      "contract": "Contratto",
+      "invoice": "Fatture e pagamenti",
+      "support": "Assistenza"
+    },
+    "fields": {
+      "name": "Nome",
+      "namePlaceholder": "es. Follow-up dopo la demo",
+      "category": "Categoria",
+      "subject": "Oggetto",
+      "subjectPlaceholder": "L'oggetto dell'email",
+      "body": "Testo",
+      "bodyPlaceholder": "Scrivi il testo del modello…",
+      "shared": "Condividi con il team",
+      "sharedHint": "Tutti nel workspace potranno usarlo; solo tu e gli amministratori potranno modificarlo."
+    },
+    "empty": {
+      "title": "Nessun modello ancora",
+      "description": "Crea i testi che scrivi più spesso e li ritrovi pronti nella finestra «Invia email». I modelli di base coprono tutto il ciclo: primo contatto, appuntamenti, preventivi, trattative, ordini, contratti, fatture e pagamenti, assistenza.",
+      "starters": "Crea i modelli di base"
+    },
+    "starters": {
+      "created": "{count, plural, one {Creato # modello} other {Creati # modelli}}: modificali come preferisci.",
+      "introduction": {
+        "name": "Primo contatto",
+        "subject": "{company} e {senderCompany}",
+        "body": "Gentile {first},\n\nmi chiamo {sender} e mi occupo di [ambito] per {senderCompany}. Le scrivo perché lavoriamo con aziende come {company} per [beneficio principale].\n\nLe andrebbe una breve chiamata di 15 minuti per capire se possiamo esserle utili?\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "followup": {
+        "name": "Follow-up dopo il contatto",
+        "subject": "A proposito della nostra conversazione",
+        "body": "Gentile {first},\n\nla ringrazio per il tempo che mi ha dedicato. Come promesso, le scrivo per fare il punto su quanto ci siamo detti: [punti principali].\n\nMi faccia sapere se ha domande o se preferisce sentirci per approfondire.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "noReply": {
+        "name": "Nessuna risposta: nuovo tentativo",
+        "subject": "Riprendo il filo, {first}",
+        "body": "Gentile {first},\n\nle avevo scritto qualche giorno fa a proposito di [argomento] e immagino sia stato un periodo intenso.\n\nÈ ancora un tema su cui state lavorando? Se non è il momento giusto, me lo dica pure: la ricontatterò più avanti.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "meeting": {
+        "name": "Richiesta di appuntamento",
+        "subject": "Possiamo sentirci?",
+        "body": "Gentile {first},\n\nvorrei proporle un breve incontro per capire meglio le esigenze di {company} e come possiamo aiutarvi.\n\nHa disponibilità nei prossimi giorni? Mi indichi pure il momento più comodo, oppure le propongo [giorno e ora].\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "meetingConfirm": {
+        "name": "Conferma appuntamento",
+        "subject": "Conferma del nostro incontro",
+        "body": "Gentile {first},\n\nle confermo il nostro appuntamento di [giorno e ora], [luogo o link della videochiamata].\n\nSe nel frattempo avesse domande o dovesse spostarlo, mi scriva pure a {senderEmail}.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "meetingRecap": {
+        "name": "Riepilogo dopo l'incontro",
+        "subject": "Riepilogo del nostro incontro",
+        "body": "Gentile {first},\n\ngrazie per l'incontro di oggi. Riassumo quanto ci siamo detti:\n- [punto 1]\n- [punto 2]\n\nCome prossimi passi, [chi fa cosa, entro quando]. Mi faccia sapere se ho dimenticato qualcosa.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "quote": {
+        "name": "Invio offerta",
+        "subject": "La nostra proposta per {company}",
+        "body": "Gentile {first},\n\ncome concordato, le invio la nostra proposta per {company} (preventivo {quoteNumber}), valida fino al {dueDate}.\n\nResto a disposizione per qualsiasi chiarimento e, se utile, per rivederla insieme.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "quoteFollowup": {
+        "name": "Sollecito preventivo",
+        "subject": "Ha avuto modo di vedere la nostra proposta?",
+        "body": "Gentile {first},\n\nvolevo sapere se ha avuto modo di esaminare il preventivo {quoteNumber} che le ho inviato.\n\nSe qualcosa non la convince o vuole modificare qualche voce, ne parliamo volentieri.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "quoteExpiring": {
+        "name": "Preventivo in scadenza",
+        "subject": "La nostra proposta scade il {dueDate}",
+        "body": "Gentile {first},\n\nle ricordo che il preventivo {quoteNumber} è valido fino al {dueDate}.\n\nSe desidera procedere, o ha bisogno di più tempo per valutarlo, me lo faccia sapere.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "quoteAccepted": {
+        "name": "Preventivo accettato: prossimi passi",
+        "subject": "Grazie per aver accettato la nostra proposta",
+        "body": "Gentile {first},\n\ngrazie per aver accettato la nostra proposta: siamo contenti di lavorare con {company}.\n\nI prossimi passi sono: [prossimi passi]. Per qualsiasi cosa, sono il suo riferimento.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "dealWon": {
+        "name": "Benvenuto a bordo",
+        "subject": "Benvenuto, {first}!",
+        "body": "Gentile {first},\n\nè un piacere dare il via a {deal} con {company}. Le presento come procederemo: [organizzazione e referenti].\n\nLa contatteremo entro [data] per [primo passo]. Nel frattempo, per qualsiasi domanda può scrivermi a {senderEmail}.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "dealLost": {
+        "name": "Trattativa non conclusa: porta aperta",
+        "subject": "Grazie per la considerazione",
+        "body": "Gentile {first},\n\ngrazie per averci considerato per {deal}. Capisco la vostra scelta e le auguro buon lavoro.\n\nSe in futuro le esigenze di {company} cambiassero, sarò felice di riprendere il discorso. Le andrebbe se la ricontattassi tra qualche mese?\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "orderConfirm": {
+        "name": "Conferma d'ordine",
+        "subject": "Conferma del suo ordine {orderNumber}",
+        "body": "Gentile {first},\n\nle confermo di aver ricevuto l'ordine {orderNumber}. La consegna è prevista per il {deliveryDate}.\n\nLa terrò aggiornata sull'avanzamento; per qualsiasi necessità, sono a sua disposizione.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "orderShipped": {
+        "name": "Ordine spedito",
+        "subject": "Il suo ordine {orderNumber} è in viaggio",
+        "body": "Gentile {first},\n\nl'ordine {orderNumber} è stato spedito con {carrier}; può seguirlo con il codice {trackingCode}.\n\nSe al ricevimento qualcosa non fosse in ordine, mi scriva subito.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "contractSend": {
+        "name": "Invio contratto da firmare",
+        "subject": "Il contratto da firmare",
+        "body": "Gentile {first},\n\ncome concordato, le invio il contratto {contractReference} per {company}.\n\nPuò restituirmelo firmato entro il [data]. Se vuole rivedere qualche clausola, ne parliamo volentieri.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "contractRenewal": {
+        "name": "Rinnovo contratto in scadenza",
+        "subject": "Il vostro contratto scade il {contractEndDate}",
+        "body": "Gentile {first},\n\nil contratto {contractReference} con {company} scade il {contractEndDate}.\n\nVorrei fissare un breve incontro per fare il punto sull'anno trascorso e sulle condizioni di rinnovo. Quando le sarebbe comodo?\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "invoiceSend": {
+        "name": "Invio fattura",
+        "subject": "Fattura {invoiceNumber}",
+        "body": "Gentile {first},\n\nle invio in allegato la copia di cortesia della fattura {invoiceNumber} di {amount}, con scadenza il {dueDate}. L'originale è stato trasmesso tramite SDI.\n\nPer qualsiasi domanda sulla fattura, sono a sua disposizione.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "paymentReminder": {
+        "name": "Promemoria di pagamento",
+        "subject": "Promemoria: fattura {invoiceNumber} in scadenza",
+        "body": "Gentile {first},\n\nle ricordo che la fattura {invoiceNumber} di {amount} scade il {dueDate}.\n\nSe ha già provveduto al pagamento, non tenga conto di questo messaggio. Grazie!\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "paymentOverdue": {
+        "name": "Sollecito pagamento scaduto",
+        "subject": "Sollecito: fattura {invoiceNumber} scaduta",
+        "body": "Gentile {first},\n\ndai nostri registri la fattura {invoiceNumber} di {amount}, scaduta il {dueDate}, risulta ancora da saldare.\n\nLe chiedo di verificare e di effettuare il pagamento al più presto (IBAN {iban}). Se ci fosse un problema, mi scriva e troviamo insieme una soluzione.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "paymentReceived": {
+        "name": "Pagamento ricevuto",
+        "subject": "Pagamento ricevuto, grazie",
+        "body": "Gentile {first},\n\nle confermo di aver ricevuto il pagamento di {amount} per la fattura {invoiceNumber}. Grazie!\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "supportAck": {
+        "name": "Presa in carico della richiesta",
+        "subject": "Abbiamo preso in carico la sua richiesta",
+        "body": "Gentile {first},\n\nabbiamo ricevuto la sua segnalazione su {ticketSubject} e ce ne stiamo occupando.\n\nLe daremo un aggiornamento entro [tempo di risposta]. Se nel frattempo ha altre informazioni utili, risponda pure a questa email.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "supportResolved": {
+        "name": "Richiesta risolta",
+        "subject": "La sua richiesta è stata risolta",
+        "body": "Gentile {first},\n\nla sua richiesta su {ticketSubject} è stata risolta: [soluzione].\n\nSe il problema si ripresentasse, risponda a questa email e riprendiamo da qui.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "reviewRequest": {
+        "name": "Richiesta di recensione",
+        "subject": "Un suo parere ci sarebbe prezioso",
+        "body": "Gentile {first},\n\nspero che la collaborazione con {senderCompany} la stia soddisfacendo. Se ha un minuto, una sua recensione ci aiuterebbe molto: [link alla recensione].\n\nE se conosce qualcuno a cui potremmo essere utili, le saremo grati per una presentazione.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "reactivation": {
+        "name": "Riattivazione cliente",
+        "subject": "È passato un po' di tempo, {first}",
+        "body": "Gentile {first},\n\nè passato un po' di tempo dal nostro ultimo contatto e volevo sapere come stanno andando le cose in {company}.\n\nNel frattempo abbiamo introdotto [novità]. Le andrebbe di sentirci per un aggiornamento?\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      },
+      "thanks": {
+        "name": "Ringraziamento",
+        "subject": "Grazie, {first}",
+        "body": "Gentile {first},\n\ngrazie per la fiducia accordata a {senderCompany}.\n\nSe c'è qualcosa che possiamo fare per lei, non esiti a scrivermi.\n\nCordiali saluti,\n{sender}\n{senderCompany}"
+      }
+    },
+    "picker": {
+      "trigger": "Modelli",
+      "search": "Cerca un modello…",
+      "none": "Nessun modello: creane uno da «Gestisci modelli» o con «Salva come modello».",
+      "noMatch": "Nessun modello trovato.",
+      "mine": "I miei",
+      "team": "Del team",
+      "campaign": "Marketing",
+      "shared": "Condiviso",
+      "manage": "Gestisci modelli"
+    },
+    "saveAs": {
+      "trigger": "Salva come modello",
+      "title": "Salva come modello",
+      "description": "Oggetto e testo di questa email diventano un modello; i campi del destinatario restano campi, da compilare per ogni email."
+    },
+    "errors": {
+      "invalid": "Compila nome, oggetto e testo.",
+      "notFound": "Il modello non esiste più.",
+      "forbidden": "Puoi modificare solo i tuoi modelli, o quelli condivisi se sei amministratore.",
+      "saveFailed": "Il modello non è stato salvato. Riprova.",
+      "deleteFailed": "Il modello non è stato eliminato. Riprova."
+    },
+    "addStarters": "Aggiungi modelli di base",
+    "startersNone": "Hai già tutti i modelli di base."
   }
 }

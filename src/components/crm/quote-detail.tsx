@@ -39,10 +39,13 @@ import {
   approveQuoteAction,
   createQuoteRevisionAction,
   type getQuoteById,
+  previewQuoteEmailAction,
   rejectQuoteAction,
   requestApprovalAction,
+  sendQuoteEmailAction,
   updateQuoteAction,
 } from "@/actions/quotes";
+import { EmailAddressButton } from "@/components/crm/email-address-button";
 import {
   EmptyHint,
   Field,
@@ -55,6 +58,7 @@ import {
   type Tone,
 } from "@/components/crm/record/record-page";
 import { RecordSections } from "@/components/crm/record/record-sections";
+import { type EmailDocument, SendEmailModal } from "@/components/crm/send-email-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -69,13 +73,19 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
-import { type DocumentLanguage, fill, QUOTE_TEXT } from "@/lib/document-language";
+import {
+  type DocumentLanguage,
+  fill,
+  formatDocumentDate,
+  formatDocumentMoney,
+  QUOTE_TEXT,
+} from "@/lib/document-language";
+import { documentValues } from "@/lib/email-placeholders";
 import { can } from "@/lib/permissions";
+import { paragraphsToHtml } from "@/lib/plain-text-html";
 import { whatToChase } from "@/lib/quote-followup";
 import { quoteStatusConfig } from "@/lib/quote-status";
 import { cn } from "@/lib/utils";
-
-import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
 
@@ -241,6 +251,47 @@ export function QuoteDetail({
   const followUpVars = { quoteNumber: quote.quoteNumber, days: followUp?.days ?? 0 };
   const statusCfg = quoteStatusConfig(quote.status);
   const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
+
+  // The email dialog every record uses, in its document mode: the quote's summary and link are
+  // added by the server under whatever the person writes (sendQuoteEmailAction).
+  const emailTo = quote.contact
+    ? { entity: { ...quote.contact, companyName: quote.company?.name }, entityType: "contact" as const }
+    : quote.company
+      ? {
+          entity: { id: quote.company.id, name: quote.company.name, email: quote.company.mainEmail },
+          entityType: "company" as const,
+        }
+      : { entity: { id: "" }, entityType: undefined };
+  const quoteEmail = (
+    kind: "send" | "followUp",
+    text: { subject: string; message: string },
+    labels: { title: string; description: string; submit: string },
+    onSent: () => void,
+  ): EmailDocument => ({
+    draftKey: `quote:${quote.id}:${kind}`,
+    title: labels.title,
+    description: labels.description,
+    parts: [{ label: tq("sendEmail.partLink", { number: quote.quoteNumber }), kind: "link" }],
+    defaultTo: quote.contact?.email ?? quote.company?.mainEmail ?? null,
+    load: async () => ({
+      ok: true,
+      subject: text.subject,
+      bodyHtml: paragraphsToHtml(text.message),
+      // In the customer's language and the quote's currency, as the quote itself says them.
+      fields: documentValues({
+        quoteNumber: quote.quoteNumber,
+        amount: formatDocumentMoney(quote.totalAmount, quote.currency, customerLanguage),
+        dueDate: quote.expiresAt ? formatDocumentDate(quote.expiresAt, customerLanguage) : null,
+      }),
+    }),
+    send: async (email) => {
+      const r = await sendQuoteEmailAction(quote.id, email);
+      return r.success ? { ok: true } : { ok: false, error: r.error };
+    },
+    preview: (email) => previewQuoteEmailAction(quote.id, email),
+    submitLabel: labels.submit,
+    onSent,
+  });
   const contactPhone = quote.contact?.mobile || quote.contact?.phone || null;
 
   async function handleStatusChange(newStatus: string, reason?: string) {
@@ -640,12 +691,14 @@ export function QuoteDetail({
                   {contactName}
                 </Link>
                 {quote.contact.email && (
-                  <a
-                    href={`mailto:${quote.contact.email}`}
+                  <EmailAddressButton
+                    email={quote.contact.email}
+                    entity={{ ...quote.contact, companyName: quote.company?.name }}
+                    entityType="contact"
+                    dealId={quote.dealId ?? undefined}
+                    canSend={can(tenantRole ?? null, "record:write")}
                     className="block truncate text-muted-foreground text-xs hover:text-foreground"
-                  >
-                    {quote.contact.email}
-                  </a>
+                  />
                 )}
                 {contactPhone && (
                   <a href={`tel:${contactPhone}`} className="block text-muted-foreground text-xs hover:text-foreground">
@@ -929,45 +982,52 @@ export function QuoteDetail({
         ]}
       />
 
-      {/* Email Dialog */}
-      <SendQuoteEmailDialog
+      {/* Email dialogs: the first send, and the follow-up drafted for this moment. */}
+      <SendEmailModal
+        {...emailTo}
+        dealId={quote.dealId ?? undefined}
+        trigger={null}
         open={showEmailDialog}
         onOpenChange={setShowEmailDialog}
-        quoteId={quote.id}
-        defaultTo={quote.contact?.email ?? quote.company?.mainEmail ?? ""}
-        defaultSubject={fill(QUOTE_TEXT[customerLanguage].emailSubject, { number: quote.quoteNumber })}
-        defaultMessage={QUOTE_TEXT[customerLanguage].emailDefaultMessage}
-        onSuccess={() => {
-          setShowEmailDialog(false);
-          toast.success(t("sentSuccess"));
-          router.refresh();
-        }}
+        document={quoteEmail(
+          "send",
+          {
+            subject: fill(QUOTE_TEXT[customerLanguage].emailSubject, { number: quote.quoteNumber }),
+            message: QUOTE_TEXT[customerLanguage].emailDefaultMessage,
+          },
+          { title: tq("sendEmail.title"), description: tq("sendEmail.description"), submit: tq("sendEmail.submit") },
+          () => {
+            toast.success(t("sentSuccess"));
+            router.refresh();
+          },
+        )}
       />
 
       {/* Follow-up draft — prefilled, fully editable, and sent only on a click. */}
       {followUp && followUpKey && (
-        <SendQuoteEmailDialog
+        <SendEmailModal
+          {...emailTo}
+          dealId={quote.dealId ?? undefined}
+          trigger={null}
           open={showFollowUpDialog}
           onOpenChange={setShowFollowUpDialog}
-          quoteId={quote.id}
-          defaultTo={quote.contact?.email ?? ""}
-          defaultSubject={
+          document={quoteEmail(
+            "followUp",
             customerDrafts?.[followUpKey]
-              ? fill(customerDrafts[followUpKey].subject, followUpVars)
-              : tf(`${followUpKey}Subject`, followUpVars)
-          }
-          defaultMessage={
-            customerDrafts?.[followUpKey]
-              ? fill(customerDrafts[followUpKey].body, followUpVars)
-              : tf(`${followUpKey}Body`, followUpVars)
-          }
-          title={tf("dialogTitle")}
-          descriptionText={tf("dialogDescription")}
-          submitLabel={tf("submitLabel")}
-          onSuccess={() => {
-            setShowFollowUpDialog(false);
-            router.refresh();
-          }}
+              ? {
+                  subject: fill(customerDrafts[followUpKey].subject, followUpVars),
+                  message: fill(customerDrafts[followUpKey].body, followUpVars),
+                }
+              : {
+                  subject: tf(`${followUpKey}Subject`, followUpVars),
+                  message: tf(`${followUpKey}Body`, followUpVars),
+                },
+            { title: tf("dialogTitle"), description: tf("dialogDescription"), submit: tf("submitLabel") },
+            () => {
+              toast.success(tq("sendEmail.sent"));
+              router.refresh();
+            },
+          )}
         />
       )}
 
