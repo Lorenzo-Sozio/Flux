@@ -232,7 +232,6 @@ export function ContractForm({
       }
       toast.success(t("saved"));
       router.push("/dashboard/sales/contracts");
-      router.refresh();
     } catch {
       toast.error(t("failed"));
     } finally {

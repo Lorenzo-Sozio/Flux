@@ -1,6 +1,14 @@
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { workspaceSettings } from "@/db/schema";
+import {
+  type BrandIdentity,
+  cleanBrandIdentity,
+  cleanSignatureSettings,
+  DEFAULT_SIGNATURE,
+  NO_BRAND_IDENTITY,
+  type SignatureSettings,
+} from "@/lib/email-brand";
 import { type ApprovalPolicy, approvalPolicyFrom } from "@/lib/quote-status";
 import type { getDb } from "@/lib/tenant-context";
 
@@ -30,8 +38,12 @@ const KEYS = {
   validityDays: "quote.validityDays",
   terms: "quote.terms",
   logo: "brand.logo",
+  identity: "brand.identity",
   approval: "quote.approval",
 } as const;
+
+/** A person's signature is theirs in this workspace: a role differs from one company to the next. */
+const signatureKey = (userId: string) => `signature.${userId}`;
 
 /** Whatever was typed, as something a quote can use. */
 export function cleanQuoteDefaults(input: { validityDays?: unknown; terms?: unknown }): QuoteDefaults {
@@ -117,6 +129,43 @@ export async function readLogoRef(db: Db): Promise<LogoRef | null> {
 export async function writeLogoRef(db: Db, ref: LogoRef | null): Promise<void> {
   if (ref) await writeKey(db, KEYS.logo, ref);
   else await db.delete(workspaceSettings).where(eq(workspaceSettings.key, KEYS.logo));
+}
+
+// ─── The identity on emails ───────────────────────────────────────────────────
+
+/** The brand colour, the website and the social pages (src/lib/email-brand.ts). Never throws. */
+export async function readBrandIdentity(db: Db): Promise<BrandIdentity> {
+  try {
+    return cleanBrandIdentity((await readKeys(db, [KEYS.identity])).get(KEYS.identity));
+  } catch {
+    return { ...NO_BRAND_IDENTITY, socials: {} };
+  }
+}
+
+export async function writeBrandIdentity(db: Db, identity: BrandIdentity): Promise<BrandIdentity> {
+  const clean = cleanBrandIdentity(identity);
+  await writeKey(db, KEYS.identity, clean);
+  return clean;
+}
+
+/** A person's part of the signature, from their Profile. Never throws: none set is the default. */
+export async function readSignatureSettings(db: Db, userId: string): Promise<SignatureSettings> {
+  try {
+    const key = signatureKey(userId);
+    return cleanSignatureSettings((await readKeys(db, [key])).get(key));
+  } catch {
+    return { ...DEFAULT_SIGNATURE };
+  }
+}
+
+export async function writeSignatureSettings(
+  db: Db,
+  userId: string,
+  settings: SignatureSettings,
+): Promise<SignatureSettings> {
+  const clean = cleanSignatureSettings(settings);
+  await writeKey(db, signatureKey(userId), clean);
+  return clean;
 }
 
 // ─── Approval ─────────────────────────────────────────────────────────────────

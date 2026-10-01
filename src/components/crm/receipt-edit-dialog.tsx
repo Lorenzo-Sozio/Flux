@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { Loader2, Pencil } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -37,7 +35,6 @@ export function ReceiptEditDialog({
   };
 }) {
   const t = useTranslations("receipts");
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [amount, setAmount] = useState(String(receipt.amount));
@@ -59,7 +56,6 @@ export function ReceiptEditDialog({
       }
       toast.success(t("saved"));
       setOpen(false);
-      router.refresh();
     });
   }
 

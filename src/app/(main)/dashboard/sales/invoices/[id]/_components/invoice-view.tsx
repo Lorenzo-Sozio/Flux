@@ -251,7 +251,6 @@ export function InvoiceView({
     try {
       if ((await save()) !== null) {
         toast.success(t("saved"));
-        router.refresh();
       }
     } finally {
       setBusy(false);
@@ -271,7 +270,6 @@ export function InvoiceView({
       }
       setRefused(null);
       toast.success(t("issuedToast", { number: result.documentNumber }));
-      router.refresh();
     } finally {
       setBusy(false);
       setConfirmIssue(false);

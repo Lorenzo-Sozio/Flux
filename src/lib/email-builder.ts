@@ -23,7 +23,9 @@ export type BlockType =
   | "spacer"
   | "two_column"
   | "footer"
-  | "html";
+  | "html"
+  | "brand_header"
+  | "signature";
 
 export type TextAlign = "left" | "center" | "right";
 
@@ -112,6 +114,15 @@ export interface HtmlProps {
   backgroundColor: string;
 }
 
+/**
+ * The workspace's letterhead (`brand_header`) or the sender's signature (`signature`): drawn when
+ * the email is sent, from Settings → General and the sender's Profile (src/lib/email-brand.ts),
+ * so a new logo or colour changes every template at once.
+ */
+export interface BrandBlockProps {
+  backgroundColor: string;
+}
+
 export type BlockProps =
   | HeadingProps
   | TextProps
@@ -121,7 +132,8 @@ export type BlockProps =
   | SpacerProps
   | TwoColumnProps
   | FooterProps
-  | HtmlProps;
+  | HtmlProps
+  | BrandBlockProps;
 
 export interface Block {
   id: string;
@@ -287,6 +299,9 @@ export function defaultProps(type: BlockType, text: BlockTextDefaults = DEFAULT_
         html: "<!-- Custom HTML block -->",
         backgroundColor: "#ffffff",
       } as HtmlProps;
+    case "brand_header":
+    case "signature":
+      return { backgroundColor: "#ffffff" } as BrandBlockProps;
   }
 }
 
@@ -506,9 +521,41 @@ function compileBlock(block: Block, fontFamily: string): string {
 </tr>`;
     }
 
+    // Placeholders, filled by whoever sends (src/lib/email-brand-load.ts `brandValues`).
+    case "brand_header": {
+      const p = props as BrandBlockProps;
+      return `
+<tr>
+  <td style="background-color:${p.backgroundColor};padding:0;">
+    {{intestazione}}
+  </td>
+</tr>`;
+    }
+
+    case "signature": {
+      const p = props as BrandBlockProps;
+      return `
+<tr>
+  <td style="background-color:${p.backgroundColor};padding:16px 24px 24px 24px;">
+    {{firma}}
+  </td>
+</tr>`;
+    }
+
     default:
       return "";
   }
+}
+
+/**
+ * The builder's preview with the letterhead and the signature drawn, from the editor's sample —
+ * the same functions the send uses — instead of their placeholders.
+ */
+export function withBrandSample(html: string, sample: { header: string; signature: string } | null): string {
+  if (!sample) return html;
+  return html
+    .replace(/\{\{\s*(intestazione|brandHeader|brand_header)\s*\}\}/gi, sample.header)
+    .replace(/\{\{\s*(firma|signature)\s*\}\}/gi, sample.signature);
 }
 
 export function compileToHtml(design: EmailDesign, subject = ""): string {

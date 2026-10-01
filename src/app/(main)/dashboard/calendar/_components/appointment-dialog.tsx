@@ -2,8 +2,6 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import {
   AlertTriangle,
   Bell,
@@ -432,7 +430,6 @@ export function AppointmentForm({
 }) {
   const t = useTranslations("appointment");
   const tc = useTranslations("common");
-  const router = useRouter();
   const inviteToast = useInviteToast();
   const [isPending, startTransition] = useTransition();
 
@@ -603,7 +600,6 @@ export function AppointmentForm({
           if (shouldNotify) inviteToast(inviteStatus);
         }
         onDone();
-        router.refresh();
       } catch {
         toast.error(mode === "edit" ? t("errorUpdate") : t("errorCreate"));
       }

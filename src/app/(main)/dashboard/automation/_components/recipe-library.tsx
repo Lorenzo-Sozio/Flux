@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { BookOpen, Check, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -37,7 +35,6 @@ import { AUTOMATION_RECIPES } from "@/lib/automation-recipes";
 export function RecipeLibrary() {
   const t = useTranslations("automation.recipes");
   const tEntities = useTranslations("automation.entities");
-  const router = useRouter();
   // The catalogue in automation-recipes.ts is English; items.<id> carries the reader's language.
   const text = (id: string, part: "summary" | "why", fallback: string) =>
     t.has(`items.${id}.${part}`) ? t(`items.${id}.${part}`) : fallback;
@@ -69,7 +66,6 @@ export function RecipeLibrary() {
       if (result.success) {
         setInstalled((prev) => new Set(prev).add(id));
         toast.success(t("installed"));
-        router.refresh();
       } else if (result.error === "already-installed") {
         setInstalled((prev) => new Set(prev).add(id));
         toast.info(t("alreadyAdded"));

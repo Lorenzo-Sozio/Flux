@@ -207,7 +207,6 @@ export function SequenceEditor({
       }
       toast.success(t("saved"));
       if (!sequence) router.replace(`/dashboard/marketing/sequences/${result.id}`);
-      else router.refresh();
     } catch {
       toast.error(t("failed"));
     } finally {

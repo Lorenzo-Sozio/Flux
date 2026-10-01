@@ -34,6 +34,14 @@ const nextConfig = {
     "/**": ["./src/db/migrations-tenant/**/*", "./node_modules/pg-cloudflare/**/*"],
   },
   reactCompiler: true,
+  experimental: {
+    // ⚠️ A page visited in the last 30 seconds is shown again from the client cache instead of
+    // waiting for the server — list → record → list, a section and back. Every save still
+    // invalidates it (revalidatePath), so what the person changed is never shown stale; a
+    // colleague's change can be at most this old. Prefetched loading skeletons are reused for the
+    // static period (5 minutes by default).
+    staleTimes: { dynamic: 30 },
+  },
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",
   },

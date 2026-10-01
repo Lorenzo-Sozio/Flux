@@ -26,8 +26,8 @@
   {
     "file": "src/actions/invoices.ts",
     "description": "⚠️ l'IBAN non viene indicato per un bonifico",
-    "find": "    iban: invoice.paymentMethod === \"MP05\" ? issuer.iban : null,",
-    "replace": "    iban: null,"
+    "find": "      iban: invoice.paymentMethod === \"MP05\" ? issuer.iban : null,\n      lang,",
+    "replace": "      iban: null,\n      lang,"
   },
   {
     "file": "src/actions/invoices.ts",

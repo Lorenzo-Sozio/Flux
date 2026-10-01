@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ChevronRight, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
+import { IntentLink as Link, LinkPending } from "@/components/intent-link";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -93,10 +93,11 @@ const NavItemExpanded = ({
               isActive={isActive(item.url, item.subItems)}
               tooltip={title}
             >
-              <Link prefetch={false} href={item.url}>
+              <Link href={item.url}>
                 {item.icon && <item.icon />}
                 <span>{title}</span>
                 {item.comingSoon && <IsComingSoon />}
+                <LinkPending className="ml-auto" />
               </Link>
             </SidebarMenuButton>
             <CollapsibleTrigger asChild>
@@ -114,7 +115,6 @@ const NavItemExpanded = ({
               tooltip={locked ? t("notInPlan", { title }) : title}
             >
               <Link
-                prefetch={false}
                 href={locked ? lockHref(item.lockedModule) : item.url}
                 target={item.newTab && !locked ? "_blank" : undefined}
                 className={locked ? "opacity-60" : undefined}
@@ -124,6 +124,7 @@ const NavItemExpanded = ({
                 {!locked && <ChatUnreadBadge url={item.url} />}
                 {item.comingSoon && <IsComingSoon />}
                 {locked && <LockedBadge />}
+                <LinkPending className="ml-auto" />
               </Link>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -135,7 +136,6 @@ const NavItemExpanded = ({
                 <SidebarMenuSubItem key={subItem.titleKey}>
                   <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
                     <Link
-                      prefetch={false}
                       href={subItem.locked ? lockHref(subItem.lockedModule) : subItem.url}
                       target={subItem.newTab && !subItem.locked ? "_blank" : undefined}
                       className={subItem.locked ? "opacity-60" : undefined}
@@ -186,7 +186,7 @@ const NavItemCollapsed = ({
                 aria-disabled={subItem.comingSoon}
                 isActive={isActive(subItem.url)}
               >
-                <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                <Link href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                   {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
                   <span>{t(`items.${subItem.titleKey}` as any)}</span>
                   {subItem.comingSoon && <IsComingSoon />}
@@ -245,12 +245,7 @@ export function NavMain({ items, showQuickCreate = true, creatable = [] }: NavMa
                           tooltip={t(`items.${item.titleKey}` as any)}
                           isActive={isItemActive(item.url)}
                         >
-                          <Link
-                            prefetch={false}
-                            href={item.url}
-                            target={item.newTab ? "_blank" : undefined}
-                            className="relative"
-                          >
+                          <Link href={item.url} target={item.newTab ? "_blank" : undefined} className="relative">
                             {item.icon && <item.icon />}
                             <span>{t(`items.${item.titleKey}` as any)}</span>
                             {/* Collapsed to icons: the count sits on the icon's corner. */}

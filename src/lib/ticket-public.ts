@@ -20,6 +20,8 @@ import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 import { companies, contacts, emailJobs, ticketMessages, tickets, workspaceSettings } from "@/db/schema";
 import { type DocumentLanguage, documentLanguage, fill } from "@/lib/document-language";
+import { brandFrame, type EmailBrand } from "@/lib/email-brand";
+import { loadEmailBrand } from "@/lib/email-brand-load";
 import { escapeHtml } from "@/lib/escape-html";
 import { newArchiveToken } from "@/lib/mail-archive";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
@@ -122,20 +124,29 @@ export function resolvedEmailHtml(input: {
   base: string;
   subdomain: string;
   token: string;
+  /** The workspace's identity: the email goes out in its frame. */
+  brand?: EmailBrand | null;
 }): string {
   const t = TICKET_TEXT[input.lang];
   const link = (rate?: CsatRating) => escapeHtml(statusPageUrl(input.base, input.subdomain, input.token, rate));
   const button = (rate: CsatRating, label: string, colour: string) =>
     `<a href="${link(rate)}" style="display:inline-block;padding:10px 18px;margin:0 8px 8px 0;border-radius:6px;background:${colour};color:#ffffff;text-decoration:none;font-weight:600">${escapeHtml(label)}</a>`;
-  return `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-  <h2 style="font-size:18px;margin:0 0 12px">${escapeHtml(t.resolvedHeading)}</h2>
+  const body = `<h2 style="font-size:20px;margin:0 0 12px;color:#141824">${escapeHtml(t.resolvedHeading)}</h2>
   <p>${escapeHtml(fill(t.resolvedBody, { number: input.number, subject: input.subject }))}</p>
   <p style="margin:24px 0 8px;font-weight:600">${escapeHtml(t.ratePrompt)}</p>
   <p>${button("good", t.rateGood, "#16a34a")}${button("bad", t.rateBad, "#dc2626")}</p>
   <p style="margin-top:24px"><a href="${link()}">${escapeHtml(t.followLink)}</a></p>
   <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-  <p style="color:#6b7280;font-size:12px">${escapeHtml(t.reopenHint)}</p>
-</div>`;
+  <p style="color:#6b7280;font-size:12px">${escapeHtml(t.reopenHint)}</p>`;
+  return input.brand
+    ? brandFrame({
+        brand: input.brand,
+        lang: input.lang,
+        label: fill(t.pageTitle, { number: input.number }),
+        preheader: t.resolvedHeading,
+        body,
+      })
+    : `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">${body}</div>`;
 }
 
 /** The line under an agent's reply that leads the customer to the status page. */
@@ -205,6 +216,7 @@ export async function requestRating(
         base: input.base,
         subdomain: input.subdomain,
         token,
+        brand: await loadEmailBrand(db),
       }),
       status: "pending",
       scheduledAt: now,

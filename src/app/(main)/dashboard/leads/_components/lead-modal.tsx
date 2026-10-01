@@ -124,17 +124,27 @@ export function LeadModal({
   children,
   categories = [],
   companyTypes = [],
+  open: openProp,
+  onOpenChange,
 }: {
   lead?: any;
-  children: React.ReactNode;
+  /** The button that opens it; left out when the caller opens it (`open`). */
+  children?: React.ReactNode;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const t = useTranslations("leads");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
   const say = useMessageText();
-  const [open, setOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = openProp ?? innerOpen;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setInnerOpen(next);
+    onOpenChange?.(next);
+  };
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkLeadDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
@@ -151,7 +161,7 @@ export function LeadModal({
   }, [companyTypes]);
 
   useEffect(() => {
-    if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
+    if (!isEditing && searchParams?.get("new") === "true") setInnerOpen(true);
   }, [isEditing, searchParams]);
 
   const sourceOptions = [
@@ -359,7 +369,7 @@ export function LeadModal({
           }
         }}
       >
-        <DialogTrigger asChild>{children}</DialogTrigger>
+        {children && <DialogTrigger asChild>{children}</DialogTrigger>}
         <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
           <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
@@ -859,6 +869,42 @@ function QuickConvertButton({ lead }: { lead: any }) {
   );
 }
 
+function EditLeadButton({
+  lead,
+  categories,
+  companyTypes,
+}: {
+  // biome-ignore lint/suspicious/noExplicitAny: see LeadModal above.
+  lead: any;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
+}) {
+  const tc = useTranslations("common");
+  // ⚠️ The dialog is mounted at the first press, not with the row: every row of the list (twice — the
+  // card and the table row) used to carry a whole form, its state and its effects, a hundred and
+  // more of them on a page of fifty, for the one or two ever opened.
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={tc("edit")}
+        onClick={() => {
+          setMounted(true);
+          setOpen(true);
+        }}
+      >
+        <PencilIcon className="h-4 w-4" />
+      </Button>
+      {mounted && (
+        <LeadModal lead={lead} categories={categories} companyTypes={companyTypes} open={open} onOpenChange={setOpen} />
+      )}
+    </>
+  );
+}
+
 export function LeadActions({
   lead,
   categories,
@@ -886,11 +932,7 @@ export function LeadActions({
           </Button>
         </Link>
       )}
-      <LeadModal lead={lead} categories={categories} companyTypes={companyTypes}>
-        <Button variant="ghost" size="icon" aria-label={tc("edit")}>
-          <PencilIcon className="h-4 w-4" />
-        </Button>
-      </LeadModal>
+      <EditLeadButton lead={lead} categories={categories} companyTypes={companyTypes} />
       {lead.status !== "converted" && <QuickConvertButton lead={lead} />}
       <DeleteLeadButton lead={lead} />
     </div>

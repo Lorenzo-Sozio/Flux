@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import dynamic from "next/dynamic";
+
 import {
   CodeIcon,
   EyeIcon,
@@ -13,6 +15,7 @@ import {
   PencilIcon,
   RotateCcwIcon,
   SendIcon,
+  SignatureIcon,
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react";
@@ -24,7 +27,6 @@ import { type EmailPreview, previewEmailAction, sendEmailAction } from "@/action
 import { getComposerTemplates } from "@/actions/email-templates";
 import { AiEmailDraft, type InsertedDraft } from "@/components/crm/ai/ai-email-draft";
 import { EmailTemplatePicker } from "@/components/crm/email-template-picker";
-import { RichTextEditor } from "@/components/crm/rich-text-editor";
 import { SaveAsTemplateButton } from "@/components/crm/save-as-template-dialog";
 import {
   AlertDialog,
@@ -53,6 +55,16 @@ import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { cn } from "@/lib/utils";
 
 /**
+ * ⚠️ Loaded the first time the dialog opens, not with the page: the editor (Tiptap and ProseMirror)
+ * is the heaviest thing on a record page, and every contact, lead, deal, quote and invoice page
+ * carried it for a dialog most visits never open.
+ */
+const RichTextEditor = dynamic(() => import("@/components/crm/rich-text-editor").then((m) => m.RichTextEditor), {
+  ssr: false,
+  loading: () => <div className="min-h-[320px] animate-pulse bg-muted/30" aria-hidden />,
+});
+
+/**
  * A template built in the email designer: tables, inline styles, a whole document. The text
  * editor would flatten it, so it is edited in place in its preview, or as HTML.
  */
@@ -78,6 +90,8 @@ export interface DocumentEmail {
   subject: string;
   bodyHtml: string;
   templateId?: string;
+  /** False when the person took their signature off this one email. */
+  signature?: boolean;
 }
 
 /**
@@ -109,7 +123,12 @@ export interface EmailDocument {
   >;
   send: (email: DocumentEmail) => Promise<{ ok: true } | { ok: false; error: string }>;
   /** The email as the customer will receive it, from the same code that sends it. */
-  preview: (email: { subject: string; bodyHtml: string }) => Promise<EmailPreview>;
+  preview: (email: { subject: string; bodyHtml: string; signature?: boolean }) => Promise<EmailPreview>;
+  /**
+   * The email carries the sender's signature (src/lib/email-brand.ts), so the dialog offers to
+   * take it off. An invoice's copy comes from the business and carries none.
+   */
+  signature?: boolean;
   submitLabel?: string;
   onSent?: (to: string) => void;
 }
@@ -248,6 +267,9 @@ export function SendEmailModal({
   const [htmlSource, setHtmlSource] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const [aiOpen, setAiOpen] = useState(false);
+  // The sender's signature from their Profile, added by the server; this one email can go without.
+  const [withSignature, setWithSignature] = useState(true);
+  const offersSignature = !doc || doc.signature === true;
   // The template the email started from: counted when it is sent, so the used ones come first.
   const [templateId, setTemplateId] = useState<string | null>(null);
   // A template picked while the editor already holds text: asked before replacing it.
@@ -406,6 +428,7 @@ export function SendEmailModal({
     setShowBcc(false);
     setDesigned(false);
     setHtmlSource(false);
+    setWithSignature(true);
     setAiOpen(false);
     setTemplateId(null);
     setPendingTemplate(null);
@@ -533,10 +556,14 @@ export function SendEmailModal({
     const html = currentHtml();
     setPreviewing(true);
     try {
-      const email = { subject: resolvePlaceholders(subject), bodyHtml: resolvePlaceholders(html) };
+      const email = {
+        subject: resolvePlaceholders(subject),
+        bodyHtml: resolvePlaceholders(html),
+        signature: withSignature,
+      };
       const result = doc
         ? await doc.preview(email)
-        : await previewEmailAction({ subject: email.subject, body: email.bodyHtml, dealId });
+        : await previewEmailAction({ subject: email.subject, body: email.bodyHtml, dealId, signature: withSignature });
       if (!result.ok) {
         toast.error(result.error);
         return;
@@ -590,6 +617,7 @@ export function SendEmailModal({
         bcc: hidden.addresses.join(", ") || undefined,
         subject: resolvePlaceholders(subject),
         templateId: templateId ?? undefined,
+        signature: withSignature,
       };
       const result = doc
         ? await doc.send({ ...email, bodyHtml: resolvePlaceholders(finalBody) })
@@ -1045,7 +1073,23 @@ export function SendEmailModal({
 
         {/* ── Footer ─────────────────────────────────────────────────────── */}
         <div className="flex shrink-0 items-center gap-3 border-t bg-background px-4 py-3 md:px-5">
-          <p className="hidden min-w-0 flex-1 text-muted-foreground text-xs sm:block">{t("footerHint")}</p>
+          {offersSignature && (
+            <Button
+              type="button"
+              variant={withSignature ? "secondary" : "ghost"}
+              size="sm"
+              aria-pressed={withSignature}
+              title={withSignature ? t("signatureOn") : t("signatureOff")}
+              onClick={() => {
+                setWithSignature((v) => !v);
+                setPreview(null);
+              }}
+            >
+              <SignatureIcon />
+              <span className={cn(!withSignature && "line-through")}>{t("signature")}</span>
+            </Button>
+          )}
+          <p className="hidden min-w-0 flex-1 text-muted-foreground text-xs lg:block">{t("footerHint")}</p>
           <div className="ml-auto flex items-center gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={discard} aria-label={t("discard")}>
               <Trash2Icon />

@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { Loader2, PlugZap, Send } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -27,7 +25,6 @@ type Settings = Awaited<ReturnType<typeof getSdiSettings>>;
  */
 export function SdiSettingsForm({ initial }: { initial: Settings }) {
   const t = useTranslations("invoicing.sdi");
-  const router = useRouter();
   const [channel, setChannel] = useState<string>(initial.channel);
   const [environment, setEnvironment] = useState<string>(initial.environment);
   const [username, setUsername] = useState(initial.username);
@@ -54,13 +51,11 @@ export function SdiSettingsForm({ initial }: { initial: Settings }) {
       setPassword("");
       if (!thenTest) {
         toast.success(t("saved"));
-        router.refresh();
         return;
       }
       const checked = await testSdiConnection().catch(() => null);
       if (checked?.ok) toast.success(t("connected", { provider: label }));
       else toast.error(checked && !checked.ok ? checked.error : t("failed"));
-      router.refresh();
     });
   }
 

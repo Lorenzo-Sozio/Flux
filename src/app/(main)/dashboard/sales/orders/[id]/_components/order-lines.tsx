@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Package, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -183,14 +181,12 @@ export function OrderLines({
   canWrite: boolean;
 }) {
   const t = useTranslations("orders.detail");
-  const router = useRouter();
   const { formatMoney } = useCurrency();
   const [pending, startTransition] = useTransition();
 
   const handleAddItem = async (item: { productId: string; quantity: number; unitPrice: number }) => {
     await addOrderItem(orderId, item);
     toast.success(t("itemAdded"));
-    router.refresh();
   };
 
   const handleRemoveItem = (itemId: string) => {
@@ -198,7 +194,6 @@ export function OrderLines({
     startTransition(async () => {
       await removeOrderItem(itemId, orderId);
       toast.success(t("itemRemoved"));
-      router.refresh();
     });
   };
 

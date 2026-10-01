@@ -9,12 +9,15 @@ import { tenantMembers, users } from "@/db/schema";
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability } from "@/lib/auth-guard";
 import { type BookingSettings, cleanBookingSettings, ensureBookingLink, saveBookingSettings } from "@/lib/booking";
+import type { EmailBrand, SignatureSettings } from "@/lib/email-brand";
+import { loadEmailBrand } from "@/lib/email-brand-load";
 import { getTenantById } from "@/lib/get-tenant";
 import { inboundEmailConfigured } from "@/lib/inbound-sales-reply";
 import { archiveAddress, archiveDomain, ensureArchiveToken, rotateArchiveToken } from "@/lib/mail-archive";
 import { can } from "@/lib/permissions";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { decryptDbUrl } from "@/lib/tenant-db";
+import { readSignatureSettings, writeSignatureSettings } from "@/lib/workspace-preferences";
 
 /**
  * The signed-in person's own account: what the profile page shows and changes.
@@ -151,4 +154,43 @@ export async function saveBookingLinkAction(
   if (!settings) return { ok: false };
   await saveBookingSettings(await getDb(), actor.userId, settings);
   return { ok: true, state: await getOwnBookingLink() };
+}
+
+export interface OwnSignature {
+  settings: SignatureSettings;
+  /** The account's side of it, for the preview: the name and address are the account's. */
+  person: { name: string | null; email: string | null; image: string | null };
+  /** The workspace's side of it (Settings → General and the invoicing details), for the preview. */
+  brand: EmailBrand;
+}
+
+/**
+ * The person's email signature (src/lib/email-brand.ts): their role and phones, set here, beside
+ * the workspace's identity, which they see but do not change. Theirs in this workspace only — a
+ * role differs from one company to the next.
+ */
+export async function getOwnSignature(): Promise<OwnSignature> {
+  const actor = await requireCapability("record:read");
+  const db = await getDb();
+  const [[account], settings, brand] = await Promise.all([
+    // The workspace's copy of the account, which is what the send reads (email-deliver.ts).
+    db
+      .select({ name: users.name, email: users.email, image: users.image })
+      .from(users)
+      .where(eq(users.id, actor.userId)),
+    readSignatureSettings(db, actor.userId),
+    loadEmailBrand(db),
+  ]);
+  return {
+    settings,
+    person: { name: account?.name ?? null, email: account?.email ?? null, image: account?.image ?? null },
+    brand,
+  };
+}
+
+export async function saveOwnSignatureAction(input: SignatureSettings): Promise<SignatureSettings> {
+  const actor = await requireCapability("record:read");
+  const saved = await writeSignatureSettings(await getDb(), actor.userId, input);
+  revalidatePath("/dashboard/profile");
+  return saved;
 }

@@ -26,14 +26,16 @@ import {
   INVOICE_TEXT,
 } from "@/lib/document-language";
 import {
-  documentEmailFrame,
   type InvoiceCopyData,
   invoiceCopyContent,
+  invoiceCopyLayout,
   type PaymentReminderData,
   paymentReminderContent,
+  paymentReminderLayout,
   sendInvoiceCopyEmail,
   sendPaymentReminderEmail,
 } from "@/lib/email";
+import { loadEmailBrand } from "@/lib/email-brand-load";
 import { composeEmail, deliverEmail, type EmailPreview } from "@/lib/email-deliver";
 import { documentValues, type PlaceholderValues } from "@/lib/email-placeholders";
 import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
@@ -1326,6 +1328,8 @@ export interface InvoiceEmail {
   bodyHtml: string;
   /** The template the text started from: counted, so the ones in use come first. */
   templateId?: string;
+  /** False when the person took the signature off this one email (a reminder carries theirs). */
+  signature?: boolean;
 }
 
 type InvoiceRow = typeof invoices.$inferSelect;
@@ -1350,6 +1354,7 @@ function copyContentOf(invoice: InvoiceRow): Omit<InvoiceCopyData, "to"> {
       dueDate: i.dueDate,
       amount: formatDocumentMoney(i.amount, invoice.currency, lang),
     })),
+    iban: invoice.paymentMethod === "MP05" ? issuer.iban : null,
     lang,
   };
 }
@@ -1383,6 +1388,7 @@ async function reminderContentOf(
       issueDate: invoice.issueDate,
       dueDate: owed.dueDate,
       amount: formatDocumentMoney(owed.overdueAmount, invoice.currency, lang),
+      daysOverdue: Math.max(0, Math.round((Date.parse(today) - Date.parse(owed.dueDate)) / 86_400_000)),
       iban: invoice.paymentMethod === "MP05" ? issuer.iban : null,
       lang,
     },
@@ -1443,19 +1449,48 @@ export async function getInvoiceEmailDraftAction(
 /** An invoice's email — its copy or a reminder — as the customer will receive it, without sending it. */
 export async function previewInvoiceEmailAction(
   id: string,
-  email: { subject: string; bodyHtml: string },
+  email: { subject: string; bodyHtml: string; signature?: boolean },
+  kind: "copy" | "reminder" = "copy",
 ): Promise<EmailPreview> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
-  const db = await getDb();
-  const [invoice] = await db.select({ id: invoices.id }).from(invoices).where(eq(invoices.id, id));
-  if (!invoice) return { ok: false, error: (await serverT("serverErrors.invoices"))("notFound") };
+  const t = await serverT("serverErrors.invoices");
+  const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  if (!invoice) return { ok: false, error: t("notFound") };
+  let layout: ReturnType<typeof invoiceLayoutOf>;
+  if (kind === "reminder") {
+    const reminder = await reminderContentOf(db, invoice, timeZone);
+    if ("error" in reminder) return { ok: false, error: t(reminder.error) };
+    layout = invoiceLayoutOf(reminder.data, email.signature);
+  } else {
+    layout = invoiceLayoutOf(copyContentOf(invoice));
+  }
   const composed = await composeEmail(
     db,
     { userId: actor.userId },
-    { subject: email.subject, html: email.bodyHtml, finish: documentEmailFrame },
+    { subject: email.subject, html: email.bodyHtml, ...layout },
   );
   return { ok: true, subject: composed.subject, html: composed.html };
+}
+
+/**
+ * How an invoice's email is laid out, for `composeEmail`/`deliverEmail`: the copy in the frame
+ * with its figures and no personal signature (it comes from the business); the reminder in the
+ * frame with the amber box and the sender's compact signature, unless they took it off.
+ */
+function invoiceLayoutOf(
+  data: Omit<InvoiceCopyData, "to"> | Omit<PaymentReminderData, "to" | "withPdf">,
+  signature?: boolean,
+) {
+  if ("daysOverdue" in data) {
+    return {
+      finish: paymentReminderLayout(data),
+      lang: data.lang,
+      signature: signature === false ? ("none" as const) : ("compact" as const),
+    };
+  }
+  return { finish: invoiceCopyLayout(data), lang: data.lang, signature: "none" as const };
 }
 
 /**
@@ -1484,6 +1519,7 @@ export async function sendInvoiceCopy(
   const pdf = await readInvoiceFile(db, invoice, "pdf");
   const issuer = (invoice.issuerSnapshot ?? {}) as Issuer;
   const attachment = { filename: pdf.name, content: pdf.bytes, contentType: "application/pdf" };
+  const copy = copyContentOf(invoice);
   // From the business, with the issuer's address to answer to; the person's text when they wrote
   // one in the dialog, the standard one otherwise.
   const sent = email
@@ -1501,14 +1537,15 @@ export async function sendInvoiceCopy(
           attachments: [attachment],
           log: { companyId: invoice.companyId, document: { type: "invoice", id, number: invoice.documentNumber } },
           templateId: email.templateId,
-          finish: documentEmailFrame,
+          ...invoiceLayoutOf(copy),
         },
       )
     : await sendInvoiceCopyEmail({
         to: address,
-        ...copyContentOf(invoice),
+        ...copy,
         pdf: { filename: pdf.name, bytes: pdf.bytes },
         replyTo: issuer.email,
+        brand: await loadEmailBrand(db),
       });
   if (!sent.success)
     return { ok: false, error: sent.error ?? (await serverT("serverErrors.invoices"))("emailNotSent") };
@@ -1585,7 +1622,7 @@ export async function sendPaymentReminder(
             document: { type: "invoice", id, number: invoice.documentNumber },
           },
           templateId: email.templateId,
-          finish: documentEmailFrame,
+          ...invoiceLayoutOf(reminder.data, email.signature),
         },
       )
     : await sendPaymentReminderEmail({
@@ -1593,6 +1630,7 @@ export async function sendPaymentReminder(
         ...reminder.data,
         pdf: pdf ? { filename: pdf.name, bytes: pdf.bytes } : null,
         replyTo: issuer.email,
+        brand: await loadEmailBrand(db),
       });
   if (!sent.success) {
     await db

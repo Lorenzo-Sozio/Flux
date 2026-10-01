@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+
 import Link from "next/link";
 import { after } from "next/server";
 
@@ -41,6 +43,7 @@ import CRMCharts from "@/components/dashboard/crm-charts-lazy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { deals, leads, salesTargets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
@@ -132,18 +135,22 @@ export default async function CRMPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const db = await getDb();
-  const t = await getTranslations("crm");
-  const tc = await getTranslations("common");
-
-  const locale = await getLocale();
-  const actor = await getActor();
-  const userId = actor?.userId;
-  const params = await searchParams;
+  // ⚠️ All at once: these eight were awaited one after another, three round trips and more before
+  // the home could even decide which dashboard to draw.
   // Which dashboard (src/lib/home-dashboards.ts): the address wins, then the person's own
   // choice in their Profile, then the role. A setting that cannot be read is no choice
   // made — the default for the role — never a home page that does not load.
-  const setting = await getHomeDashboardSetting().catch(() => null);
+  const [db, t, tc, locale, actor, params, setting, timeZone] = await Promise.all([
+    getDb(),
+    getTranslations("crm"),
+    getTranslations("common"),
+    getLocale(),
+    getActor(),
+    searchParams,
+    getHomeDashboardSetting().catch(() => null),
+    getWorkspaceTimeZone(),
+  ]);
+  const userId = actor?.userId;
   const dashboard = resolveHomeDashboard(
     { fromUrl: params.dashboard ?? params.view, saved: setting?.saved },
     setting?.access ?? {
@@ -162,7 +169,6 @@ export default async function CRMPage({
   const now = new Date();
   // The month on the workspace's clock: a deal won at 00:30 on the first, Rome time, is
   // this month's — on the server's UTC clock it was still last month's.
-  const timeZone = await getWorkspaceTimeZone();
   const currentPeriod = toWallDate(now, timeZone).slice(0, 7);
   const monthStart = workspaceMonthStart(now, timeZone);
 
@@ -223,7 +229,7 @@ export default async function CRMPage({
   // The four numbers of one's own are Commerciale's; Direzione does not read them, and
   // the month-target card that showed one's own target on the business's page is gone.
   const mine = view === "me" ? userId : undefined;
-  const [myTarget, wonThisMonth, myLeads, nextActions, today, onboarding, bareDeals, modules] = await Promise.all([
+  const [myTarget, wonThisMonth, myLeads, today, bareDeals, modules] = await Promise.all([
     // Current month target for this user
     mine
       ? db
@@ -255,18 +261,10 @@ export default async function CRMPage({
           .catch(() => 0)
       : Promise.resolve(0),
 
-    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
-    // build the work list must not take the whole dashboard down with it: an
-    // empty list reads as "nothing waiting", which is the safe way to be wrong.
-    getNextActions(8).catch(() => null),
-
     // The day's agenda. This page used to assemble it from three queries of its
     // own and a hundred and thirty lines of mapping; the "today" screen needs the
     // same list, and two copies of it would have drifted apart within a month.
     getTodayView(),
-
-    // The first-run steps, for whoever manages the workspace. Never the reason the page fails.
-    getOnboarding().catch(() => null),
 
     // The first of the three numbers of one's own. Never the reason the page fails.
     mine ? countOpenDealsWithoutNextStep(db, mine).catch(() => 0) : Promise.resolve(0),
@@ -512,18 +510,17 @@ export default async function CRMPage({
         one says what to do about it, which is the question the screen is opened
         with (audit rilievo S-02).
       */}
-      {onboarding && showOnboarding(onboarding) && (
-        <div className="max-md:order-first">
-          <OnboardingCard state={onboarding} />
-        </div>
-      )}
+      {/* ⚠️ Streamed: the work list is seven statements and the first-run steps two more. Awaited
+          with the rest, they held back the whole home — the greeting, the figures, the agenda —
+          on a pool of three connections. They arrive a moment after, each in its place. */}
+      <Suspense fallback={null}>
+        <HomeOnboarding />
+      </Suspense>
 
       <div className="max-md:order-3">
-        <NextActionsCard
-          actions={nextActions ?? []}
-          failed={nextActions === null}
-          canWrite={can(actor, "record:write")}
-        />
+        <Suspense fallback={<NextActionsSkeleton />}>
+          <HomeNextActions canWrite={can(actor, "record:write")} />
+        </Suspense>
       </div>
 
       {/* ── Agenda + Tickets ─────────────────────────────────────────── */}
@@ -803,6 +800,44 @@ export default async function CRMPage({
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+/** The first-run steps, for whoever manages the workspace. Never the reason the page fails. */
+async function HomeOnboarding() {
+  const onboarding = await getOnboarding().catch(() => null);
+  if (!onboarding || !showOnboarding(onboarding)) return null;
+  return (
+    <div className="max-md:order-first">
+      <OnboardingCard state={onboarding} />
+    </div>
+  );
+}
+
+/**
+ * What needs doing, rather than what exists (audit rilievo S-02). Failing to build the work list
+ * must not take the whole dashboard down with it: an empty list reads as "nothing waiting", which is
+ * the safe way to be wrong.
+ */
+async function HomeNextActions({ canWrite }: { canWrite: boolean }) {
+  const nextActions = await getNextActions(8).catch(() => null);
+  return <NextActionsCard actions={nextActions ?? []} failed={nextActions === null} canWrite={canWrite} />;
+}
+
+function NextActionsSkeleton() {
+  return (
+    <div className="space-y-3 rounded-xl border p-4" aria-hidden>
+      <Skeleton className="h-5 w-40" />
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3">
+          <Skeleton className="size-8 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-1.5">
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-1/3" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

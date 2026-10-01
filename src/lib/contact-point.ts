@@ -94,6 +94,26 @@ export function phoneVariants(digits: string, callingCode: string | null): strin
   return [...out];
 }
 
+/**
+ * What the global search looks for in phone and mobile columns, as `LIKE` patterns on digits.
+ *
+ * Always the digits as typed — four or more, so a number's last digits find it. ⚠️ Typed with an
+ * international prefix ("+39 333 …", "0039 333 …", copied from WhatsApp or a signature), also the
+ * national number by `phoneVariants`, the rule the opt-out and the erasure use: the same number
+ * saved as "333 …" was not found. A query without a prefix is exactly what it was, so nothing
+ * found before stops being found, and a national number starting 39 is never cut.
+ */
+export function phoneSearchPatterns(query: string, callingCode: string | null): string[] | null {
+  const digits = query.replace(/\D/g, "");
+  if (digits.length < 4) return null;
+  const patterns = new Set([digits]);
+  if (/^\s*(\+|00)/.test(query)) {
+    const bare = /^\s*00/.test(query) ? digits.replace(/^00/, "") : digits;
+    for (const variant of phoneVariants(`+${bare}`, callingCode)) patterns.add(variant);
+  }
+  return [...patterns].map((d) => `%${d}%`);
+}
+
 export function matchesContactPoint(
   table: typeof leads | typeof contacts,
   email: string | null,

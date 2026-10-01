@@ -8,6 +8,8 @@
  * layers cannot drift apart — which is exactly what happened before (audit
  * rilievi P-01 → P-06, U-02).
  */
+import { cache } from "react";
+
 import { auth } from "@/auth";
 import { getAdminSession } from "@/lib/admin-session";
 import { assertLimit, EntitlementError, getEntitlements, requireModule } from "@/lib/billing/licensing";
@@ -163,8 +165,8 @@ export async function requireAdminPanelAccess(): Promise<{ user: { id: string; r
 
 // ─── Entitlements ─────────────────────────────────────────────────────────────
 
-/** Returns the active tenant's entitlements, or null outside a tenant context. */
-export async function getTenantEntitlements() {
+/** Returns the active tenant's entitlements, or null outside a tenant context. Once per request. */
+export const getTenantEntitlements = cache(async function getTenantEntitlements() {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return null;
 
@@ -172,7 +174,7 @@ export async function getTenantEntitlements() {
   if (!tenant) return null;
 
   return getEntitlements(tenant.id);
-}
+});
 
 /** Requires the subscription to be operational. */
 export async function requireActiveSubscription() {

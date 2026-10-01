@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePipelineFilters, pipelineView } from "@/lib/pipeline-filters";
 
-import { PipelineReportCharts } from "./_components/pipeline-report-charts";
+import { PipelineReportCharts } from "./_components/pipeline-report-charts-lazy";
 
 export default async function PipelineReportPage({
   searchParams,

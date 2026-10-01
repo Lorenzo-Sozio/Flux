@@ -32,14 +32,12 @@ const STATUSES: OrderStatus[] = ["draft", "processing", "completed", "cancelled"
 function useStatusChange(orderId: string) {
   const t = useTranslations("orders.detail");
   const tFail = useTranslations("orders.payments");
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const change = (status: OrderStatus) =>
     startTransition(async () => {
       try {
         await updateOrderStatus(orderId, status);
         toast.success(t("statusUpdated"));
-        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : tFail("recordFailed"));
       }

@@ -534,8 +534,8 @@ until the email is sent, and sending counts the template's use (`use_count`).
   (`{{trattativa}}`, `{{valore}}`, in the deal's currency and the customer's language).
 - ⚠️⚠️ So `renderPlaceholders` leaves a field it was **not given** as written, and blanks only one
   given empty. Blanking both would send every email unsigned.
-- The campaign editors offer only recipient fields and the unsubscribe link: a campaign has no
-  sender or deal to fill the others with.
+- The campaign editors offer only recipient fields, the unsubscribe link and the letterhead and
+  signature (scope `brand`, filled by every sender): a campaign has no sender or deal to fill the others with.
 
 **Parts to write by hand**, in square brackets (`[numero fattura]`), are asked about before sending
 (`pendingFields`). So are a deal's field outside a deal and a field nobody knows.
@@ -569,6 +569,50 @@ won and lost, orders, contracts, invoices and payments, support, reviews and rea
 
 `src/lib/ai/*.test.ts` (recorded answers, PGlite); `scripts/mutations/ai-provider.json`, `ai-access.json`,
 `ai-copilot.json`.
+
+### Emails to customers carry the workspace's identity
+
+[src/lib/email-brand.ts](src/lib/email-brand.ts) draws what every email to a customer looks like;
+[src/lib/email-brand-load.ts](src/lib/email-brand-load.ts) reads it. Three pieces:
+
+- **The frame** (`brandFrame`): a bar in the brand colour, the logo and what the email is
+  ("Preventivo 2026/014"), a hidden preheader, the company's details underneath. Quotes, invoice
+  copies, payment reminders, appointment invitations and ticket replies go out in it.
+- **The signature** (`signatureHtml`), `full` or `compact`: the person's name, role and phones from
+  their Profile (`workspace_setting` `signature.<userId>`), and the workspace's logo, address,
+  VAT number, website and socials. Added by `composeEmail` to every email written from the CRM —
+  also from a connected Gmail/Outlook mailbox (decided 1 October 2026: Flux's signature, not the
+  mailbox's) — and taken off a single message with the dialog's "Firma" button.
+- **The boxes** before the text: `summaryBox` (the total, the installments; amber for a reminder),
+  `ctaButton`, `ibanBox`.
+
+Brand colour, website and socials are `workspace_setting` `brand.identity` (Settings → General),
+next to `brand.logo`. No migration: everything is a setting.
+
+- ⚠️⚠️ **Everything a person typed is escaped; every link is http(s); every colour is a hex.** A
+  job title or a company name reaches a customer's inbox inside HTML. `cleanUrl` refuses
+  `javascript://host/…` by its scheme — a host does not make it a web address.
+- ⚠️⚠️ **The logo has a public address, signed for one workspace**:
+  `/api/brand/logo/<token>?v=` ([src/lib/brand-logo-token.ts](src/lib/brand-logo-token.ts)). A
+  mail client fetches images with no session. The token signs `brand-logo:<tenant>` with
+  `AUTH_SECRET` — the purpose is part of what is signed, so a calendar feed token is never a logo
+  token — and opens that workspace's logo and nothing else. `?v=` changes with the logo. Without a
+  logo, an app URL or `AUTH_SECRET`, the company's name is drawn as a wordmark instead.
+- ⚠️ A light brand colour gets dark text on its buttons (`inkOn`, WCAG 3:1), and is not used as text.
+- ⚠️⚠️ **A template that places `{{firma}}` gets the signature there, and not again at the end**
+  (`placesSignature`). `{{intestazione}}` and `{{firma}}` are the builder's "Letterhead" and
+  "Signature" blocks (placeholder scope `brand`), filled by every sender: `composeEmail`, campaigns
+  (the sender's signature, the campaign owner's when the scheduler sends), sequences (the
+  enrollment owner's: full on the first email, compact on a reply in the thread) and rules (the
+  record owner's).
+- ⚠️ An invoice's copy carries **no** personal signature — it comes from the business — and a
+  credit note no IBAN. A reminder carries the sender's compact signature.
+- ⚠️ **Each recipient reads it in their language.** Appointment invitations follow the invited
+  contact's company (`documentLanguage`); a colleague or a typed address reads Italian. They were
+  Italian for everybody, and the ticket reply had an English line for everybody.
+
+`src/lib/email-brand.test.ts`, `src/lib/email-brand-compose.test.ts` (PGlite),
+`src/lib/brand-logo-token.test.ts`; `scripts/mutations/email-brand.json`.
 
 ### Deploy: Vercel e Cloudflare Workers
 
@@ -685,9 +729,9 @@ and a mismatch is a silent no-op.
 ⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
 schedules to fit; an eighth job on a new schedule needs Workers Paid.
 
-⚠️⚠️ **The bundle is 8.93 MB gzipped against a 10 MB limit** (measured on 30 September
-2026 with `npx wrangler deploy --dry-run`: 9,149 KiB of 10,240 — up 181 KiB with the copilot, the
-email dialog everywhere and the email templates). It fits Workers Paid, never
+⚠️⚠️ **The bundle is 9.06 MB gzipped against a 10 MB limit** (measured on 1 October 2026
+with `npx wrangler deploy --dry-run`: 9,276 KiB of 10,240; 9,149 on 30 September, before the
+branded emails and the work beside them). It fits Workers Paid, never
 Free (3 MB). ⚠️⚠️ **Next bundles per route, so an import is paid once per route that reaches
 it.** The SDI integration first took it to 9,977 KiB — 263 KiB from the limit — because the
 settings page and the job imported the sending module, which imported the invoice archive, which
@@ -1109,6 +1153,60 @@ quotes. Members only, `digest_email` switchable in My notifications, written in 
 `locale` remembered from the home page, and claimed per day with a conditional update so
 two runs send one email. ⚠️ Built from a few grouped queries per workspace, never the full
 work list per person: the job runs every workspace in one request.
+
+### Speed: what a page switch costs
+
+Every query is a round trip through Hyperdrive (tens of ms) on a pool of three, so a page is as fast
+as its longest chain of awaits. Audit of 1 October 2026; the rules it left:
+
+- ⚠️⚠️ **`auth()` is read once per request** (`cache()` in [src/auth.ts](src/auth.ts)): a page used to
+  call it five to ten times, and once the role check was five minutes old each call queried the
+  registry. The role read is remembered per isolate for those five minutes (`recentMembership`).
+- ⚠️⚠️ **Per-request lookups go through React `cache()`**: `getTenantById`, `getEntitlements`,
+  `getTenantEntitlements`, `readWorkspaceFeatures`. ⚠️ **Never a promise shared between requests**:
+  on Workers a request awaiting I/O another request started can hang. Isolate maps keep values.
+- **Start independent reads together** and await them where used: the record pages start the
+  copilot's entry, the plan, the timeline summary and every list before the record row arrives.
+- **A slow card gets its own `<Suspense>`**: `RecordTimeline` has one inside it, so the record draws
+  before its history; its own queries run side by side.
+- **Every section and every record page has a `loading.tsx`** from
+  [page-skeletons.tsx](src/components/crm/page-skeletons.tsx) (list, record, board, calendar). A new
+  section adds one.
+- ⚠️⚠️ **Navigation links are `IntentLink`** ([intent-link.tsx](src/components/intent-link.tsx)):
+  prefetch on hover, touch or focus, so the skeleton is there at the tap. Not `prefetch={false}`
+  (every tap a cold trip, the old page frozen), not viewport prefetch on forty sidebar links. A
+  `LinkPending` dot and the top `NavigationProgress` bar answer every tap at once.
+- `experimental.staleTimes.dynamic: 30` in next.config.mjs: a page seen in the last 30 seconds is
+  shown again at once; a save still invalidates it.
+- **Data a dialog needs is loaded when it opens**, never with the page: the deal dialog's companies
+  and contacts (every row of both tables used to travel with each board and deal visit), the email
+  composer's templates. **A row's edit dialog is mounted at the first press** (contacts, leads).
+- **Heavy client code is `next/dynamic`**: the email editor (Tiptap) loads when the composer opens.
+- **No redirect to apply a default**: the board applies `owners=<me>` itself and writes it into the
+  address with `history.replaceState` (two server renders per tap before).
+- The service worker uses navigation preload: a cold installed app no longer waits for the worker
+  to wake before asking for the page.
+- ⚠️⚠️ **No `router.refresh()` after an action that revalidates the page being viewed.** The action's
+  response already carries the page re-rendered ("updates the UI immediately, if viewing the
+  affected path"); a refresh after it rendered everything a second time, layout included. 73 of 103
+  were removed on 1 October 2026. A refresh stays only where the action does **not** cover the
+  page: a literal list path (`/dashboard/leads`) does not cover `/dashboard/leads/123`, so the
+  record pages' stage bars, the deal edit button and the merge dialog keep theirs; so do a change of
+  session, an `/api` fetch, and a refresh that also runs when the action failed (to undo an
+  optimistic change).
+- **The home streams its work list and first-run card** (`HomeNextActions`, `HomeOnboarding` in
+  their own `<Suspense>`): nine of its ~20 statements no longer hold back the greeting, the figures
+  and the agenda.
+- **Charts load after the page** (`*-lazy.tsx` beside forecast, pipeline report and cash flow).
+  ⚠️ A module that renders a chart must not export anything else a page imports: `CashError` lived
+  in cash-card.tsx and put Recharts into every company page (it is `cash-error.tsx` now).
+- A ticket's linked tasks and people arrive with the page; its presence is one request every 30
+  seconds and none from a hidden tab. ⚠️ Presence is kept in one isolate's memory, so on Workers it
+  is a hint, not a fact: making it reliable needs shared state (a Durable Object), not the database
+  every 15 seconds.
+- ⚠️ **The message catalog is not split** (decided 1 October 2026): 89 of its 93 namespaces are read by
+  Client Components, so `pick` would save 4%; a real cut means a catalog per section, 573 files. It
+  travels with full loads and refreshes, compressed, which is why removing refreshes mattered.
 
 ### A lead assigned is a lead somebody is told about
 
@@ -1784,8 +1882,21 @@ Flux installs to a phone's home screen: [src/app/manifest.ts](src/app/manifest.t
 export in the root layout that declares `viewport-fit=cover` — without which every
 `env(safe-area-inset-*)` is zero and the bottom bar sits on the home indicator.
 
+**The mark is one drawing** ([scripts/brand/flux-mark.mjs](scripts/brand/flux-mark.mjs)): the looped
+square (⌘) as one closed strand in four ribbons, each one tone (its bar and its loop), the colour
+changing smoothly where one hands over to the next, each starting on top of the one before. On the
+navy tile it is every icon in `public/icons/`, the 18 launch images, the opening screen and
+`BrandMark` (the sidebar, the sign-in pages); the logos with the name are in `public/brand/`
+(`flux-logo-crm.png` is the one to upload as a workspace logo).
+- ⚠️ SVG has no gradient along a curve, so the strand is fine slices, each reaching back over the one
+  before by more than its own length — otherwise a hairline shows between them when downscaled.
+- ⚠️ `public/icons/` is served cache-first by the service worker: new icons need `VERSION` bumped in
+  `public/sw.js`, or installed apps keep the old ones.
+- The name in `public/brand/` is Plus Jakarta Sans (SIL OFL) converted to paths; the script that set
+  it is not in the repository (it needs opentype.js), so those files are the source for the name.
+
 **The opening screen is one gradient from the system to the page.**
-- Android paints the manifest's `background_color`, which is brand blue, not white.
+- Android paints the manifest's `background_color`, the tile's navy, not white.
 - iOS shows an `apple-touch-startup-image` for the exact screen size. There are
   18 of them in `public/splash/`, generated by `npm run generate:icons` from
   `src/config/splash-screens.json`. Without one iOS opens on white.
@@ -1939,12 +2050,19 @@ auto-migration as everything else.
   read" as a filter. A new panel in that bar uses the same component: a 320px dropdown on a phone
   is a third of the screen with the page still under it to tap by mistake.
 - ⚠️⚠️ **Back closes what is open, not the page** ([use-back-dismiss.ts](src/hooks/use-back-dismiss.ts)):
-  below md every Dialog, Sheet and Drawer pushes a history entry naming itself and closes when Back
-  takes it away — one layer at a time, so the template list closes and the email dialog under it
-  stays. Closed by its X, a layer takes its entry back off; closed by navigating, it leaves the new
-  page's entry alone. It is in the primitives, so a new dialog has it without asking. ⚠️ The
-  dialog's close button is `z-20`: a sticky header inside the content (z-10) used to paint over it,
-  and the full-screen panels had no visible way out.
+  below md every Dialog, AlertDialog, Sheet and Drawer — the record edit forms, confirmations, the
+  panels, the Menu — owns one history entry and closes when Back takes it, one layer at a time (the
+  template list closes, the email dialog under it stays). It is in the primitives, so a new dialog
+  has it without asking.
+  - ⚠️⚠️ **The open layers are counted in memory, never written into `history.state`**: Next's router
+    rewrites the current entry's state on every refresh, and the first version lost its layers there.
+  - ⚠️⚠️ **Closing a layer never moves the history.** A `history.back()` on close is a navigation to
+    Next, which discards what it has in flight: a record saved in its edit dialog closes it and
+    refreshes the page at once, and the refresh was thrown away; a link from the Menu was cancelled.
+    A closed layer's entry stays, *spent*: the next layer on the same page takes it over, and a Back
+    with nothing open skips the spent entries and the page's own with one `history.go(-n)`.
+  - ⚠️ The full-screen panel draws its close button in its own header (`ownCloseButton`); the
+    dialog's default one is `z-20` and moves up on a touchscreen, where every button is 44px tall.
 - **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).
   A nine-column table does not become usable by scrolling sideways. Contacts,
   companies, leads, orders, quotes and tickets render cards below `md` and the
@@ -2412,6 +2530,13 @@ screen in production, so it is not the place for user-facing text.
 ### Sidebar navigation
 
 Defined in [src/navigation/sidebar/sidebar-items.ts](src/navigation/sidebar/sidebar-items.ts) as typed `NavGroup[]`. Add new routes here to make them appear in the sidebar.
+
+- **Groups are kinds of work, in the order a customer meets them** (1 October 2026): Work
+  (dashboard, work queue, calendar, tasks, chat) · Customers (leads, contacts, companies) ·
+  Sales (pipeline with its analyses then targets and commissions, quotes, orders, contracts,
+  products, price lists) · **Billing and payments** (invoices, bank, finance) · Support ·
+  Marketing and automation · Analysis (reports, the assistant's contribution) · the account
+  group. ⚠️ The array's order is the menu's; `id` is only a React key.
 
 - **`need`** is the permission; an entry to a guarded page without one shows a link that
   bounces (Finance did, for every editor).

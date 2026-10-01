@@ -25,6 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrency } from "@/hooks/use-currency";
 import type { ContractPhase } from "@/lib/contract-terms";
@@ -107,37 +108,39 @@ export function ContractsClient({
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
+      {/* On a phone MRR and ARR side by side and the renewals under them: three cards stacked
+          full width were half the screen before the first contract. */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Card className="max-sm:gap-1 max-sm:py-3">
+          <CardHeader className="pb-2 max-sm:px-3 max-sm:pb-0">
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("mrr")}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="break-words font-bold text-2xl tabular-nums">{byCurrency(1)}</div>
+          <CardContent className="max-sm:px-3">
+            <div className="break-words font-bold text-2xl tabular-nums max-sm:text-lg">{byCurrency(1)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("mrrDesc", { count: earning })}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
+        <Card className="max-sm:gap-1 max-sm:py-3">
+          <CardHeader className="pb-2 max-sm:px-3 max-sm:pb-0">
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("arr")}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="break-words font-bold text-2xl tabular-nums">{byCurrency(12)}</div>
+          <CardContent className="max-sm:px-3">
+            <div className="break-words font-bold text-2xl tabular-nums max-sm:text-lg">{byCurrency(12)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("arrDesc")}</p>
           </CardContent>
         </Card>
-        <Link href={viewHref("renewal_due")} className="group">
+        <Link href={viewHref("renewal_due")} className="group max-sm:col-span-2">
           <Card
             className={cn(
-              "transition-shadow group-hover:shadow-md",
+              "transition-shadow group-hover:shadow-md max-sm:gap-1 max-sm:py-3",
               due > 0 && "border-amber-300 dark:border-amber-800",
             )}
           >
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 max-sm:px-3 max-sm:pb-0">
               <CardTitle className="font-medium text-muted-foreground text-sm">{t("renewalsDue")}</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="font-bold text-2xl tabular-nums">{due}</div>
+            <CardContent className="max-sm:px-3">
+              <div className="font-bold text-2xl tabular-nums max-sm:text-lg">{due}</div>
               <p className="mt-1 text-muted-foreground text-xs">{t("renewalsDueDesc")}</p>
             </CardContent>
           </Card>
@@ -145,9 +148,28 @@ export function ContractsClient({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Five views do not fit a phone's width; they scroll sideways there instead
-            of wrapping into a second row that looks like a different control. */}
-        <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto max-sm:pb-1 sm:flex-wrap">
+        {/* ⚠️ On a phone the five views are one menu, full width — the phone's own picker opens.
+            They used to scroll sideways, which hid "Expired" and "Cancelled" past the edge with
+            nothing to say they were there; wrapping made a second row that read as another
+            control. From sm up there is room for them as buttons. */}
+        <div className="w-full sm:hidden">
+          <label htmlFor="contracts-view" className="sr-only">
+            {t("viewLabel")}
+          </label>
+          <NativeSelect
+            id="contracts-view"
+            className="w-full"
+            value={view}
+            onChange={(e) => router.push(viewHref(e.target.value), { scroll: false })}
+          >
+            {VIEWS.map((v) => (
+              <NativeSelectOption key={v} value={v}>
+                {v === "renewal_due" && due > 0 ? `${t(`views.${v}`)} (${due})` : t(`views.${v}`)}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="hidden min-w-0 flex-wrap gap-2 sm:flex">
           {VIEWS.map((v) => (
             <Button key={v} asChild size="sm" variant={view === v ? "default" : "outline"} className="shrink-0">
               <Link href={viewHref(v)} scroll={false}>

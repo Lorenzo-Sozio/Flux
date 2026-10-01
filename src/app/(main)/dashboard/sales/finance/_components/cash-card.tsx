@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import Link from "next/link";
 
-import { AlertTriangle, Banknote, Clock, HandCoins, Percent, Wallet } from "lucide-react";
+import { Banknote, Clock, HandCoins, Percent, Wallet } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
@@ -193,14 +193,6 @@ function Figure({
   );
 }
 
-/** The cash figures did not load: said so, with no number standing in for them. */
-export function CashError({ text }: { text: string }) {
-  return (
-    <Card className="border-destructive/40">
-      <CardContent className="flex items-start gap-3 py-4 text-sm">
-        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-        <p>{text}</p>
-      </CardContent>
-    </Card>
-  );
-}
+// The error card lives in ./cash-error.tsx: the company page shows it, and importing it from here
+// carried the chart library into every company page.
+export { CashError } from "./cash-error";

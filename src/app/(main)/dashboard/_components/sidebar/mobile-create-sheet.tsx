@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { entityIcon, GROUP_TINT } from "@/components/crm/entity-icon";
+import { IntentLink as Link } from "@/components/intent-link";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { ENTITIES, ENTITY_GROUPS, type EntityType } from "@/lib/entities";
 import { cn } from "@/lib/utils";
@@ -57,7 +57,6 @@ export function MobileCreateSheet({
           {here && (
             <Link
               href={here.create?.href ?? here.list}
-              prefetch={false}
               onClick={close}
               className="mb-4 flex min-h-14 items-center gap-3 rounded-xl bg-primary px-4 text-primary-foreground shadow-sm active:bg-primary/90"
             >
@@ -82,7 +81,6 @@ export function MobileCreateSheet({
                       <li key={e.type}>
                         <Link
                           href={e.create?.href ?? e.list}
-                          prefetch={false}
                           onClick={close}
                           aria-label={te(`types.${e.type}.new` as never)}
                           className={cn(

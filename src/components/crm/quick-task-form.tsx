@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { format } from "date-fns";
 import { enUS, it } from "date-fns/locale";
 import { CalendarDays, CalendarIcon, Loader2, X } from "lucide-react";
@@ -123,7 +121,6 @@ function DateTimePicker({
 
 export function QuickTaskForm({ entityType, entityId, userId }: Props) {
   const tD = useTranslations("entityDetail");
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const [title, setTitle] = useState("");
@@ -190,8 +187,6 @@ export function QuickTaskForm({ entityType, entityId, userId }: Props) {
         setDueDate(undefined);
         setDueTime("18:00");
         setAssigneeValue(encodeAssignee(userId, null));
-
-        router.refresh();
       } catch {
         toast.error(tD("taskCreateFailed"));
       }

@@ -293,6 +293,8 @@ export const proxy = auth((req) => {
  *                    Outlook and Apple Calendar, which have no session and no
  *                    way to obtain one. The workspace comes from the signed
  *                    token in the URL.
+ * - /api/brand/*     The workspace's logo inside its emails — a mail client
+ *                    fetches images with no session. Signed token, logo only.
  */
 function isPublicApiPath(pathname: string): boolean {
   const PUBLIC_PREFIXES = [
@@ -304,6 +306,7 @@ function isPublicApiPath(pathname: string): boolean {
     "/api/quotes/public",
     "/api/appointments/rsvp",
     "/api/calendar/",
+    "/api/brand/",
   ];
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }

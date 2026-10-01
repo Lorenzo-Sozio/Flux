@@ -1,9 +1,9 @@
 import Link from "next/link";
 
 import { and, eq, gt } from "drizzle-orm";
-import { Command } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
+import { BrandMark } from "@/components/brand-mark";
 import { platformDb } from "@/db";
 import { userInvitations } from "@/db/schema";
 
@@ -69,7 +69,7 @@ export default async function AcceptInvitationPage({ searchParams }: Props) {
       <div className="hidden bg-primary lg:block lg:w-1/3">
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
-            <Command className="mx-auto size-12 text-primary-foreground" />
+            <BrandMark className="mx-auto size-16" />
             <div className="space-y-2">
               <h1 className="font-light text-5xl text-primary-foreground">{t("sidebarTitle")}</h1>
               <p className="text-primary-foreground/80 text-xl">{t("sidebarSubtitle")}</p>

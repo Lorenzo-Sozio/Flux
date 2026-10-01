@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { AlarmClockIcon, MailIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -43,7 +41,6 @@ export function OverdueBanner({
 }) {
   const t = useTranslations("invoices.reminder");
   const format = useFormatter();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -79,11 +76,11 @@ export function OverdueBanner({
               defaultTo: customerEmail,
               load: () => getInvoiceEmailDraftAction(invoiceId, "reminder"),
               send: (email) => sendPaymentReminder(invoiceId, email),
-              preview: (email) => previewInvoiceEmailAction(invoiceId, email),
+              preview: (email) => previewInvoiceEmailAction(invoiceId, email, "reminder"),
+              signature: true,
               submitLabel: t("send"),
               onSent: (to) => {
                 toast.success(t("sent", { to }));
-                router.refresh();
               },
             }}
           />

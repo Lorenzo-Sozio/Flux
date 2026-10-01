@@ -94,13 +94,14 @@ function ToolbarButton({ onClick, active, disabled, label, children }: ToolbarBu
 // Three of the eight, hand-written here and nowhere documented, so anyone wanting
 // the other five had to guess — and a wrong guess ships to a customer verbatim
 // (audit rilievo S-08). The catalogue is the list now.
-// ⚠️ The recipient's and the unsubscribe link only: a campaign or a sequence has no sender or deal
-// to fill the others with, and would send them as typed.
-const EMAIL_VARS = PLACEHOLDERS.filter((p) => p.scope === "recipient" || p.scope === "campaign").map(
-  (p) => `{{${p.aliases[0]}}}`,
-);
+// ⚠️ The recipient's, the unsubscribe link, and the letterhead and signature (filled by every
+// sender): a campaign or a sequence has no sender or deal to fill the others with, and would
+// send them as typed.
+const EMAIL_VARS = PLACEHOLDERS.filter(
+  (p) => p.scope === "recipient" || p.scope === "campaign" || p.scope === "brand",
+).map((p) => `{{${p.aliases[0]}}}`);
 /** A one-to-one email's fields, grouped as the menu shows them; no unsubscribe link in one. */
-const ONE_TO_ONE_GROUPS = (["recipient", "sender", "deal", "document"] as const).map((scope) => ({
+const ONE_TO_ONE_GROUPS = (["recipient", "sender", "deal", "document", "brand"] as const).map((scope) => ({
   scope,
   fields: PLACEHOLDERS.filter((p) => p.scope === scope),
 }));

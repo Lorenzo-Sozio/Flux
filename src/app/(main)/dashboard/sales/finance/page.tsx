@@ -9,7 +9,7 @@ import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { requirePageCapability } from "@/lib/page-guard";
 
 import { CashCard, CashError } from "./_components/cash-card";
-import { CashFlowOverview } from "./_components/cash-flow-overview";
+import { CashFlowOverview } from "./_components/cash-flow-overview-lazy";
 import { FinanceKPICards } from "./_components/finance-kpi-cards";
 import { ReceivablesCard } from "./_components/receivables-card";
 

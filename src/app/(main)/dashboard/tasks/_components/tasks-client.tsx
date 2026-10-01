@@ -3,7 +3,6 @@
 import { useMemo, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import {
@@ -393,7 +392,6 @@ export function TasksClient({
   const t = useTranslations("tasks");
   const tc = useTranslations("common");
   const locale = useLocale();
-  const router = useRouter();
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
   // ⚠️ Taken from the server again whenever it sends a new list. The list was copied into
@@ -495,10 +493,6 @@ export function TasksClient({
     });
   };
 
-  const handleCreated = () => {
-    router.refresh();
-  };
-
   const handleDragEnd = (result: DropResult) => {
     const { destination, source, draggableId } = result;
     if (!destination) return;
@@ -596,7 +590,6 @@ export function TasksClient({
               deals={deals}
               tickets={tickets}
               currentUserId={currentUserId}
-              onCreated={handleCreated}
               openOnNew
             />
           </div>
@@ -1109,7 +1102,6 @@ export function TasksClient({
           onCompleted={() => {
             setTasks((prev) => prev.map((tk) => (tk.id === asking.id ? { ...tk, status: "done" } : tk)));
             // The next step, if one was planned, is a new row only the server has.
-            router.refresh();
           }}
         />
       )}

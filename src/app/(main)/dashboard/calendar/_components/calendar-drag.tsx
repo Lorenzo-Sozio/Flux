@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { CalendarCheck, CalendarDays, CheckSquare, Loader2, PhoneCall, Repeat, Users } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -80,7 +79,6 @@ function useReschedule(drag: DragInfo | undefined, onSettled: () => void) {
       timeZone: drag.timeZone,
     }).format(at);
   };
-  const router = useRouter();
   const inviteToast = useInviteToast();
   const [pending, setPending] = useState<Pending | null>(null);
   const [scope, setScope] = useState<RecurrenceScope>("this");
@@ -103,7 +101,6 @@ function useReschedule(drag: DragInfo | undefined, onSettled: () => void) {
         toast.success(t("drag.moved"));
         if (notifyAttendees && drag.hasInvitees) inviteToast(inviteStatus);
         setPending(null);
-        router.refresh();
       } catch {
         toast.error(t("errorUpdate"));
         setPending(null);

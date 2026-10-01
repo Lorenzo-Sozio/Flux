@@ -4,7 +4,7 @@ import { getForecastData } from "@/actions/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parsePipelineFilters } from "@/lib/pipeline-filters";
 
-import { ForecastBarChart, OwnerPieChart } from "./_components/forecast-charts";
+import { ForecastBarChart, OwnerPieChart } from "./_components/forecast-charts-lazy";
 import { ForecastKPI, ForecastOutside, ForecastOwnerTable } from "./_components/forecast-kpi";
 
 export default async function ForecastPage({

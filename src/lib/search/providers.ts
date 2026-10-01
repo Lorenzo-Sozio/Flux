@@ -48,8 +48,11 @@ type Db = any;
 
 export interface SearchTerms {
   like: string;
-  /** Digits of the query when it has at least four, for phone numbers. */
-  phoneLike: string | null;
+  /**
+   * Digits of the query when it has at least four, for phone numbers — one pattern, or several
+   * when the number was typed with an international prefix (`phoneSearchPatterns`).
+   */
+  phoneLike: string | readonly string[] | null;
 }
 
 export const PER_ENTITY = 5;
@@ -57,8 +60,12 @@ export const PER_ENTITY = 5;
 const fullName = (first: AnyPgColumn, last: AnyPgColumn, like: string) =>
   sql`${fold(sql`coalesce(${first}, '') || ' ' || coalesce(${last}, '')`)} LIKE ${fold(like)}`;
 
-const phone = (col: AnyPgColumn, phoneLike: string | null) =>
-  phoneLike ? sql`regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g') LIKE ${phoneLike}` : undefined;
+const phone = (col: AnyPgColumn, phoneLike: SearchTerms["phoneLike"]) => {
+  const patterns = phoneLike === null ? [] : typeof phoneLike === "string" ? [phoneLike] : [...phoneLike];
+  if (patterns.length === 0) return undefined;
+  const digits = sql`regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g')`;
+  return or(...patterns.map((p) => sql`${digits} LIKE ${p}`));
+};
 
 const name = (first: string | null, last: string | null) => `${first ?? ""} ${last ?? ""}`.trim();
 

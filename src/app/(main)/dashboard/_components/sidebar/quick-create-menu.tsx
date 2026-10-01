@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-
 import { PlusCircleIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { entityIcon, GROUP_TINT } from "@/components/crm/entity-icon";
+import { IntentLink as Link } from "@/components/intent-link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,7 +63,7 @@ export function QuickCreateMenu({ creatable }: { creatable: readonly EntityType[
                 const Icon = entityIcon(e.type);
                 return (
                   <DropdownMenuItem key={e.type} asChild>
-                    <Link prefetch={false} href={e.create?.href ?? e.list} className="flex items-center gap-2">
+                    <Link href={e.create?.href ?? e.list} className="flex items-center gap-2">
                       <span className={cn("flex h-6 w-6 items-center justify-center rounded", GROUP_TINT[group])}>
                         <Icon className="h-3.5 w-3.5" />
                       </span>

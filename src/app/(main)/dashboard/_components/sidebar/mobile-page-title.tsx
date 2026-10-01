@@ -67,7 +67,6 @@ export function MobilePageTitle({ className }: { className?: string }) {
       {back && (
         <Link
           href={back}
-          prefetch={false}
           aria-label={tm("back")}
           className="-ml-2 flex size-10 shrink-0 items-center justify-center rounded-md text-foreground active:bg-muted"
         >

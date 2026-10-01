@@ -29,7 +29,11 @@ import {
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { FALLBACK_CALENDAR, parseWeek } from "@/lib/business-calendar";
+import { fill } from "@/lib/document-language";
+import { brandFrame } from "@/lib/email-brand";
+import { loadEmailBrand, signatureFor } from "@/lib/email-brand-load";
 import { sendEmail } from "@/lib/email-provider";
+import { escapeHtml } from "@/lib/escape-html";
 import { getTenantById } from "@/lib/get-tenant";
 import { can } from "@/lib/permissions";
 import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
@@ -39,6 +43,7 @@ import { ticketEventPayload } from "@/lib/ticket-events";
 import { handover } from "@/lib/ticket-handover";
 import { generateTicketNumber } from "@/lib/ticket-number";
 import { ensurePublicToken, replyFooterHtml, requestRating, statusPageUrl, ticketLanguage } from "@/lib/ticket-public";
+import { TICKET_TEXT } from "@/lib/ticket-public-text";
 import { resolveSla } from "@/lib/ticket-sla";
 import { becameResolved, statusStamps } from "@/lib/ticket-state-machine";
 import { HANDOVER_CONTENT_CAP, TICKET_THREAD_PAGE } from "@/lib/ticket-thread";
@@ -586,10 +591,13 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
       const tenant = tenantId ? await getTenantById(tenantId) : null;
       const base = getAppUrlOrNull();
       const token = base && tenant?.subdomain ? await ensurePublicToken(db, ticketId).catch(() => null) : null;
+      // ⚠️ In the customer's language, all of it: the line under the reply was English for everybody.
+      const lang = await ticketLanguage(db, contactId);
+      const tt = TICKET_TEXT[lang];
       const follow =
-        token && base && tenant?.subdomain
-          ? replyFooterHtml(await ticketLanguage(db, contactId), statusPageUrl(base, tenant.subdomain, token))
-          : "";
+        token && base && tenant?.subdomain ? replyFooterHtml(lang, statusPageUrl(base, tenant.subdomain, token)) : "";
+      const brand = await loadEmailBrand(db, tenantId);
+      const signature = await signatureFor(db, actor.userId, brand, "compact", lang);
       // ⚠️ Ours, not the provider's: Resend returns its own id, which is not a Message-ID,
       // and a reply threaded to it threads to nothing.
       const headerId = `<tkt-${message.id}@${new URL(base ?? "https://fluxcrm.app").hostname}>`;
@@ -597,19 +605,18 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
       const result = await sendEmail({
         to: customerEmail,
         subject: `[${ticket.ticketNumber}] Re: ${ticket.subject}`,
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
-            <p style="color:#6b7280;font-size:12px;margin-bottom:16px">
-              Reply to your support ticket <strong>${ticket.ticketNumber}</strong>
-            </p>
-            ${validated.content}
-            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-            <p style="color:#9ca3af;font-size:11px">
-              To reply, simply reply to this email and include the ticket number in the subject.
-            </p>
-            ${follow}
-          </div>
-        `,
+        html: brandFrame({
+          brand,
+          lang,
+          label: fill(tt.pageTitle, { number: ticket.ticketNumber }),
+          preheader: fill(tt.replyPreheader, { number: ticket.ticketNumber }),
+          body:
+            `${validated.content}` +
+            (signature ? `<div style="margin-top:22px">${signature}</div>` : "") +
+            `<hr style="border:none;border-top:1px solid #e3e6ec;margin:24px 0">` +
+            `<p style="color:#7a8192;font-size:12px;margin:0 0 6px">${escapeHtml(tt.replyEmailHint)}</p>` +
+            follow,
+        }),
         messageId: headerId,
         inReplyTo: threadMsgIds.at(-1),
         references: threadMsgIds.length > 0 ? threadMsgIds.join(" ") : undefined,

@@ -690,7 +690,6 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
     try {
       if (flag === "isPinned") await togglePinFilter(f.id, next);
       else await updateCustomFilter(f.id, { isPublic: next });
-      router.refresh();
     } catch {
       setSaved((prev) => prev.map((x) => (x.id === f.id ? { ...x, [flag]: !next } : x)));
       toast.error(t("presets.saveFailed"));

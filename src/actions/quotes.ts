@@ -11,9 +11,17 @@ import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validatio
 import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
 import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { documentLanguage, fill, formatDocumentDate, formatDocumentMoney, QUOTE_TEXT } from "@/lib/document-language";
+import {
+  type DocumentLanguage,
+  documentLanguage,
+  fill,
+  formatDocumentDate,
+  formatDocumentMoney,
+  QUOTE_TEXT,
+} from "@/lib/document-language";
 import { computeDocument } from "@/lib/document-totals";
-import { composeEmail, deliverEmail, type EmailPreview } from "@/lib/email-deliver";
+import { brandFrame, ctaButton, esc, summaryBox } from "@/lib/email-brand";
+import { composeEmail, deliverEmail, type EmailKit, type EmailPreview } from "@/lib/email-deliver";
 import { getExchangeRates } from "@/lib/exchange-rates";
 import { getTenantById } from "@/lib/get-tenant";
 import { serverT } from "@/lib/i18n-server";
@@ -542,7 +550,7 @@ function quoteEmailFinish(
   quote: Pick<typeof quotes.$inferSelect, "publicToken" | "quoteNumber" | "totalAmount" | "currency" | "expiresAt"> & {
     company: { language?: string | null; country?: string | null } | null;
   },
-): (body: string) => string {
+): { finish: (body: string, kit: EmailKit) => string; lang: DocumentLanguage } {
   // ⚠️ The link used a fresh hash of the id and the time, saved nowhere, so every
   // customer received a "View quote" button that opened a not-found page. The
   // public page looks quotes up by `publicToken`; that is the link.
@@ -551,36 +559,40 @@ function quoteEmailFinish(
   // In the customer's language and the quote's currency, whoever sends it.
   const lang = documentLanguage(quote.company);
   const tx = QUOTE_TEXT[lang];
-  const escapeHtml = (v: string) =>
-    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  const summary = fill(tx.emailBody, {
-    number: escapeHtml(quote.quoteNumber),
-    total: escapeHtml(formatDocumentMoney(quote.totalAmount, quote.currency, lang)),
-  });
-  const validity = quote.expiresAt
-    ? ` ${fill(tx.emailValidUntil, { date: escapeHtml(formatDocumentDate(quote.expiresAt, lang)) })}`
-    : "";
-  return (body) => `
-      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827;line-height:1.5">
-        ${body}
-        <div style="margin:20px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
-          <p style="margin:0">${summary}${validity}</p>
-        </div>
-        <p><a href="${quoteViewUrl}" style="display:inline-block;padding:10px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">${escapeHtml(tx.emailCta)}</a></p>
-      </div>
-    `;
+  const total = formatDocumentMoney(quote.totalAmount, quote.currency, lang);
+  const expires = quote.expiresAt ? formatDocumentDate(quote.expiresAt, lang) : null;
+  const finish = (body: string, { brand, signature }: EmailKit) =>
+    brandFrame({
+      brand,
+      lang,
+      label: `${tx.documentTitle} ${quote.quoteNumber}`,
+      preheader: expires
+        ? fill(tx.emailPreheader, { number: quote.quoteNumber, total, date: expires })
+        : fill(tx.emailPreheaderNoDate, { number: quote.quoteNumber, total }),
+      body:
+        body +
+        summaryBox({
+          highlight: { label: tx.total, value: total },
+          rows: [[tx.emailNumber, quote.quoteNumber], ...(expires ? [[tx.expires, expires] as [string, string]] : [])],
+        }) +
+        ctaButton(brand, tx.emailCta, quoteViewUrl) +
+        `<p style="margin:10px 0 24px;font-size:13px;color:#5d6475">${esc(tx.emailCtaHint)}</p>` +
+        signature,
+    });
+  return { finish, lang };
 }
 
 /** The quote's email as the customer will receive it, without sending it or moving the quote. */
 export async function previewQuoteEmailAction(
   quoteId: string,
-  email: { subject: string; bodyHtml: string },
+  email: { subject: string; bodyHtml: string; signature?: boolean },
 ): Promise<EmailPreview> {
   const actor = await requireCapability("quote:write");
   await requirePlanModule("sales");
   const db = await getDb();
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId), with: { company: true } });
   if (!quote) return { ok: false, error: (await serverT("serverErrors.quotes"))("notFound") };
+  const { finish, lang } = quoteEmailFinish(quote);
   const composed = await composeEmail(
     db,
     { userId: actor.userId },
@@ -588,7 +600,9 @@ export async function previewQuoteEmailAction(
       subject: email.subject,
       html: email.bodyHtml,
       dealId: quote.dealId ?? undefined,
-      finish: quoteEmailFinish(quote),
+      finish,
+      lang,
+      signature: email.signature === false ? "none" : "full",
     },
   );
   return { ok: true, subject: composed.subject, html: composed.html };
@@ -596,7 +610,16 @@ export async function previewQuoteEmailAction(
 
 export async function sendQuoteEmailAction(
   quoteId: string,
-  email: { to: string; cc?: string; bcc?: string; subject: string; bodyHtml: string; templateId?: string },
+  email: {
+    to: string;
+    cc?: string;
+    bcc?: string;
+    subject: string;
+    bodyHtml: string;
+    templateId?: string;
+    /** False when the person took the signature off this one email. */
+    signature?: boolean;
+  },
 ): Promise<{ success: true } | { success: false; error: string }> {
   const actor = await requireCapability("quote:write");
   await requirePlanModule("sales");
@@ -631,7 +654,7 @@ export async function sendQuoteEmailAction(
     return { success: false, error: t("notSendable") };
   }
 
-  const finish = quoteEmailFinish(quote);
+  const { finish, lang } = quoteEmailFinish(quote);
 
   // The person's text as written in the editor, then what the quote itself says: its number,
   // its total, until when, and the button — so no version of the email can leave without them.
@@ -654,6 +677,8 @@ export async function sendQuoteEmailAction(
       },
       templateId: email.templateId,
       finish,
+      lang,
+      signature: email.signature === false ? "none" : "full",
     },
   );
   // ⚠️ A send that did not leave moves nothing: a quote whose email never went was marked sent,

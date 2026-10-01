@@ -80,7 +80,6 @@ export function InvoicePaymentsCard({
       setMethod("");
       setReference("");
       setAdding(false);
-      router.refresh();
     });
   }
 
@@ -114,7 +113,6 @@ export function InvoicePaymentsCard({
         return;
       }
       setRefunding(false);
-      router.refresh();
     });
   }
 

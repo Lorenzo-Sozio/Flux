@@ -406,7 +406,6 @@ export function CreateTicketModal({
       onOpenChange(false);
       form.reset();
       setShowAdvanced(false);
-      router.refresh();
       toast.success(t("successTitle", { number: result.ticketNumber }), {
         description: t("successDesc"),
         action: {

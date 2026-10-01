@@ -198,7 +198,6 @@ export function QuotesClient({
         setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id));
         // The count above and the row that moves up from the next page are both
         // the server's to know, so ask for the page again rather than guess.
-        router.refresh();
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : tc("deleteError"));
       } finally {

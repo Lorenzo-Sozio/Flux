@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import {
   BarChart2,
@@ -89,7 +88,6 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
   const t = useTranslations("marketing.campaigns");
   const tc = useTranslations("common");
   const formatter = useFormatter();
-  const router = useRouter();
   const [campaigns, setCampaigns] = useState(initial);
   const [launchTarget, setLaunchTarget] = useState<Campaign | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Campaign | null>(null);
@@ -115,7 +113,6 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
       try {
         await duplicateCampaignAction(campaign.id);
         toast.success(t("duplicatedToast"));
-        router.refresh();
       } catch {
         toast.error(t("duplicateFailedToast"));
       }
@@ -127,7 +124,6 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
       try {
         await cancelScheduledCampaignAction(campaign.id);
         toast.success(t("scheduleCancelledToast"));
-        router.refresh();
       } catch {
         toast.error(t("scheduleCancelFailed"));
       }
@@ -140,7 +136,7 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
         <TargetIcon className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
         <p className="font-medium text-muted-foreground">{t("noCampaignsYet")}</p>
         <p className="text-sm text-muted-foreground mt-1 mb-5">{t("noCampaignsYetDesc")}</p>
-        <CampaignModal templates={templates} onSuccess={() => router.refresh()} />
+        <CampaignModal templates={templates} />
       </div>
     );
   }
@@ -286,7 +282,6 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                           status: c.status,
                           templateId: c.templateId ?? undefined,
                         }}
-                        onSuccess={() => router.refresh()}
                       />
                       <Button
                         size="sm"

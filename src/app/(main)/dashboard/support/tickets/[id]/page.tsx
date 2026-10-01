@@ -1,4 +1,5 @@
 import { getMacros, getTicketById } from "@/actions/support";
+import { getAllUsers, getTasksByTicketId } from "@/actions/tasks";
 import { auth } from "@/auth";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { aiEntries, aiViewer } from "@/lib/ai/access";
@@ -22,10 +23,15 @@ import { TicketDetail } from "./_components/ticket-detail";
  */
 export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [ticket, macros, session] = await Promise.all([
+  // ⚠️ The linked tasks and the people arrive with the page too: asked for by the browser after it
+  // drew, they were two more requests in a row — server actions run one at a time — each paying
+  // the session and the workspace again.
+  const [ticket, macros, session, tasks, users] = await Promise.all([
     getTicketById(id).catch(() => null),
     getMacros().catch(() => []),
     auth(),
+    getTasksByTicketId(id).catch(() => null),
+    getAllUsers().catch(() => null),
   ]);
   // ⚠️ The workspace role, never `session.user.role` — that is Flux's own staff
   // scale and reads "user" for every customer. See CLAUDE.md on the two scales.
@@ -42,6 +48,8 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
         id={id}
         initialTicket={ticket}
         initialMacros={macros}
+        initialTasks={tasks}
+        initialUsers={users}
         canWrite={can(tenantRole, "ticket:write")}
         canDelete={can(tenantRole, "ticket:delete")}
         aiSummary={aiSummary}

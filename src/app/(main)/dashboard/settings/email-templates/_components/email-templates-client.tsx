@@ -2,8 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-import { useRouter } from "next/navigation";
-
 import {
   CopyIcon,
   FileTextIcon,
@@ -94,7 +92,6 @@ export function EmailTemplatesClient({
 }) {
   const t = useTranslations("emailTemplates");
   const format = useFormatter();
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<PersonalCategory | "all">("all");
   const [form, setForm] = useState<Form | null>(null);
@@ -126,7 +123,6 @@ export function EmailTemplatesClient({
       }
       toast.success(t("saved"));
       setForm(null);
-      router.refresh();
     } catch {
       toast.error(t("errors.saveFailed"));
     } finally {
@@ -143,7 +139,6 @@ export function EmailTemplatesClient({
       return;
     }
     toast.success(t("deleted"));
-    router.refresh();
   };
 
   const startWithBasics = async () => {
@@ -154,7 +149,6 @@ export function EmailTemplatesClient({
       else if (result.created === 0) toast.info(t("startersNone"));
       else {
         toast.success(t("starters.created", { count: result.created }));
-        router.refresh();
       }
     } finally {
       setStarting(false);

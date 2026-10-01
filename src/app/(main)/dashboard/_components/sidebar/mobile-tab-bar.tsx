@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { LayoutGrid, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { LinkPending } from "@/components/intent-link";
 import type { EntityType } from "@/lib/entities";
 import { cn } from "@/lib/utils";
 import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav";
@@ -52,7 +53,6 @@ function Tab({ tab, active, label }: { tab: NavMainItem; active: boolean; label:
     <li className="flex-1">
       <Link
         href={tab.url}
-        prefetch={false}
         aria-current={active ? "page" : undefined}
         className={cn(
           "flex h-full flex-col items-center justify-center gap-1 px-1 transition-colors",
@@ -61,6 +61,8 @@ function Tab({ tab, active, label }: { tab: NavMainItem; active: boolean; label:
       >
         {tab.icon && <tab.icon className={cn("size-5 shrink-0", active && "stroke-[2.25]")} aria-hidden />}
         <span className="max-w-full truncate font-medium text-[10px] leading-none">{label}</span>
+        {/* Answered at the tap, while the page is on its way. */}
+        <LinkPending className="-mt-0.5" />
       </Link>
     </li>
   );

@@ -148,11 +148,37 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   // viewer reads the lead; the controls that would only answer "forbidden" are
   // not drawn for them. See CLAUDE.md on the two role scales.
   const canWrite = can(session?.user?.tenantRole ?? null, "record:write");
-  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
+  // ⚠️ Everything that does not need the lead is started now and awaited where it is used: these
+  // reads used to wait for one another, a dozen round trips in a row before the page could draw.
+  const aiP: ReturnType<typeof aiEntries<"summary" | "draft">> = canWrite
+    ? aiEntries(["summary", "draft"] as const, aiViewer(session?.user))
+    : Promise.resolve({});
   const db = await getDb();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
-  const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
+  const hasMarketingP = getTenantEntitlements()
+    .catch(() => null)
+    .then((ent) => ent?.enabledModules?.includes("marketing") ?? true);
+  // The timeline's count and last contact, from the same source as the list.
+  const timelineSummaryP = recordTimelineSummary(db, { type: "lead", id: leadId });
+  const restP = Promise.all([
+    getActivitiesByLead(leadId),
+    getTasksByLead(leadId),
+    getAllUsers(),
+    getCustomFieldDefinitions("lead"),
+    getCustomFieldValues("lead", leadId),
+    getCompanyTypes().catch(() => [] as { id: string; name: string }[]),
+    getCompanyCategories().catch(() => [] as { id: string; name: string }[]),
+    getTranslations("leads"),
+    getTranslations("entityDetail"),
+    getTranslations("common"),
+    getTranslations("record"),
+    getTranslations("pipeline"),
+    getTranslations("pipeline.detail"),
+    getFormatter(),
+  ]);
+  // Rejections are read where each is awaited; until then they must not surface as unhandled.
+  for (const pending of [aiP, timelineSummaryP, restP]) pending.catch(() => undefined);
 
   let lead: typeof leads.$inferSelect | undefined;
   let templates: Awaited<ReturnType<typeof getComposerTemplates>> = [];
@@ -215,22 +241,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     tP,
     tX,
     format,
-  ] = await Promise.all([
-    getActivitiesByLead(leadId),
-    getTasksByLead(leadId),
-    getAllUsers(),
-    getCustomFieldDefinitions("lead"),
-    getCustomFieldValues("lead", leadId),
-    getCompanyTypes().catch(() => [] as { id: string; name: string }[]),
-    getCompanyCategories().catch(() => [] as { id: string; name: string }[]),
-    getTranslations("leads"),
-    getTranslations("entityDetail"),
-    getTranslations("common"),
-    getTranslations("record"),
-    getTranslations("pipeline"),
-    getTranslations("pipeline.detail"),
-    getFormatter(),
-  ]);
+  ] = await restP;
+  const [ai, hasMarketing] = await Promise.all([aiP, hasMarketingP]);
 
   const leadTypeName = lead.leadTypeId ? (allCompanyTypes.find((ct) => ct.id === lead.leadTypeId)?.name ?? null) : null;
   const leadCategoryName = lead.leadCategoryId
@@ -275,7 +287,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   const createdAt = new Date(lead.createdAt);
   // The timeline also holds the lead's field changes: its count comes from the same place.
-  const timelineSummary = await recordTimelineSummary(await getDb(), { type: "lead", id: leadId });
+  const timelineSummary = await timelineSummaryP;
   const lastContact =
     leadActivities
       .filter((a) => CONTACT_TYPES.has(a.type))

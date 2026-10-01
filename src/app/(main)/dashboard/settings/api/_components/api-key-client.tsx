@@ -68,7 +68,6 @@ export function ApiKeyClient({ keys, legacy, tenantId }: { keys: ApiKeyRow[]; le
         setCreating(false);
         setName("");
         setScopes(new Set());
-        router.refresh();
       } catch {
         toast.error(t("createFailed"));
       }

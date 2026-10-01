@@ -33,7 +33,7 @@ import { getCustomerMoney } from "@/actions/receipts";
 import { deleteTask, getAllUsers, getTasksByCompany } from "@/actions/tasks";
 import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
 import { DealAmount } from "@/app/(main)/dashboard/pipeline/[id]/_components/deal-amount";
-import { CashError } from "@/app/(main)/dashboard/sales/finance/_components/cash-card";
+import { CashError } from "@/app/(main)/dashboard/sales/finance/_components/cash-error";
 import { auth } from "@/auth";
 import { AiSummaryCard } from "@/components/crm/ai/ai-summary-card";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
@@ -127,39 +127,18 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   // A viewer reads the account; controls that would only answer "forbidden" are
   // not drawn for them.
   const canWrite = can(tenantRole, "record:write");
-  const ai = canWrite ? await aiEntries(["summary"] as const, aiViewer(session?.user)) : {};
+  // ⚠️ Started together and awaited where used: the company row, the copilot's entry and the
+  // page's reads used to wait for one another before the page could draw.
+  const aiP: ReturnType<typeof aiEntries<"summary">> = canWrite
+    ? aiEntries(["summary"] as const, aiViewer(session?.user))
+    : Promise.resolve({});
   const db = await getDb();
-
-  const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
-  if (!company) return notFound();
-
-  const [
-    timelineSummary,
-    tasksList,
-    allUsers,
-    customFieldDefs,
-    customFieldVals,
-    record,
-    // The edit dialog opened from here used to be handed none of its lookups, so
-    // opening a company from its own page offered empty category and type
-    // selects — and saving from that dialog wrote the blanks back.
-    categories,
-    companyTypeOptions,
-    priceLists,
-    people,
-    [figures],
-    moneyOutcome,
-    t,
-    tD,
-    tI,
-    tc,
-    tR,
-    tX,
-    tP,
-    tS,
-    format,
-    tFinance,
-  ] = await Promise.all([
+  const companyP = db
+    .select()
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .then((rows) => rows[0]);
+  const restP = Promise.all([
     // What the timeline holds — the company's own, its contacts' and its deals' — for the
     // tab's count and the last contact, so neither disagrees with the list.
     recordTimelineSummary(db, { type: "company", id: companyId }),
@@ -173,7 +152,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     getCompanyTypes().catch(() => []),
     // The list this customer is on comes back even if it has been retired: a screen
     // that hides it says "no price list" about a customer who has one.
-    getPriceListsForSelect(company.priceListId).catch(() => []),
+    companyP.then((c) => (c ? getPriceListsForSelect(c.priceListId).catch(() => []) : [])),
     // The people who work here. A company page with no way to reach anybody at
     // the company sent the reader to the contacts list and a search box.
     // `count(*) over ()` carries the total in the same statement, so a company
@@ -223,6 +202,40 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     getFormatter(),
     getTranslations("finance"),
   ]);
+  // Rejections are read where each is awaited; until then they must not surface as unhandled.
+  for (const pending of [aiP, restP]) pending.catch(() => undefined);
+
+  const company = await companyP;
+  if (!company) return notFound();
+
+  const [
+    timelineSummary,
+    tasksList,
+    allUsers,
+    customFieldDefs,
+    customFieldVals,
+    record,
+    // The edit dialog opened from here used to be handed none of its lookups, so
+    // opening a company from its own page offered empty category and type
+    // selects — and saving from that dialog wrote the blanks back.
+    categories,
+    companyTypeOptions,
+    priceLists,
+    people,
+    [figures],
+    moneyOutcome,
+    t,
+    tD,
+    tI,
+    tc,
+    tR,
+    tX,
+    tP,
+    tS,
+    format,
+    tFinance,
+  ] = await restP;
+  const ai = await aiP;
 
   // ── Server actions scoped to this company ──
   const pagePath = `/dashboard/companies/${companyId}`;

@@ -14,6 +14,8 @@ import {
 } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
 import { FALLBACK_CALENDAR } from "@/lib/business-calendar";
+import { type EmailBrand, personalEmail, placesSignature, type SignatureVariant } from "@/lib/email-brand";
+import { brandValues, loadEmailBrand, signatureFor } from "@/lib/email-brand-load";
 import { ensureUnsubscribe, renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { notify } from "@/lib/notify";
 import {
@@ -337,6 +339,21 @@ export async function advanceSequences(db: AnyDb, now = new Date(), limit = 50, 
   let stopped = 0;
   let completed = 0;
 
+  // The owner's signature, as on an email they write by hand (src/lib/email-brand.ts): full on the
+  // first email, compact on a reply in the thread. Read once per run, and only if an email is due.
+  let brand: EmailBrand | null | undefined;
+  const signatures = new Map<string, string>();
+  const signatureOf = async (ownerId: string | null, variant: SignatureVariant): Promise<string> => {
+    if (!ownerId) return "";
+    if (brand === undefined) brand = await loadEmailBrand(db).catch(() => null);
+    if (!brand) return "";
+    const key = `${ownerId}:${variant}`;
+    if (!signatures.has(key)) {
+      signatures.set(key, await signatureFor(db, ownerId, brand, variant, "it").catch(() => ""));
+    }
+    return signatures.get(key) ?? "";
+  };
+
   for (const enrollment of due) {
     const sequence = byId.get(enrollment.sequenceId) as
       | {
@@ -451,7 +468,15 @@ export async function advanceSequences(db: AnyDb, now = new Date(), limit = 50, 
           toEmail: enrollment.email,
           subject: thread?.subject ?? renderPlaceholders(step.subject, values),
           // Every automated email carries a way out, written by the author or not.
-          htmlBody: ensureUnsubscribe(renderPlaceholders(step.body, values), unsubscribeUrl),
+          htmlBody: await (async () => {
+            const signature = await signatureOf(enrollment.ownerId, thread?.inReplyTo ? "compact" : "full");
+            const body = renderPlaceholders(step.body, {
+              ...values,
+              ...(brand ? brandValues(brand, signature) : {}),
+            });
+            // A step that places `{{firma}}` itself gets it there, and not again at the end.
+            return ensureUnsubscribe(personalEmail(body, placesSignature(step.body) ? "" : signature), unsubscribeUrl);
+          })(),
           status: "pending",
           scheduledAt: now,
           sequenceEnrollmentId: enrollment.id,

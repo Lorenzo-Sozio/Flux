@@ -50,8 +50,8 @@
   {
     "file": "src/lib/sequence-runner.ts",
     "description": "⚠️⚠️ l'email automatica parte senza link di disiscrizione quando l'autore non l'ha messo",
-    "find": "        htmlBody: ensureUnsubscribe(renderPlaceholders(step.body, values), unsubscribeUrl),",
-    "replace": "        htmlBody: renderPlaceholders(step.body, values),"
+    "find": "            return ensureUnsubscribe(personalEmail(body, placesSignature(step.body) ? \"\" : signature), unsubscribeUrl);",
+    "replace": "            return personalEmail(body, placesSignature(step.body) ? \"\" : signature);"
   },
   {
     "file": "src/lib/sequence-runner.ts",

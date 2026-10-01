@@ -51,7 +51,6 @@ export function PipelinesBar({ pipelines, current }: { pipelines: { id: string; 
         }
         setDialog(null);
         router.push(`/dashboard/settings/pipeline?pipeline=${result.id}`);
-        router.refresh();
         return;
       }
       const result = await renamePipelineAction(current, dialog.name).catch(() => null);
@@ -60,7 +59,6 @@ export function PipelinesBar({ pipelines, current }: { pipelines: { id: string; 
         return;
       }
       setDialog(null);
-      router.refresh();
     });
 
   const remove = () =>
@@ -75,7 +73,6 @@ export function PipelinesBar({ pipelines, current }: { pipelines: { id: string; 
         return;
       }
       router.push("/dashboard/settings/pipeline");
-      router.refresh();
     });
 
   return (

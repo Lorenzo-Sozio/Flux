@@ -5,6 +5,7 @@ import { AlertDialog as AlertDialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useBackDismiss } from "@/hooks/use-back-dismiss"
 
 function AlertDialog({
   ...props
@@ -51,6 +52,10 @@ function AlertDialogContent({
 }: React.ComponentProps<typeof AlertDialogPrimitive.Content> & {
   size?: "default" | "sm"
 }) {
+  // On a phone the system's Back answers "cancel" (src/hooks/use-back-dismiss.ts): a confirmation
+  // open over a form is a layer like any other.
+  const cancelRef = React.useRef<HTMLButtonElement>(null)
+  useBackDismiss(() => cancelRef.current?.click())
   return (
     <AlertDialogPortal>
       <AlertDialogOverlay />
@@ -62,7 +67,10 @@ function AlertDialogContent({
           className
         )}
         {...props}
-      />
+      >
+        {props.children}
+        <AlertDialogPrimitive.Cancel ref={cancelRef} className="hidden" tabIndex={-1} aria-hidden />
+      </AlertDialogPrimitive.Content>
     </AlertDialogPortal>
   )
 }

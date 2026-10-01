@@ -107,12 +107,28 @@ function _Section({ title }: { title: string }) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: the callers pass three differently shaped contact rows (list, detail and lookup), so narrowing this is a change to them rather than to this line.
-export function ContactModal({ contact, children }: { contact?: any; children: React.ReactNode }) {
+export function ContactModal({
+  contact,
+  children,
+  open: openProp,
+  onOpenChange,
+}: {
+  contact?: any;
+  /** The button that opens it; left out when the caller opens it (`open`). */
+  children?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
   const t = useTranslations("contacts");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
   const say = useMessageText();
-  const [open, setOpen] = useState(false);
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = openProp ?? innerOpen;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setInnerOpen(next);
+    onOpenChange?.(next);
+  };
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkContactDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
@@ -121,7 +137,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
+    if (!isEditing && searchParams?.get("new") === "true") setInnerOpen(true);
   }, [isEditing, searchParams]);
 
   useEffect(() => {
@@ -329,7 +345,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
           }
         }}
       >
-        <DialogTrigger asChild>{children}</DialogTrigger>
+        {children && <DialogTrigger asChild>{children}</DialogTrigger>}
         <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
           <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
@@ -657,6 +673,32 @@ export function DeleteContactButton({ id }: { id: string }) {
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: see ContactModal above.
+function EditContactButton({ contact }: { contact: any }) {
+  const tc = useTranslations("common");
+  // ⚠️ The dialog is mounted at the first press, not with the row: every row of the list (twice — the
+  // card and the table row) used to carry a whole form, its state and its effects, a hundred and
+  // more of them on a page of fifty, for the one or two ever opened.
+  const [mounted, setMounted] = useState(false);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={tc("edit")}
+        onClick={() => {
+          setMounted(true);
+          setOpen(true);
+        }}
+      >
+        <PencilIcon className="h-4 w-4" />
+      </Button>
+      {mounted && <ContactModal contact={contact} open={open} onOpenChange={setOpen} />}
+    </>
+  );
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: see ContactModal above.
 export function ContactActions({ contact, hideView = false }: { contact: any; readonly hideView?: boolean }) {
   // An icon on its own is a target with no name — on a phone there is no
   // hover to reveal one, and a screen reader is told nothing at all.
@@ -672,11 +714,7 @@ export function ContactActions({ contact, hideView = false }: { contact: any; re
           </Button>
         </Link>
       )}
-      <ContactModal contact={contact}>
-        <Button variant="ghost" size="icon" aria-label={tc("edit")}>
-          <PencilIcon className="h-4 w-4" />
-        </Button>
-      </ContactModal>
+      <EditContactButton contact={contact} />
       <DeleteContactButton id={contact.id} />
     </div>
   );

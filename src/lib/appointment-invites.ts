@@ -1,9 +1,11 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
-import { appointmentAttendees, appointments, users } from "@/db/schema";
+import { appointmentAttendees, appointments, companies, contacts, users } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
+import { type DocumentLanguage, documentLanguage } from "@/lib/document-language";
 import { type AppointmentEmailData, sendAppointmentInviteEmail } from "@/lib/email";
+import { loadEmailBrand, signatureFor } from "@/lib/email-brand-load";
 import { getEmailConfig } from "@/lib/email-provider";
 import { generateICS, type ICSAttendee } from "@/lib/ical";
 import { parseRRule } from "@/lib/recurrence";
@@ -67,6 +69,7 @@ export async function dispatchInvites(
       icalUid: appointments.icalUid,
       sequence: appointments.sequence,
       reminderMinutes: appointments.reminderMinutes,
+      organizerId: appointments.organizerId,
       organizerName: users.name,
       organizerEmail: users.email,
     })
@@ -119,16 +122,35 @@ export async function dispatchInvites(
 
   const icsContent = generateICS(icsEvent, method);
 
-  // The invitation email is written in Italian throughout, so its one generated
-  // sentence is too.
+  // ⚠️ Each recipient reads it in their language: a customer's company decides it (as on the
+  // quote), a colleague or an address typed by hand reads Italian. It was Italian for everybody.
+  const contactIds = recipients.map((a) => a.contactId).filter((id): id is string => Boolean(id));
+  const languageOf = new Map<string, DocumentLanguage>();
+  if (contactIds.length > 0) {
+    const rows = await db
+      .select({ id: contacts.id, language: companies.language, country: companies.country })
+      .from(contacts)
+      .leftJoin(companies, eq(contacts.companyId, companies.id))
+      .where(inArray(contacts.id, contactIds))
+      .catch(() => []);
+    for (const r of rows) languageOf.set(r.id, documentLanguage(r));
+  }
+  const langOf = (a: { contactId: string | null }): DocumentLanguage =>
+    (a.contactId && languageOf.get(a.contactId)) || "it";
+
   const rule = parseRRule(appt.recurrenceRule);
-  let recurrenceText: string | null = null;
-  if (rule) {
-    const t = (await getTranslations({ locale: "it", namespace: "appointment" })) as unknown as (
-      key: string,
-      values?: Record<string, string | number>,
-    ) => string;
-    recurrenceText = describeRecurrence(t, rule, appt.startAt, timeZone, "it");
+  const recurrenceText = new Map<DocumentLanguage, string | null>();
+  const brand = await loadEmailBrand(db);
+  const signature = new Map<DocumentLanguage, string>();
+  for (const lang of new Set(recipients.map(langOf))) {
+    if (rule) {
+      const t = (await getTranslations({ locale: lang, namespace: "appointment" })) as unknown as (
+        key: string,
+        values?: Record<string, string | number>,
+      ) => string;
+      recurrenceText.set(lang, describeRecurrence(t, rule, appt.startAt, timeZone, lang));
+    }
+    signature.set(lang, await signatureFor(db, appt.organizerId, brand, "compact", lang));
   }
 
   const emailData: AppointmentEmailData = {
@@ -144,7 +166,6 @@ export async function dispatchInvites(
     method,
     timeZone,
     allDay: appt.allDay,
-    recurrenceText,
     isUpdate: options.isUpdate,
   };
 
@@ -159,7 +180,13 @@ export async function dispatchInvites(
             }
           : undefined;
 
-      return sendAppointmentInviteEmail({ email: attendee.email, name: attendee.name }, emailData, rsvpLinks);
+      const lang = langOf(attendee);
+      return sendAppointmentInviteEmail(
+        { email: attendee.email, name: attendee.name },
+        { ...emailData, recurrenceText: recurrenceText.get(lang) ?? null },
+        rsvpLinks,
+        { brand, signature: signature.get(lang) ?? "", lang },
+      );
     }),
   );
 

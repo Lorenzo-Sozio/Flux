@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -46,7 +45,6 @@ export function EnrollmentsTable({
   const t = useTranslations("sequences");
   const tR = useTranslations("record");
   const locale = useLocale();
-  const router = useRouter();
   // Up to five hundred people come back from the server; ten are drawn at first,
   // the most recently enrolled, and more on request.
   const [limit, setLimit] = useState(PAGE);
@@ -58,7 +56,6 @@ export function EnrollmentsTable({
   const stop = async (id: string) => {
     await stopEnrollment(id);
     toast.success(t("stoppedToast"));
-    router.refresh();
   };
 
   return (

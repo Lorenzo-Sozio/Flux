@@ -1337,7 +1337,8 @@
       "priceList": "Listino",
       "priceListNone": "Nessun listino (prezzi di catalogo)",
       "priceListHint": "I preventivi, gli ordini e le fatture intestati a questo cliente propongono i prezzi di questo listino.",
-      "priceListRetired": "{name} (non più attivo)"
+      "priceListRetired": "{name} (non più attivo)",
+      "sectionsLabel": "Sezioni della scheda azienda"
     },
     "createSuccess": "Azienda creata.",
     "updateSuccess": "Azienda aggiornata.",
@@ -2575,7 +2576,8 @@
         "recipient": "Destinatario",
         "sender": "Mittente (tu)",
         "deal": "Trattativa (solo dalla sua pagina)",
-        "document": "Documento (da un preventivo, una fattura, un ordine, un contratto o una richiesta)"
+        "document": "Documento (da un preventivo, una fattura, un ordine, un contratto o una richiesta)",
+        "brand": "Marchio e firma"
       }
     },
     "sendEmailModal": {
@@ -2639,7 +2641,10 @@
       "previewAttachments": "Allegati",
       "previewUnfilled": "Da completare prima di inviare: {list}",
       "previewFailed": "Non è stato possibile preparare l'anteprima.",
-      "writeWithAiShort": "IA"
+      "writeWithAiShort": "IA",
+      "signature": "Firma",
+      "signatureOn": "La tua firma è aggiunta in fondo all'email. Premi per toglierla da questa email.",
+      "signatureOff": "Questa email parte senza la tua firma. Premi per aggiungerla."
     },
     "emailBuilder": {
       "blocks": {
@@ -2678,13 +2683,23 @@
         "html": {
           "label": "HTML personalizzato",
           "desc": "Blocco HTML libero"
+        },
+        "brand_header": {
+          "label": "Intestazione del marchio",
+          "desc": "Logo e colore dell'azienda, dalle impostazioni"
+        },
+        "signature": {
+          "label": "Firma",
+          "desc": "La firma di chi invia, dal suo profilo"
         }
       },
       "canvas": {
         "textPlaceholder": "Blocco di testo",
         "imagePlaceholder": "Imposta l'URL dell'immagine nel pannello →",
         "spacer": "spaziatore {height}px",
-        "htmlPlaceholder": "Blocco HTML"
+        "htmlPlaceholder": "Blocco HTML",
+        "brandHeaderHint": "Logo e colore vengono da Impostazioni › Generali al momento dell'invio: cambiandoli lì, cambiano in ogni modello.",
+        "signatureHint": "La firma di chi invia l'email, dal suo Profilo. In una campagna, quella di chi la invia; in una sequenza, quella del responsabile."
       },
       "align": {
         "left": "Sinistra",
@@ -2888,7 +2903,8 @@
       "support": "Assistenza",
       "outreach": "Marketing e automazioni",
       "analysis": "Analisi",
-      "administration": "Amministrazione"
+      "administration": "Amministrazione",
+      "money": "Fatturazione e incassi"
     },
     "items": {
       "apiKeys": "Chiavi API",
@@ -2900,35 +2916,35 @@
       "chat": "Chat",
       "companies": "Aziende",
       "contacts": "Contatti",
-      "customFields": "Campi Personalizzati",
+      "customFields": "Campi personalizzati",
       "dashboard": "Dashboard",
       "email": "Email",
       "finance": "Finanza",
       "forecast": "Previsione",
       "gantt": "Gantt",
-      "help": "Centro Assistenza",
+      "help": "Guida",
       "leads": "Lead",
       "macros": "Macro",
       "orders": "Ordini",
       "pipeline": "Pipeline",
       "pipelineReport": "Report pipeline",
-      "pipelineStages": "Fasi Pipeline",
+      "pipelineStages": "Fasi pipeline",
       "products": "Prodotti",
       "quotes": "Preventivi",
       "reportBuilder": "Generatore di report",
-      "reports": "Rapporti",
-      "salesFunnel": "Funnel Vendite",
-      "salesTargets": "Obiettivi di Vendita",
+      "reports": "Report",
+      "salesFunnel": "Funnel vendite",
+      "salesTargets": "Obiettivi di vendita",
       "settings": "Impostazioni",
       "slaManagement": "Gestione SLA",
       "supportOverview": "Panoramica",
       "tasks": "Attività",
-      "templates": "Modelli",
+      "templates": "Modelli campagne",
       "tickets": "Ticket",
       "users": "Utenti",
       "webhooks": "Webhook",
       "winLoss": "Vinte / Perse",
-      "workload": "Carico Lavoro",
+      "workload": "Carico di lavoro",
       "territories": "Territori",
       "territoryReport": "Per territorio",
       "contracts": "Contratti",
@@ -2943,10 +2959,11 @@
       "profile": "Profilo",
       "repScorecard": "Per commerciale",
       "webForms": "Moduli",
-      "supportAgents": "Assistenza per agente",
+      "supportAgents": "Per agente",
       "commissions": "Provvigioni",
       "bank": "Banca",
-      "emailTemplates": "Modelli email"
+      "emailTemplates": "Modelli email",
+      "queue": "Coda di lavoro"
     },
     "user": {
       "profile": "Profilo",
@@ -3681,6 +3698,14 @@
       "unsubscribe": {
         "label": "Link di disiscrizione",
         "description": "Dove il destinatario smette di ricevere i tuoi messaggi. Viene aggiunto in automatico se lo ometti."
+      },
+      "brandHeader": {
+        "label": "Intestazione",
+        "description": "Il logo dell'azienda su una barra del suo colore, da Impostazioni › Generali."
+      },
+      "signature": {
+        "label": "Firma",
+        "description": "La firma di chi invia, dal suo Profilo; in una campagna, quella di chi la invia."
       }
     }
   },
@@ -5036,7 +5061,7 @@
     "indexSubtitle": "Cosa puoi cambiare — per te e per il workspace.",
     "generalPage": {
       "title": "Generale",
-      "subtitle": "L'orologio del workspace, da cosa parte un nuovo preventivo e il logo sui documenti.",
+      "subtitle": "L'orologio del workspace, da cosa parte un nuovo preventivo, il logo e l'identità sui documenti e nelle email.",
       "save": "Salva",
       "saved": "Salvato.",
       "failed": "Impossibile salvare.",
@@ -5057,7 +5082,7 @@
       },
       "logo": {
         "title": "Logo",
-        "help": "Stampato in cima al PDF dei preventivi. PNG o JPEG, fino a 512 KB.",
+        "help": "In cima al PDF dei preventivi e in ogni email ai clienti, accanto alla firma. PNG o JPEG, fino a 512 KB.",
         "alt": "Logo del workspace",
         "none": "Nessun logo",
         "upload": "Carica il logo",
@@ -5076,6 +5101,24 @@
         "maxDiscount": "Sconto massimo senza approvazione (%)",
         "maxTotal": "Totale massimo senza approvazione",
         "zeroOff": "0 disattiva quel limite."
+      },
+      "brand": {
+        "title": "Identità nelle email",
+        "help": "Il colore, il sito e i profili social che compaiono nelle email ai clienti e nelle firme di tutto il team. Nome, indirizzo, partita IVA e telefono vengono dai dati di fatturazione.",
+        "color": "Colore del marchio",
+        "colorHex": "Codice del colore",
+        "colorHelp": "Usato per la barra in alto, i pulsanti e i dettagli della firma. Se è chiaro, il testo dei pulsanti diventa scuro per restare leggibile.",
+        "sample": "Apri il preventivo",
+        "website": "Sito web",
+        "socials": "Profili social",
+        "invalidUrl": "Non è un indirizzo web valido: non verrà salvato.",
+        "social": {
+          "linkedin": "LinkedIn",
+          "instagram": "Instagram",
+          "facebook": "Facebook",
+          "x": "X",
+          "youtube": "YouTube"
+        }
       }
     },
     "lists": {
@@ -6420,7 +6463,8 @@
       "tabValue": "Valore",
       "tabTerm": "Durata",
       "tabNotes": "Note"
-    }
+    },
+    "viewLabel": "Quali contratti mostrare"
   },
   "sequences": {
     "title": "Sequenze di follow-up",
@@ -8953,6 +8997,25 @@
       "open": "Apri la home",
       "saved": "Dashboard salvata.",
       "saveFailed": "Non è stato possibile salvare la dashboard."
+    },
+    "signature": {
+      "title": "Firma email",
+      "desc": "Aggiunta in fondo alle email che scrivi dal CRM, anche quando partono dalla tua casella Gmail o Outlook. Puoi toglierla dal singolo messaggio.",
+      "enabled": "Aggiungi la firma alle mie email",
+      "role": "Ruolo",
+      "rolePlaceholder": "Es. Responsabile commerciale",
+      "mobile": "Cellulare",
+      "phone": "Telefono",
+      "phoneHelp": "Vuoto: il telefono dell'azienda.",
+      "photo": "Usa la foto del mio account al posto delle iniziali",
+      "preview": "Anteprima",
+      "variant": "Formato della firma",
+      "full": "Completa",
+      "compact": "Compatta",
+      "fullHelp": "La completa va nelle email dai record e nei preventivi.",
+      "compactHelp": "La compatta va nei solleciti di pagamento.",
+      "brandLink": "Logo, colore, indirizzo, sito e social si cambiano in Impostazioni › Generali.",
+      "brandByAdmin": "Logo, colore, indirizzo, sito e social sono dell'azienda e li cambia un amministratore."
     }
   },
   "planFollowUp": {

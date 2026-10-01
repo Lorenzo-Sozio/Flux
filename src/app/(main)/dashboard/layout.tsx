@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, Suspense } from "react";
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -11,6 +11,7 @@ import { auth } from "@/auth";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { WorkspaceScopeProvider } from "@/components/crm/workspace-scope";
+import { NavigationProgress } from "@/components/navigation-progress";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
@@ -121,6 +122,10 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
           a session and a workspace, and the root layout also wraps the login
           page and the public quote page, where `getDb()` throws by design. */}
         <PushSubscriptionKeeper />
+        {/* A tap on any link is answered at once, however long the server takes. */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
+        </Suspense>
         <SidebarProvider defaultOpen={defaultOpen}>
           <AppSidebar
             user={user}

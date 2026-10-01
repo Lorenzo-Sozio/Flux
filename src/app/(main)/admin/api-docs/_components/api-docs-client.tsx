@@ -536,12 +536,40 @@ const GROUPS: ApiGroup[] = [
         path: "/api/workspace/logo",
         summary: "Logo del workspace",
         description:
-          "Il logo impostato in Impostazioni → Generale, per l'anteprima. Solo per chi è entrato nel workspace: ai clienti il logo arriva dentro i PDF dei preventivi, non da qui. PNG o JPEG, `Cache-Control: private, no-store`.",
+          "Il logo impostato in Impostazioni → Generale, per l'anteprima. Solo per chi è entrato nel workspace: ai clienti il logo arriva dentro i PDF dei preventivi e, nelle email, da `/api/brand/logo/{token}`. PNG o JPEG, `Cache-Control: private, no-store`.",
         auth: "session",
         responses: [
           { status: 200, description: "L'immagine (`image/png` o `image/jpeg`)", example: "<bytes>" },
           { status: 401, description: "Non autenticato", example: "Unauthorized" },
           { status: 404, description: "Nessun logo impostato, o l'archivio non lo restituisce", example: "Not found" },
+        ],
+      },
+      {
+        id: "brand-logo",
+        method: "GET",
+        path: "/api/brand/logo/{token}",
+        summary: "Logo del workspace nelle email",
+        description:
+          "Il logo che le email ai clienti mostrano nell'intestazione e nella firma (src/lib/email-brand.ts). Un programma di posta scarica le immagini senza sessione, quindi l'indirizzo porta il workspace firmato con `AUTH_SECRET` (src/lib/brand-logo-token.ts): apre il logo di quel workspace e nient'altro.\n\n" +
+          "`?v=` cambia con il logo, così una nuova immagine è un nuovo indirizzo. `Cache-Control: public, max-age=86400`.",
+        auth: "public",
+        parameters: [
+          {
+            name: "token",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "Il workspace in base64url e la sua firma, separati da un punto. Lo scrive il CRM nelle email",
+            example: "ZmFiY2QtMTIzNA.k3Jv9xQe0b1T",
+          },
+        ],
+        responses: [
+          { status: 200, description: "L'immagine (`image/png` o `image/jpeg`)", example: "<bytes>" },
+          {
+            status: 404,
+            description: "Token non valido, workspace non trovato o nessun logo impostato. I casi non si distinguono",
+            example: "Not found",
+          },
         ],
       },
       {

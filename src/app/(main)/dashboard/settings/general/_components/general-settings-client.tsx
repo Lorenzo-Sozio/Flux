@@ -19,8 +19,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
+import type { BrandIdentity } from "@/lib/email-brand";
 import type { ApprovalPolicy } from "@/lib/quote-status";
 import type { QuoteDefaults } from "@/lib/workspace-preferences";
+
+import { BrandIdentityCard } from "./brand-identity-card";
 
 /** Every zone the browser knows, with the current one kept even if it does not. */
 function zoneOptions(current: string) {
@@ -39,11 +42,13 @@ export function GeneralSettingsClient({
   quoteDefaults,
   hasLogo: initialHasLogo,
   approval,
+  brand,
 }: {
   timeZone: string;
   quoteDefaults: QuoteDefaults;
   hasLogo: boolean;
   approval: ApprovalPolicy;
+  brand: BrandIdentity;
 }) {
   const t = useTranslations("settings.generalPage");
   const [pending, startTransition] = useTransition();
@@ -267,6 +272,8 @@ export function GeneralSettingsClient({
           </div>
         </CardContent>
       </Card>
+
+      <BrandIdentityCard initial={brand} />
     </div>
   );
 }

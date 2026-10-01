@@ -54,5 +54,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     updatedAt: Date.now(),
   });
 
-  return NextResponse.json({ ok: true });
+  // Who else is here, in the same answer: the page used to ask with a second request every round.
+  return NextResponse.json({ ok: true, presence: getTicketPresence(id) });
 }

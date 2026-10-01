@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { inArray, sql } from "drizzle-orm";
 
 import { workspaceSettings } from "@/db/schema";
@@ -26,7 +28,9 @@ export const ALL_FEATURES_ON: WorkspaceFeatures = { projects: true, chat: true, 
  * Never throws: a database still waiting for the migration that creates the table answers
  * "all on", which is how it behaved yesterday.
  */
-export async function readWorkspaceFeatures(db: Db): Promise<WorkspaceFeatures> {
+// One read per request whatever asks for it — the layout, the guards, the page, the copilot's
+// entry — through React's per-request `cache()`; outside a render it simply calls through.
+export const readWorkspaceFeatures = cache(async function readWorkspaceFeatures(db: Db): Promise<WorkspaceFeatures> {
   try {
     const rows = await db
       .select({ key: workspaceSettings.key, value: workspaceSettings.value })
@@ -41,7 +45,7 @@ export async function readWorkspaceFeatures(db: Db): Promise<WorkspaceFeatures> 
   } catch {
     return { ...ALL_FEATURES_ON };
   }
-}
+});
 
 /** Switches one feature on or off for the workspace. */
 export async function writeWorkspaceFeature(db: Db, feature: WorkspaceFeature, on: boolean): Promise<void> {

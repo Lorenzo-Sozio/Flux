@@ -123,8 +123,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   // A viewer reads the deal; the controls that would only answer "forbidden" are
   // not drawn for them.
   const canWrite = can(tenantRole, "record:write");
-  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
+  // ⚠️ Started now, awaited where used: the copilot's entry and the timeline's count used to wait
+  // in turn before and after the page's reads.
+  const aiP: ReturnType<typeof aiEntries<"summary" | "draft">> = canWrite
+    ? aiEntries(["summary", "draft"] as const, aiViewer(session?.user))
+    : Promise.resolve({});
   const db = await getDb();
+  const timelineSummaryP = recordTimelineSummary(db, { type: "deal", id: dealId });
+  // Rejections are read where each is awaited; until then they must not surface as unhandled.
+  for (const pending of [aiP, timelineSummaryP]) pending.catch(() => undefined);
 
   const [
     row,
@@ -134,8 +141,6 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     allUsers,
     quotesList,
     ordersList,
-    companiesList,
-    contactsList,
     commentsList,
     customFieldDefs,
     customFieldVals,
@@ -158,13 +163,6 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     // Did this deal actually become an order. The link has been in the data since
     // the conversion was wired up and nothing on the page showed it.
     getOrdersByDeal(dealId),
-    // ⚠️ The `ForSelect` variants, not the full ones. These two feed the dropdowns
-    // in the deal edit dialog, which need an id and a name; the full versions
-    // select every column of every company and every contact in the workspace, on
-    // every visit to every deal. That is audit rilievo B-08 — the defect the list
-    // pagination was built to close — left behind on a page nobody re-checked.
-    getCompaniesForSelect(),
-    getContactsForSelect(),
     getDealComments(dealId),
     // Custom fields have always been definable for a deal — the entity type is in
     // the picker — and there was nowhere to fill them in (audit rilievo U-09).
@@ -180,6 +178,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     getTranslations("record"),
     getFormatter(),
   ]);
+  const ai = await aiP;
   const statusLabel = (s: string) => (tStatus.has(s as never) ? tStatus(s as never) : s);
 
   if (!row) return notFound();
@@ -369,7 +368,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   // made the page twice as long as either needs.
   // The timeline also holds the deal's field changes and quote events: its count comes
   // from the same place, so the badge and the list agree.
-  const timelineSummary = await recordTimelineSummary(db, { type: "deal", id: dealId });
+  const timelineSummary = await timelineSummaryP;
 
   const history = (
     <Card>
@@ -732,9 +731,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 </a>
               </Button>
             ) : null}
-            {canWrite && (
-              <DealEditButton deal={deal} stages={stages} companies={companiesList} contacts={contactsList} />
-            )}
+            {canWrite && <DealEditButton deal={deal} stages={stages} />}
           </>
         }
       >

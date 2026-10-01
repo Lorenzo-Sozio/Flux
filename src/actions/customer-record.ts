@@ -76,15 +76,15 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
   const clause = where({ companyId: deals.companyId, contactId: deals.contactId });
   if (!clause) return EMPTY;
 
-  const entitlements = await getTenantEntitlements().catch(() => null);
+  // The plan and the database at once, then the four lists at once: they never depended on
+  // one another, and read in turn they were five round trips before the customer card drew.
+  const [entitlements, db] = await Promise.all([getTenantEntitlements().catch(() => null), getDb()]);
   const modules = {
     sales: entitlements ? entitlements.enabledModules.includes("sales") : true,
     support: entitlements ? entitlements.enabledModules.includes("support") : true,
   };
 
-  const db = await getDb();
-
-  const dealRows = await db
+  const dealRowsP = db
     .select({
       id: deals.id,
       name: deals.name,
@@ -98,8 +98,8 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
     .orderBy(desc(deals.createdAt))
     .limit(PAGE + 1);
 
-  const quoteRows = modules.sales
-    ? await db
+  const quoteRowsP = modules.sales
+    ? db
         .select({
           id: quotes.id,
           number: quotes.quoteNumber,
@@ -111,10 +111,10 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
         .where(where({ companyId: quotes.companyId, contactId: quotes.contactId }))
         .orderBy(desc(quotes.createdAt))
         .limit(PAGE + 1)
-    : [];
+    : Promise.resolve([]);
 
-  const orderRows = modules.sales
-    ? await db
+  const orderRowsP = modules.sales
+    ? db
         .select({
           id: orders.id,
           number: orders.orderNumber,
@@ -126,10 +126,10 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
         .where(where({ companyId: orders.companyId, contactId: orders.contactId }))
         .orderBy(desc(orders.createdAt))
         .limit(PAGE + 1)
-    : [];
+    : Promise.resolve([]);
 
-  const ticketRows = modules.support
-    ? await db
+  const ticketRowsP = modules.support
+    ? db
         .select({
           id: tickets.id,
           number: tickets.ticketNumber,
@@ -152,7 +152,13 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
         )
         .orderBy(desc(tickets.createdAt))
         .limit(PAGE + 1)
-    : [];
+    : Promise.resolve([]);
+  const [dealRows, quoteRows, orderRows, ticketRows] = await Promise.all([
+    dealRowsP,
+    quoteRowsP,
+    orderRowsP,
+    ticketRowsP,
+  ]);
 
   const d = take(
     dealRows.map((r) => ({

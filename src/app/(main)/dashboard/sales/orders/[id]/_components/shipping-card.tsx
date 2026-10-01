@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { Loader2, PencilIcon, TruckIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -36,7 +34,6 @@ export function ShippingCard({
 }) {
   const t = useTranslations("orders.shipping");
   const format = useFormatter();
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [day, setDay] = useState(expectedDeliveryDate ?? "");
   const [by, setBy] = useState(carrier ?? "");
@@ -61,7 +58,6 @@ export function ShippingCard({
       }
       toast.success(t("saved"));
       setEditing(false);
-      router.refresh();
     });
 
   // Noon UTC, so no time zone moves the day it names.

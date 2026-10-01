@@ -12,6 +12,7 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { createDeal, updateDeal } from "@/actions/pipeline";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,9 @@ export function DealModal({
   }[];
   // Only what the two selects draw. `any[]` here meant a typo in either list
   // compiled fine and produced empty options at runtime.
+  // ⚠️ Usually left out: the dialog asks for them when it opens. Every company and every contact
+  // of the workspace used to travel with each visit to the board and to every deal, for a
+  // dialog most visits never open.
   companies?: { id: string; name: string }[];
   contacts?: { id: string; firstName: string | null; lastName: string | null }[];
   children?: React.ReactNode;
@@ -109,6 +113,26 @@ export function DealModal({
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
+
+  // The two lists, asked for the first time the dialog opens when the page did not hand them over.
+  const [fetched, setFetched] = useState<{
+    companies: { id: string; name: string }[];
+    contacts: { id: string; firstName: string | null; lastName: string | null }[];
+  } | null>(null);
+  useEffect(() => {
+    if (!open || fetched || (companies && contacts)) return;
+    let alive = true;
+    Promise.all([getCompaniesForSelect(), getContactsForSelect()])
+      .then(([companyRows, contactRows]) => {
+        if (alive) setFetched({ companies: companyRows, contacts: contactRows });
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [open, fetched, companies, contacts]);
+  const companyOptions = companies ?? fetched?.companies ?? [];
+  const contactOptions = contacts ?? fetched?.contacts ?? [];
 
   const toDateInput = (val: Date | string | null | undefined) => {
     if (!val) return "";
@@ -354,7 +378,7 @@ export function DealModal({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
-                          {companies?.map((c) => (
+                          {companyOptions.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name}
                             </SelectItem>
@@ -378,7 +402,7 @@ export function DealModal({
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
-                          {contacts?.map((c) => (
+                          {contactOptions.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.firstName} {c.lastName}
                             </SelectItem>

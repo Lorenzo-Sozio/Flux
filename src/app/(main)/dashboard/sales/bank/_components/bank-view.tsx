@@ -136,7 +136,6 @@ ${t("confirmSureText", { total: formatMoney(total, currency) })}`,
     const r = await archiveBankAccountAction(account.id).catch(() => null);
     if (!r?.ok) toast.error(r && !r.ok ? r.error : t("failed"));
     router.push("/dashboard/sales/bank");
-    router.refresh();
   }
 
   const counts = queue?.counts ?? { open: 0, outgoing: 0, reconciled: 0, ignored: 0 };

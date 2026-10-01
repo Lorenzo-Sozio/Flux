@@ -2,11 +2,10 @@
 
 import { useMemo } from "react";
 
-import Link from "next/link";
-
-import { Command } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
+import { BrandMark } from "@/components/brand-mark";
+import { IntentLink as Link } from "@/components/intent-link";
 import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import {
@@ -63,8 +62,8 @@ export function AppSidebar({
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
-              <Link prefetch={false} href="/dashboard/crm">
-                <Command />
+              <Link href="/dashboard/crm">
+                <BrandMark className="size-5 rounded-[5px]" />
                 <span className="font-semibold text-base">{APP_CONFIG.name}</span>
               </Link>
             </SidebarMenuButton>

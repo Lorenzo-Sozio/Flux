@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { Archive, CheckCircle2, FileCode2, FileText, Loader2, Mail } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -49,7 +47,6 @@ export function SendInvoiceCopyButton({
   customer: { id: string | null; name: string | null };
 }) {
   const t = useTranslations("invoices.files");
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -75,7 +72,6 @@ export function SendInvoiceCopyButton({
           submitLabel: t("sendButton"),
           onSent: (to) => {
             toast.success(t("sent", { to }));
-            router.refresh();
           },
         }}
       />
@@ -114,7 +110,6 @@ export function IssuedInvoiceFiles({
 }) {
   const t = useTranslations("invoices.files");
   const tR = useTranslations("record");
-  const router = useRouter();
   const locale = useLocale();
   const [archiving, setArchiving] = useState(false);
 
@@ -124,7 +119,6 @@ export function IssuedInvoiceFiles({
       const result = await archiveInvoiceAction(invoiceId);
       if (result.ok) {
         toast.success(t("archivedToast"));
-        router.refresh();
       } else {
         toast.error(result.error ?? t("archiveFailed"));
       }

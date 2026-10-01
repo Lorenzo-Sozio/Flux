@@ -43,7 +43,9 @@ export type PlaceholderKey =
   | "contractReference"
   | "contractEndDate"
   | "ticketNumber"
-  | "ticketSubject";
+  | "ticketSubject"
+  | "brandHeader"
+  | "signature";
 
 /**
  * Whose data a field carries, which decides where it can be filled in:
@@ -53,8 +55,10 @@ export type PlaceholderKey =
  * - `deal` — the deal an email is sent from: only from a deal's page;
  * - `document` — the quote, invoice, order, contract or ticket the email is written from: filled in
  *   by the dialog from that record.
+ * - `brand` — the workspace's letterhead and the sender's signature (src/lib/email-brand.ts):
+ *   HTML, filled in wherever the CRM sends — a one-to-one email, a campaign, a sequence, a rule.
  */
-export type PlaceholderScope = "recipient" | "campaign" | "sender" | "deal" | "document";
+export type PlaceholderScope = "recipient" | "campaign" | "sender" | "deal" | "document" | "brand";
 
 export interface PlaceholderSpec {
   key: PlaceholderKey;
@@ -160,6 +164,22 @@ export const PLACEHOLDERS: PlaceholderSpec[] = [
     label: "Your company",
     description: "The workspace's company, as on its quotes and invoices.",
     sample: "Flux S.r.l.",
+  },
+  {
+    key: "brandHeader",
+    scope: "brand",
+    aliases: ["intestazione", "brandHeader", "brand_header"],
+    label: "Letterhead",
+    description: "The workspace's logo on a bar of its colour, from Settings → General.",
+    sample: "",
+  },
+  {
+    key: "signature",
+    scope: "brand",
+    aliases: ["firma", "signature"],
+    label: "Signature",
+    description: "The sender's signature from their Profile; in a campaign, the person who sends it.",
+    sample: "",
   },
   {
     key: "dealName",

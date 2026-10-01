@@ -56,7 +56,7 @@
   {
     "file": "src/actions/quotes.ts",
     "description": "⚠️⚠️ l'email del preventivo scritta nel dialogo parte senza il link che lo apre",
-    "find": "        <p><a href=\"${quoteViewUrl}\" style=\"display:inline-block;padding:10px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600\">${escapeHtml(tx.emailCta)}</a></p>\n",
+    "find": "        ctaButton(brand, tx.emailCta, quoteViewUrl) +\n",
     "replace": ""
   },
   {
@@ -68,7 +68,7 @@
   {
     "file": "src/actions/quotes.ts",
     "description": "⚠️ l'anteprima del preventivo non mostra il riquadro e il link che il cliente riceverà",
-    "find": "      finish: quoteEmailFinish(quote),\n",
-    "replace": ""
+    "find": "      dealId: quote.dealId ?? undefined,\n      finish,\n",
+    "replace": "      dealId: quote.dealId ?? undefined,\n"
   }
 ]

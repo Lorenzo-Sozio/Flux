@@ -130,11 +130,38 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   // "forbidden" are not drawn for them.
   const tenantRole = session?.user?.tenantRole ?? null;
   const canWrite = can(tenantRole, "record:write");
-  const ai = canWrite ? await aiEntries(["summary", "draft"] as const, aiViewer(session?.user)) : {};
+  // ⚠️ Everything that does not need the contact row is started now and awaited where it is used:
+  // these reads used to wait for one another, a dozen round trips in a row before the page drew.
+  const aiP: ReturnType<typeof aiEntries<"summary" | "draft">> = canWrite
+    ? aiEntries(["summary", "draft"] as const, aiViewer(session?.user))
+    : Promise.resolve({});
   const db = await getDb();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
-  const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
+  const hasMarketingP = getTenantEntitlements()
+    .catch(() => null)
+    .then((ent) => ent?.enabledModules?.includes("marketing") ?? true);
+  const restP = Promise.all([
+    // What the timeline holds — this person's and their deals' — for the tab's count and
+    // the last contact, so neither disagrees with the list.
+    recordTimelineSummary(db, { type: "contact", id: contactId }),
+    getTasksByContact(contactId),
+    getAllUsers(),
+    getCustomFieldDefinitions("contact"),
+    getCustomFieldValues("contact", contactId),
+    // What this person has been sold, which is what a customer page is opened for.
+    getCustomerRecord({ contactId }),
+    getTranslations("contacts"),
+    getTranslations("entityDetail"),
+    getTranslations("record"),
+    getTranslations("pipeline.detail"),
+    getTranslations("pipeline"),
+    getTranslations("contacts.detail"),
+    getFormatter(),
+    getTranslations("common"),
+  ]);
+  // Rejections are read where each is awaited; until then they must not surface as unhandled.
+  for (const pending of [aiP, restP]) pending.catch(() => undefined);
 
   let contactRow: Awaited<ReturnType<typeof loadContact>>;
   let templates: Awaited<ReturnType<typeof getComposerTemplates>> = [];
@@ -172,25 +199,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     tP,
     tC,
     format,
-  ] = await Promise.all([
-    // What the timeline holds — this person's and their deals' — for the tab's count and
-    // the last contact, so neither disagrees with the list.
-    recordTimelineSummary(db, { type: "contact", id: contactId }),
-    getTasksByContact(contactId),
-    getAllUsers(),
-    getCustomFieldDefinitions("contact"),
-    getCustomFieldValues("contact", contactId),
-    // What this person has been sold, which is what a customer page is opened for.
-    getCustomerRecord({ contactId }),
-    getTranslations("contacts"),
-    getTranslations("entityDetail"),
-    getTranslations("record"),
-    getTranslations("pipeline.detail"),
-    getTranslations("pipeline"),
-    getTranslations("contacts.detail"),
-    getFormatter(),
-  ]);
-  const tc = await getTranslations("common");
+    tc,
+  ] = await restP;
+  const [ai, hasMarketing] = await Promise.all([aiP, hasMarketingP]);
 
   // ── Server actions scoped to this contact ──
   const pagePath = `/dashboard/contacts/${contactId}`;

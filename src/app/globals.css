@@ -474,3 +474,14 @@ body {
     scrollbar-width: auto;
   }
 }
+
+/* The navigation bar (src/components/navigation-progress.tsx): quick at first, then slower and
+ * slower, never reaching the end on its own — the page arriving is what completes it. */
+@keyframes nav-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}

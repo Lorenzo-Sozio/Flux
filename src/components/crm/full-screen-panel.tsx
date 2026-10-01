@@ -2,7 +2,11 @@
 
 import type { ReactNode } from "react";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,15 +39,24 @@ export function FullScreenPanel({
   children: ReactNode;
   className?: string;
 }) {
+  const tc = useTranslations("common");
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={cn("gap-0 p-0 sm:h-[min(640px,calc(100dvh-4rem))] sm:p-0", className)}>
-        <div className="sticky top-0 z-10 flex min-h-14 shrink-0 items-center gap-2 border-b bg-background py-2 pr-14 pl-4">
+      <DialogContent ownCloseButton className={cn("gap-0 p-0 sm:h-[min(640px,calc(100dvh-4rem))] sm:p-0", className)}>
+        {/* ⚠️ The close button is the header's own, centred with the title and the action: the
+            dialog's default one is pinned 12px from the top, and on a touchscreen — where every
+            control grows to 44px — it sat lower than everything beside it. */}
+        <div className="sticky top-0 z-10 flex min-h-14 shrink-0 items-center gap-2 border-b bg-background py-2 pr-2 pl-4">
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-base">{title}</DialogTitle>
             <DialogDescription className="sr-only">{description}</DialogDescription>
           </div>
           {action}
+          <DialogClose asChild>
+            <Button type="button" variant="ghost" size="icon" aria-label={tc("close")} className="shrink-0">
+              <XIcon />
+            </Button>
+          </DialogClose>
         </div>
         <div className="min-h-0 flex-1">{children}</div>
         {footer && <div className="sticky bottom-0 shrink-0 border-t bg-background">{footer}</div>}

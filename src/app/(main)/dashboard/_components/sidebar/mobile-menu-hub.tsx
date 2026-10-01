@@ -2,7 +2,6 @@
 
 import { type ReactNode, useMemo, useState } from "react";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ArrowLeftRight, Check, ChevronRight, Lock, LogOut, Pencil, RotateCcw, Search } from "lucide-react";
@@ -10,6 +9,7 @@ import { useTranslations } from "next-intl";
 
 import { logoutAction } from "@/actions/auth";
 import { ChatUnreadBadge } from "@/components/chat/chat-unread-badge";
+import { IntentLink as Link } from "@/components/intent-link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { CurrencySwitcher } from "@/components/ui/currency-switcher";
@@ -244,7 +244,6 @@ export function MobileMenuHub({
                             <li key={item.url}>
                               <Link
                                 href={item.locked ? lockHref(item.lockedModule) : item.url}
-                                prefetch={false}
                                 onClick={close}
                                 aria-current={active ? "page" : undefined}
                                 aria-label={item.locked ? t("notInPlan", { title: label(item.titleKey) }) : undefined}
@@ -278,7 +277,6 @@ export function MobileMenuHub({
                             <li key={sub.url}>
                               <Link
                                 href={sub.locked ? lockHref(sub.lockedModule) : sub.url}
-                                prefetch={false}
                                 onClick={close}
                                 aria-current={pathname === sub.url ? "page" : undefined}
                                 className={cn(
@@ -317,7 +315,6 @@ export function MobileMenuHub({
                         <li key={item.url}>
                           <Link
                             href={item.locked ? lockHref(item.lockedModule) : item.url}
-                            prefetch={false}
                             onClick={close}
                             aria-current={isHere(pathname, item.url) ? "page" : undefined}
                             className={cn("flex min-h-12 items-center gap-3 px-3", item.locked && "opacity-60")}
@@ -342,7 +339,6 @@ export function MobileMenuHub({
                             <li key={sub.url}>
                               <Link
                                 href={sub.locked ? lockHref(sub.lockedModule) : sub.url}
-                                prefetch={false}
                                 onClick={close}
                                 className={cn(
                                   "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-muted-foreground text-xs",
@@ -387,7 +383,7 @@ export function MobileMenuHub({
               {/* ── Leaving ─────────────────────────────────────────────────── */}
               <div className="mt-5 grid grid-cols-2 gap-2">
                 <Button variant="outline" className="h-11 gap-2" asChild>
-                  <Link href="/select-tenant" prefetch={false} onClick={close}>
+                  <Link href="/select-tenant" onClick={close}>
                     <ArrowLeftRight className="size-4" />
                     <span className="truncate">{tm("switchWorkspace")}</span>
                   </Link>

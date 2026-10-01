@@ -80,8 +80,9 @@ export function PipelineBoard({
 }: {
   initialStages: Stage[];
   initialDeals: Deal[];
-  companies: { id: string; name: string }[];
-  contacts: { id: string; firstName: string | null; lastName: string | null }[];
+  /** Left out, the deal dialog loads them when it opens. */
+  companies?: { id: string; name: string }[];
+  contacts?: { id: string; firstName: string | null; lastName: string | null }[];
   canEdit?: boolean;
   canManageStages?: boolean;
 }) {

@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
-
 import { EllipsisVertical, LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { logoutAction } from "@/actions/auth";
+import { IntentLink as Link } from "@/components/intent-link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -98,7 +97,7 @@ export function NavUser({
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="min-w-48">
                         <DropdownMenuItem asChild>
-                          <Link prefetch={false} href={item.url} className="flex items-center gap-2">
+                          <Link href={item.url} className="flex items-center gap-2">
                             {item.icon && <item.icon className="h-4 w-4" />}
                             <span>{tNav(`items.${item.titleKey}` as never)}</span>
                           </Link>
@@ -106,7 +105,7 @@ export function NavUser({
                         <DropdownMenuSeparator />
                         {item.subItems.map((sub) => (
                           <DropdownMenuItem key={sub.titleKey} asChild>
-                            <Link prefetch={false} href={sub.url} className="flex items-center gap-2">
+                            <Link href={sub.url} className="flex items-center gap-2">
                               {sub.icon && <sub.icon className="h-4 w-4" />}
                               <span>{tNav(`items.${sub.titleKey}` as never)}</span>
                             </Link>
@@ -116,7 +115,7 @@ export function NavUser({
                     </DropdownMenuSub>
                   ) : (
                     <DropdownMenuItem key={item.titleKey} asChild>
-                      <Link prefetch={false} href={item.url} className="flex items-center gap-2">
+                      <Link href={item.url} className="flex items-center gap-2">
                         {item.icon && <item.icon className="h-4 w-4" />}
                         <span>{tNav(`items.${item.titleKey}` as never)}</span>
                       </Link>

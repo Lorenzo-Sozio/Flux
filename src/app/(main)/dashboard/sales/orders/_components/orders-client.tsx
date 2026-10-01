@@ -114,7 +114,6 @@ export function OrdersClient({
       setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
       // The four figures above the list are counted on the server, and a status
       // change moves two of them.
-      router.refresh();
       toast.success(tc("updateSuccess"));
     });
   };
@@ -126,7 +125,6 @@ export function OrdersClient({
       setOrders((prev) => prev.filter((o) => o.id !== id));
       // The total in the toolbar and the row that moves up from the next page
       // are both the server's to know, so ask for the page again.
-      router.refresh();
       toast.success(t("deleteSuccess"));
     });
   };

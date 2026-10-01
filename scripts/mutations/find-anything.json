@@ -46,5 +46,17 @@
     "description": "il filtro «contiene» delle liste torna a distinguere gli accenti",
     "find": "    case \"contains\":\n      return matchesText(col, `%${val}%`);",
     "replace": "    case \"contains\":\n      return sql`${col} ILIKE ${`%${val}%`}`;"
+  },
+  {
+    "file": "src/lib/contact-point.ts",
+    "description": "⚠️⚠️ un numero cercato con +39 non trova lo stesso numero salvato senza prefisso",
+    "find": "    for (const variant of phoneVariants(`+${bare}`, callingCode)) patterns.add(variant);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contact-point.ts",
+    "description": "⚠️ un numero scritto con 0039 non viene riconosciuto come internazionale",
+    "find": "    const bare = /^\\s*00/.test(query) ? digits.replace(/^00/, \"\") : digits;",
+    "replace": "    const bare = digits;"
   }
 ]

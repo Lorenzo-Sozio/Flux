@@ -18,7 +18,8 @@ import { eq } from "drizzle-orm";
 
 import { campaignLogs, emailJobs, emailSuppressions } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
-import { ensureUnsubscribe } from "@/lib/email-placeholders";
+import { brandValues, loadEmailBrand, signatureFor } from "@/lib/email-brand-load";
+import { ensureUnsubscribe, renderPlaceholders } from "@/lib/email-placeholders";
 import { normaliseEmail } from "@/lib/sequence-plan";
 import { getDb } from "@/lib/tenant-context";
 import { trackLinks } from "@/lib/tracking-token";
@@ -87,6 +88,17 @@ export async function sendAutomationEmailWithContext(
   }
 
   const db = await getDb();
+
+  // `{{intestazione}}` and `{{firma}}`, from a template designed in the builder: the workspace's
+  // identity and the record owner's signature, as on the email the owner would have written.
+  if (/\{\{\s*(intestazione|brandHeader|brand_header|firma|signature)\s*\}\}/i.test(finalBody)) {
+    const brand = await loadEmailBrand(db).catch(() => null);
+    if (brand) {
+      const ownerId = (mergeData.owner as { id?: string } | undefined)?.id ?? null;
+      const signature = await signatureFor(db, ownerId, brand, "full", "it").catch(() => "");
+      finalBody = renderPlaceholders(finalBody, brandValues(brand, signature));
+    }
+  }
 
   // ⚠️ The exclusion list first: somebody who unsubscribed, or whose address bounced, is
   // not written to by a rule any more than by a campaign.

@@ -1,7 +1,7 @@
 import { APP_CONFIG } from "@/config/app-config";
 
 /**
- * The opening screen: the mark draws itself, the name rises under it, a thin bar
+ * The opening screen: the app's tile pops in, the name rises under it, a thin bar
  * says the app is on its way — and then it lifts away as the page is ready.
  *
  * ⚠️ Plain HTML, CSS and one inline script, rendered by the root layout, on
@@ -42,13 +42,11 @@ export function SplashScreen({ nonce }: { nonce?: string }) {
         <div className="fs-glow" />
         <div className="fs-center">
           <div className="fs-mark">
-            <svg viewBox="0 0 24 24" width="52" height="52" role="presentation">
-              <path
-                className="fs-glyph"
-                pathLength={100}
-                d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"
-              />
-            </svg>
+            {/* The tile itself (scripts/generate-pwa-icons.mjs), as on the home screen and in the
+                launch images: an image rather than inline SVG, which would put the mark's
+                twenty kilobytes into every page's HTML. */}
+            {/* biome-ignore lint/performance/noImgElement: plain HTML painted before React, by design */}
+            <img src="/icons/icon.svg" alt="" width={104} height={104} fetchPriority="high" />
           </div>
           <div className="fs-word">{APP_CONFIG.name}</div>
         </div>
@@ -62,29 +60,26 @@ export function SplashScreen({ nonce }: { nonce?: string }) {
 
 const SPLASH_CSS = `
 #flux-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-items:center;overflow:hidden;color:#fff;
-background:radial-gradient(120% 75% at 50% 0%,#3a6bff 0%,#1447e6 38%,#0c2fa8 72%,#071d6e 100%);
+background:radial-gradient(120% 75% at 50% 0%,#25386f 0%,#15224d 38%,#0c1633 72%,#070d22 100%);
 transition:opacity .5s ease,visibility .5s ease,transform .6s cubic-bezier(.2,.8,.2,1);
 animation:fs-failsafe .4s 6s forwards}
 html[data-splash=done] #flux-splash{opacity:0;visibility:hidden;transform:scale(1.06);pointer-events:none}
 html[data-splash=off] #flux-splash{display:none}
 #flux-splash .fs-glow{position:absolute;left:50%;top:50%;width:560px;height:560px;margin:-300px 0 0 -280px;border-radius:50%;
-background:radial-gradient(circle,rgba(140,175,255,.55) 0%,rgba(90,130,255,.18) 40%,transparent 70%);animation:fs-breathe 2.8s ease-in-out infinite}
+background:radial-gradient(circle,rgba(124,125,255,.38) 0%,rgba(75,134,255,.12) 40%,transparent 70%);animation:fs-breathe 2.8s ease-in-out infinite}
 #flux-splash .fs-center{position:relative;display:flex;flex-direction:column;align-items:center}
-#flux-splash .fs-mark{position:relative;overflow:hidden;display:grid;place-items:center;width:104px;height:104px;border-radius:28px;
-background:linear-gradient(150deg,rgba(255,255,255,.26),rgba(255,255,255,.07));border:1px solid rgba(255,255,255,.3);
-box-shadow:0 24px 60px -12px rgba(2,10,50,.65),inset 0 1px 0 rgba(255,255,255,.4);
+#flux-splash .fs-mark{position:relative;overflow:hidden;width:104px;height:104px;border-radius:30px;
+box-shadow:0 24px 60px -12px rgba(1,4,15,.75),0 0 0 1px rgba(255,255,255,.14);
 animation:fs-pop .8s cubic-bezier(.2,.9,.25,1.15) both}
+#flux-splash .fs-mark img{display:block;width:104px;height:104px}
 #flux-splash .fs-mark::after{content:"";position:absolute;inset:0;border-radius:inherit;transform:translateX(-130%);
 background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.5) 50%,transparent 70%);animation:fs-shine .8s .9s ease-in-out forwards}
-#flux-splash .fs-glyph{fill:none;stroke:#fff;stroke-width:2.1;stroke-linecap:round;stroke-linejoin:round;
-stroke-dasharray:100;stroke-dashoffset:100;animation:fs-draw .8s .15s cubic-bezier(.6,0,.2,1) forwards}
 #flux-splash .fs-word{margin-top:26px;font:600 30px/1.1 var(--font-sans,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif);
 letter-spacing:-.02em;opacity:0;transform:translateY(10px);animation:fs-rise .6s .45s cubic-bezier(.2,.8,.2,1) forwards}
 #flux-splash .fs-bar{position:absolute;left:50%;bottom:calc(56px + env(safe-area-inset-bottom));width:132px;height:3px;margin-left:-66px;
 border-radius:3px;overflow:hidden;background:rgba(255,255,255,.18);opacity:0;animation:fs-fade .4s .6s forwards}
 #flux-splash .fs-bar i{position:absolute;top:0;bottom:0;width:42%;border-radius:3px;background:#fff;animation:fs-slide 1.15s ease-in-out infinite}
 @keyframes fs-pop{from{opacity:0;transform:scale(.72) translateY(6px)}to{opacity:1;transform:none}}
-@keyframes fs-draw{to{stroke-dashoffset:0}}
 @keyframes fs-shine{to{transform:translateX(130%)}}
 @keyframes fs-rise{to{opacity:1;transform:none}}
 @keyframes fs-fade{to{opacity:1}}

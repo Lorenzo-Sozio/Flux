@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { Command } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
+import { BrandMark } from "@/components/brand-mark";
 
 import { RegisterForm } from "../../_components/register-form";
 import { GoogleButton } from "../../_components/social-auth/google-button";
@@ -33,7 +34,7 @@ export default async function RegisterV1() {
       <div className="hidden bg-primary lg:block lg:w-1/3">
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
-            <Command className="mx-auto size-12 text-primary-foreground" />
+            <BrandMark className="mx-auto size-16" />
             <div className="space-y-2">
               <h1 className="font-light text-5xl text-primary-foreground">{t("welcomeTitle")}</h1>
               <p className="text-primary-foreground/80 text-xl">{t("welcomeSubtitle")}</p>

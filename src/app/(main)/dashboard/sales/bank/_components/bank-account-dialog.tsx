@@ -49,7 +49,6 @@ export function BankAccountDialog({
           return;
         }
         onOpenChange(false);
-        router.refresh();
         return;
       }
       const r = await createBankAccountAction({ name, iban, currency }).catch(() => null);
@@ -59,7 +58,6 @@ export function BankAccountDialog({
       }
       onOpenChange(false);
       router.push(`/dashboard/sales/bank?account=${encodeURIComponent(r.id)}`);
-      router.refresh();
     });
   }
 

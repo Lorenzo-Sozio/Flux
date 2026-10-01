@@ -14,7 +14,7 @@
   {
     "file": "src/app/(main)/dashboard/pipeline/page.tsx",
     "description": "⚠️ la lavagna si apre sulle trattative di tutti",
-    "find": "      next.set(\"owners\", actor.userId);",
-    "replace": "      next.set(\"owners\", \"all\");"
+    "find": "  const effective = actor ? { ...params, owners: actor.userId } : params;",
+    "replace": "  const effective = actor ? { ...params, owners: \"all\" } : params;"
   }
 ]

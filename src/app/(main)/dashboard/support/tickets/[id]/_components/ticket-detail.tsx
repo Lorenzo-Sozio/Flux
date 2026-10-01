@@ -162,6 +162,8 @@ export function TicketDetail({
   id,
   initialTicket,
   initialMacros,
+  initialTasks,
+  initialUsers,
   canWrite,
   canDelete,
   aiSummary,
@@ -171,6 +173,9 @@ export function TicketDetail({
   id: string;
   initialTicket: TicketRow | null;
   initialMacros: TicketMacro[];
+  /** Loaded with the page; null when the server could not, and the screen asks itself. */
+  initialTasks?: LinkedTask[] | null;
+  initialUsers?: { id: string; name: string | null }[] | null;
   /** `ticket:write` — replying, changing status/priority/assignee, tasks, linking an order. */
   canWrite: boolean;
   /** `ticket:delete`, which is an admin's. */
@@ -196,8 +201,8 @@ export function TicketDetail({
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   // Held here rather than in the tasks card, so the phone's Tasks tab can show
   // how many are open before it is opened.
-  const [tasks, setTasks] = useState<LinkedTask[]>([]);
-  const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
+  const [tasks, setTasks] = useState<LinkedTask[]>(initialTasks ?? []);
+  const [users, setUsers] = useState<{ id: string; name: string | null }[]>(initialUsers ?? []);
 
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -280,8 +285,8 @@ export function TicketDetail({
   // Without a ticket from the server, load everything as the page always did.
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on mount
   useEffect(() => {
-    void loadTasks();
-    getAllUsers().then(setUsers).catch(console.error);
+    if (!initialTasks) void loadTasks();
+    if (!initialUsers) getAllUsers().then(setUsers).catch(console.error);
     if (initialTicket) {
       void loadDocuments();
       return;
@@ -290,24 +295,29 @@ export function TicketDetail({
     getMacros().then(setMacros).catch(console.error);
   }, []);
   useEffect(() => {
-    const announce = (action: "viewing" | "typing") =>
+    // ⚠️ One request a round, not two: the announcement answers with who else is here. Every 30
+    // seconds rather than 15, and none while the tab is hidden — each was a Worker request, and
+    // the presence itself is kept in the memory of one isolate (route.ts), so it is a hint at best.
+    const round = () => {
+      if (document.hidden) return;
       fetch(`/api/tickets/${id}/presence`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      }).catch(console.error);
-    const poll = () =>
-      fetch(`/api/tickets/${id}/presence`)
-        .then((r) => r.json())
-        .then((d: PresenceEntry[]) => setPresence(d))
+        body: JSON.stringify({ action: "viewing" }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { presence?: PresenceEntry[] } | null) => {
+          if (d?.presence) setPresence(d.presence);
+        })
         .catch(console.error);
-    announce("viewing");
-    poll();
-    const t = setInterval(() => {
-      announce("viewing");
-      poll();
-    }, 15_000);
-    return () => clearInterval(t);
+    };
+    round();
+    const t = setInterval(round, 30_000);
+    document.addEventListener("visibilitychange", round);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", round);
+    };
   }, [id]);
 
   const isReplyEmpty = !replyContent.trim() || replyContent === "<p></p>";

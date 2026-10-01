@@ -11,6 +11,16 @@ import { eq } from "drizzle-orm";
 import { activities, companies, deals, users } from "@/db/schema";
 import { documentLanguage, formatDocumentMoney } from "@/lib/document-language";
 import { MAX_COPIES, parseAddressList } from "@/lib/email-addresses";
+import {
+  type BrandLang,
+  type EmailKit,
+  personalEmail,
+  placesSignature,
+  type SignatureVariant,
+  signatureHtml,
+  signaturePerson,
+} from "@/lib/email-brand";
+import { brandValues, loadEmailBrand } from "@/lib/email-brand-load";
 import { dealValues, type PlaceholderValues, renderPlaceholders, senderValues } from "@/lib/email-placeholders";
 import { type EmailAttachment, sendEmail } from "@/lib/email-provider";
 import { recordTemplateUse } from "@/lib/email-templates";
@@ -19,6 +29,7 @@ import { inboundEmailConfigured, replyToFor } from "@/lib/inbound-sales-reply";
 import { loadConnection } from "@/lib/mail-connection";
 import { sendFromOwnMailbox } from "@/lib/mailbox-send";
 import { sellerIdentity } from "@/lib/seller-identity";
+import { readSignatureSettings } from "@/lib/workspace-preferences";
 
 // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
 type AnyDb = any;
@@ -57,9 +68,22 @@ export interface DeliverEmail {
     document?: { type: "quote" | "invoice"; id: string; number?: string | null };
   };
   templateId?: string;
-  /** What a document adds below the person's text once the fields are filled: the quote's link. */
-  finish?: (html: string) => string;
+  /**
+   * What a document makes of the person's text once the fields are filled: the frame with the
+   * workspace's logo, the document's figures, its button — and where the signature goes.
+   * Without it the email is personal: the text, then the signature.
+   */
+  finish?: (html: string, kit: EmailKit) => string;
+  /**
+   * The sender's signature (src/lib/email-brand.ts), from their Profile — added whether the email
+   * leaves from the workspace or from their own mailbox. Nothing when they switched it off.
+   */
+  signature?: SignatureVariant | "none";
+  /** The customer's language, for the frame's and the signature's fixed words. */
+  lang?: BrandLang;
 }
+
+export type { EmailKit };
 
 function stripHtml(html: string): string {
   return html
@@ -81,9 +105,10 @@ export async function ownFields(
   db: AnyDb,
   me: { name: string | null; email: string | null } | undefined,
   dealId: string | undefined,
+  companyName?: string,
 ): Promise<PlaceholderValues> {
-  const seller = await sellerIdentity(db).catch(() => ({ name: "" }));
-  const values: PlaceholderValues = senderValues({ name: me?.name, email: me?.email, company: seller.name });
+  const company = companyName ?? (await sellerIdentity(db).catch(() => ({ name: "" }))).name;
+  const values: PlaceholderValues = senderValues({ name: me?.name, email: me?.email, company });
   if (!dealId) return values;
   const [row] = await db
     .select({
@@ -111,16 +136,37 @@ export async function ownFields(
 export async function composeEmail(
   db: AnyDb,
   actor: { userId: string },
-  input: Pick<DeliverEmail, "subject" | "html" | "dealId" | "finish">,
+  input: Pick<DeliverEmail, "subject" | "html" | "dealId" | "finish" | "signature" | "lang">,
 ): Promise<{ me: { name: string | null; email: string | null } | undefined; subject: string; html: string }> {
-  const [me] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, actor.userId));
+  const [[me], brand] = await Promise.all([
+    db
+      .select({ email: users.email, name: users.name, image: users.image })
+      .from(users)
+      .where(eq(users.id, actor.userId)) as Promise<
+      { email: string | null; name: string | null; image: string | null }[]
+    >,
+    loadEmailBrand(db),
+  ]);
+  const lang = input.lang ?? "it";
+
+  let signature = "";
+  if (me && input.signature && input.signature !== "none") {
+    const settings = await readSignatureSettings(db, actor.userId);
+    if (settings.enabled) {
+      signature = signatureHtml({ person: signaturePerson(me, settings), brand, variant: input.signature, lang });
+    }
+  }
 
   // The sender's fields — and the deal's, from a deal — are filled in here, where who sends and
-  // from where are known; the dialog has already filled in the recipient's.
-  const fill = await ownFields(db, me, input.dealId);
+  // from where are known; the dialog has already filled in the recipient's. A template that
+  // places `{{firma}}` itself gets it there, and not a second time at the end.
+  const placed = placesSignature(input.html);
+  const fill = { ...(await ownFields(db, me, input.dealId, brand.name)), ...brandValues(brand, signature) };
   const subject = renderPlaceholders(input.subject, fill);
   const filled = renderPlaceholders(input.html, fill);
-  return { me, subject, html: input.finish ? input.finish(filled) : filled };
+  const end = placed ? "" : signature;
+  const html = input.finish ? input.finish(filled, { brand, signature: end, lang }) : personalEmail(filled, end);
+  return { me: me ? { name: me.name, email: me.email } : undefined, subject, html };
 }
 
 export async function deliverEmail(

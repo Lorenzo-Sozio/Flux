@@ -17,6 +17,7 @@ import {
 import { getAppUrl } from "@/lib/app-url";
 import { notWithAssistant } from "@/lib/assistant-handling";
 import { resolveSegmentIds } from "@/lib/campaign-segment";
+import { brandValues, loadEmailBrand, signatureFor } from "@/lib/email-brand-load";
 import { ensureUnsubscribe, renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { getDb } from "@/lib/tenant-context";
 import { trackLinks } from "@/lib/tracking-token";
@@ -98,6 +99,15 @@ export async function executeCampaignSend(data: {
       .where(filter);
   }
 
+  // `{{intestazione}}` and `{{firma}}` (the builder's Letterhead and Signature blocks): the
+  // workspace's identity, and the signature of whoever sends it — the campaign's owner when the
+  // scheduler does. Read once, and only when the template uses them.
+  const branded = /\{\{\s*(intestazione|brandHeader|brand_header|firma|signature)\s*\}\}/i.test(template.body);
+  const brand = branded ? await loadEmailBrand(db).catch(() => null) : null;
+  const brandFields = brand
+    ? brandValues(brand, await signatureFor(db, data.actorId ?? campaign.ownerId, brand, "full", "it").catch(() => ""))
+    : {};
+
   let queued = 0;
   let skipped = 0;
 
@@ -123,7 +133,7 @@ export async function executeCampaignSend(data: {
 
     const unsubToken = generateUnsubscribeToken(recipient.email, log.id);
     const unsubscribeUrl = `${appBase()}/api/unsubscribe?token=${unsubToken}`;
-    const values = valuesForRecipient({ ...recipient, unsubscribeUrl });
+    const values = { ...valuesForRecipient({ ...recipient, unsubscribeUrl }), ...brandFields };
 
     // The unsubscribe link is added when the author left it out. A marketing
     // email without one is not a rendering defect but an unlawful one, and the

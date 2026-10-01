@@ -52,9 +52,15 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  ownCloseButton = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /**
+   * The content draws its own close button, in its header and aligned with it (FullScreenPanel).
+   * The default one stays in the DOM, hidden: Back on a phone closes the dialog through it.
+   */
+  ownCloseButton?: boolean
 }) {
   // On a phone the system's Back closes the dialog, through its own close button: see the hook.
   const closeRef = React.useRef<HTMLButtonElement>(null)
@@ -126,7 +132,13 @@ function DialogContent({
           <Button
             ref={closeRef}
             variant="ghost"
-            className={cn("absolute top-3 right-3 z-20 sm:top-4 sm:right-4", !showCloseButton && "sm:hidden")}
+            className={cn(
+              // On a touchscreen every button grows to 44px tall (globals.css): moved up by half the
+              // difference, so its centre stays where a header's centre is.
+              "absolute top-3 right-3 z-20 pointer-coarse:top-1.5 sm:top-4 sm:right-4 sm:pointer-coarse:top-2.5",
+              !showCloseButton && "sm:hidden",
+              ownCloseButton && "hidden sm:hidden"
+            )}
             size="icon-sm"
             >
             <XIcon />

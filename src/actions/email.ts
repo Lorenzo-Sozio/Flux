@@ -24,6 +24,7 @@ export async function sendEmailAction({
   dealId,
   ownerId,
   templateId,
+  signature,
 }: {
   to: string;
   /** Copies, as typed: comma, semicolon or space separated (src/lib/email-addresses.ts). */
@@ -40,6 +41,8 @@ export async function sendEmailAction({
   ownerId?: string;
   /** The template the email started from: counted, so the ones in use come first. */
   templateId?: string;
+  /** False when the person took the signature off this one email. */
+  signature?: boolean;
 }): Promise<SendEmailResult> {
   const actor = await requireWriteAccess();
   const db = await getDb();
@@ -53,6 +56,7 @@ export async function sendEmailAction({
       subject,
       html: body,
       sender: "person",
+      signature: signature === false ? "none" : "full",
       dealId,
       log: { leadId, contactId, companyId, dealId, ownerId },
       templateId,
@@ -75,12 +79,18 @@ export async function previewEmailAction({
   subject,
   body,
   dealId,
+  signature,
 }: {
   subject: string;
   body: string;
   dealId?: string;
+  signature?: boolean;
 }): Promise<EmailPreview> {
   const actor = await requireWriteAccess();
-  const email = await composeEmail(await getDb(), { userId: actor.user.id }, { subject, html: body, dealId });
+  const email = await composeEmail(
+    await getDb(),
+    { userId: actor.user.id },
+    { subject, html: body, dealId, signature: signature === false ? "none" : "full" },
+  );
   return { ok: true, subject: email.subject, html: email.html };
 }

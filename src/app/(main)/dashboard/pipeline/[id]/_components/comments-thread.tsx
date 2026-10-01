@@ -2,8 +2,6 @@
 
 import { useState } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { CornerDownRight, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -212,7 +210,6 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
 
 export function CommentsThread({ dealId, initialComments, currentUserId, currentUserRole }: Props) {
   const t = useTranslations("pipeline.comments");
-  const router = useRouter();
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -222,7 +219,6 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
     try {
       await addDealComment(dealId, newComment);
       setNewComment("");
-      router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t("postFailed"));
     } finally {
@@ -272,7 +268,7 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
               dealId={dealId}
               currentUserId={currentUserId}
               currentUserRole={currentUserRole}
-              onAction={router.refresh}
+              onAction={() => undefined}
             />
           ))}
         </div>

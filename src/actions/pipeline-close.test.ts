@@ -454,7 +454,12 @@ describe("⚠️ the board opens on the deals of whoever is looking", () => {
   it("writes `owners=<me>` into the URL when none is given, and leaves `all` alone", async () => {
     const { readFileSync } = await import("node:fs");
     const src = readFileSync("src/app/(main)/dashboard/pipeline/page.tsx", "utf8");
-    expect(src).toContain("if (params.owners === undefined) {");
-    expect(src).toContain('next.set("owners", actor.userId);');
+    // Applied by the page, without a redirect (two server renders per tap), and written into the
+    // address by the browser so the filter bar shows it.
+    expect(src).toContain("const actor = params.owners === undefined ? await getActor() : null;");
+    expect(src).toContain("const effective = actor ? { ...params, owners: actor.userId } : params;");
+    expect(src).not.toContain("redirect(");
+    const writer = readFileSync("src/app/(main)/dashboard/pipeline/components/default-owners-param.tsx", "utf8");
+    expect(writer).toContain('url.searchParams.set("owners", userId);');
   });
 });

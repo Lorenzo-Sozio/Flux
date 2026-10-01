@@ -276,7 +276,11 @@ export default async function CalendarPage({
   // ⚠️ The workspace role, never the platform one.
   const tenantRole = session?.user?.tenantRole ?? null;
   const canWrite = can(tenantRole, "record:write");
-  const aiBriefing = canWrite ? (await aiEntries(["briefing"], aiViewer(session?.user))).briefing : undefined;
+  // Started now and awaited with the calendar's reads: it used to hold them back.
+  const aiBriefingP = canWrite
+    ? aiEntries(["briefing"], aiViewer(session?.user)).then((e) => e.briefing)
+    : Promise.resolve(undefined);
+  aiBriefingP.catch(() => undefined);
   const canDelete = can(tenantRole, "record:delete");
 
   const currentView: View = (VIEWS as readonly string[]).includes(viewParam ?? "") ? (viewParam as View) : "week";
@@ -346,7 +350,7 @@ export default async function CalendarPage({
   const rangeStart = subDays(fetchStart, 1);
   const rangeEnd = addDays(fetchEnd, 1);
 
-  const [crmEvents, external, tFeed, tApt, members] = await Promise.all([
+  const [crmEvents, external, tFeed, tApt, members, aiBriefing] = await Promise.all([
     getCalendarEvents(currentFilter, { start: rangeStart, end: rangeEnd }),
     // Never blocks and never throws: a calendar that cannot be reached is shown
     // as empty **and said to be**, because a screen that looks free while
@@ -357,6 +361,7 @@ export default async function CalendarPage({
     // The colleagues the people filter offers. A filter that cannot load them still
     // offers everybody, me and my group; it does not take the calendar down.
     getPipelineMembers().catch(() => []),
+    aiBriefingP,
   ]);
   const people = members.map((m) => ({ id: m.id, name: m.name, email: m.email, former: m.former }));
 

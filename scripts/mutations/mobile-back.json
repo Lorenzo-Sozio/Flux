@@ -1,20 +1,32 @@
 [
   {
     "file": "src/hooks/use-back-dismiss.ts",
-    "description": "⚠️⚠️ il tasto Indietro chiude insieme l'elenco dei modelli e la finestra email sotto",
-    "find": "    if (gone || layersOf(event.state).includes(id)) return;",
-    "replace": "    if (gone) return;"
+    "description": "⚠️⚠️ il tasto Indietro chiude la finestra sotto invece dell'elenco aperto sopra",
+    "find": "    const top = stack.pop();",
+    "replace": "    const top = stack.shift();"
   },
   {
     "file": "src/hooks/use-back-dismiss.ts",
-    "description": "⚠️ chiudere un pannello toccando una notifica annulla la navigazione verso il record",
-    "find": "      if (layersOf(win.history.state).at(-1) === id) win.history.back();",
-    "replace": "      win.history.back();"
+    "description": "⚠️⚠️ chiudere una scheda dopo il salvataggio torna indietro nella cronologia e Next scarta l'aggiornamento della pagina",
+    "find": "        spent += 1;\n      };",
+    "replace": "        spent += 1;\n        win.history.go(-1);\n      };"
   },
   {
     "file": "src/hooks/use-back-dismiss.ts",
-    "description": "⚠️ il pannello copre lo stato della pagina nella cronologia",
-    "find": "{ ...((win.history.state as object | null) ?? {}), fluxLayers: [...below, id] }",
-    "replace": "{ fluxLayers: [...below, id] }"
+    "description": "⚠️ dopo aver chiuso due finestre con la X, Indietro resta sulla stessa pagina",
+    "find": "      win.history.go(-steps);",
+    "replace": "      win.history.go(-1);"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️ ogni apertura aggiunge una voce alla cronologia e Indietro va premuto più volte",
+    "find": "      if (spent > 0 && spentHref === href) {",
+    "replace": "      if (false) {"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️ la voce del pannello perde lo stato di Next, e Indietro non ritrova la pagina",
+    "find": "        win.history.pushState(win.history.state, \"\");",
+    "replace": "        win.history.pushState({}, \"\");"
   }
 ]

@@ -6,6 +6,8 @@
  * Call invalidateTenantCache(id) after creating or updating a tenant
  * so the new record is picked up immediately.
  */
+import { cache } from "react";
+
 import { eq } from "drizzle-orm";
 
 import { platformDb } from "@/db";
@@ -22,8 +24,10 @@ interface CacheEntry {
 
 const cacheById = new Map<string, CacheEntry>();
 
+// One read per request whatever asks for it — the layout, the guards, the page, the copilot's
+// entry — through React's per-request `cache()`; outside a render it simply calls through.
 /** Primary runtime lookup — used by getDb() via x-tenant-id header. */
-export async function getTenantById(id: string): Promise<Tenant | null> {
+export const getTenantById = cache(async function getTenantById(id: string): Promise<Tenant | null> {
   const now = Date.now();
   const hit = cacheById.get(id);
   if (hit && now < hit.expiresAt) return hit.tenant;
@@ -34,7 +38,7 @@ export async function getTenantById(id: string): Promise<Tenant | null> {
 
   cacheById.set(id, { tenant: tenant ?? null, expiresAt: now + TTL_MS });
   return tenant ?? null;
-}
+});
 
 /**
  * Runtime lookup for machine-to-machine callers: the tenant is a property of the

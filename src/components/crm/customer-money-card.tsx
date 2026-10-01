@@ -3,7 +3,6 @@
 import { useMemo, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { BanknoteIcon, DownloadIcon, Loader2, Plus, Undo2, WalletIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -42,7 +41,6 @@ export function CustomerMoneyCard({
   const t = useTranslations("receipts");
   const tS = useTranslations("statement");
   const format = useFormatter();
-  const router = useRouter();
   const { formatMoney } = useCurrency();
   const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -120,7 +118,6 @@ export function CustomerMoneyCard({
       setMethod("");
       setReference("");
       setTyped({});
-      router.refresh();
     });
   }
 
@@ -388,7 +385,6 @@ function CreditRow({
   canWrite: boolean;
 }) {
   const t = useTranslations("receipts");
-  const router = useRouter();
   const { formatMoney } = useCurrency();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -418,7 +414,6 @@ function CreditRow({
       }
       toast.success(t("refunded", { amount: formatMoney(value, currency) }));
       setOpen(false);
-      router.refresh();
     });
   }
 

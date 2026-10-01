@@ -3,7 +3,6 @@
 import { useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { CheckCircle2, Circle, Database, Rocket, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -47,7 +46,6 @@ const HREF: Record<OnboardingStep, string> = {
 export function OnboardingCard({ state }: { state: OnboardingState & { dependents: number } }) {
   const t = useTranslations("onboarding");
   const tc = useTranslations("common");
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const total = ONBOARDING_STEPS.length;
 
@@ -63,7 +61,6 @@ export function OnboardingCard({ state }: { state: OnboardingState & { dependent
         return;
       }
       if (success) toast.success(success);
-      router.refresh();
     });
 
   return (

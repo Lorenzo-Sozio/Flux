@@ -1,7 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
 import { CampaignModal } from "@/components/crm/campaign-modal";
 
 interface Template {
@@ -12,6 +10,5 @@ interface Template {
 }
 
 export function NewCampaignButton({ templates }: { templates: Template[] }) {
-  const router = useRouter();
-  return <CampaignModal templates={templates} onSuccess={() => router.refresh()} openOnNew />;
+  return <CampaignModal templates={templates} openOnNew />;
 }

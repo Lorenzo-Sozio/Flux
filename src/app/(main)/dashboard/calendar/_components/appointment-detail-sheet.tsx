@@ -261,7 +261,6 @@ export function AppointmentDetailSheet({
     if (notified && inviteStatus) reportNotices(inviteStatus);
     setConfirm(null);
     close();
-    router.refresh();
   };
 
   const handleCancel = () => {

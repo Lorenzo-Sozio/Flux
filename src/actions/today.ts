@@ -170,7 +170,8 @@ export async function getTodayView(): Promise<TodayView> {
       )
       .orderBy(activities.date),
 
-    getAppointmentCalendarEvents([userId]).then((rows) =>
+    // Today only: with no range it expanded every repeating appointment over two years, to keep a day.
+    getAppointmentCalendarEvents([userId], { start: todayStart, end: todayEnd }).then((rows) =>
       rows.filter((r) => {
         const d = new Date(r.date);
         return d >= todayStart && d <= todayEnd && r.status !== "cancelled";

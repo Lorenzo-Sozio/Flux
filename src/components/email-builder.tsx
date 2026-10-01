@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -28,7 +28,9 @@ import {
   RotateCcw,
   Save,
   Settings2,
+  Signature,
   Smartphone,
+  Stamp,
   Trash2,
   Type,
 } from "lucide-react";
@@ -57,6 +59,7 @@ import {
   type Block,
   type BlockProps,
   type BlockType,
+  type BrandBlockProps,
   type ButtonProps,
   blockTextDefaults,
   compileToHtml,
@@ -75,6 +78,7 @@ import {
   type TwoColumnProps,
   unsubscribeLabel,
   VARIABLES,
+  withBrandSample,
 } from "@/lib/email-builder";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { cn } from "@/lib/utils";
@@ -96,8 +100,14 @@ const PALETTE: { type: BlockType; icon: React.ReactNode }[] = [
   { type: "spacer", icon: <LayoutTemplate className="h-4 w-4" /> },
   { type: "two_column", icon: <Columns className="h-4 w-4" /> },
   { type: "footer", icon: <Mail className="h-4 w-4" /> },
+  { type: "brand_header", icon: <Stamp className="h-4 w-4" /> },
+  { type: "signature", icon: <Signature className="h-4 w-4" /> },
   { type: "html", icon: <Code2 className="h-4 w-4" /> },
 ];
+
+/** The letterhead and the signature as the send draws them, for the canvas and the preview. */
+export type BrandSample = { header: string; signature: string } | null;
+const BrandSampleContext = createContext<BrandSample>(null);
 
 // ─── Canvas block preview ─────────────────────────────────────────────────────
 
@@ -271,6 +281,18 @@ function BlockPreview({ block }: { block: Block }) {
         />
       );
     }
+    case "brand_header":
+    case "signature": {
+      const p = props as BrandBlockProps;
+      return (
+        <BrandBlockPreview
+          kind={type}
+          background={p.backgroundColor}
+          label={t(`blocks.${type}.label`)}
+          hint={t(`canvas.${type === "signature" ? "signatureHint" : "brandHeaderHint"}`)}
+        />
+      );
+    }
     case "html": {
       const p = props as HtmlProps;
       return (
@@ -298,6 +320,39 @@ function BlockPreview({ block }: { block: Block }) {
 }
 
 // ─── Inspector fields ─────────────────────────────────────────────────────────
+
+/** The letterhead or the signature on the canvas: the sample when there is one, else what it will be. */
+function BrandBlockPreview({
+  kind,
+  background,
+  label,
+  hint,
+}: {
+  kind: "brand_header" | "signature";
+  background: string;
+  label: string;
+  hint: string;
+}) {
+  const sample = useContext(BrandSampleContext);
+  const html = sample ? (kind === "signature" ? sample.signature : sample.header) : "";
+  if (html) {
+    return (
+      <div style={{ background, padding: kind === "signature" ? "16px 24px 24px" : 0 }}>
+        {/* Built by the server from escaped values; sanitised all the same, like every block. */}
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: the workspace's own letterhead and signature; sanitised */}
+        <div dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(html) }} />
+      </div>
+    );
+  }
+  return (
+    <div style={{ background, padding: "12px 24px" }}>
+      <div className="rounded border border-dashed px-3 py-2 text-center text-muted-foreground text-xs">
+        <p className="font-medium">{label}</p>
+        <p>{hint}</p>
+      </div>
+    </div>
+  );
+}
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -748,6 +803,20 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           );
         })()}
 
+      {(block.type === "brand_header" || block.type === "signature") && (
+        <>
+          <p className="text-muted-foreground text-xs">
+            {t(`canvas.${block.type === "signature" ? "signatureHint" : "brandHeaderHint"}`)}
+          </p>
+          <Row label={t("fields.background")}>
+            <ColorInput
+              value={(p as BrandBlockProps).backgroundColor}
+              onChange={(v) => set({ backgroundColor: v } as BrandBlockProps)}
+            />
+          </Row>
+        </>
+      )}
+
       {block.type === "html" &&
         (() => {
           const hp = p as HtmlProps;
@@ -858,6 +927,8 @@ interface EmailBuilderProps {
   initialCategory?: string;
   /** The template had no saved design and opens as its HTML, in one block. */
   fromHtml?: boolean;
+  /** The letterhead and the signature as they will be sent, drawn by the server for the preview. */
+  brandSample?: BrandSample;
 }
 
 type MobilePanel = "email" | "add" | "edit" | "settings";
@@ -872,6 +943,7 @@ export function EmailBuilder({
   initialDesign,
   initialCategory = "general",
   fromHtml = false,
+  brandSample = null,
 }: EmailBuilderProps) {
   const t = useTranslations("marketing.emailBuilder");
   const tm = useTranslations("marketing");
@@ -1003,8 +1075,9 @@ export function EmailBuilder({
     commit({ ...design, blocks });
   };
 
-  const html = compileToHtml(design, subject);
-  const sizeInfo = estimateHtmlSize(html);
+  const compiled = compileToHtml(design, subject);
+  const sizeInfo = estimateHtmlSize(compiled);
+  const html = withBrandSample(compiled, brandSample);
 
   // Live preview. ⚠️ Sized to the email, not to a fixed 600px: a long email was cut off
   // at the bottom of the frame, and a short one sat in a tall empty box.
@@ -1355,186 +1428,188 @@ export function EmailBuilder({
   return (
     // `data-fullscreen-editor`: the chat bubble steps aside (chat-widget.tsx), since it
     // would sit on the inspector and, on a phone, on this editor's own tab bar.
-    <div data-fullscreen-editor="" className="flex h-dvh flex-col overflow-hidden bg-background">
-      {/* ── Top bar ── */}
-      {/* ⚠️ Below lg the fields leave the bar: three inputs beside five controls were
+    <BrandSampleContext.Provider value={brandSample}>
+      <div data-fullscreen-editor="" className="flex h-dvh flex-col overflow-hidden bg-background">
+        {/* ── Top bar ── */}
+        {/* ⚠️ Below lg the fields leave the bar: three inputs beside five controls were
           ~50px each on a phone ("Nome mode…"). They live in the details panel there,
           and the bar keeps the name as a title, undo, preview and save. */}
-      <div className="flex shrink-0 items-center gap-2 border-b bg-card px-2 py-2 sm:px-4 lg:gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-9 shrink-0 lg:size-8"
-          onClick={() => (dirty ? setLeaving(true) : leave())}
-          aria-label={tc("back")}
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <p className="min-w-0 flex-1 truncate font-semibold text-sm lg:hidden">{name.trim() || t("untitled")}</p>
-        <div className="flex min-w-0 flex-1 items-center gap-3 max-lg:hidden">{detailsFields("bar")}</div>
-
-        <div className="flex shrink-0 items-center gap-1 lg:gap-1.5">
-          <Badge
-            variant={sizeInfo.warning ? "destructive" : "secondary"}
-            className="font-mono text-[10px] max-sm:hidden"
-            title={t("sizeHint")}
-          >
-            {sizeInfo.kb} KB
-          </Badge>
+        <div className="flex shrink-0 items-center gap-2 border-b bg-card px-2 py-2 sm:px-4 lg:gap-3">
           <Button
             variant="ghost"
             size="icon"
-            className="size-9 lg:size-8"
-            onClick={undo}
-            disabled={history.length === 0}
-            title={t("undo")}
-            aria-label={t("undo")}
+            className="size-9 shrink-0 lg:size-8"
+            onClick={() => (dirty ? setLeaving(true) : leave())}
+            aria-label={tc("back")}
           >
-            <RotateCcw className="h-3.5 w-3.5" />
+            <ArrowLeft className="h-4 w-4" />
           </Button>
-          {/* On a phone one preview, the phone's: a 600px desktop frame is not
+          <p className="min-w-0 flex-1 truncate font-semibold text-sm lg:hidden">{name.trim() || t("untitled")}</p>
+          <div className="flex min-w-0 flex-1 items-center gap-3 max-lg:hidden">{detailsFields("bar")}</div>
+
+          <div className="flex shrink-0 items-center gap-1 lg:gap-1.5">
+            <Badge
+              variant={sizeInfo.warning ? "destructive" : "secondary"}
+              className="font-mono text-[10px] max-sm:hidden"
+              title={t("sizeHint")}
+            >
+              {sizeInfo.kb} KB
+            </Badge>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-9 lg:size-8"
+              onClick={undo}
+              disabled={history.length === 0}
+              title={t("undo")}
+              aria-label={t("undo")}
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
+            {/* On a phone one preview, the phone's: a 600px desktop frame is not
               something a 375px screen can show. */}
-          <Button
-            variant={preview ? "default" : "outline"}
-            size="icon"
-            className="size-9 lg:hidden"
-            onClick={() => {
-              setPreview(preview ? null : "mobile");
-              setPanel("email");
-            }}
-            aria-label={t("preview")}
-            aria-pressed={preview !== null}
-            title={t("preview")}
-          >
-            {preview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant={preview === "desktop" ? "default" : "outline"}
-            size="sm"
-            className="h-8 gap-1 text-xs max-lg:hidden"
-            onClick={() => setPreview(preview === "desktop" ? null : "desktop")}
-            aria-label={t("desktop")}
-            aria-pressed={preview === "desktop"}
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            {t("desktop")}
-          </Button>
-          <Button
-            variant={preview === "mobile" ? "default" : "outline"}
-            size="sm"
-            className="h-8 gap-1 text-xs max-lg:hidden"
-            onClick={() => setPreview(preview === "mobile" ? null : "mobile")}
-            aria-label={t("mobile")}
-            aria-pressed={preview === "mobile"}
-          >
-            <Smartphone className="h-3.5 w-3.5" />
-            {t("mobile")}
-          </Button>
+            <Button
+              variant={preview ? "default" : "outline"}
+              size="icon"
+              className="size-9 lg:hidden"
+              onClick={() => {
+                setPreview(preview ? null : "mobile");
+                setPanel("email");
+              }}
+              aria-label={t("preview")}
+              aria-pressed={preview !== null}
+              title={t("preview")}
+            >
+              {preview ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+            <Button
+              variant={preview === "desktop" ? "default" : "outline"}
+              size="sm"
+              className="h-8 gap-1 text-xs max-lg:hidden"
+              onClick={() => setPreview(preview === "desktop" ? null : "desktop")}
+              aria-label={t("desktop")}
+              aria-pressed={preview === "desktop"}
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              {t("desktop")}
+            </Button>
+            <Button
+              variant={preview === "mobile" ? "default" : "outline"}
+              size="sm"
+              className="h-8 gap-1 text-xs max-lg:hidden"
+              onClick={() => setPreview(preview === "mobile" ? null : "mobile")}
+              aria-label={t("mobile")}
+              aria-pressed={preview === "mobile"}
+            >
+              <Smartphone className="h-3.5 w-3.5" />
+              {t("mobile")}
+            </Button>
 
-          <Button size="sm" className="h-9 gap-1 text-xs lg:h-8" onClick={handleSave} disabled={saving}>
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            {tc("save")}
-          </Button>
+            <Button size="sm" className="h-9 gap-1 text-xs lg:h-8" onClick={handleSave} disabled={saving}>
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {tc("save")}
+            </Button>
+          </div>
         </div>
-      </div>
 
-      {/* ── Main area ── */}
-      {/* ⚠️ lg and up: palette, canvas and inspector side by side. Below lg one of
+        {/* ── Main area ── */}
+        {/* ⚠️ lg and up: palette, canvas and inspector side by side. Below lg one of
           four panels at a time behind a tab bar — the email, add a block, edit the
           selected one, the details — instead of the three stacked in one scroll, where
           the canvas collapsed to a strip under the palette. Every field is controlled,
           so the phone's copy of the inspector and the desktop's share one state. */}
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div
-          className={cn(
-            "shrink-0 overflow-y-auto bg-muted/30 lg:w-52 lg:border-r",
-            panel === "add" ? "max-lg:flex-1" : "max-lg:hidden",
-          )}
-        >
-          {palette}
-        </div>
-
-        <div className={cn("flex min-h-0 flex-1 flex-col", panel !== "email" && "max-lg:hidden")}>{canvas}</div>
-
-        <div
-          className={cn(
-            "shrink-0 overflow-y-auto bg-card lg:w-64 lg:border-l",
-            panel === "edit" || panel === "settings" ? "max-lg:flex-1" : "max-lg:hidden",
-          )}
-        >
-          {/* A desktop's inspector: the selected block, or the global settings. */}
-          <div className="max-lg:hidden">{inspector}</div>
-
-          {/* A phone's two panels here. The details come first in theirs: a template
-              cannot be saved without a name and a subject. "Edit" is always a block;
-              the global settings have their own tab. */}
-          <div className="lg:hidden">
-            {panel === "settings" && (
-              <>
-                <div className="space-y-3 border-b p-4">
-                  <p className="border-b pb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-                    {t("templateDetails")}
-                  </p>
-                  {detailsFields("panel")}
-                  <p className="text-muted-foreground text-xs">
-                    {t("sizeLabel", { kb: sizeInfo.kb })}
-                    {sizeInfo.warning && ` · ${t("sizeHint")}`}
-                  </p>
-                </div>
-                <SettingsInspector settings={design.settings} onChange={updateSettings} />
-              </>
-            )}
-            {panel === "edit" &&
-              (selectedBlock ? (
-                <BlockInspector block={selectedBlock} onChange={updateBlock} />
-              ) : (
-                <div className="mt-8 p-4 text-center text-muted-foreground text-sm">
-                  <p>{t("inspector.emptyMobile")}</p>
-                  <Button variant="outline" className="mt-4 h-11" onClick={() => setPanel("email")}>
-                    {t("tabs.email")}
-                  </Button>
-                </div>
-              ))}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Phone and tablet: the four panels ── */}
-      <nav aria-label={t("tabs.label")} className="grid shrink-0 grid-cols-4 border-t bg-card lg:hidden">
-        {MOBILE_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            aria-current={panel === tab.key ? "page" : undefined}
-            onClick={() => {
-              setPanel(tab.key);
-              if (tab.key === "settings") setSelectedId("settings");
-            }}
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          <div
             className={cn(
-              "flex min-h-14 flex-col items-center justify-center gap-0.5 font-medium text-[11px] transition-colors",
-              panel === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              "shrink-0 overflow-y-auto bg-muted/30 lg:w-52 lg:border-r",
+              panel === "add" ? "max-lg:flex-1" : "max-lg:hidden",
             )}
           >
-            {tab.icon}
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+            {palette}
+          </div>
 
-      <AlertDialog open={leaving} onOpenChange={setLeaving}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("leaveTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("leaveBody")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("stay")}</AlertDialogCancel>
-            <AlertDialogAction onClick={leave} className="bg-destructive text-white hover:bg-destructive/90">
-              {t("leaveConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+          <div className={cn("flex min-h-0 flex-1 flex-col", panel !== "email" && "max-lg:hidden")}>{canvas}</div>
+
+          <div
+            className={cn(
+              "shrink-0 overflow-y-auto bg-card lg:w-64 lg:border-l",
+              panel === "edit" || panel === "settings" ? "max-lg:flex-1" : "max-lg:hidden",
+            )}
+          >
+            {/* A desktop's inspector: the selected block, or the global settings. */}
+            <div className="max-lg:hidden">{inspector}</div>
+
+            {/* A phone's two panels here. The details come first in theirs: a template
+              cannot be saved without a name and a subject. "Edit" is always a block;
+              the global settings have their own tab. */}
+            <div className="lg:hidden">
+              {panel === "settings" && (
+                <>
+                  <div className="space-y-3 border-b p-4">
+                    <p className="border-b pb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+                      {t("templateDetails")}
+                    </p>
+                    {detailsFields("panel")}
+                    <p className="text-muted-foreground text-xs">
+                      {t("sizeLabel", { kb: sizeInfo.kb })}
+                      {sizeInfo.warning && ` · ${t("sizeHint")}`}
+                    </p>
+                  </div>
+                  <SettingsInspector settings={design.settings} onChange={updateSettings} />
+                </>
+              )}
+              {panel === "edit" &&
+                (selectedBlock ? (
+                  <BlockInspector block={selectedBlock} onChange={updateBlock} />
+                ) : (
+                  <div className="mt-8 p-4 text-center text-muted-foreground text-sm">
+                    <p>{t("inspector.emptyMobile")}</p>
+                    <Button variant="outline" className="mt-4 h-11" onClick={() => setPanel("email")}>
+                      {t("tabs.email")}
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Phone and tablet: the four panels ── */}
+        <nav aria-label={t("tabs.label")} className="grid shrink-0 grid-cols-4 border-t bg-card lg:hidden">
+          {MOBILE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              aria-current={panel === tab.key ? "page" : undefined}
+              onClick={() => {
+                setPanel(tab.key);
+                if (tab.key === "settings") setSelectedId("settings");
+              }}
+              className={cn(
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 font-medium text-[11px] transition-colors",
+                panel === tab.key ? "text-primary" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        <AlertDialog open={leaving} onOpenChange={setLeaving}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("leaveTitle")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("leaveBody")}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("stay")}</AlertDialogCancel>
+              <AlertDialogAction onClick={leave} className="bg-destructive text-white hover:bg-destructive/90">
+                {t("leaveConfirm")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </BrandSampleContext.Provider>
   );
 }

@@ -1337,7 +1337,8 @@
       "priceList": "Price list",
       "priceListNone": "No price list (catalogue prices)",
       "priceListHint": "Quotes, orders and invoices for this customer propose the prices on this list.",
-      "priceListRetired": "{name} (retired)"
+      "priceListRetired": "{name} (retired)",
+      "sectionsLabel": "Company form sections"
     },
     "createSuccess": "Company created.",
     "updateSuccess": "Company updated.",
@@ -2575,7 +2576,8 @@
         "recipient": "Recipient",
         "sender": "Sender (you)",
         "deal": "Deal (only from its page)",
-        "document": "Document (from a quote, an invoice, an order, a contract or a request)"
+        "document": "Document (from a quote, an invoice, an order, a contract or a request)",
+        "brand": "Brand and signature"
       }
     },
     "sendEmailModal": {
@@ -2639,7 +2641,10 @@
       "previewAttachments": "Attachments",
       "previewUnfilled": "Still to fill in before sending: {list}",
       "previewFailed": "The preview could not be prepared.",
-      "writeWithAiShort": "AI"
+      "writeWithAiShort": "AI",
+      "signature": "Signature",
+      "signatureOn": "Your signature is added at the end of the email. Press to leave it off this email.",
+      "signatureOff": "This email goes without your signature. Press to add it."
     },
     "emailBuilder": {
       "blocks": {
@@ -2678,13 +2683,23 @@
         "html": {
           "label": "Custom HTML",
           "desc": "Raw HTML block"
+        },
+        "brand_header": {
+          "label": "Brand letterhead",
+          "desc": "The company's logo and colour, from settings"
+        },
+        "signature": {
+          "label": "Signature",
+          "desc": "The sender's signature, from their profile"
         }
       },
       "canvas": {
         "textPlaceholder": "Text block",
         "imagePlaceholder": "Set image URL in panel →",
         "spacer": "spacer {height}px",
-        "htmlPlaceholder": "HTML block"
+        "htmlPlaceholder": "HTML block",
+        "brandHeaderHint": "Logo and colour come from Settings › General when the email is sent: change them there and every template follows.",
+        "signatureHint": "The signature of whoever sends the email, from their Profile. In a campaign, the sender's; in a sequence, the owner's."
       },
       "align": {
         "left": "Left",
@@ -2888,7 +2903,8 @@
       "support": "Support",
       "outreach": "Marketing & automation",
       "analysis": "Analysis",
-      "administration": "Administration"
+      "administration": "Administration",
+      "money": "Billing and payments"
     },
     "items": {
       "apiKeys": "API keys",
@@ -2906,7 +2922,7 @@
       "finance": "Finance",
       "forecast": "Forecast",
       "gantt": "Gantt",
-      "help": "Help Center",
+      "help": "Help",
       "leads": "Leads",
       "macros": "Macros",
       "orders": "Orders",
@@ -2923,7 +2939,7 @@
       "slaManagement": "SLA Management",
       "supportOverview": "Overview",
       "tasks": "Tasks",
-      "templates": "Templates",
+      "templates": "Campaign templates",
       "tickets": "Tickets",
       "users": "Users",
       "webhooks": "Webhooks",
@@ -2943,10 +2959,11 @@
       "profile": "Profile",
       "repScorecard": "Per salesperson",
       "webForms": "Forms",
-      "supportAgents": "Support by agent",
+      "supportAgents": "By agent",
       "commissions": "Commissions",
       "bank": "Bank",
-      "emailTemplates": "Email templates"
+      "emailTemplates": "Email templates",
+      "queue": "Work queue"
     },
     "user": {
       "profile": "Profile",
@@ -3681,6 +3698,14 @@
       "unsubscribe": {
         "label": "Unsubscribe link",
         "description": "Where the recipient goes to stop hearing from you. Added automatically if you leave it out."
+      },
+      "brandHeader": {
+        "label": "Letterhead",
+        "description": "The company's logo on a bar of its colour, from Settings › General."
+      },
+      "signature": {
+        "label": "Signature",
+        "description": "The sender's signature from their Profile; in a campaign, the person who sends it."
       }
     }
   },
@@ -4402,12 +4427,7 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": [
-        "All admin permissions",
-        "Transfer workspace ownership",
-        "Delete workspace",
-        "Manage billing"
-      ],
+      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
       "admin": [
         "All user permissions",
         "Invite and manage users",
@@ -5036,7 +5056,7 @@
     "indexSubtitle": "What you can change — for yourself, and for the workspace.",
     "generalPage": {
       "title": "General",
-      "subtitle": "The workspace's clock, what a new quote starts with, and the logo on its documents.",
+      "subtitle": "The workspace's clock, what a new quote starts with, and the logo and identity on its documents and emails.",
       "save": "Save",
       "saved": "Saved.",
       "failed": "Could not save.",
@@ -5057,7 +5077,7 @@
       },
       "logo": {
         "title": "Logo",
-        "help": "Printed at the top of quote PDFs. PNG or JPEG, up to 512 KB.",
+        "help": "At the top of quote PDFs and of every email to customers, beside the signature. PNG or JPEG, up to 512 KB.",
         "alt": "Workspace logo",
         "none": "No logo",
         "upload": "Upload logo",
@@ -5076,6 +5096,24 @@
         "maxDiscount": "Highest discount without approval (%)",
         "maxTotal": "Highest total without approval",
         "zeroOff": "0 switches that limit off."
+      },
+      "brand": {
+        "title": "Identity in emails",
+        "help": "The colour, website and social profiles shown in emails to customers and in the whole team's signatures. Name, address, VAT number and phone come from the invoicing details.",
+        "color": "Brand colour",
+        "colorHex": "Colour code",
+        "colorHelp": "Used for the bar at the top, the buttons and the signature's details. When it is light, button text turns dark so it stays readable.",
+        "sample": "Open the quote",
+        "website": "Website",
+        "socials": "Social profiles",
+        "invalidUrl": "Not a valid web address: it will not be saved.",
+        "social": {
+          "linkedin": "LinkedIn",
+          "instagram": "Instagram",
+          "facebook": "Facebook",
+          "x": "X",
+          "youtube": "YouTube"
+        }
       }
     },
     "lists": {
@@ -6420,7 +6458,8 @@
       "tabValue": "Value",
       "tabTerm": "Term",
       "tabNotes": "Notes"
-    }
+    },
+    "viewLabel": "Which contracts to show"
   },
   "sequences": {
     "title": "Follow-up sequences",
@@ -8953,6 +8992,25 @@
       "open": "Open the home",
       "saved": "Dashboard saved.",
       "saveFailed": "The dashboard could not be saved."
+    },
+    "signature": {
+      "title": "Email signature",
+      "desc": "Added at the end of the emails you write from the CRM, also when they leave from your Gmail or Outlook mailbox. You can take it off a single message.",
+      "enabled": "Add the signature to my emails",
+      "role": "Role",
+      "rolePlaceholder": "E.g. Sales manager",
+      "mobile": "Mobile",
+      "phone": "Phone",
+      "phoneHelp": "Empty: the company's phone.",
+      "photo": "Use my account's picture instead of initials",
+      "preview": "Preview",
+      "variant": "Signature format",
+      "full": "Full",
+      "compact": "Compact",
+      "fullHelp": "The full one goes on emails from records and on quotes.",
+      "compactHelp": "The compact one goes on payment reminders.",
+      "brandLink": "Logo, colour, address, website and socials are changed in Settings › General.",
+      "brandByAdmin": "Logo, colour, address, website and socials belong to the company and an administrator changes them."
     }
   },
   "planFollowUp": {

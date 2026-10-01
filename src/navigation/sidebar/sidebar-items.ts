@@ -23,6 +23,7 @@ import {
   Landmark,
   LifeBuoy,
   LineChart,
+  ListChecks,
   ListOrdered,
   ListTree,
   type LucideIcon,
@@ -133,7 +134,10 @@ export interface NavGroup {
  *    a line and says nothing; Automation was exactly that.
  * 3. **Every page is either in here or deleted.** The support overview, the sales
  *    analytics screen, the pipeline report and the API keys page all existed and
- *    were reachable only by typing the path.
+ *    were reachable only by typing the path. The work queue was the last one.
+ * 4. **Groups are kinds of work, in the order a customer meets them**: the day,
+ *    the customers, selling, billing and money in, support, outreach, analysis.
+ *    The ids are only keys; the array's order is the menu's.
  */
 export const sidebarItems: NavGroup[] = [
   {
@@ -145,6 +149,9 @@ export const sidebarItems: NavGroup[] = [
       // work list and the same ticket queue as this one, so it was a second copy
       // of the first half of a page everybody already lands on.
       { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
+      // ⚠️ The day's calls and follow-ups one after another — the most operational page there is —
+      // was reachable only from a card on the home and from the palette.
+      { titleKey: "queue", url: "/dashboard/queue", icon: ListChecks, need: "record:read" },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
       {
         titleKey: "tasks",
@@ -186,18 +193,18 @@ export const sidebarItems: NavGroup[] = [
           // The analysis views are also the tabs across the Pipeline section, so a salesperson
           // reaches them from the board without six more lines in the menu.
           {
-            titleKey: "salesTargets",
-            url: "/dashboard/pipeline/targets",
-            icon: TrendingUp,
+            titleKey: "forecast",
+            url: "/dashboard/pipeline/forecast",
+            icon: LineChart,
             module: "sales",
             audience: "manager",
           },
-          // Not for managers only: what a person's own wins earned is theirs to see.
           {
-            titleKey: "commissions",
-            url: "/dashboard/pipeline/commissions",
-            icon: HandCoins,
+            titleKey: "pipelineReport",
+            url: "/dashboard/pipeline/report",
+            icon: ClipboardList,
             module: "sales",
+            audience: "manager",
           },
           {
             titleKey: "salesFunnel",
@@ -221,23 +228,27 @@ export const sidebarItems: NavGroup[] = [
             need: "report:read",
             audience: "manager",
           },
+          // Then the team: what each person is asked to sell, and what their wins earned.
           {
-            titleKey: "forecast",
-            url: "/dashboard/pipeline/forecast",
-            icon: LineChart,
+            titleKey: "salesTargets",
+            url: "/dashboard/pipeline/targets",
+            icon: TrendingUp,
             module: "sales",
             audience: "manager",
           },
+          // Not for managers only: what a person's own wins earned is theirs to see.
           {
-            titleKey: "pipelineReport",
-            url: "/dashboard/pipeline/report",
-            icon: ClipboardList,
+            titleKey: "commissions",
+            url: "/dashboard/pipeline/commissions",
+            icon: HandCoins,
             module: "sales",
-            audience: "manager",
           },
         ],
       },
+      // In the order the work flows: the deal, its quote, the order it becomes, the contract that
+      // renews it. Orders used to come after invoices.
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
+      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
       {
         titleKey: "contracts",
         url: "/dashboard/sales/contracts",
@@ -245,12 +256,37 @@ export const sidebarItems: NavGroup[] = [
         module: "sales",
         audience: "manager",
       },
-      { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales", audience: "manager" },
-      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales", audience: "manager" },
       // Beside the catalogue, because a price list is the catalogue for one group
       // of customers — not a separate thing they buy.
       { titleKey: "priceLists", url: "/dashboard/sales/price-lists", icon: Tags, module: "sales", audience: "manager" },
+    ],
+  },
+  {
+    id: 8,
+    labelKey: "money",
+    items: [
+      // ⚠️ The money that comes in, in one place: what was invoiced, what the bank says arrived,
+      // and the cash figures over both. Invoices sat in Sales and the bank under Analysis, though
+      // reconciling a statement is daily bookkeeping, not analysis — and the three are worked together.
+      { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales", audience: "manager" },
+      // Bank reconciliation (I13): the statement beside what customers owe. Admin, like the page.
+      {
+        titleKey: "bank",
+        url: "/dashboard/sales/bank",
+        icon: Landmark,
+        module: "sales",
+        need: "bank:reconcile",
+      },
+      // ⚠️ The page is an administrator's (settings:manage) and the entry had no need, so
+      // every editor saw it and was bounced on clicking.
+      {
+        titleKey: "finance",
+        url: "/dashboard/sales/finance",
+        icon: Banknote,
+        module: "sales",
+        need: "settings:manage",
+      },
     ],
   },
   {
@@ -311,26 +347,16 @@ export const sidebarItems: NavGroup[] = [
     id: 6,
     labelKey: "analysis",
     items: [
-      // ⚠️ Finance moved here from Sales when the analytics screen was deleted,
-      // and it belongs here on its own merits: it is a revenue trend and a
-      // spending breakdown, not a thing you write. It also keeps this group
-      // above one entry, which is the line between a heading and a label.
-      // ⚠️ The page is an administrator's (settings:manage) and the entry had no need, so
-      // every editor saw it and was bounced on clicking.
       {
-        titleKey: "finance",
-        url: "/dashboard/sales/finance",
-        icon: Banknote,
-        module: "sales",
-        need: "settings:manage",
-      },
-      // Bank reconciliation (I13): the statement beside what customers owe. Admin, like the page.
-      {
-        titleKey: "bank",
-        url: "/dashboard/sales/bank",
-        icon: Landmark,
-        module: "sales",
-        need: "bank:reconcile",
+        titleKey: "reports",
+        url: "/dashboard/reports",
+        icon: BarChart3,
+        module: "reporting",
+        need: "report:read",
+        subItems: [
+          { titleKey: "repScorecard", url: "/dashboard/reports/scorecard", icon: Gauge, need: "report:read" },
+          { titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" },
+        ],
       },
       // ⚠️ Here rather than beside the orders, where it used to sit: it is not a sales
       // number. It says what the thing writing into this CRM has been doing — leads,
@@ -346,17 +372,6 @@ export const sidebarItems: NavGroup[] = [
         icon: Bot,
         need: "report:read",
         audience: "manager",
-      },
-      {
-        titleKey: "reports",
-        url: "/dashboard/reports",
-        icon: BarChart3,
-        module: "reporting",
-        need: "report:read",
-        subItems: [
-          { titleKey: "repScorecard", url: "/dashboard/reports/scorecard", icon: Gauge, need: "report:read" },
-          { titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" },
-        ],
       },
     ],
   },

@@ -106,7 +106,9 @@ describe("⚠️ what the customer receives", () => {
       bodyHtml: "<p>Gentile cliente, ecco la proposta.</p>",
     });
     const email = sent[0] as { html: string; cc?: string };
-    expect(email.html.indexOf("ecco la proposta")).toBeLessThan(email.html.indexOf("P-2026-001"));
+    // The number heads the frame ("Preventivo P-2026-001") and is in the box under the text.
+    expect(email.html.indexOf("P-2026-001")).toBeLessThan(email.html.indexOf("ecco la proposta"));
+    expect(email.html.indexOf("ecco la proposta")).toBeLessThan(email.html.lastIndexOf("P-2026-001"));
     expect(email.html).toContain("https://crm.example.it/q/tok");
     expect(email.cc).toBe("ufficio@x.it");
   });
@@ -118,7 +120,7 @@ describe("⚠️ what the customer receives", () => {
     });
     expect(shown.ok).toBe(true);
     const html = shown.ok ? shown.html : "";
-    expect(html.indexOf("Ecco la proposta")).toBeLessThan(html.indexOf("P-2026-001"));
+    expect(html.indexOf("Ecco la proposta")).toBeLessThan(html.lastIndexOf("P-2026-001"));
     expect(html).toContain("https://crm.example.it/q/tok");
     expect(sent).toHaveLength(0);
     expect(updates).toHaveLength(0);

@@ -16,8 +16,9 @@ export function DealEditButton({
 }: {
   deal: any;
   stages: any[];
-  companies: any[];
-  contacts: any[];
+  /** Left out, the dialog loads them when it opens. */
+  companies?: { id: string; name: string }[];
+  contacts?: { id: string; firstName: string | null; lastName: string | null }[];
 }) {
   const router = useRouter();
   const tc = useTranslations("common");

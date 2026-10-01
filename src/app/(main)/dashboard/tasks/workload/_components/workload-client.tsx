@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import {
   AlertTriangle,
@@ -282,8 +281,6 @@ export function WorkloadClient({ matrix, start }: Props) {
   const tTasks = useTranslations("tasks");
   const tc = useTranslations("common");
   const locale = useLocale();
-  const router = useRouter();
-  const [, startRouterTransition] = useTransition();
   // Two months side by side are ~560px: wider than a phone, so the range picker shows one there.
   const isMobile = useIsMobile();
 
@@ -412,7 +409,6 @@ export function WorkloadClient({ matrix, start }: Props) {
       toast.success(t("dueDateMoved", { date: formatDate(newDate, locale) }));
       setSelected(null);
       fetchMatrix(periodStart, periodEnd);
-      startRouterTransition(() => router.refresh());
     } catch (err) {
       toast.error(err instanceof Error ? err.message : tc("updateError"));
     } finally {
@@ -449,7 +445,6 @@ export function WorkloadClient({ matrix, start }: Props) {
       setSelected(null);
       setShowConflicts(false);
       fetchMatrix(periodStart, periodEnd);
-      startRouterTransition(() => router.refresh());
     } finally {
       setResolvingAll(false);
     }

@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { and, desc, eq, inArray, lt, or, type SQL, sql } from "drizzle-orm";
 
 import {
@@ -81,27 +83,35 @@ export type TimelineItem =
 
 export const TIMELINE_PAGE = 30;
 
-/** The record, and the records whose history it shows as its own. */
-async function related(db: Db, scope: TimelineScope) {
-  const contactRows =
-    scope.type === "company"
-      ? await db
+/**
+ * The record, and the records whose history it shows as its own. Read once per request: the page's
+ * summary and the timeline's first page both need it (React's `cache()`, keyed by primitives).
+ */
+const relatedOf = cache(async (db: Db, type: TimelineScope["type"], id: string) => {
+  // The company's contacts and its deals at once: two independent reads, one round trip.
+  const [contactRows, dealRows] = await Promise.all([
+    type === "company"
+      ? db
           .select({ id: contacts.id, first: contacts.firstName, last: contacts.lastName })
           .from(contacts)
-          .where(eq(contacts.companyId, scope.id))
-      : [];
-  const dealRows =
-    scope.type === "company"
-      ? await db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.companyId, scope.id))
-      : scope.type === "contact"
-        ? await db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.contactId, scope.id))
-        : [];
+          .where(eq(contacts.companyId, id))
+      : Promise.resolve([] as { id: string; first: string | null; last: string | null }[]),
+    type === "company"
+      ? db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.companyId, id))
+      : type === "contact"
+        ? db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.contactId, id))
+        : Promise.resolve([] as { id: string; name: string }[]),
+  ]);
   const via = new Map<string, TimelineVia>();
   for (const c of contactRows) {
     via.set(`contact:${c.id}`, { type: "contact", id: c.id, name: `${c.first ?? ""} ${c.last ?? ""}`.trim() });
   }
   for (const d of dealRows) via.set(`deal:${d.id}`, { type: "deal", id: d.id, name: d.name });
   return { contactIds: contactRows.map((c) => c.id), dealIds: dealRows.map((d) => d.id), via };
+});
+
+function related(db: Db, scope: TimelineScope) {
+  return relatedOf(db, scope.type, scope.id);
 }
 
 const activityMoment = sql`coalesce(${activities.date}, ${activities.createdAt})`;
@@ -141,7 +151,14 @@ export async function loadRecordTimeline(
   const fetch = limit + 20;
   const { contactIds, dealIds, via } = await related(db, scope);
 
-  const activityRows = await db
+  // Activities, field changes and quote events are independent: read side by side, not in turn.
+  const qScope = quoteScope(scope, dealIds);
+  const historyRecords: { type: HistoryEntity; ids: string[] }[] = [
+    { type: scope.type, ids: [scope.id] },
+    { type: "contact", ids: contactIds },
+    { type: "deal", ids: dealIds },
+  ];
+  const activityRowsP = db
     .select({
       id: activities.id,
       type: activities.type,
@@ -162,16 +179,10 @@ export async function loadRecordTimeline(
     .orderBy(desc(activityMoment))
     .limit(fetch);
 
-  const historyRecords: { type: HistoryEntity; ids: string[] }[] = [
-    { type: scope.type, ids: [scope.id] },
-    { type: "contact", ids: contactIds },
-    { type: "deal", ids: dealIds },
-  ];
-  const changeRows = await readFieldChanges(db, historyRecords, { before: opts.before, limit: fetch });
+  const changeRowsP = readFieldChanges(db, historyRecords, { before: opts.before, limit: fetch });
 
-  const qScope = quoteScope(scope, dealIds);
-  const quoteRows = qScope
-    ? await db
+  const quoteRowsP = qScope
+    ? db
         .select({
           id: quoteActivities.id,
           type: quoteActivities.type,
@@ -188,8 +199,9 @@ export async function loadRecordTimeline(
         .where(and(qScope, opts.before ? lt(quoteActivities.createdAt, opts.before) : undefined))
         .orderBy(desc(quoteActivities.createdAt))
         .limit(fetch)
-    : [];
+    : Promise.resolve([]);
 
+  const [activityRows, changeRows, quoteRows] = await Promise.all([activityRowsP, changeRowsP, quoteRowsP]);
   const labels = await labelsFor(db, changeRows);
   const viaOf = (contactId: string | null, dealId: string | null): TimelineVia | null => {
     if (scope.type === "company" && contactId && via.has(`contact:${contactId}`))
@@ -280,49 +292,42 @@ async function labelsFor(
   const put = (field: string, list: { id: string; name: string | null }[]) => {
     for (const r of list) if (r.name) out.set(`${field}:${r.id}`, r.name);
   };
-  if (people.length)
-    put("ownerId", await db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, people)));
   const stageIds = ids("stageId");
-  if (stageIds.length) {
-    put(
-      "stageId",
-      await db
-        .select({ id: pipelineStages.id, name: pipelineStages.name })
-        .from(pipelineStages)
-        .where(inArray(pipelineStages.id, stageIds)),
-    );
-  }
   const companyIds = ids("companyId");
-  if (companyIds.length) {
-    put(
-      "companyId",
-      await db
-        .select({ id: companies.id, name: companies.name })
-        .from(companies)
-        .where(inArray(companies.id, companyIds)),
-    );
-  }
   const contactIds = ids("contactId");
-  if (contactIds.length) {
-    const rows = await db
-      .select({ id: contacts.id, first: contacts.firstName, last: contacts.lastName })
-      .from(contacts)
-      .where(inArray(contacts.id, contactIds));
-    put(
-      "contactId",
-      rows.map((c) => ({ id: c.id, name: `${c.first ?? ""} ${c.last ?? ""}`.trim() })),
-    );
-  }
   const listIds = ids("priceListId");
-  if (listIds.length) {
-    put(
-      "priceListId",
-      await db
-        .select({ id: priceLists.id, name: priceLists.name })
-        .from(priceLists)
-        .where(inArray(priceLists.id, listIds)),
-    );
-  }
+  // The names behind the ids, every kind at once: up to five lookups, one round trip.
+  const [owners, stages, companyRows, contactRows, lists] = await Promise.all([
+    people.length
+      ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, people))
+      : Promise.resolve([]),
+    stageIds.length
+      ? db
+          .select({ id: pipelineStages.id, name: pipelineStages.name })
+          .from(pipelineStages)
+          .where(inArray(pipelineStages.id, stageIds))
+      : Promise.resolve([]),
+    companyIds.length
+      ? db.select({ id: companies.id, name: companies.name }).from(companies).where(inArray(companies.id, companyIds))
+      : Promise.resolve([]),
+    contactIds.length
+      ? db
+          .select({ id: contacts.id, first: contacts.firstName, last: contacts.lastName })
+          .from(contacts)
+          .where(inArray(contacts.id, contactIds))
+      : Promise.resolve([] as { id: string; first: string | null; last: string | null }[]),
+    listIds.length
+      ? db.select({ id: priceLists.id, name: priceLists.name }).from(priceLists).where(inArray(priceLists.id, listIds))
+      : Promise.resolve([]),
+  ]);
+  put("ownerId", owners);
+  put("stageId", stages);
+  put("companyId", companyRows);
+  put(
+    "contactId",
+    contactRows.map((c) => ({ id: c.id, name: `${c.first ?? ""} ${c.last ?? ""}`.trim() })),
+  );
+  put("priceListId", lists);
   return out;
 }
 
@@ -337,28 +342,31 @@ export async function recordTimelineSummary(
 ): Promise<{ count: number; lastContactAt: Date | null }> {
   const { contactIds, dealIds } = await related(db, scope);
   const where = activityScope(scope, contactIds, dealIds);
-  const [a] = await db
-    .select({
-      n: sql<number>`count(*)::int`,
-      last: sql<Date | null>`max(${activityMoment}) filter (where ${activityMoment} <= ${now})`.mapWith(
-        activities.createdAt,
-      ),
-    })
-    .from(activities)
-    .where(where);
-  const changes = await countFieldChanges(db, [
-    { type: scope.type, ids: [scope.id] },
-    { type: "contact", ids: contactIds },
-    { type: "deal", ids: dealIds },
-  ]);
   const qScope = quoteScope(scope, dealIds);
-  const [q] = qScope
-    ? await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(quoteActivities)
-        .innerJoin(quotes, eq(quotes.id, quoteActivities.quoteId))
-        .where(qScope)
-    : [{ n: 0 }];
+  // Three independent counts, side by side.
+  const [[a], changes, [q]] = await Promise.all([
+    db
+      .select({
+        n: sql<number>`count(*)::int`,
+        last: sql<Date | null>`max(${activityMoment}) filter (where ${activityMoment} <= ${now})`.mapWith(
+          activities.createdAt,
+        ),
+      })
+      .from(activities)
+      .where(where),
+    countFieldChanges(db, [
+      { type: scope.type, ids: [scope.id] },
+      { type: "contact", ids: contactIds },
+      { type: "deal", ids: dealIds },
+    ]),
+    qScope
+      ? db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(quoteActivities)
+          .innerJoin(quotes, eq(quotes.id, quoteActivities.quoteId))
+          .where(qScope)
+      : Promise.resolve([{ n: 0 }]),
+  ]);
   return {
     count: Number(a?.n ?? 0) + changes + Number(q?.n ?? 0),
     lastContactAt: a?.last ? new Date(a.last) : null,

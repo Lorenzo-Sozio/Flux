@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { businessCalendar } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { FALLBACK_CALENDAR } from "@/lib/business-calendar";
+import type { BrandIdentity } from "@/lib/email-brand";
 import { getTenantById } from "@/lib/get-tenant";
 import type { ApprovalPolicy } from "@/lib/quote-status";
 import { getStorage, newStorageKey } from "@/lib/storage";
@@ -19,9 +20,11 @@ import {
   logoTypeOf,
   type QuoteDefaults,
   readApprovalPolicy,
+  readBrandIdentity,
   readLogoRef,
   readQuoteDefaults,
   writeApprovalPolicy,
+  writeBrandIdentity,
   writeLogoRef,
   writeQuoteDefaults,
 } from "@/lib/workspace-preferences";
@@ -47,18 +50,33 @@ export async function getGeneralSettings(): Promise<{
   quoteDefaults: QuoteDefaults;
   hasLogo: boolean;
   approval: ApprovalPolicy;
+  brand: BrandIdentity;
 }> {
   await requireCapability("settings:manage");
   const db = await getDb();
   const tenantId = await getCurrentTenantId();
   const tenant = tenantId ? await getTenantById(tenantId) : null;
-  const [timeZone, quoteDefaults, logo, approval] = await Promise.all([
+  const [timeZone, quoteDefaults, logo, approval, brand] = await Promise.all([
     getWorkspaceTimeZone(),
     readQuoteDefaults(db),
     readLogoRef(db),
     readApprovalPolicy(db, tenant?.settings),
+    readBrandIdentity(db),
   ]);
-  return { timeZone, quoteDefaults, hasLogo: Boolean(logo), approval };
+  return { timeZone, quoteDefaults, hasLogo: Boolean(logo), approval, brand };
+}
+
+/**
+ * The identity every email to a customer carries (src/lib/email-brand.ts): the colour of its
+ * buttons and details, the website and the social pages in the signatures. Whatever cannot be
+ * used — a colour that is not one, a link that is not http(s) — is dropped, not stored.
+ */
+export async function saveBrandIdentityAction(input: BrandIdentity): Promise<BrandIdentity> {
+  await requireCapability("settings:manage");
+  const saved = await writeBrandIdentity(await getDb(), input);
+  revalidatePath("/dashboard/settings/general");
+  revalidatePath("/dashboard/profile");
+  return saved;
 }
 
 /** Above which discount or total a quote needs approval before it leaves (§7.5). */

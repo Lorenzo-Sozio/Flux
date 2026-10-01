@@ -16,6 +16,7 @@ import type { Actor } from "@/lib/permissions";
 import { applyNavAccess, computeNavAccess } from "@/navigation/sidebar/filter-nav";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 
+import { phoneSearchPatterns } from "./contact-point";
 import { buildWhereClause, CONTACT_FIELDS } from "./filter-engine";
 import { matchCommands, navigationCommands, PALETTE_COMMANDS, type PaletteCommand } from "./palette-commands";
 import { SEARCH_PROVIDERS } from "./search/providers";
@@ -111,5 +112,52 @@ describe("⚠️⚠️ accents do not decide what is found", () => {
     );
     const rows = await db.select({ id: contacts.id }).from(contacts).where(where);
     expect(rows.map((r) => r.id)).toEqual(["c1"]);
+  });
+});
+
+describe("⚠️⚠️ a phone number is found however it was typed, prefix or not", () => {
+  // The workspace's dialling code (Italy). A number typed "+39 333 …" or "0039 333 …" — copied
+  // from WhatsApp or a signature — used to miss the same number saved as "333 …".
+  const patterns = (q: string) => phoneSearchPatterns(q, "39");
+  const search = async (q: string) =>
+    (await SEARCH_PROVIDERS.contact(db, { like: `%${q}%`, phoneLike: patterns(q) })).map((h) => h.id).sort();
+
+  beforeAll(async () => {
+    await applyTenantMigrations(db as never);
+  }, 120_000);
+
+  beforeEach(async () => {
+    await db.execute(sql`delete from contact`);
+    await db.execute(sql`
+      insert into contact (id, first_name, last_name, phone, mobile) values
+        ('plain', 'Anna', 'Uno', null, '333 123 4567'),
+        ('plus', 'Bruno', 'Due', '+39 333 1234567', null),
+        ('zeros', 'Carla', 'Tre', null, '0039-333-1234567'),
+        ('swiss', 'Dario', 'Quattro', '+41 79 123 45 67', null),
+        ('tim', 'Elena', 'Cinque', null, '393 765 4321')`);
+  });
+
+  it("typed with +39 or 0039, it finds the number saved with or without the prefix", async () => {
+    expect(await search("+39 333 1234567")).toEqual(["plain", "plus", "zeros"]);
+    expect(await search("0039 333 123 4567")).toEqual(["plain", "plus", "zeros"]);
+  });
+
+  it("typed without a prefix, it finds what it always found", async () => {
+    expect(await search("333 1234567")).toEqual(["plain", "plus", "zeros"]);
+    // The last digits are enough — anybody's, the Swiss number ends in them too.
+    expect(await search("4567")).toEqual(["plain", "plus", "swiss", "zeros"]);
+  });
+
+  it("⚠️ a foreign number is matched as written, and a national one starting 39 is never cut", async () => {
+    expect(await search("+41 79 123 45 67")).toEqual(["swiss"]);
+    // A TIM mobile: "393 …" without a "+" is a national number, not +39 followed by "3 …".
+    expect(await search("393 765 4321")).toEqual(["tim"]);
+    expect(patterns("393 765 4321")).toEqual(["%3937654321%"]);
+  });
+
+  it("a short international fragment is not cut down to almost nothing", () => {
+    // "+39 33" keeps its digits: stripping the prefix would leave "33" and match half the book.
+    expect(patterns("+39 333")).toEqual(["%39333%"]);
+    expect(patterns("+3")).toBeNull();
   });
 });

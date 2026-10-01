@@ -66,9 +66,8 @@ describe("the customer's way in", () => {
 
   it("⚠️ a reply carries the link to it, under our own Message-ID", () => {
     const support = read("src/actions/support.ts");
-    expect(support).toContain(
-      "replyFooterHtml(await ticketLanguage(db, contactId), statusPageUrl(base, tenant.subdomain, token))",
-    );
+    expect(support).toContain("const lang = await ticketLanguage(db, contactId);");
+    expect(support).toContain("replyFooterHtml(lang, statusPageUrl(base, tenant.subdomain, token))");
     expect(support).toContain(".set({ emailMessageId: headerId })");
   });
 });

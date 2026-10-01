@@ -2,8 +2,6 @@
 
 import { useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { BanknoteIcon, Loader2, Plus, TruckIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -83,7 +81,6 @@ export function PaymentsCard({
 }) {
   const t = useTranslations("orders.payments");
   const format = useFormatter();
-  const router = useRouter();
   const { formatMoney } = useCurrency();
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState("");
@@ -125,7 +122,6 @@ export function PaymentsCard({
         setReference("");
         setInvoiceId("");
         setAdding(false);
-        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("recordFailed"));
       }
@@ -137,7 +133,6 @@ export function PaymentsCard({
       try {
         const r = await deleteOrderPayment(id);
         toast.success(r.removed === "allocation" ? t("removedToCredit") : t("removed"));
-        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("recordFailed"));
       }
@@ -149,7 +144,6 @@ export function PaymentsCard({
     startTransition(async () => {
       try {
         await linkOrderPaymentToInvoice(paymentId, target);
-        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("recordFailed"));
       }
@@ -164,7 +158,6 @@ export function PaymentsCard({
     startTransition(async () => {
       try {
         await setOrderDelivered(orderId, value || null);
-        router.refresh();
       } catch (err) {
         toast.error(err instanceof Error ? err.message : t("recordFailed"));
       }

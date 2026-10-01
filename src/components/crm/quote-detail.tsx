@@ -212,7 +212,6 @@ export function QuoteDetail({
     try {
       await action();
       toast.success(successMsg);
-      router.refresh();
     } catch (error: unknown) {
       toast.error(error instanceof Error ? error.message : errorMsg);
     } finally {
@@ -289,6 +288,7 @@ export function QuoteDetail({
       return r.success ? { ok: true } : { ok: false, error: r.error };
     },
     preview: (email) => previewQuoteEmailAction(quote.id, email),
+    signature: true,
     submitLabel: labels.submit,
     onSent,
   });
@@ -315,7 +315,6 @@ export function QuoteDetail({
       const result = await createQuoteRevisionAction(quote.id);
       toast.success(t("revisionCreated", { quoteNumber: result.quoteNumber }));
       router.push(`/dashboard/sales/quotes/${result.quoteId}/edit`);
-      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("revisionFailed"));
     } finally {
@@ -342,7 +341,6 @@ export function QuoteDetail({
       const result = await convertQuoteToOrderAction(quote.id);
       toast.success(t("orderCreated", { orderNumber: result.orderNumber }));
       router.push(`/dashboard/sales/orders/${result.orderId}`);
-      router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t("orderCreateFailed"));
     } finally {
@@ -998,7 +996,6 @@ export function QuoteDetail({
           { title: tq("sendEmail.title"), description: tq("sendEmail.description"), submit: tq("sendEmail.submit") },
           () => {
             toast.success(t("sentSuccess"));
-            router.refresh();
           },
         )}
       />
@@ -1025,7 +1022,6 @@ export function QuoteDetail({
             { title: tf("dialogTitle"), description: tf("dialogDescription"), submit: tf("submitLabel") },
             () => {
               toast.success(tq("sendEmail.sent"));
-              router.refresh();
             },
           )}
         />

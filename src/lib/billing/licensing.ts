@@ -8,6 +8,8 @@
  *  - Every entitlement change is written to billing_audit_log.
  */
 
+import { cache } from "react";
+
 import { and, eq } from "drizzle-orm";
 
 import { platformDb } from "@/db";
@@ -155,14 +157,18 @@ async function computeEntitlements(tenantId: string): Promise<TenantEntitlements
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function getEntitlements(tenantId: string): Promise<TenantEntitlements> {
+// One read per request whatever asks for it — the layout, the guards, the page, the copilot's
+// entry — through React's per-request `cache()`; outside a render it simply calls through.
+// ⚠️ Never a promise shared between requests: on Workers a request awaiting I/O started by
+// another can hang, so the isolate's map keeps values and `cache()` dedupes within a request.
+export const getEntitlements = cache(async function getEntitlements(tenantId: string): Promise<TenantEntitlements> {
   const cached = entitlementCache.get(tenantId);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
   const data = await computeEntitlements(tenantId);
   entitlementCache.set(tenantId, { data, expiresAt: Date.now() + CACHE_TTL_MS });
   return data;
-}
+});
 
 export function invalidateEntitlementCache(tenantId: string): void {
   entitlementCache.delete(tenantId);

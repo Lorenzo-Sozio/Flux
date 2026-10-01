@@ -35,6 +35,7 @@ import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { DuplicateHint } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
+import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -120,6 +121,27 @@ function F({
   );
 }
 
+type CompanyTab = "info" | "crm" | "address" | "billing";
+const COMPANY_TABS: CompanyTab[] = ["info", "crm", "address", "billing"];
+/** The fields each tab holds: the error dots on the tabs, and where a refused save sends the person. */
+const TAB_FIELDS: Record<CompanyTab, string[]> = {
+  info: [
+    "name",
+    "type",
+    "status",
+    "industry",
+    "employeeCount",
+    "annualRevenue",
+    "website",
+    "mainPhone",
+    "mainEmail",
+    "linkedinUrl",
+  ],
+  crm: ["source", "leadScore", "tags"],
+  address: ["street", "city", "state", "zipCode", "country"],
+  billing: ["vatNumber", "sdiCode", "fiscalCode", "pec"],
+};
+
 export function CompanyModal({
   company,
   children,
@@ -141,6 +163,8 @@ export function CompanyModal({
   const tf = useTranslations("recordForm");
   const say = useMessageText();
   const [open, setOpen] = useState(false);
+  // The open tab, shared by the phone's tab bar and the desktop's tabs.
+  const [tab, setTab] = useState<CompanyTab>("info");
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkCompanyDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
@@ -276,22 +300,18 @@ export function CompanyModal({
   }, [open, company, form.reset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const e = errors;
-  const tabErrors = {
-    info: !!(
-      e.name ||
-      e.type ||
-      e.status ||
-      e.industry ||
-      e.employeeCount ||
-      e.annualRevenue ||
-      e.website ||
-      e.mainPhone ||
-      e.mainEmail ||
-      e.linkedinUrl
-    ),
-    crm: !!(e.source || e.leadScore || e.tags),
-    address: !!(e.street || e.city || e.state || e.zipCode || e.country),
-    billing: !!(e.vatNumber || e.sdiCode || e.fiscalCode || e.pec),
+  // One list of fields per tab (`TAB_FIELDS`) for the dots and for where a refused save goes.
+  const tabErrors = Object.fromEntries(
+    COMPANY_TABS.map((id) => [id, TAB_FIELDS[id].some((field) => field in e)]),
+  ) as Record<CompanyTab, boolean>;
+
+  /**
+   * A save refused by validation opens the tab holding the first error: a field that failed on a
+   * tab out of sight read, on a phone, as a Save button that did nothing.
+   */
+  const onInvalid = (errs: Record<string, unknown>) => {
+    const first = COMPANY_TABS.find((tabId) => TAB_FIELDS[tabId].some((field) => field in errs));
+    if (first) setTab(first);
   };
 
   const saveCompany = async (payload: Record<string, unknown>) => {
@@ -382,6 +402,7 @@ export function CompanyModal({
         open={open}
         onOpenChange={(v) => {
           setOpen(v);
+          if (v) setTab("info");
           if (!v) {
             form.reset();
             setDuplicates([]);
@@ -391,9 +412,11 @@ export function CompanyModal({
       >
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
-          <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
-            <div className="flex items-center justify-between gap-2">
-              <DialogTitle className="text-lg">
+          {/* On a phone the dialog's close button sits top right: the header leaves it room, and a long
+              company name is cut rather than pushed under it. */}
+          <DialogHeader className="border-b px-4 pt-6 pb-4 max-sm:pt-4 max-sm:pr-14 md:px-6">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <DialogTitle className="min-w-0 truncate text-lg">
                 {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
               </DialogTitle>
               {isEditing && company && (
@@ -412,7 +435,7 @@ export function CompanyModal({
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+          <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
               <DuplicateHint
                 titleKey="companyTitle"
@@ -425,8 +448,23 @@ export function CompanyModal({
                 onDismiss={dupWatch.dismiss}
               />
 
-              <Tabs defaultValue="info">
-                <TabsList className="mb-5 w-full overflow-x-auto">
+              <Tabs value={tab} onValueChange={(v) => setTab(v as CompanyTab)}>
+                {/* ⚠️ Below lg the record pages' tab bar: four equal columns, the icon over the label,
+                    always one row, pinned while the form scrolls, a dot on a tab holding an error.
+                    The tabs below wrapped "Fatturazione" onto a second line on a phone. */}
+                <RecordTabBar
+                  tabs={[
+                    { id: "info", label: t("form.tabs.info"), icon: <BuildingIcon aria-hidden /> },
+                    { id: "crm", label: t("form.tabs.crm"), icon: <TagIcon aria-hidden /> },
+                    { id: "address", label: t("form.tabs.address"), icon: <MapPinIcon aria-hidden /> },
+                    { id: "billing", label: t("form.tabs.billing"), icon: <ReceiptIcon aria-hidden /> },
+                  ]}
+                  active={tab}
+                  onChange={(id) => setTab(id as CompanyTab)}
+                  label={t("form.sectionsLabel")}
+                  invalid={COMPANY_TABS.filter((id) => tabErrors[id])}
+                />
+                <TabsList className="mb-5 w-full max-lg:hidden">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">
                     <BuildingIcon className="h-3.5 w-3.5" />
                     {t("form.tabs.info")}
@@ -770,7 +808,8 @@ export function CompanyModal({
               </div>
             )}
 
-            <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
+            {/* On a phone the two buttons side by side, Save on the thumb's side, not two full-width bars. */}
+            <DialogFooter className="border-t bg-muted/30 px-4 py-4 max-sm:grid max-sm:grid-cols-2 md:px-6">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 {tc("cancel")}
               </Button>

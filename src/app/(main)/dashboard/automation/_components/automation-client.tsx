@@ -2,8 +2,6 @@
 
 import { useTransition } from "react";
 
-import { useRouter } from "next/navigation";
-
 import { Clock, Pencil, Plus, Trash2, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -81,7 +79,6 @@ function getScheduledTrigger(triggerOn: string[] | null): string | null {
 export function AutomationClient({ rules, canEdit }: Props) {
   const t = useTranslations("automation");
   const tCommon = useTranslations("common");
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const triggerLabels: Record<string, string> = {
@@ -96,7 +93,6 @@ export function AutomationClient({ rules, canEdit }: Props) {
   const handleToggle = (id: string, current: boolean) => {
     startTransition(async () => {
       await toggleAutomationRuleActive(id, !current);
-      router.refresh();
     });
   };
 
@@ -105,7 +101,6 @@ export function AutomationClient({ rules, canEdit }: Props) {
       try {
         await deleteAutomationRule(id);
         toast.success(t("deleteSuccess"));
-        router.refresh();
       } catch {
         toast.error(t("deleteFailed"));
       }
@@ -131,7 +126,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
           <div className="flex shrink-0 flex-wrap items-center gap-2">
             {/* Offered before the empty builder, not after it. */}
             <RecipeLibrary />
-            <RuleModal onSaved={() => router.refresh()}>
+            <RuleModal>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" /> {t("newRule")}
               </Button>
@@ -151,7 +146,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
           {canEdit && (
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
               <RecipeLibrary />
-              <RuleModal onSaved={() => router.refresh()}>
+              <RuleModal>
                 <Button className="gap-2">
                   <Plus className="h-4 w-4" /> {t("createFirstRule")}
                 </Button>
@@ -261,7 +256,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
                       title={rule.isActive ? tCommon("disable") : tCommon("enable")}
                     />
 
-                    <RuleModal rule={rule} onSaved={() => router.refresh()}>
+                    <RuleModal rule={rule}>
                       <Button
                         variant="ghost"
                         size="icon"

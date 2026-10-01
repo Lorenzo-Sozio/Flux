@@ -3,7 +3,7 @@
 import { type ReactNode, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { HandCoins, Lock, LockOpen, Plus, Trash2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -76,7 +76,6 @@ export function CommissionsClient({
   const format = useFormatter();
   const periodLabel = usePeriodLabel();
   const { formatMoney } = useCurrency();
-  const router = useRouter();
   const search = useSearchParams();
   const [pending, startTransition] = useTransition();
 
@@ -98,7 +97,7 @@ export function CommissionsClient({
     return `/dashboard/pipeline/commissions?${q.toString()}`;
   };
 
-  const run = (fn: () => Promise<void>) => startTransition(async () => fn().then(() => router.refresh()));
+  const run = (fn: () => Promise<void>) => startTransition(async () => fn());
 
   const approve = (month: string) =>
     run(async () => {
@@ -402,7 +401,6 @@ function RulesCard({
   todayDate: string;
 }) {
   const t = useTranslations("commissions");
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [userId, setUserId] = useState(ALL);
   const [pipelineId, setPipelineId] = useState(ALL);
@@ -423,12 +421,10 @@ function RulesCard({
       }
       setRate("");
       toast.success(t("ruleSaved"));
-      router.refresh();
     });
   const remove = (id: string) =>
     startTransition(async () => {
       await deleteCommissionRuleAction(id);
-      router.refresh();
     });
 
   // Newest first: the rate in force is the one people look for.

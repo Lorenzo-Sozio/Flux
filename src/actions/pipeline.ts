@@ -60,8 +60,13 @@ export async function getPipelineData(
   await requireCapability("record:read");
   const db = await getDb();
   // Closed within a calendar period: the deals a figure on the scorecard counted.
-  const closedIn = filters.closed ? periodBounds(filters.closed, await getWorkspaceTimeZone()) : null;
-  let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  // The stages, the pipelines and the clock at once: they were read in turn on every board visit.
+  let [stages, pipelineList, timeZone] = await Promise.all([
+    db.select().from(pipelineStages).orderBy(pipelineStages.order),
+    listPipelines(db),
+    filters.closed ? getWorkspaceTimeZone() : Promise.resolve(null),
+  ]);
+  const closedIn = filters.closed && timeZone ? periodBounds(filters.closed, timeZone) : null;
 
   // Seed default stages if pipeline is completely empty.
   //
@@ -76,7 +81,6 @@ export async function getPipelineData(
 
   // One pipeline's columns — or, asked for "all" (a figure opening the deals it counted
   // across the workspace), every pipeline's, each column saying whose it is.
-  const pipelineList = await listPipelines(db);
   const all = filters.pipeline === "all" && pipelineList.length > 1;
   const pipelineId = all ? "all" : (pipelineList.find((p) => p.id === filters.pipeline) ?? pipelineList[0])?.id;
   const pipelineOrder = new Map(pipelineList.map((p, i) => [p.id, { i, name: p.name }]));

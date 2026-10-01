@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getActor, getTenantEntitlements } from "@/lib/auth-guard";
+import { phoneSearchPatterns, workspaceCallingCode } from "@/lib/contact-point";
 import { ENTITIES, type EntityType, entityInPlan } from "@/lib/entities";
 import { can } from "@/lib/permissions";
 import { SEARCH_PROVIDERS, type SearchHit } from "@/lib/search/providers";
@@ -38,8 +39,11 @@ export async function GET(req: NextRequest) {
   );
 
   const db = await getDb();
-  const digits = q.replace(/\D/g, "");
-  const terms = { like: `%${q}%`, phoneLike: digits.length >= 4 ? `%${digits}%` : null };
+  // The workspace's dialling code is read only for a number typed with "+" or "00": a search
+  // without one costs what it always did (src/lib/contact-point.ts, `phoneSearchPatterns`).
+  const international = /^\s*(\+|00)/.test(q) && q.replace(/\D/g, "").length >= 4;
+  const callingCode = international ? await workspaceCallingCode(db) : null;
+  const terms = { like: `%${q}%`, phoneLike: phoneSearchPatterns(q, callingCode) };
 
   // One entity failing (a table a workspace has not migrated yet, say) must not
   // blank the whole palette.

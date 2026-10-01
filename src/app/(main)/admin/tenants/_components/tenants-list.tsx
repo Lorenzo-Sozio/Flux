@@ -85,7 +85,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     setError(null);
     try {
       await adminSyncTenantSubscription(tenant.id);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sync failed");
     } finally {
@@ -114,7 +113,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     try {
       await adminSetTenantPlan(planDialogTenant.id, pendingPlanId);
       setPlanDialogTenant(null);
-      router.refresh();
     } catch (err) {
       setPlanError(err instanceof Error ? err.message : "Failed to update plan");
     } finally {
@@ -192,7 +190,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     setError(null);
     try {
       await deleteTenant(subdomain);
-      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete tenant");
     } finally {

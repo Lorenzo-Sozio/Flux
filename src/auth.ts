@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import bcrypt from "bcryptjs";
 import { and, eq } from "drizzle-orm";
@@ -38,7 +40,10 @@ declare module "@auth/core/jwt" {
   }
 }
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+/** The membership role this isolate last read, per person and workspace: values, never promises. */
+const recentMembership = new Map<string, { role: string | null; at: number }>();
+
+const nextAuth = NextAuth({
   ...authConfig,
   adapter: DrizzleAdapter(platformDb, {
     usersTable: users,
@@ -155,6 +160,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const STALE_AFTER_MS = 5 * 60 * 1000;
 
       if (token.activeTenantId && token.id && Date.now() - checkedAt > STALE_AFTER_MS) {
+        // ⚠️ A page cannot save the refreshed token (only the browser's session fetch can), so once
+        // the check was five minutes old every request repeated it. What this isolate read in the
+        // last five minutes stands in for the query: the bound on a revoked role stays five minutes.
+        const key = `${token.id}:${token.activeTenantId}`;
+        const known = recentMembership.get(key);
+        if (known && Date.now() - known.at < STALE_AFTER_MS) {
+          if (known.role) token.tenantRole = known.role;
+          else {
+            token.activeTenantId = null;
+            token.tenantRole = null;
+          }
+          token.tenantRoleCheckedAt = known.at;
+          return token;
+        }
         try {
           const membership = await platformDb.query.tenantMembers.findFirst({
             where: and(
@@ -163,6 +182,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ),
           });
 
+          recentMembership.set(key, { role: membership?.role ?? null, at: Date.now() });
           if (membership) {
             token.tenantRole = membership.role;
           } else {
@@ -192,3 +212,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
+
+export const { handlers, signIn, signOut } = nextAuth;
+
+/**
+ * The session, read once per request.
+ *
+ * ⚠️⚠️ A page used to call `auth()` five to ten times — the layout, every guard, every action it
+ * renders through — and each call decrypts the token again, and once the role check is five minutes
+ * old (`jwt` below) queries the registry again: a Server Component cannot save the refreshed token,
+ * so in a tab open for a while every call paid that query, on a pool of two connections. React's
+ * `cache()` makes it one per request; outside a render (a route handler) it simply calls through.
+ */
+export const auth = cache(() => nextAuth.auth());

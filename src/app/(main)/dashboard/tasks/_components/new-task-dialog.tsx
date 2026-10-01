@@ -338,7 +338,8 @@ interface Props {
   deals: { id: string; name: string }[];
   tickets: { id: string; ticketNumber: string; subject: string }[];
   currentUserId: string;
-  onCreated: () => void;
+  /** After a task is saved. The page needs nothing: the action revalidates it. */
+  onCreated?: () => void;
   defaultTicketId?: string;
 }
 
@@ -524,7 +525,7 @@ export function NewTaskDialog({
       form.reset();
       setSubtasks([]);
       setExpandedIds(new Set());
-      onCreated();
+      onCreated?.();
     } catch {
       toast.error(t("dialog.saveFailed"));
     }

@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/brand-logo-token.ts",
+    "description": "⚠️⚠️ il token del logo non porta lo scopo nella firma: un token del calendario apre il logo",
+    "find": "update(`${PURPOSE}:${tenantId}`)",
+    "replace": "update(tenantId)"
+  },
+  {
+    "file": "src/lib/brand-logo-token.ts",
+    "description": "⚠️⚠️ la firma del token del logo non viene confrontata: qualunque workspace si apre con un token inventato",
+    "find": "    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;",
+    "replace": "    if (a.length !== b.length) return null;"
+  },
+  {
+    "file": "src/app/api/brand/logo/[token]/route.ts",
+    "description": "⚠️⚠️ un token del logo non valido apre comunque un database",
+    "find": "  if (!tenantId) return new NextResponse(\"Not found\", { status: 404 });\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-brand.ts",
+    "description": "⚠️⚠️ un link javascript: con un host finisce nella firma o in un pulsante",
+    "find": "    if (url.protocol !== \"https:\" && url.protocol !== \"http:\") return null;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-brand.ts",
+    "description": "⚠️⚠️ il nome nella firma non viene escapato: chi scrive il proprio nome scrive HTML nell'email",
+    "find": "color:${INK}\">${esc(person.name)}</div>${role ?",
+    "replace": "color:${INK}\">${person.name}</div>${role ?"
+  },
+  {
+    "file": "src/lib/email-brand.ts",
+    "description": "⚠️ su un colore chiaro i pulsanti restano bianchi su chiaro, illeggibili",
+    "find": "  return contrastRatio(color, \"#ffffff\") >= 3 ? \"#ffffff\" : INK;",
+    "replace": "  return \"#ffffff\";"
+  },
+  {
+    "file": "src/lib/email-deliver.ts",
+    "description": "⚠️ un modello che mette {{firma}} riceve la firma due volte",
+    "find": "  const end = placed ? \"\" : signature;",
+    "replace": "  const end = signature;"
+  },
+  {
+    "file": "src/lib/email-deliver.ts",
+    "description": "⚠️⚠️ chi ha spento la firma nel Profilo la trova comunque nelle email",
+    "find": "    if (settings.enabled) {",
+    "replace": "    if (true) {"
+  },
+  {
+    "file": "src/lib/email.ts",
+    "description": "⚠️ la nota di credito porta l'IBAN, come se ci fosse da pagare",
+    "find": "        (data.iban && data.documentType !== \"TD04\"",
+    "replace": "        (data.iban"
+  },
+  {
+    "file": "src/lib/workspace-preferences.ts",
+    "description": "⚠️⚠️ la firma è una sola per il workspace: le email di una persona escono con il ruolo di un'altra",
+    "find": "const signatureKey = (userId: string) => `signature.${userId}`;",
+    "replace": "const signatureKey = (_userId: string) => \"signature\";"
+  },
+  {
+    "file": "src/lib/email-brand-load.ts",
+    "description": "⚠️ un logo nuovo ha lo stesso indirizzo del vecchio: i programmi di posta mostrano quello in cache",
+    "find": "/api/brand/logo/${signBrandLogoToken(tenantId)}?v=${version}`;",
+    "replace": "/api/brand/logo/${signBrandLogoToken(tenantId)}`;"
+  }
+]

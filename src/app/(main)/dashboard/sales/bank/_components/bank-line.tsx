@@ -298,7 +298,6 @@ export function OpenLineRow({
           onDone={() => {
             setChoosing(false);
             onGone();
-            router.refresh();
           }}
         />
       )}

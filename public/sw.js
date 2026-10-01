@@ -28,7 +28,7 @@
  * of what "feels like an app" actually means.
  */
 
-const VERSION = "v2";
+const VERSION = "v4";
 const SHELL_CACHE = `flux-shell-${VERSION}`;
 const ASSET_CACHE = `flux-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -63,6 +63,12 @@ self.addEventListener("activate", (event) => {
       const keep = new Set([SHELL_CACHE, ASSET_CACHE]);
       const names = await caches.keys();
       await Promise.all(names.filter((n) => n.startsWith("flux-") && !keep.has(n)).map((n) => caches.delete(n)));
+      // ⚠️ Navigation preload: the browser starts the page's request while this worker is still
+      // waking up, instead of after. Without it an installed app opened cold waited for the worker
+      // to start before the request for the page even left.
+      if (self.registration.navigationPreload) {
+        await self.registration.navigationPreload.enable().catch(() => undefined);
+      }
       await self.clients.claim();
     })(),
   );
@@ -117,7 +123,8 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const link = (event.notification.data && event.notification.data.link) || "/dashboard";
+  // The home itself, not /dashboard: that address is two redirects away from a page.
+  const link = (event.notification.data && event.notification.data.link) || "/dashboard/crm";
   const target = new URL(link, self.location.origin).href;
 
   event.waitUntil(
@@ -223,6 +230,9 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       (async () => {
         try {
+          // The request the browser already started (navigation preload), else a new one.
+          const preloaded = await event.preloadResponse;
+          if (preloaded) return preloaded;
           return await fetch(request);
         } catch {
           const offline = await caches.match(OFFLINE_URL);

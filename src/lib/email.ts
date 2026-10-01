@@ -6,7 +6,17 @@
 import { createTranslator } from "next-intl";
 
 import { getAppUrl } from "@/lib/app-url";
-import { type DocumentLanguage, fill, INVOICE_TEXT } from "@/lib/document-language";
+import { DOCUMENT_LOCALE, type DocumentLanguage, fill, INVOICE_TEXT, type InvoiceText } from "@/lib/document-language";
+import {
+  brandFrame,
+  ctaButton,
+  DEFAULT_BRAND_COLOR,
+  type EmailBrand,
+  type EmailKit,
+  ibanBox,
+  inkOn,
+  summaryBox,
+} from "@/lib/email-brand";
 import { getPlatformEmailConfig, sendEmail } from "@/lib/email-provider";
 
 // Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
@@ -248,142 +258,175 @@ export interface AppointmentEmailData {
    */
   timeZone?: string;
   allDay?: boolean;
-  /** "Ogni settimana il lunedì", when it repeats. */
+  /** "Ogni settimana il lunedì", when it repeats — in the recipient's language. */
   recurrenceText?: string | null;
   /** A change to an invitation already sent, rather than a first one. */
   isUpdate?: boolean;
+}
+
+/** The invitation's fixed words, in the language of whoever receives it. */
+const INVITE_TEXT = {
+  it: {
+    invitation: "Invito",
+    updated: "Invito aggiornato",
+    cancelled: "Appuntamento annullato",
+    subjectCancelled: "Annullato",
+    hello: "Salve {name},",
+    invited: "{organizer} ti ha invitato a un appuntamento.",
+    changed: "{organizer} ha modificato un appuntamento a cui sei invitato.",
+    cancelledBody: "l'appuntamento {title} è stato annullato da {organizer}.",
+    removed: "L'evento è stato rimosso dal tuo calendario.",
+    appointment: "Appuntamento",
+    start: "Inizio",
+    end: "Fine",
+    date: "Data",
+    recurrence: "Ricorrenza",
+    place: "Luogo",
+    notes: "Note",
+    video: "Partecipa alla videochiamata",
+    rsvp: "Conferma la tua partecipazione:",
+    accept: "Accetto",
+    tentative: "Forse",
+    decline: "Non posso",
+    ics: "Il file .ics allegato aggiunge l'evento al tuo calendario.",
+    allDay: "tutto il giorno",
+    file: "appuntamento.ics",
+  },
+  en: {
+    invitation: "Invitation",
+    updated: "Updated invitation",
+    cancelled: "Appointment cancelled",
+    subjectCancelled: "Cancelled",
+    hello: "Hello {name},",
+    invited: "{organizer} has invited you to an appointment.",
+    changed: "{organizer} has changed an appointment you are invited to.",
+    cancelledBody: "the appointment {title} has been cancelled by {organizer}.",
+    removed: "The event has been removed from your calendar.",
+    appointment: "Appointment",
+    start: "Starts",
+    end: "Ends",
+    date: "Date",
+    recurrence: "Repeats",
+    place: "Where",
+    notes: "Notes",
+    video: "Join the video call",
+    rsvp: "Let us know if you can make it:",
+    accept: "Accept",
+    tentative: "Maybe",
+    decline: "Decline",
+    ics: "The attached .ics file adds the event to your calendar.",
+    allDay: "all day",
+    file: "appointment.ics",
+  },
+} satisfies Record<DocumentLanguage, Record<string, string>>;
+
+export interface InviteLayout {
+  /** The workspace's identity: the frame, the colour of the buttons. Absent: a plain frame. */
+  brand?: EmailBrand | null;
+  /** The organiser's compact signature, already drawn. */
+  signature?: string;
+  /** The recipient's language: a customer's company decides it, a colleague reads Italian. */
+  lang?: DocumentLanguage;
+}
+
+/** The three answers as buttons: the first in the brand colour, the others outlined. */
+function rsvpButtons(
+  brand: EmailBrand,
+  links: { accept: string; decline: string; tentative: string },
+  tx: (typeof INVITE_TEXT)[DocumentLanguage],
+): string {
+  const cell = (label: string, href: string, primary: boolean) =>
+    `<td style="padding:0 8px 8px 0"><a href="${esc(safeHref(href))}" style="display:inline-block;padding:11px 20px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;${
+      primary
+        ? `background:${brand.color};color:${inkOn(brand.color)};border:1px solid ${brand.color}`
+        : "background:#ffffff;color:#1f2430;border:1px solid #cdd2dc"
+    }">${esc(label)}</a></td>`;
+  return `<p style="margin:0 0 10px;font-size:14px;color:#1f2430">${esc(tx.rsvp)}</p><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;margin:0 0 18px"><tr>${cell(tx.accept, links.accept, true)}${cell(tx.tentative, links.tentative, false)}${cell(tx.decline, links.decline, false)}</tr></table>`;
 }
 
 export async function sendAppointmentInviteEmail(
   to: { email: string; name: string },
   data: AppointmentEmailData,
   rsvpLinks?: { accept: string; decline: string; tentative: string },
+  layout: InviteLayout = {},
 ): Promise<{ success: boolean; error?: string }> {
   const safe = (s: string) => sanitizeHeader(s);
+  const lang = layout.lang ?? "it";
+  const tx = INVITE_TEXT[lang];
+  const locale = DOCUMENT_LOCALE[lang];
+  // Without the workspace's identity (a caller that has none), the same frame in neutral colours.
+  const brand: EmailBrand = layout.brand ?? {
+    name: data.organizerName,
+    color: DEFAULT_BRAND_COLOR,
+    logoUrl: null,
+    website: null,
+    socials: [],
+    address: null,
+    vatNumber: null,
+    phone: null,
+    email: null,
+  };
 
   const zone = data.timeZone ? { timeZone: data.timeZone } : {};
   const dayOpts = { weekday: "long", day: "numeric", month: "long", year: "numeric", ...zone } as const;
   // An all-day event ends at midnight after its last day; the last day is the one before.
   const lastDay = new Date(data.endAt.getTime() - 60_000);
   const startStr = data.allDay
-    ? data.startAt.toLocaleDateString("it-IT", dayOpts)
-    : data.startAt.toLocaleString("it-IT", { ...dayOpts, hour: "2-digit", minute: "2-digit" });
+    ? data.startAt.toLocaleDateString(locale, dayOpts)
+    : data.startAt.toLocaleString(locale, { ...dayOpts, hour: "2-digit", minute: "2-digit" });
   const endStr = data.allDay
-    ? lastDay.toLocaleDateString("it-IT", dayOpts)
-    : data.endAt.toLocaleString("it-IT", { hour: "2-digit", minute: "2-digit", ...zone });
-  const durationMs = data.endAt.getTime() - data.startAt.getTime();
-  const durationMin = Math.round(durationMs / 60_000);
+    ? lastDay.toLocaleDateString(locale, dayOpts)
+    : data.endAt.toLocaleString(locale, { hour: "2-digit", minute: "2-digit", ...zone });
+  const durationMin = Math.round((data.endAt.getTime() - data.startAt.getTime()) / 60_000);
   const durationLabel = data.allDay
-    ? "tutto il giorno"
+    ? tx.allDay
     : durationMin < 60
       ? `${durationMin} min`
       : `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}min` : ""}`;
 
   const isCancel = data.method === "CANCEL";
-  const subject = isCancel
-    ? safe(`Cancelled: ${data.title}`)
-    : data.isUpdate
-      ? safe(`Updated invitation: ${data.title}`)
-      : safe(`Invitation: ${data.title}`);
+  const heading = isCancel ? tx.cancelled : data.isUpdate ? tx.updated : tx.invitation;
+  const subject = safe(`${isCancel ? tx.subjectCancelled : heading}: ${data.title}`);
+  const hello = `<p style="margin:0 0 14px">${esc(fill(tx.hello, { name: to.name }))}</p>`;
 
-  const recurrenceRow = data.recurrenceText
-    ? `<tr>
-        <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Ricorrenza</td>
-        <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(data.recurrenceText)}</td>
-      </tr>`
-    : "";
+  let body: string;
+  if (isCancel) {
+    body =
+      hello +
+      `<p style="margin:0 0 14px">${esc(fill(tx.cancelledBody, { title: data.title, organizer: data.organizerName }))}</p>` +
+      summaryBox({
+        tone: "warning",
+        highlight: { label: tx.cancelled, value: data.title },
+        rows: [[tx.date, startStr]],
+      }) +
+      `<p style="margin:0 0 18px;font-size:13px;color:#5d6475">${esc(tx.removed)}</p>`;
+  } else {
+    const place = data.location ?? data.locationUrl ?? null;
+    const rows: [string, string][] = [
+      [tx.start, startStr],
+      [tx.end, `${endStr} (${durationLabel})`],
+      ...(data.recurrenceText ? [[tx.recurrence, data.recurrenceText] as [string, string]] : []),
+      ...(place ? [[tx.place, place] as [string, string]] : []),
+      ...(data.description ? [[tx.notes, data.description] as [string, string]] : []),
+    ];
+    body =
+      hello +
+      `<p style="margin:0 0 14px">${esc(fill(data.isUpdate ? tx.changed : tx.invited, { organizer: data.organizerName }))}</p>` +
+      summaryBox({ highlight: { label: tx.appointment, value: data.title }, rows }) +
+      (data.conferenceLink
+        ? `<div style="margin:0 0 18px">${ctaButton(brand, tx.video, data.conferenceLink)}</div>`
+        : "") +
+      (rsvpLinks ? rsvpButtons(brand, rsvpLinks, tx) : "") +
+      `<p style="margin:0 0 18px;font-size:12px;color:#7a8192">${esc(tx.ics)}</p>`;
+  }
 
-  const locationRow =
-    (data.conferenceLink ?? data.locationUrl ?? data.location)
-      ? `<tr>
-        <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Luogo</td>
-        <td style="padding:8px 12px;border:1px solid #e5e7eb">
-          ${
-            data.conferenceLink
-              ? `<a href="${safeHref(data.conferenceLink)}" style="color:#2563eb">Collegamento video</a>`
-              : data.locationUrl
-                ? `<a href="${safeHref(data.locationUrl)}" style="color:#2563eb">${esc(data.locationUrl)}</a>`
-                : esc(data.location ?? "")
-          }
-        </td>
-      </tr>`
-      : "";
-
-  const rsvpSection =
-    !isCancel && rsvpLinks
-      ? `<div style="margin:24px 0">
-        <p style="font-size:14px;color:#374151;margin-bottom:12px">Conferma la tua partecipazione:</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <a href="${rsvpLinks.accept}"
-             style="display:inline-block;padding:10px 20px;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
-            ✓ Accetta
-          </a>
-          <a href="${rsvpLinks.tentative}"
-             style="display:inline-block;padding:10px 20px;background:#d97706;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
-            ? Forse
-          </a>
-          <a href="${rsvpLinks.decline}"
-             style="display:inline-block;padding:10px 20px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
-            ✗ Rifiuta
-          </a>
-        </div>
-      </div>`
-      : "";
-
-  const html = isCancel
-    ? `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-        <div style="background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
-          <h2 style="margin:0;font-size:18px">Appuntamento annullato</h2>
-        </div>
-        <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
-          <p>Salve ${esc(to.name)},</p>
-          <p>L'appuntamento <strong>${esc(data.title)}</strong> è stato annullato da ${esc(data.organizerName)}.</p>
-          <table style="border-collapse:collapse;width:100%;margin:16px 0">
-            <tr>
-              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Data</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${startStr}</td>
-            </tr>
-          </table>
-          <p style="color:#6b7280;font-size:13px">L'evento è stato rimosso dal tuo calendario.</p>
-        </div>
-      </div>`
-    : `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
-        <div style="background:#2563eb;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
-          <h2 style="margin:0;font-size:18px">${data.isUpdate ? "Invito aggiornato" : "Invito"}: ${esc(data.title)}</h2>
-        </div>
-        <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
-          <p>Salve ${esc(to.name)},</p>
-          <p>${
-            data.isUpdate
-              ? `${esc(data.organizerName)} ha modificato un appuntamento a cui sei invitato.`
-              : `${esc(data.organizerName)} ti ha invitato a un appuntamento.`
-          }</p>
-          <table style="border-collapse:collapse;width:100%;margin:16px 0">
-            <tr>
-              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Inizio</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${startStr}</td>
-            </tr>
-            <tr>
-              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Fine</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${endStr} (${durationLabel})</td>
-            </tr>
-            ${recurrenceRow}
-            ${locationRow}
-            ${
-              data.description
-                ? `<tr>
-              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Note</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb;white-space:pre-wrap">${esc(data.description)}</td>
-            </tr>`
-                : ""
-            }
-          </table>
-          ${rsvpSection}
-          <p style="color:#6b7280;font-size:12px;margin-top:24px">
-            Il file .ics allegato ti permette di aggiungere l'evento al tuo calendario.
-          </p>
-        </div>
-      </div>`;
+  const html = brandFrame({
+    brand,
+    lang,
+    label: heading,
+    preheader: `${data.title} · ${startStr}`,
+    body: body + (layout.signature ?? ""),
+  });
 
   const icsMethod = isCancel ? "CANCEL" : "REQUEST";
   const result = await sendEmail({
@@ -392,7 +435,7 @@ export async function sendAppointmentInviteEmail(
     html,
     attachments: [
       {
-        filename: "appuntamento.ics",
+        filename: tx.file,
         content: data.icsContent,
         contentType: `text/calendar; method=${icsMethod}; charset=utf-8`,
       },
@@ -427,66 +470,89 @@ export interface InvoiceCopyData {
   dueDate: string | null;
   /** Paid in parts (I12): each installment's day and amount, already formatted in the document's currency. */
   installments?: { dueDate: string; amount: string }[] | null;
+  /** Paid by bank transfer: where to, shown in a box of its own beside the figures. */
+  iban?: string | null;
   lang: DocumentLanguage;
+}
+
+const day = (iso: string) => iso.split("-").reverse().join("/");
+
+function invoiceLabel(tx: InvoiceText, documentType: string): string {
+  return documentType === "TD04" ? tx.creditNote : documentType === "TD02" ? tx.depositInvoice : tx.invoice;
 }
 
 /**
  * The courtesy copy's subject and text, in the customer's language: what the email dialog opens
  * with (actions/invoices.ts `getInvoiceEmailDraftAction`) and what `sendInvoiceCopyEmail` sends
  * when nobody changed it. One source, so the two never say different things.
+ *
+ * The figures — the amount, the due date or the installments, the IBAN — are not in the text:
+ * `invoiceCopyLayout` puts them in a box beside it, where they cannot be edited away.
  */
 export function invoiceCopyContent(data: InvoiceCopyData): { subject: string; bodyHtml: string } {
   const tx = INVOICE_TEXT[data.lang];
-  const day = (iso: string) => iso.split("-").reverse().join("/");
-  const label =
-    data.documentType === "TD04" ? tx.creditNote : data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
-  const body =
-    fill(tx.emailBody, {
-      label: esc(data.lang === "it" ? label.toLowerCase() : label),
-      number: `<strong>${esc(data.documentNumber)}</strong>`,
-      date: day(data.issueDate),
-      total: `<strong>${esc(data.total)}</strong>`,
-    }) +
-    // In installments the last day is not "the" due date: the schedule follows, one line each.
-    (data.dueDate && !(data.installments && data.installments.length > 1)
-      ? fill(tx.emailDue, { date: esc(day(data.dueDate)) })
-      : "");
-  const schedule =
-    data.installments && data.installments.length > 1
-      ? `<p>${esc(tx.emailInstallments)}</p><ul>${data.installments
-          .map(
-            (i, k) =>
-              `<li>${esc(tx.installment)} ${k + 1}: ${esc(day(i.dueDate))} — <strong>${esc(i.amount)}</strong></li>`,
-          )
-          .join("")}</ul>`
-      : "";
+  const label = invoiceLabel(tx, data.documentType);
+  const body = fill(tx.emailBody, {
+    label: esc(data.lang === "it" ? label.toLowerCase() : label),
+    number: `<strong>${esc(data.documentNumber)}</strong>`,
+    date: day(data.issueDate),
+    total: `<strong>${esc(data.total)}</strong>`,
+  });
   return {
     subject: `${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
     bodyHtml:
-      `<p>${esc(tx.emailGreeting)}</p><p>${body}.</p>${schedule}` +
+      `<p>${esc(tx.emailGreeting)}</p><p>${body}.</p>` +
       `<p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p><p><em>${esc(tx.emailNotice)}</em></p>`,
   };
 }
 
-/** A document's text inside the frame every email to a customer from the business carries. */
-export function documentEmailFrame(bodyHtml: string): string {
-  return `
-      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
-        ${bodyHtml}
-      </div>`;
+/**
+ * The courtesy copy as it leaves: the workspace's frame, the person's text, then the amount with
+ * its due date — or one line per installment — and the IBAN ready to copy, with the reference.
+ * No personal signature: an invoice comes from the business.
+ */
+export function invoiceCopyLayout(data: Omit<InvoiceCopyData, "to">): (body: string, kit: EmailKit) => string {
+  const tx = INVOICE_TEXT[data.lang];
+  const label = invoiceLabel(tx, data.documentType);
+  const several = data.installments && data.installments.length > 1;
+  const rows: [string, string][] = several
+    ? (data.installments ?? []).map((i, k) => [`${tx.installment} ${k + 1} · ${day(i.dueDate)}`, i.amount])
+    : data.dueDate
+      ? [[tx.due, day(data.dueDate)]]
+      : [];
+  return (body, { brand }) =>
+    brandFrame({
+      brand,
+      lang: data.lang,
+      label: `${label} ${data.documentNumber}`,
+      preheader: fill(tx.emailPreheader, { label, number: data.documentNumber, total: data.total }),
+      body:
+        body +
+        summaryBox({ highlight: { label: tx.amount, value: data.total }, rows }) +
+        // A credit note is money going the other way: nothing to pay, no bank details.
+        (data.iban && data.documentType !== "TD04"
+          ? ibanBox({
+              iban: data.iban,
+              payee: data.issuerName,
+              reference: `${label} ${data.documentNumber}`,
+              lang: data.lang,
+            })
+          : ""),
+    });
 }
 
 export async function sendInvoiceCopyEmail(
   data: InvoiceCopyData & {
     pdf: { filename: string; bytes: Uint8Array };
     replyTo?: string | null;
+    brand: EmailBrand;
   },
 ) {
   const { subject, bodyHtml } = invoiceCopyContent(data);
   return sendEmail({
     to: sanitizeHeader(data.to),
     subject: sanitizeHeader(subject),
-    html: documentEmailFrame(bodyHtml),
+    html: invoiceCopyLayout(data)(bodyHtml, { brand: data.brand, signature: "", lang: data.lang }),
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],
   });
@@ -509,6 +575,8 @@ export interface PaymentReminderData {
   issueDate: string;
   dueDate: string;
   amount: string;
+  /** Whole days since the due date, on the workspace's clock. */
+  daysOverdue: number;
   iban?: string | null;
   /** Whether the courtesy PDF goes with it: the notice about it is said only then. */
   withPdf: boolean;
@@ -518,8 +586,7 @@ export interface PaymentReminderData {
 /** The reminder's subject and text, in the customer's language — the dialog's draft and the default send. */
 export function paymentReminderContent(data: PaymentReminderData): { subject: string; bodyHtml: string } {
   const tx = INVOICE_TEXT[data.lang];
-  const day = (iso: string) => iso.split("-").reverse().join("/");
-  const label = data.documentType === "TD02" ? tx.depositInvoice : tx.invoice;
+  const label = invoiceLabel(tx, data.documentType);
   const body = fill(tx.reminderBody, {
     label: esc(data.lang === "it" ? label.toLowerCase() : label),
     number: `<strong>${esc(data.documentNumber)}</strong>`,
@@ -527,28 +594,62 @@ export function paymentReminderContent(data: PaymentReminderData): { subject: st
     due: day(data.dueDate),
     amount: `<strong>${esc(data.amount)}</strong>`,
   });
-  const iban = (data.iban ?? "").replace(/\s+/g, "").toUpperCase();
   return {
     subject: `${tx.reminderSubject} — ${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`,
     bodyHtml:
       `<p>${esc(tx.emailGreeting)}</p><p>${body}.</p>` +
-      (iban ? `<p>${fill(tx.reminderIban, { iban: `<strong>${esc(iban)}</strong>` })}</p>` : "") +
-      `<p>${esc(tx.reminderPaid)}</p><p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>` +
+      `<p>${esc(tx.reminderPaid)}</p><p>${esc(tx.reminderReply)}</p>` +
+      `<p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>` +
       (data.withPdf ? `<p><em>${esc(tx.emailNotice)}</em></p>` : ""),
   };
+}
+
+/**
+ * The reminder as it leaves: the frame, the person's text, an amber box — overdue since when,
+ * how much, which invoice, the IBAN — and the sender's compact signature. Amber, not red: it is
+ * a reminder, not a demand.
+ */
+export function paymentReminderLayout(
+  data: Omit<PaymentReminderData, "to" | "withPdf">,
+): (body: string, kit: EmailKit) => string {
+  const tx = INVOICE_TEXT[data.lang];
+  const label = invoiceLabel(tx, data.documentType);
+  const iban = (data.iban ?? "").replace(/\s+/g, "").toUpperCase();
+  const overdue =
+    data.daysOverdue === 1 ? tx.reminderOverdueOne : fill(tx.reminderOverdue, { days: Math.max(0, data.daysOverdue) });
+  return (body, { brand, signature }) =>
+    brandFrame({
+      brand,
+      lang: data.lang,
+      label: tx.reminderSubject,
+      preheader: fill(tx.reminderPreheader, { label, number: data.documentNumber, due: day(data.dueDate) }),
+      body:
+        body +
+        summaryBox({
+          tone: "warning",
+          highlight: { label: overdue, value: data.amount },
+          rows: [
+            [label, fill(tx.documentRow, { number: data.documentNumber, date: day(data.issueDate) })],
+            [tx.due, day(data.dueDate)],
+            ...(iban ? [["IBAN", iban.replace(/(.{4})/g, "$1 ").trim()] as [string, string]] : []),
+          ],
+        }) +
+        signature,
+    });
 }
 
 export async function sendPaymentReminderEmail(
   data: Omit<PaymentReminderData, "withPdf"> & {
     pdf: { filename: string; bytes: Uint8Array } | null;
     replyTo?: string | null;
+    brand: EmailBrand;
   },
 ) {
   const { subject, bodyHtml } = paymentReminderContent({ ...data, withPdf: Boolean(data.pdf) });
   return sendEmail({
     to: sanitizeHeader(data.to),
     subject: sanitizeHeader(subject),
-    html: documentEmailFrame(bodyHtml),
+    html: paymentReminderLayout(data)(bodyHtml, { brand: data.brand, signature: "", lang: data.lang }),
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     ...(data.pdf
       ? { attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }] }

@@ -1,10 +1,8 @@
-import { redirect } from "next/navigation";
-
-import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { getPipelineData } from "@/actions/pipeline";
 import { getActor, hasCapability } from "@/lib/auth-guard";
 import { parsePipelineFilters } from "@/lib/pipeline-filters";
 
+import { DefaultOwnersParam } from "./components/default-owners-param";
 import { PipelineBoard } from "./components/pipeline-board";
 
 export default async function PipelinePage({
@@ -14,41 +12,27 @@ export default async function PipelinePage({
 }) {
   const params = await searchParams;
   // ⚠️ The board opens on the deals of whoever is looking. It opened on everybody's, so a
-  // salesperson's own work was one filter away every morning. Written into the URL rather
-  // than applied silently, so the filter bar shows what is applied; "everyone" is
-  // `owners=all`, which stays.
-  if (params.owners === undefined) {
-    const actor = await getActor();
-    if (actor) {
-      const next = new URLSearchParams();
-      for (const [k, v] of Object.entries(params)) if (typeof v === "string") next.set(k, v);
-      next.set("owners", actor.userId);
-      redirect(`/dashboard/pipeline?${next.toString()}`);
-    }
-  }
-  const filters = parsePipelineFilters(params);
-  // Workspace role, not the platform staff field (audit rilievo U-02).
-  const [canEdit, canManageStages] = await Promise.all([
+  // salesperson's own work was one filter away every morning. Written into the URL, so the filter
+  // bar shows what is applied — by the browser, not by a redirect: the redirect made every tap on
+  // Pipeline two server renders. "Everyone" is `owners=all`, which stays.
+  const actor = params.owners === undefined ? await getActor() : null;
+  const effective = actor ? { ...params, owners: actor.userId } : params;
+  const filters = parsePipelineFilters(effective);
+  // Workspace role, not the platform staff field (audit rilievo U-02). Read beside the board.
+  // ⚠️ No company or contact lists here: the deal dialog asks for them when it opens. They used to
+  // travel with every visit to the board, for a dialog most visits never open.
+  const [canEdit, canManageStages, data] = await Promise.all([
     hasCapability("record:write"),
     hasCapability("pipeline:manage"),
-  ]);
-
-  // The deal modal needs two dropdowns, not every column of every record. These
-  // used to load the full contact and company tables on each visit to the board
-  // (audit rilievo B-08).
-  const [data, companies, contacts] = await Promise.all([
     getPipelineData(filters),
-    getCompaniesForSelect(),
-    getContactsForSelect(),
   ]);
 
   return (
     <div className="h-full min-h-0 bg-muted/10">
+      {actor && <DefaultOwnersParam userId={actor.userId} />}
       <PipelineBoard
         initialStages={data.stages}
         initialDeals={data.deals}
-        companies={companies}
-        contacts={contacts}
         canEdit={canEdit}
         canManageStages={canManageStages}
       />
