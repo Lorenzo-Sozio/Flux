@@ -381,7 +381,8 @@ whether or not they bought a reports package.
 [src/lib/ai/](src/lib/ai/) (Fase 5, C0). A task calls `aiGenerate("summary", request)`,
 `aiStream(...)` or `aiGenerateJson(...)` from [client.ts](src/lib/ai/client.ts) and never names a
 vendor. Each provider is one file implementing `AiProvider` ([types.ts](src/lib/ai/types.ts)) and one
-line in [registry.ts](src/lib/ai/registry.ts); Gemini ([gemini.ts](src/lib/ai/gemini.ts)) is the first.
+line in [registry.ts](src/lib/ai/registry.ts): Gemini ([gemini.ts](src/lib/ai/gemini.ts)) and OpenAI
+([openai.ts](src/lib/ai/openai.ts), the Responses API).
 
 - ⚠️⚠️ **The model is configuration, not code** ([config.ts](src/lib/ai/config.ts)):
   - `AI_PROVIDER` / `AI_MODEL` set every task; the defaults are `gemini` and `gemini-2.5-flash-lite`.
@@ -404,6 +405,12 @@ line in [registry.ts](src/lib/ai/registry.ts); Gemini ([gemini.ts](src/lib/ai/ge
 - **Data:** a paid Gemini key (Google does not train on paid traffic). The Developer API cannot
   choose where a request is processed; processing in the EU means Vertex AI, which would be one
   more provider file.
+- **OpenAI** (`AI_PROVIDER=openai`, `OPENAI_API_KEY`; with no `AI_PROVIDER` the provider whose key
+  is set is used): `store: false`, so OpenAI keeps nothing of a call. ⚠️⚠️ A GPT-5 / o-series model
+  thinks out of `max_output_tokens` and refuses `temperature`: it gets a thinking allowance on top
+  of the task's ceiling and `reasoning.effort` low (`OPENAI_REASONING_EFFORT`), and a message marked
+  `phase: "commentary"` is its working, never the answer. A JSON schema whose properties are all
+  required is sent `strict`. No real key has been through it yet.
 
 **Who may use it: four keys** ([access.ts](src/lib/ai/access.ts)). A task goes through `runAiTask` /
 `runAiJsonTask` ([run.ts](src/lib/ai/run.ts)), never `aiGenerate` directly, and it checks them in order:
@@ -1102,6 +1109,18 @@ quotes. Members only, `digest_email` switchable in My notifications, written in 
 `locale` remembered from the home page, and claimed per day with a conditional update so
 two runs send one email. ⚠️ Built from a few grouped queries per workspace, never the full
 work list per person: the job runs every workspace in one request.
+
+### A lead assigned is a lead somebody is told about
+
+[src/lib/lead-assignment.ts](src/lib/lead-assignment.ts): the new owner, or — handed to a group — every
+member of the group, hears of it (`lead_assigned`, which pushes); whoever made the assignment does not.
+⚠️⚠️ Every way a lead gets an owner or a group goes through it: `createLead` and `updateLead`, the bulk
+reassignment (one notification with how many), the single `POST /api/crm/leads` (a key is a machine:
+the owner is told even when the key's person is the owner), web forms, the automation's round-robin.
+A lead created already assigned used to tell nobody, and one handed to a group told nobody at all. It
+writes into the database it is handed (`notifyManyIn`): on the API there is no session and `notify`
+reads one. The bulk import routes and the CSV import tell nobody, like they run no rules.
+`src/lib/lead-assignment.test.ts` (PGlite); `scripts/mutations/lead-assignment.json`.
 
 ### A record's timeline
 
@@ -1919,6 +1938,13 @@ auto-migration as everything else.
   is one target — tapping opens what it is about and marks it read — grouped by day, with "To
   read" as a filter. A new panel in that bar uses the same component: a 320px dropdown on a phone
   is a third of the screen with the page still under it to tap by mistake.
+- ⚠️⚠️ **Back closes what is open, not the page** ([use-back-dismiss.ts](src/hooks/use-back-dismiss.ts)):
+  below md every Dialog, Sheet and Drawer pushes a history entry naming itself and closes when Back
+  takes it away — one layer at a time, so the template list closes and the email dialog under it
+  stays. Closed by its X, a layer takes its entry back off; closed by navigating, it leaves the new
+  page's entry alone. It is in the primitives, so a new dialog has it without asking. ⚠️ The
+  dialog's close button is `z-20`: a sticky header inside the content (z-10) used to paint over it,
+  and the full-screen panels had no visible way out.
 - **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).
   A nine-column table does not become usable by scrolling sideways. Contacts,
   companies, leads, orders, quotes and tickets render cards below `md` and the

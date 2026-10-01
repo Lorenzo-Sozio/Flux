@@ -37,7 +37,9 @@ export function readMigrations(folder = FOLDER) {
   const journal = JSON.parse(readFileSync(join(folder, "meta", "_journal.json"), "utf8"));
 
   return journal.entries.map((entry) => {
-    const query = readFileSync(join(folder, `${entry.tag}.sql`), "utf8");
+    // ⚠️ Line endings normalised: a Windows checkout with core.autocrlf hands the same file over
+    // with CRLF, and embedding whatever the disk had made the bundle depend on who generated it.
+    const query = readFileSync(join(folder, `${entry.tag}.sql`), "utf8").replace(/\r\n/g, "\n");
     return {
       tag: entry.tag,
       folderMillis: entry.when,

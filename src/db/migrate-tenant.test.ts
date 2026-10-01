@@ -48,12 +48,15 @@ describe("embedded migrations stay in step with the folder", () => {
     // Regenerating is one command; forgetting it ships a build that believes it
     // has migrated a database it has not touched.
     for (const entry of journal.entries) {
-      const onDisk = readFileSync(join(FOLDER, `${entry.tag}.sql`), "utf8");
+      const onDisk = lf(readFileSync(join(FOLDER, `${entry.tag}.sql`), "utf8"));
       const embedded = tenantMigrations.find((m) => m.tag === entry.tag);
 
       expect(embedded, `${entry.tag} is missing — run: npm run generate:migrations`).toBeDefined();
-      expect(embedded?.sql.join("--> statement-breakpoint")).toBe(onDisk);
-      expect(embedded?.hash).toBe(createHash("sha256").update(onDisk).digest("hex"));
+      expect(lf(embedded?.sql.join("--> statement-breakpoint") ?? "")).toBe(onDisk);
+      // The hash of the text as embedded, in either spelling of its line ends: older entries were
+      // embedded from a CRLF checkout, newer ones are normalised (generate-embedded-migrations.mjs).
+      const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+      expect([sha(onDisk), sha(onDisk.replace(/\n/g, "\r\n"))]).toContain(embedded?.hash);
     }
   });
 
@@ -61,12 +64,20 @@ describe("embedded migrations stay in step with the folder", () => {
     // Drizzle records one row per migration but executes one request per
     // statement; a different split is a different sequence of writes.
     for (const entry of journal.entries) {
-      const onDisk = readFileSync(join(FOLDER, `${entry.tag}.sql`), "utf8");
+      const onDisk = lf(readFileSync(join(FOLDER, `${entry.tag}.sql`), "utf8"));
       const embedded = tenantMigrations.find((m) => m.tag === entry.tag);
-      expect(embedded?.sql).toEqual(onDisk.split("--> statement-breakpoint"));
+      expect(embedded?.sql.map(lf)).toEqual(onDisk.split("--> statement-breakpoint"));
     }
   });
 });
+
+/**
+ * ⚠️ Compared with line ends normalised: Git on Windows (core.autocrlf) writes a file with CRLF
+ * whatever it was committed with, and the SQL is the same either way.
+ */
+function lf(text: string): string {
+  return text.replace(/\r\n/g, "\n");
+}
 
 describe("hasExecutableSql", () => {
   it("rejects fragments that are only comments or blank lines", () => {

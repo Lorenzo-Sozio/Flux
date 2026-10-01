@@ -46,6 +46,7 @@ const SAMPLE: Record<string, string | number> = {
   who: "Mario Rossi",
   when: "29/09/2026, 10:00",
   rules: 3,
+  group: "Nord",
 };
 
 const KEYS = Object.keys(en.notificationTexts) as NotificationKey[];

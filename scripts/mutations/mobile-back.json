@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️⚠️ il tasto Indietro chiude insieme l'elenco dei modelli e la finestra email sotto",
+    "find": "    if (gone || layersOf(event.state).includes(id)) return;",
+    "replace": "    if (gone) return;"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️ chiudere un pannello toccando una notifica annulla la navigazione verso il record",
+    "find": "      if (layersOf(win.history.state).at(-1) === id) win.history.back();",
+    "replace": "      win.history.back();"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️ il pannello copre lo stato della pagina nella cronologia",
+    "find": "{ ...((win.history.state as object | null) ?? {}), fluxLayers: [...below, id] }",
+    "replace": "{ fluxLayers: [...below, id] }"
+  }
+]

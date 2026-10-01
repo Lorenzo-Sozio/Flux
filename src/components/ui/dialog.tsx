@@ -5,6 +5,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useBackDismiss } from "@/hooks/use-back-dismiss"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -55,6 +56,9 @@ function DialogContent({
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
 }) {
+  // On a phone the system's Back closes the dialog, through its own close button: see the hook.
+  const closeRef = React.useRef<HTMLButtonElement>(null)
+  useBackDismiss(() => closeRef.current?.click())
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -113,11 +117,16 @@ function DialogContent({
 
           From sm up nothing changes: the caller's choice stands, because there
           the overlay and the keyboard are both still there.
+
+          ⚠️ z-20: above a sticky header drawn by the content (z-10), which
+          otherwise painted over it — the full-screen panels had no visible way
+          out at all.
         */}
         <DialogPrimitive.Close data-slot="dialog-close" asChild>
           <Button
+            ref={closeRef}
             variant="ghost"
-            className={cn("absolute top-3 right-3 sm:top-4 sm:right-4", !showCloseButton && "sm:hidden")}
+            className={cn("absolute top-3 right-3 z-20 sm:top-4 sm:right-4", !showCloseButton && "sm:hidden")}
             size="icon-sm"
             >
             <XIcon />

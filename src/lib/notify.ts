@@ -72,7 +72,16 @@ export async function notify(data: NotificationInput): Promise<void> {
  */
 export async function notifyMany(rows: NotificationInput[]): Promise<void> {
   if (rows.length === 0) return;
-  const db = await getDb();
+  await notifyManyIn(await getDb(), rows);
+}
+
+/**
+ * The same, into a database the caller hands over: an API route, a webhook or a job has no
+ * session, and `getDb()` throws there — a notification it wrote through `notify` was lost unseen.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
+export async function notifyManyIn(db: any, rows: NotificationInput[]): Promise<void> {
+  if (rows.length === 0) return;
   const written = await Promise.all(rows.map(toRow));
   await db.insert(notifications).values(written);
   announce(db, written);

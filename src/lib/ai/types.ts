@@ -17,8 +17,8 @@
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 /** The providers this deployment knows how to call. */
-export type AiProviderId = "gemini";
-export const AI_PROVIDER_IDS: readonly AiProviderId[] = ["gemini"];
+export type AiProviderId = "gemini" | "openai";
+export const AI_PROVIDER_IDS: readonly AiProviderId[] = ["gemini", "openai"];
 
 /**
  * What the copilot is asked to do (Fase 5, C1–C8). Each can be routed to its own provider and

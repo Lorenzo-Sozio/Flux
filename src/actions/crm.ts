@@ -47,6 +47,7 @@ import {
 } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
 import { guardedT, serverT } from "@/lib/i18n-server";
+import { announceLeadAssignment } from "@/lib/lead-assignment";
 import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
 import { notify } from "@/lib/notify";
@@ -179,7 +180,7 @@ export async function getContacts(encodedFilter?: string | null) {
 
 export async function createLead(data: unknown) {
   return guardedT(async () => {
-    await requireWriteAccess();
+    const actor = await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -192,6 +193,14 @@ export async function createLead(data: unknown) {
       leadScore: computeLeadScore(validated),
     };
     const [newLead] = await db.insert(leads).values(payload).returning();
+    // Created already assigned — to a colleague or to a group: they are told.
+    await announceLeadAssignment(db, {
+      leadId: newLead.id,
+      name: `${newLead.firstName ?? ""} ${newLead.lastName ?? ""}`,
+      before: null,
+      after: newLead,
+      actorId: actor.user.id,
+    });
     revalidatePath("/dashboard/leads");
     dispatchWebhook("lead.created", {
       id: newLead.id,
@@ -226,23 +235,6 @@ export async function updateLead(id: string, data: unknown) {
     // Read before the write: the automation engine compares old and new to
     // decide whether a field `changed`, and cannot do that after the fact.
     const [previous] = await db.select().from(leads).where(eq(leads.id, id));
-    // Notify new assignee if ownerId changed
-    if (validated.ownerId) {
-      const [cur] = await db
-        .select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName })
-        .from(leads)
-        .where(eq(leads.id, id));
-      if (cur && cur.ownerId !== validated.ownerId) {
-        notify({
-          userId: validated.ownerId,
-          type: "lead_assigned",
-          key: "leadAssigned",
-          params: { name: `${cur.firstName} ${cur.lastName}`.trim() },
-          link: `/dashboard/leads/${id}`,
-          // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-        }).catch(() => {});
-      }
-    }
     const payload = {
       ...validated,
       // A consent that changes here is a decision taken today, in a form (src/lib/consent.ts).
@@ -255,6 +247,14 @@ export async function updateLead(id: string, data: unknown) {
     };
     const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
     await recordFieldChanges(db, "lead", id, previous, updatedLead, actor.user.id);
+    // A new owner or a new group is told; whoever made the change is not.
+    await announceLeadAssignment(db, {
+      leadId: id,
+      name: `${updatedLead.firstName ?? ""} ${updatedLead.lastName ?? ""}`,
+      before: previous ?? null,
+      after: updatedLead,
+      actorId: actor.user.id,
+    });
     // Withdrawn here, from the record: every system that writes to them hears it.
     if (previous?.marketingConsent === true && updatedLead.marketingConsent === false) {
       await announceOptOut(

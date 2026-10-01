@@ -8608,6 +8608,14 @@
     "sdiSendFailed": {
       "title": "Invio allo SDI non riuscito",
       "message": "La fattura {number} non è arrivata allo SDI."
+    },
+    "leadAssignedToGroup": {
+      "title": "Un nuovo lead per il gruppo {group}",
+      "message": "{name} è stato assegnato al tuo gruppo."
+    },
+    "leadsAssigned": {
+      "title": "{count, plural, one {Ti è stato assegnato un lead} other {Ti sono stati assegnati # lead}}",
+      "message": "{count, plural, one {Lo trovi nell'elenco dei lead.} other {Li trovi nell'elenco dei lead.}}"
     }
   },
   "activityReminderEmail": {
@@ -9502,7 +9510,7 @@
       }
     },
     "unavailable": {
-      "off": "Copilota IA non configurato su questa installazione: imposta GEMINI_API_KEY sul server, poi attiva il flag «AI copilot» nel piano (/admin/plans).",
+      "off": "Copilota IA non configurato su questa installazione: imposta la chiave di un fornitore sul server (GEMINI_API_KEY oppure OPENAI_API_KEY), poi attiva il flag «AI copilot» nel piano (/admin/plans).",
       "config": "Copilota IA configurato in modo errato sul server: controlla AI_PROVIDER, AI_MODEL e la chiave del fornitore.",
       "plan": "Il tuo piano non include il copilota IA."
     }

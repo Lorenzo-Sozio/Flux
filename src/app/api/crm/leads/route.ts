@@ -12,6 +12,7 @@ import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
+import { announceLeadAssignment } from "@/lib/lead-assignment";
 import { decryptDbUrl } from "@/lib/tenant-db";
 import { dispatchWebhook } from "@/lib/webhook-dispatch";
 import { apiOrigin } from "@/lib/webhook-envelope";
@@ -43,6 +44,8 @@ export async function POST(req: NextRequest) {
   // Marks every event this request causes as written by the API, and by which key: an
   // integration drops its own writes by that, and still hears everyone else's.
   const API_ORIGIN = apiOrigin(authResult);
+  // A person signed in knows what they assigned; a key is a machine, and the owner is told.
+  const assignedBy = authResult.via === "session" ? authResult.userId : null;
 
   if (!authResult.tenantId) {
     return NextResponse.json(
@@ -155,6 +158,13 @@ export async function POST(req: NextRequest) {
               .where(eq(leads.id, existing.id))
               .returning();
             dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);
+            await announceLeadAssignment(db, {
+              leadId: updated.id,
+              name: `${updated.firstName ?? ""} ${updated.lastName ?? ""}`,
+              before: existing,
+              after: updated,
+              actorId: assignedBy,
+            });
             runRulesAfterApiWrite(tenant.id, {
               entityType: "lead",
               entityId: updated.id,
@@ -176,6 +186,14 @@ export async function POST(req: NextRequest) {
 
       const [created] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning();
       dispatchWebhook("lead.created", { lead: created }, API_ORIGIN, db);
+      // ⚠️ Into the database handed over: an API request has no session, and `notify` reads one.
+      await announceLeadAssignment(db, {
+        leadId: created.id,
+        name: `${created.firstName ?? ""} ${created.lastName ?? ""}`,
+        before: null,
+        after: created,
+        actorId: assignedBy,
+      });
       // ⚠️ The rules a lead typed into the dashboard runs — round-robin owner, sequence
       // enrolment, the owner's notification. Without this a lead filed by an assistant
       // arrived with no owner and nobody was told. Only here and in the single routes: see

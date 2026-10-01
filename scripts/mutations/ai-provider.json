@@ -58,5 +58,41 @@
     "description": "⚠️⚠️ un JSON che non rispetta lo schema viene passato come dato estratto",
     "find": "  if (parsed === null) return fail(\"the answer does not match the schema\");",
     "replace": ""
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "⚠️ OpenAI conserva le richieste, che contengono i dati dei clienti",
+    "find": "    store: false,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "⚠️⚠️ un modello che ragiona spende tutto il tetto pensando e non risponde",
+    "find": "request.maxOutputTokens + (reasoning ? THINKING_ALLOWANCE : 0)",
+    "replace": "request.maxOutputTokens"
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "⚠️ a un modello che ragiona si manda la temperatura, e OpenAI rifiuta la richiesta",
+    "find": "  } else if (request.temperature !== undefined) {",
+    "replace": "  }\n  if (request.temperature !== undefined) {"
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "⚠️ il ragionamento di lavoro del modello finisce nella bozza",
+    "find": "    if (item.type !== \"message\" || item.phase === \"commentary\") continue;",
+    "replace": "    if (item.type !== \"message\") continue;"
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "⚠️ nello streaming il ragionamento di lavoro compare a schermo",
+    "find": "if (event.delta && !(event.item_id && commentary.has(event.item_id))) {",
+    "replace": "if (event.delta) {"
+  },
+  {
+    "file": "src/lib/ai/openai.ts",
+    "description": "una risposta vuota tagliata dal tetto passa per una risposta",
+    "find": "  if (end.truncated && !text) {",
+    "replace": "  if (false) {"
   }
 ]

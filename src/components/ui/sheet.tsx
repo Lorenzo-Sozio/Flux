@@ -5,6 +5,7 @@ import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { useBackDismiss } from "@/hooks/use-back-dismiss"
 import { XIcon } from "lucide-react"
 
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
@@ -55,6 +56,9 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  // On a phone the system's Back closes the sheet, through its close button: see the hook.
+  const closeRef = React.useRef<HTMLButtonElement>(null)
+  useBackDismiss(() => closeRef.current?.click())
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -68,11 +72,12 @@ function SheetContent({
         {...props}
       >
         {children}
-        {showCloseButton && (
-          <SheetPrimitive.Close data-slot="sheet-close" asChild>
+        {/* Rendered even when hidden: Back closes the sheet through it. */}
+        <SheetPrimitive.Close data-slot="sheet-close" asChild>
             <Button
+              ref={closeRef}
               variant="ghost"
-              className="absolute top-4 right-4"
+              className={cn("absolute top-4 right-4 z-20", !showCloseButton && "hidden")}
               size="icon-sm"
             >
               <XIcon
@@ -80,7 +85,6 @@ function SheetContent({
               <span className="sr-only">Close</span>
             </Button>
           </SheetPrimitive.Close>
-        )}
       </SheetPrimitive.Content>
     </SheetPortal>
   )

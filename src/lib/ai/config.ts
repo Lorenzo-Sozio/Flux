@@ -6,6 +6,8 @@
  * AI_PROVIDER=gemini                     # the provider for every task (default: gemini)
  * AI_MODEL=gemini-2.5-flash-lite         # its model (default: the provider's own)
  * GEMINI_API_KEY=…                       # the provider's key; without it the copilot is off
+ * OPENAI_API_KEY=…                       # OpenAI's (AI_PROVIDER=openai, or the only key set)
+ * OPENAI_REASONING_EFFORT=low            # a GPT-5 / o-series model's thinking (default: low)
  * AI_MODEL_CLASSIFY=…                    # one task on another model of the same provider
  * AI_PROVIDER_DRAFT=… / AI_MODEL_DRAFT=… # one task on another provider altogether
  * ```
@@ -20,7 +22,7 @@
  * mistake by whoever operates the deployment, and saying "not available" would hide it.
  */
 import { aiProvider, DEFAULT_AI_PROVIDER, isAiProviderId } from "./registry";
-import type { AiProvider, AiTask } from "./types";
+import { AI_PROVIDER_IDS, type AiProvider, type AiTask } from "./types";
 
 type Env = Record<string, string | undefined>;
 
@@ -40,7 +42,13 @@ export function aiRoute(task: AiTask, env: Env = process.env): AiRoute {
   const suffix = task.toUpperCase();
   const taskProvider = read(env, `AI_PROVIDER_${suffix}`);
   const globalProvider = read(env, "AI_PROVIDER");
-  const name = taskProvider ?? globalProvider ?? DEFAULT_AI_PROVIDER;
+  // Named, or else the default provider if its key is set, or else the one provider with a key: a
+  // deployment that only set OPENAI_API_KEY means OpenAI, and saying "off" would hide it.
+  const byKey = read(env, aiProvider(DEFAULT_AI_PROVIDER).keyVariable)
+    ? DEFAULT_AI_PROVIDER
+    : (AI_PROVIDER_IDS.find((id) => read(env, aiProvider(id).keyVariable)) ?? DEFAULT_AI_PROVIDER);
+  const globalName = globalProvider ?? byKey;
+  const name = taskProvider ?? globalName;
   if (!isAiProviderId(name)) return { state: "config", problem: `unknown AI provider "${name}"` };
 
   const provider = aiProvider(name);
@@ -51,7 +59,8 @@ export function aiRoute(task: AiTask, env: Env = process.env): AiRoute {
       : { state: "off" };
   }
 
-  const inheritsGlobalModel = name === (globalProvider ?? DEFAULT_AI_PROVIDER);
+  // AI_MODEL belongs to the provider every task uses: the one named, or the one chosen by its key.
+  const inheritsGlobalModel = name === globalName;
   const model =
     read(env, `AI_MODEL_${suffix}`) ??
     (inheritsGlobalModel ? read(env, "AI_MODEL") : undefined) ??

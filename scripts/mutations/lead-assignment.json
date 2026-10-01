@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/lead-assignment.ts",
+    "description": "⚠️ chi assegna un lead a un collega riceve lui stesso la notifica",
+    "find": " && after.ownerId !== actorId ? after.ownerId : null;",
+    "replace": " ? after.ownerId : null;"
+  },
+  {
+    "file": "src/lib/lead-assignment.ts",
+    "description": "⚠️⚠️ un lead creato già assegnato non avvisa il responsabile",
+    "find": "after.ownerId && after.ownerId !== before?.ownerId &&",
+    "replace": "after.ownerId && before !== null && after.ownerId !== before?.ownerId &&"
+  },
+  {
+    "file": "src/lib/lead-assignment.ts",
+    "description": "⚠️ ogni modifica di un lead del gruppo riavvisa tutto il gruppo",
+    "find": "  const groupChanged = Boolean(after.groupId) && after.groupId !== before?.groupId;",
+    "replace": "  const groupChanged = Boolean(after.groupId);"
+  },
+  {
+    "file": "src/lib/lead-assignment.ts",
+    "description": "il responsabile, se è anche nel gruppo, riceve due notifiche",
+    "find": ".filter((id) => id !== actorId && id !== after.ownerId)",
+    "replace": ".filter((id) => id !== actorId)"
+  },
+  {
+    "file": "src/lib/lead-assignment.ts",
+    "description": "una riassegnazione massiva a sé stessi notifica chi l'ha fatta",
+    "find": "  if (input.count === 0 || input.ownerId === input.actorId) return;",
+    "replace": "  if (input.count === 0) return;"
+  }
+]

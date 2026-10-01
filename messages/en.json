@@ -4402,7 +4402,12 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
+      "owner": [
+        "All admin permissions",
+        "Transfer workspace ownership",
+        "Delete workspace",
+        "Manage billing"
+      ],
       "admin": [
         "All user permissions",
         "Invite and manage users",
@@ -8603,6 +8608,14 @@
     "sdiSendFailed": {
       "title": "Sending to SDI failed",
       "message": "Invoice {number} did not reach SDI."
+    },
+    "leadAssignedToGroup": {
+      "title": "A new lead for the {group} group",
+      "message": "{name} was assigned to your group."
+    },
+    "leadsAssigned": {
+      "title": "{count, plural, one {A lead was assigned to you} other {# leads were assigned to you}}",
+      "message": "{count, plural, one {You will find it in the leads list.} other {You will find them in the leads list.}}"
     }
   },
   "activityReminderEmail": {
@@ -9497,7 +9510,7 @@
       }
     },
     "unavailable": {
-      "off": "AI copilot not configured on this installation: set GEMINI_API_KEY on the server, then enable the AI copilot flag in the plan (/admin/plans).",
+      "off": "AI copilot not configured on this installation: set a provider's key on the server (GEMINI_API_KEY or OPENAI_API_KEY), then enable the AI copilot flag in the plan (/admin/plans).",
       "config": "AI copilot configured incorrectly on the server: check AI_PROVIDER, AI_MODEL and the provider's key.",
       "plan": "Your plan does not include the AI copilot."
     }

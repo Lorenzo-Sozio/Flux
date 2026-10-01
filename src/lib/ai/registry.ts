@@ -1,4 +1,5 @@
 import { geminiProvider } from "./gemini";
+import { openAiProvider } from "./openai";
 import { AI_PROVIDER_IDS, type AiProvider, type AiProviderId } from "./types";
 
 /**
@@ -7,6 +8,7 @@ import { AI_PROVIDER_IDS, type AiProvider, type AiProviderId } from "./types";
  */
 const PROVIDERS: Record<AiProviderId, AiProvider> = {
   gemini: geminiProvider,
+  openai: openAiProvider,
 };
 
 /** The provider used when the configuration names none. */

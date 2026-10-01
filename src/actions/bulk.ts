@@ -7,6 +7,7 @@ import { inArray } from "drizzle-orm";
 import { companies, contacts, leads } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { companiesWithAccounts } from "@/lib/company-accounts";
+import { announceLeadsAssigned, leadsChangingOwner } from "@/lib/lead-assignment";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Leads ────────────────────────────────────────────────────────────────────
@@ -30,10 +31,13 @@ export async function bulkUpdateLeadStatus(ids: string[], status: string) {
 }
 
 export async function bulkAssignLeads(ids: string[], ownerId: string) {
-  await requireWriteAccess();
+  const actor = await requireWriteAccess();
   const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
+  // Counted before the write: the new owner hears how many became theirs, in one notification.
+  const changing = await leadsChangingOwner(db, ids, ownerId);
   await db.update(leads).set({ ownerId, updatedAt: new Date() }).where(inArray(leads.id, ids));
+  await announceLeadsAssigned(db, { ownerId, count: changing, actorId: actor.user.id });
   revalidatePath("/dashboard/leads");
   return { updated: ids.length };
 }
