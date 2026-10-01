@@ -31,7 +31,7 @@ import {
   updateContact,
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
-import { DuplicateHint } from "@/components/crm/duplicate-hint";
+import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -122,6 +122,7 @@ export function ContactModal({
   const t = useTranslations("contacts");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
+  const tDup = useTranslations("duplicates");
   const say = useMessageText();
   const [innerOpen, setInnerOpen] = useState(false);
   const open = openProp ?? innerOpen;
@@ -376,9 +377,11 @@ export function ContactModal({
                 titleKey="contactTitle"
                 matches={dupWatch.matches.map((d) => ({
                   id: d.id,
-                  label: [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
+                  label: d.restricted
+                    ? restrictedLabel(tDup, d.ownerName)
+                    : [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
                   detail: d.email ?? d.phone,
-                  href: `/dashboard/contacts/${d.id}`,
+                  href: d.restricted ? null : `/dashboard/contacts/${d.id}`,
                 }))}
                 onDismiss={dupWatch.dismiss}
               />
@@ -573,15 +576,19 @@ export function ContactModal({
                       key={d.id}
                       className="flex flex-wrap items-center gap-x-2 gap-y-1 text-amber-700 text-sm dark:text-amber-400"
                     >
-                      <Link
-                        href={`/dashboard/contacts/${d.id}`}
-                        className="underline underline-offset-2 hover:text-amber-900"
-                        target="_blank"
-                      >
-                        {d.firstName} {d.lastName}
-                      </Link>
+                      {d.restricted ? (
+                        <span>{restrictedLabel(tDup, d.ownerName)}</span>
+                      ) : (
+                        <Link
+                          href={`/dashboard/contacts/${d.id}`}
+                          className="underline underline-offset-2 hover:text-amber-900"
+                          target="_blank"
+                        >
+                          {d.firstName} {d.lastName}
+                        </Link>
+                      )}
                       {d.email && <span className="min-w-0 break-all text-xs opacity-70">{d.email}</span>}
-                      {isEditing && contact && (
+                      {isEditing && contact && !d.restricted && (
                         <Button
                           type="button"
                           size="sm"

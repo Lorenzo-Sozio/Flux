@@ -11,6 +11,7 @@ import {
   UnauthenticatedError,
 } from "@/lib/auth-guard";
 import { type ArchiveKind, archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 /**
@@ -33,7 +34,12 @@ export async function invoiceFileResponse(id: string, kind: ArchiveKind): Promis
     throw err;
   }
   const db = await getDb();
-  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  // Only ever reached with a session (the guards above): an invoice the person does not see is
+  // not there for them.
+  const [invoice] = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.id, id), visibleWhere("invoice", await recordScope())));
 
   if (!invoice) return new Response("Not found", { status: 404 });
   if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {

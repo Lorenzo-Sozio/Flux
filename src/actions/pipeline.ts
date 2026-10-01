@@ -41,6 +41,7 @@ import {
   stagesOfPipeline,
 } from "@/lib/pipelines";
 import { countRecords } from "@/lib/record-count";
+import { assertCanSee, ownerOnCreate, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { isStale, type StageChange, salesVelocity, stageFigures } from "@/lib/stage-history";
 import { checkStageKind, flagsOf, type StageKind, type StageKindRefusal } from "@/lib/stage-kind";
 import { getDb } from "@/lib/tenant-context";
@@ -95,7 +96,10 @@ export async function getPipelineData(
     pipelineName: all ? (pipelineOrder.get(st.pipelineId)?.name ?? null) : null,
   }));
 
-  const where: (SQL | undefined)[] = [ownerCondition(deals.ownerId, filters.owners ?? [])];
+  const where: (SQL | undefined)[] = [
+    ownerCondition(deals.ownerId, filters.owners ?? []),
+    visibleWhere("deal", await recordScope()),
+  ];
   if (!all) {
     const ids = stages.map((st) => st.id);
     where.push(ids.length ? inArray(deals.stageId, ids) : sql`false`);
@@ -176,8 +180,9 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   await requirePlanLimit("maxRecords", await countRecords(db));
 
   // EUR in `amount`, the figure as typed in `amountOriginal`: see src/lib/deal-amount.ts.
+  // What a salesperson creates for nobody is theirs (src/lib/record-visibility.ts).
   const payload = {
-    ...data,
+    ...ownerOnCreate(await recordScope(), data),
     ...(await storedAmount(data.amount, data.currency)),
     status: data.status || "open",
   };
@@ -224,6 +229,7 @@ export interface LossDetails {
 
 export async function updateDealStage(dealId: string, newStageId: string, loss?: LossDetails) {
   const actor = await requireWriteAccess();
+  await assertCanSee("deal", dealId);
   const db = await getDb();
 
   // Capture old state BEFORE the update (needed for "changed" operators)
@@ -392,6 +398,7 @@ async function reconcileStageAndStatus(
 
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
   const actor = await requireWriteAccess();
+  await assertCanSee("deal", dealId);
   const db = await getDb();
 
   // Capture old state BEFORE the update
@@ -510,7 +517,8 @@ export async function getDealById(dealId: string) {
     .leftJoin(companies, eq(deals.companyId, companies.id))
     .leftJoin(contacts, eq(deals.contactId, contacts.id))
     .leftJoin(users, eq(deals.ownerId, users.id))
-    .where(eq(deals.id, dealId));
+    // A colleague's deal is not found (src/lib/record-visibility.ts).
+    .where(and(eq(deals.id, dealId), visibleWhere("deal", await recordScope())));
   if (!row) return null;
 
   const now = new Date();
@@ -553,6 +561,7 @@ export async function getPipelineReport(
     .where(
       and(
         ownerCondition(deals.ownerId, filters.owners ?? []),
+        visibleWhere("deal", await recordScope()),
         since ? or(eq(deals.status, "open"), gte(deals.closedAt, since)) : undefined,
         stageIdList.length ? inArray(deals.stageId, stageIdList) : sql`false`,
       ),
@@ -773,7 +782,11 @@ export async function deletePipelineStage(id: string) {
 export async function getDealsForSelect() {
   await requireCapability("record:read");
   const db = await getDb();
-  return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
+  return db
+    .select({ id: deals.id, name: deals.name })
+    .from(deals)
+    .where(visibleWhere("deal", await recordScope()))
+    .orderBy(deals.name);
 }
 
 // ── Forecast ──────────────────────────────────────────────────────────────────
@@ -804,6 +817,7 @@ export async function getForecastData(filters: { owners?: string[]; pipeline?: s
       and(
         eq(deals.status, "open"),
         ownerCondition(deals.ownerId, owners),
+        visibleWhere("deal", await recordScope()),
         inArray(deals.stageId, await stageIdsOfPipeline(db, await resolvePipelineId(db, filters.pipeline))),
       ),
     );
@@ -927,7 +941,13 @@ export async function getForecastData(filters: { owners?: string[]; pipeline?: s
   const [wonRow] = await db
     .select({ revenue: sql<number>`coalesce(sum(${dealEur}), 0)` })
     .from(deals)
-    .where(and(closedBetween("won", startOfCurrentMonth), ownerCondition(deals.ownerId, owners)));
+    .where(
+      and(
+        closedBetween("won", startOfCurrentMonth),
+        ownerCondition(deals.ownerId, owners),
+        visibleWhere("deal", await recordScope()),
+      ),
+    );
   const wonThisMonth = Number(wonRow?.revenue ?? 0);
 
   return {
@@ -1000,6 +1020,7 @@ export async function updateLossReason(id: string, data: { name?: string; isActi
  */
 export async function loseDeal(dealId: string, loss: LossDetails) {
   const actor = await requireWriteAccess();
+  await assertCanSee("deal", dealId);
   const db = await getDb();
 
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
@@ -1075,6 +1096,7 @@ export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = [],
         inArray(deals.status, ["won", "lost"]),
         gte(deals.closedAt, since),
         ownerCondition(deals.ownerId, owners),
+        visibleWhere("deal", await recordScope()),
         inArray(deals.stageId, await stageIdsOfPipeline(db, await resolvePipelineId(db, pipeline))),
       ),
     );

@@ -6,9 +6,9 @@
  *   all · mine · group · u:<id>,<id>,…
  *
  * No membership check is needed on the ids: each workspace has its own database, so
- * an id from elsewhere matches nothing, and everybody in a workspace sees all of its
- * records (decision D-D). They are only cleaned, so a hand-typed address cannot turn
- * into a query with a thousand parameters.
+ * an id from elsewhere matches nothing, and the filter only picks among the events the
+ * person may see anyway (src/lib/record-visibility.ts). They are only cleaned, so a
+ * hand-typed address cannot turn into a query with a thousand parameters.
  */
 
 export type CalendarFilter = "all" | "mine" | "group" | `u:${string}`;

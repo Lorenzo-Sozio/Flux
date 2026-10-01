@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
+import { canSeeRecord, recordScope } from "@/lib/record-visibility";
 import { getStorage, isValidStorageKey } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
@@ -37,7 +38,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   // ── Fetch record ─────────────────────────────────────────────────────────────
   const [doc] = await db.select().from(documents).where(eq(documents.id, id));
-  if (!doc) {
+  // A file of a record the person cannot see is not found, like the record itself.
+  if (!doc || !(await canSeeRecord(db, "document", id, await recordScope()))) {
     return new NextResponse("Not found", { status: 404 });
   }
 

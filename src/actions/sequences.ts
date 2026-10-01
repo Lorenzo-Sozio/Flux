@@ -8,6 +8,7 @@ import { contacts, emailSequenceEnrollments, emailSequenceSteps, emailSequences,
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
 import { inboundEmailConfigured } from "@/lib/inbound-sales-reply";
+import { assertCanSee } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { cleanSequence, type SequenceEntity, type SequenceInput, type StopReason } from "@/lib/sequence-plan";
 import { enroll, stopEnrollments } from "@/lib/sequence-runner";
@@ -222,6 +223,7 @@ export async function enrollRecord(
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const actor = await requireCapability("record:write");
   await requirePlanModule("marketing");
+  await assertCanSee(entity === "lead" ? "lead" : "contact", recordId);
   const db = await getDb();
   const result = await enroll(db, { sequenceId, entity, recordId, enrolledBy: actor.userId });
   if (!result.ok) {
@@ -235,6 +237,7 @@ export async function enrollRecord(
 /** Active enrollments of one record, for its detail page. */
 export async function getEnrollmentsForRecord(entity: SequenceEntity, recordId: string) {
   await requireCapability("record:read");
+  await assertCanSee(entity === "lead" ? "lead" : "contact", recordId);
   const db = await getDb();
   const column = entity === "lead" ? emailSequenceEnrollments.leadId : emailSequenceEnrollments.contactId;
   return tolerateUnmigrated(

@@ -1,7 +1,8 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { companies, contacts, deals, leads } from "@/db/schema";
 import { ownerCondition } from "@/lib/pipeline-filters";
+import { type RecordScope, SEE_ALL, visibleWhere } from "@/lib/record-visibility";
 
 /**
  * The two statements behind the territory report.
@@ -14,12 +15,15 @@ import { ownerCondition } from "@/lib/pipeline-filters";
  * `converted_at` for a conversion, `closed_at` for a won or lost deal — never on
  * `updated_at`, which moves whenever somebody re-saves an old record and would put
  * last year's win into this month.
+ *
+ * `scope` is the reader's (src/lib/record-visibility.ts): a salesperson's map counts only the
+ * leads and deals they may see.
  */
 
 // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
 type AnyDb = any;
 
-export function leadsByPlace(db: AnyDb, since: Date, owners: readonly string[] = []) {
+export function leadsByPlace(db: AnyDb, since: Date, owners: readonly string[] = [], scope: RecordScope = SEE_ALL) {
   const from = since.toISOString();
   return db
     .select({
@@ -31,11 +35,11 @@ export function leadsByPlace(db: AnyDb, since: Date, owners: readonly string[] =
       convertedLeads: sql<string>`count(*) filter (where ${leads.isConverted} = true and ${leads.convertedAt} >= ${from})`,
     })
     .from(leads)
-    .where(ownerCondition(leads.ownerId, owners))
+    .where(and(ownerCondition(leads.ownerId, owners), visibleWhere("lead", scope)))
     .groupBy(leads.country, leads.state, leads.zipCode);
 }
 
-export function dealsByPlace(db: AnyDb, since: Date, owners: readonly string[] = []) {
+export function dealsByPlace(db: AnyDb, since: Date, owners: readonly string[] = [], scope: RecordScope = SEE_ALL) {
   const from = since.toISOString();
   return db
     .select({
@@ -54,6 +58,6 @@ export function dealsByPlace(db: AnyDb, since: Date, owners: readonly string[] =
     .from(deals)
     .leftJoin(companies, eq(companies.id, deals.companyId))
     .leftJoin(contacts, eq(contacts.id, deals.contactId))
-    .where(ownerCondition(deals.ownerId, owners))
+    .where(and(ownerCondition(deals.ownerId, owners), visibleWhere("deal", scope)))
     .groupBy(companies.country, companies.state, companies.zipCode, contacts.country, contacts.state, contacts.zipCode);
 }

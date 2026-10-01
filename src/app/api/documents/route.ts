@@ -11,7 +11,10 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { can } from "@/lib/permissions";
+import { canSeeRecord, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getStorage } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
@@ -19,8 +22,8 @@ const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticke
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) {
+  const actor = await getActor();
+  if (!actor || !can(actor, "record:read")) {
     return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
 
@@ -40,7 +43,14 @@ export async function GET(req: NextRequest) {
   const docs = await db
     .select()
     .from(documents)
-    .where(and(eq(documents.entityType, entityType), eq(documents.entityId, entityId)))
+    // The files of a record the person cannot see are not theirs to list.
+    .where(
+      and(
+        eq(documents.entityType, entityType),
+        eq(documents.entityId, entityId),
+        visibleWhere("document", await recordScope()),
+      ),
+    )
     .orderBy(documents.createdAt);
 
   return NextResponse.json({ documents: docs });
@@ -63,7 +73,7 @@ export async function DELETE(req: NextRequest) {
 
   // Verify the document exists and belongs to this user
   const [doc] = await db.select().from(documents).where(eq(documents.id, id));
-  if (!doc) {
+  if (!doc || !(await canSeeRecord(db, "document", id, await recordScope()))) {
     return NextResponse.json({ error: (await serverT("serverErrors.documents"))("notFound") }, { status: 404 });
   }
   if (doc.ownerId !== session.user.id) {

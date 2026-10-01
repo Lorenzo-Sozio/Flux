@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
@@ -10,6 +10,7 @@ import { notWithAssistant } from "@/lib/assistant-handling";
 import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { canUseSegment, listSegments, resolveSegmentIds } from "@/lib/campaign-segment";
 import { executeCampaignSend } from "@/lib/campaign-send";
+import { inVisible, recordScope } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Schemas ──────────────────────────────────────────────────────────────────
@@ -202,6 +203,18 @@ export async function getCampaignReport(campaignId: string) {
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
   if (!campaign) return null;
 
+  // ⚠️ The figures are the campaign's, every recipient counted; the rows name people, and list
+  // only those the reader may see (src/lib/record-visibility.ts) — a colleague's customers stay
+  // out of the table though they were sent to.
+  const scope = await recordScope();
+  const contactSeen = inVisible("contact", campaignLogs.contactId, scope);
+  const leadSeen = inVisible("lead", campaignLogs.leadId, scope);
+  const seen =
+    contactSeen && leadSeen
+      ? sql<boolean>`(CASE WHEN ${campaignLogs.contactId} IS NOT NULL THEN ${contactSeen}
+          WHEN ${campaignLogs.leadId} IS NOT NULL THEN ${leadSeen} ELSE TRUE END)`
+      : sql<boolean>`TRUE`;
+
   // Join with contacts and leads to get recipient names/emails
   const rawLogs = await db
     .select({
@@ -219,13 +232,14 @@ export async function getCampaignReport(campaignId: string) {
       leadFirstName: leads.firstName,
       leadLastName: leads.lastName,
       leadEmail: leads.email,
+      seen,
     })
     .from(campaignLogs)
     .leftJoin(contacts, eq(campaignLogs.contactId, contacts.id))
     .leftJoin(leads, eq(campaignLogs.leadId, leads.id))
     .where(eq(campaignLogs.campaignId, campaignId));
 
-  const logs = rawLogs.map((r) => ({
+  const all = rawLogs.map((r) => ({
     id: r.id,
     status: r.status,
     sentAt: r.sentAt,
@@ -239,16 +253,17 @@ export async function getCampaignReport(campaignId: string) {
     recipientEmail: r.contactEmail ?? r.leadEmail ?? "—",
     recipientType: r.contactId ? ("contact" as const) : r.leadId ? ("lead" as const) : null,
   }));
+  const logs = all.filter((_, i) => Boolean(rawLogs[i].seen));
 
-  const total = logs.length;
-  const queued = logs.filter((l) => l.status === "queued").length;
-  const sent = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
-  const opened = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
-  const clicked = logs.filter((l) => l.status === "clicked").length;
-  const bounced = logs.filter((l) => l.status === "bounced").length;
-  const complained = logs.filter((l) => l.status === "complained").length;
-  const unsubscribed = logs.filter((l) => l.status === "unsubscribed").length;
-  const failed = logs.filter((l) => l.status === "failed").length;
+  const total = all.length;
+  const queued = all.filter((l) => l.status === "queued").length;
+  const sent = all.filter((l) => !["failed", "queued"].includes(l.status)).length;
+  const opened = all.filter((l) => ["opened", "clicked"].includes(l.status)).length;
+  const clicked = all.filter((l) => l.status === "clicked").length;
+  const bounced = all.filter((l) => l.status === "bounced").length;
+  const complained = all.filter((l) => l.status === "complained").length;
+  const unsubscribed = all.filter((l) => l.status === "unsubscribed").length;
+  const failed = all.filter((l) => l.status === "failed").length;
 
   return {
     campaign,

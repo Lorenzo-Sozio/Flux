@@ -37,6 +37,7 @@ import {
   revisionNumber,
   transitionError,
 } from "@/lib/quote-status";
+import { assertCanSee, canSeeRecord, inVisible, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 import { membersWith } from "@/lib/workspace-members";
@@ -99,6 +100,12 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
     const actor = await requireCapability("quote:write");
     await requirePlanModule("sales");
     const validated = CreateQuoteSchema.parse(data);
+    // A quote for somebody else's deal or customer would be a way into them.
+    await Promise.all([
+      assertCanSee("deal", validated.dealId),
+      assertCanSee("company", validated.companyId),
+      validated.contactId ? assertCanSee("contact", validated.contactId) : undefined,
+    ]);
 
     // Verify deal exists
     const dealExists = await db.query.deals.findFirst({
@@ -231,9 +238,12 @@ export async function getQuoteById(quoteId: string) {
       throw new Error("Quote not found");
     }
 
-    // Check permission: owner, deal owner, or admin
+    // Owner, deal owner, admin — or anybody who sees the quote through its deal or customer.
     const isAuthorized =
-      actor.userId === quote.ownerId || actor.userId === quote.deal.ownerId || can(actor, "record:manageAny");
+      actor.userId === quote.ownerId ||
+      actor.userId === quote.deal.ownerId ||
+      can(actor, "record:manageAny") ||
+      (await canSeeRecord(db, "quote", quoteId, await recordScope()));
 
     if (!isAuthorized) {
       throw new Error("Unauthorized");
@@ -251,8 +261,9 @@ export async function getQuotesByDeal(dealId: string) {
   try {
     await requireCapability("record:read");
     await requirePlanModule("sales");
+    // ⚠️ A relational query aliases its table, so visibility goes through the id, not visibleWhere.
     const quoteList = await db.query.quotes.findMany({
-      where: eq(quotes.dealId, dealId),
+      where: and(eq(quotes.dealId, dealId), inVisible("quote", quotes.id, await recordScope())),
       orderBy: desc(quotes.createdAt),
       with: {
         items: true,
@@ -289,6 +300,12 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     if (actor.userId !== quote.ownerId && !mayEditOthers) {
       throw new ForbiddenError("Only the quote's owner or a workspace admin can change it.");
     }
+    // Moving it onto a deal or customer one does not see would be a way into them.
+    await Promise.all([
+      validated.dealId ? assertCanSee("deal", validated.dealId) : undefined,
+      validated.companyId ? assertCanSee("company", validated.companyId) : undefined,
+      validated.contactId ? assertCanSee("contact", validated.contactId) : undefined,
+    ]);
     // ⚠️⚠️ What was sent does not change under the customer. Lines, prices, notes, expiry and
     // recipient are a draft's to change: after it, the customer may be reading — or signing —
     // the old text (src/lib/quote-signature.ts builds the PDF from the rows at that moment), and
@@ -591,7 +608,10 @@ export async function previewQuoteEmailAction(
   await requirePlanModule("sales");
   const db = await getDb();
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId), with: { company: true } });
-  if (!quote) return { ok: false, error: (await serverT("serverErrors.quotes"))("notFound") };
+  const t = await serverT("serverErrors.quotes");
+  if (!quote) return { ok: false, error: t("notFound") };
+  // Whoever may send it, as in sendQuoteEmailAction: a preview is the whole email.
+  if (actor.userId !== quote.ownerId && !can(actor, "record:manageAny")) return { ok: false, error: t("forbidden") };
   const { finish, lang } = quoteEmailFinish(quote);
   const composed = await composeEmail(
     db,
@@ -694,30 +714,6 @@ export async function sendQuoteEmailAction(
   }
   revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
   return { success: true };
-}
-
-export async function markQuoteAsViewedAction(quoteId: string, email?: string, ipAddress?: string) {
-  const db = await getDb();
-  try {
-    const quote = await db.query.quotes.findFirst({
-      where: eq(quotes.id, quoteId),
-    });
-
-    if (!quote) {
-      throw new Error("Quote not found");
-    }
-
-    // Update viewed timestamp
-    const [_updated] = await db.update(quotes).set({ viewedAt: new Date() }).where(eq(quotes.id, quoteId)).returning();
-
-    // Log activity
-    await logQuoteActivity(quoteId, "viewed", undefined, email, ipAddress);
-
-    return { success: true };
-  } catch (error) {
-    console.error("[markQuoteAsViewedAction]", error);
-    throw error;
-  }
 }
 
 // ── Approval Workflow ──────────────────────────────────────────────────────────
@@ -842,13 +838,19 @@ export async function getQuoteFormData() {
   const db = await getDb();
   await requireCapability("record:read");
   await requirePlanModule("sales");
+  const scope = await recordScope();
 
   const [dealList, companyList, contactList, productList] = await Promise.all([
     db
       .select({ id: deals.id, name: deals.name, companyId: deals.companyId, contactId: deals.contactId })
       .from(deals)
+      .where(visibleWhere("deal", scope))
       .orderBy(desc(deals.createdAt)),
-    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
+    db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(visibleWhere("company", scope))
+      .orderBy(companies.name),
     db
       .select({
         id: contacts.id,
@@ -858,6 +860,7 @@ export async function getQuoteFormData() {
         companyId: contacts.companyId,
       })
       .from(contacts)
+      .where(visibleWhere("contact", scope))
       .orderBy(contacts.firstName),
     db
       .select({
@@ -914,6 +917,7 @@ export async function listQuotes(params: ListParams, status?: string) {
 
   const term = params.search.trim();
   const clauses: (SQL | undefined)[] = [
+    visibleWhere("quote", await recordScope()),
     // "awaiting": with the customer, sent or opened — the figure the home page adds up.
     status === "awaiting"
       ? inArray(quotes.status, ["sent", "viewed"])
@@ -988,6 +992,7 @@ export async function getQuoteStats() {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+  const visible = visibleWhere("quote", await recordScope());
 
   const [[counted], byCurrency] = await Promise.all([
     db
@@ -996,10 +1001,12 @@ export async function getQuoteStats() {
         sent: sql<number>`count(*) filter (where ${quotes.status} in ('sent', 'viewed'))`,
         accepted: sql<number>`count(*) filter (where ${quotes.status} = 'accepted')`,
       })
-      .from(quotes),
+      .from(quotes)
+      .where(visible),
     db
       .select({ currency: quotes.currency, amount: sql<string>`coalesce(sum(${quotes.totalAmount}), 0)` })
       .from(quotes)
+      .where(visible)
       .groupBy(quotes.currency)
       .orderBy(desc(sql`coalesce(sum(${quotes.totalAmount}), 0)`)),
   ]);

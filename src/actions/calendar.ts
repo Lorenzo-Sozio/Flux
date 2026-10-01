@@ -23,6 +23,7 @@ import { signCalendarFeedToken } from "@/lib/calendar-feed-token";
 import { type CalendarFilter, peopleOf } from "@/lib/calendar-filter";
 import { checkExternalCalendarUrl, fetchWithCheckedRedirects, type UrlRefusal } from "@/lib/external-calendar-url";
 import { type ExternalEvent, parseIcal } from "@/lib/ical-parse";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 export type { CalendarFilter };
@@ -77,8 +78,9 @@ function activityTitle(content: string | null, type: string): string {
 }
 
 export async function getCalendarEvents(filter: CalendarFilter = "all", range?: { start: Date; end: Date }) {
+  await requireCapability("record:read");
   const db = await getDb();
-  const filterIds = await resolveFilterUserIds(filter);
+  const [filterIds, scope] = await Promise.all([resolveFilterUserIds(filter), recordScope()]);
 
   // Empty set — user not found or group has no members
   if (filterIds !== null && filterIds.length === 0) return [];
@@ -133,6 +135,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
                 ),
               )
             : undefined,
+          visibleWhere("task", scope),
         ),
       ),
 
@@ -166,6 +169,7 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
           range ? gte(activities.date, range.start) : undefined,
           range ? lte(activities.date, range.end) : undefined,
           filterIds ? inArray(activities.ownerId, filterIds) : undefined,
+          visibleWhere("activity", scope),
         ),
       ),
 

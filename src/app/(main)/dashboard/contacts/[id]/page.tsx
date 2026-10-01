@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   BotIcon,
   BriefcaseIcon,
@@ -75,6 +75,7 @@ import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
 
@@ -166,12 +167,14 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   let contactRow: Awaited<ReturnType<typeof loadContact>>;
   let templates: Awaited<ReturnType<typeof getComposerTemplates>> = [];
 
+  // A colleague's contact is not found, rather than refused: a refusal would confirm it exists.
+  const scope = await recordScope();
   const loadContact = () =>
     db
       .select({ contact: contacts, companyName: companies.name })
       .from(contacts)
       .leftJoin(companies, eq(contacts.companyId, companies.id))
-      .where(eq(contacts.id, contactId))
+      .where(and(eq(contacts.id, contactId), visibleWhere("contact", scope)))
       .then((rows) => rows[0]);
 
   try {

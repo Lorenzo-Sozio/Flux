@@ -1729,6 +1729,8 @@
     "start": "Comincia qualcosa da qui"
   },
   "duplicates": {
+    "restricted": "Già presente nel CRM, assegnato a {owner}",
+    "restrictedColleague": "Già presente nel CRM, assegnato a un collega",
     "companyTitle": "Un'azienda con questo nome potrebbe già esserci",
     "contactTitle": "Questa persona potrebbe già essere un contatto",
     "leadTitle": "Questa persona potrebbe già essere un lead",
@@ -5955,6 +5957,21 @@
     "macros": "Risposte salvate che potrebbero servire"
   },
   "users": {
+    "visibility": {
+      "title": "Chi vede quali record",
+      "desc": "Lead, contatti, aziende e trattative, con i preventivi, gli ordini, le attività e i documenti che li riguardano.",
+      "team": {
+        "label": "Ognuno vede i propri (consigliato)",
+        "desc": "Ogni utente vede i record di cui è titolare, quelli assegnati a un suo gruppo e quelli non ancora assegnati. Chi è titolare di un'azienda ne vede i contatti e le trattative; chi segue una trattativa vede la sua azienda. Un record creato senza titolare diventa di chi lo crea."
+      },
+      "all": {
+        "label": "Tutti vedono tutto",
+        "desc": "Ogni utente del workspace vede ogni record, come prima del 1° ottobre 2026."
+      },
+      "adminsSeeAll": "Amministratori e proprietario vedono sempre tutti i record.",
+      "saved": "Visibilità dei record aggiornata",
+      "failed": "Non è stato possibile salvare la scelta"
+    },
     "title": "Utenti",
     "teamMembers": "Membri del Team",
     "subtitle": "Gestisci utenti, ruoli e inviti.",
@@ -8052,6 +8069,7 @@
   "serverErrors": {
     "generic": {
       "forbidden": "Non hai i permessi per eseguire questa operazione.",
+      "recordNotFound": "Questo record non esiste o non è assegnato a te.",
       "unauthenticated": "Devi accedere per continuare.",
       "validation": "Alcuni campi richiedono attenzione.",
       "unknown": "Si è verificato un errore da parte nostra. Riprova."

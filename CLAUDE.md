@@ -1070,8 +1070,8 @@ nothing to reset. `src/lib/appointment-reminders.test.ts` and
 
 ⚠️ **Whose calendar is one URL value**: `filter=all|mine|group|u:<id>,<id>`
 ([src/lib/calendar-filter.ts](src/lib/calendar-filter.ts)), so every link the page builds
-carries it. The ids are only cleaned — each workspace has its own database and everybody
-sees all its records (D-D). With two people or more, each event's left edge takes the
+carries it. The ids are only cleaned: the filter picks among the events a person may see
+anyway ("Who sees which customer", below). With two people or more, each event's left edge takes the
 colour of the first chosen person involved in it (`people` on every event: owner and
 assignee, organiser and invited colleagues), and a key names them.
 
@@ -2216,6 +2216,47 @@ remain as aliases over `record:write` and `settings:manage`.
 
 `viewer` is **read-only** everywhere. `src/lib/permissions.test.ts` and
 `scripts/mutations/permissions.json` hold that line.
+
+### Who sees which customer
+
+[src/lib/record-visibility.ts](src/lib/record-visibility.ts) (decided 1 October 2026; it reverses
+D-D). Several salespeople in one workspace must not read each other's customers.
+
+- **Administrators and the owner see everything** (`record:manageAny`), and so does Flux staff.
+- **Everybody else sees** leads, contacts, companies and deals they own, those assigned to one of
+  their groups, and those assigned to nobody (no owner, no group) — the pool anybody may take on.
+- **A customer is seen through what one works on**: a company's owner sees its contacts and deals;
+  a deal's or contact's owner sees the company. Only through records one *owns* (or one's group
+  does): an unassigned company opens none of the contacts filed under it.
+- **What hangs off a customer follows its most specific link** (deal, then contact, then lead,
+  then company): quotes, orders, contracts, invoices, tasks, activities, appointments, attached
+  documents, the record timeline, the customer panel. ⚠️⚠️ The most specific, not any: a
+  colleague's call on their own deal also names the company, which one may see through one's own
+  deal.
+- What a salesperson creates naming no owner and no group is theirs (`ownerOnCreate`).
+- Settings → Users, "Who sees which records": `team` (the default, also when no row exists or the
+  read fails) or `all`, everybody everything as before.
+- ⚠️⚠️ **A request with nobody behind it sees everything**: jobs, API keys, webhooks, public
+  pages. A signed-in person calling `/api/crm` reads by the rules.
+- Not scoped: tickets (the support desk's shared queue), campaigns and segments used to send.
+
+How to apply it:
+- **A list, picker, count or report** ANDs `visibleWhere(kind, await recordScope())` into its
+  WHERE. It is `undefined` for whoever sees everything.
+- **A record page** reads its row with the clause and answers `notFound()`.
+- **An action taking an id** calls `assertCanSee(kind, id)`, which refuses as "not found": a
+  refusal naming the record would confirm it exists.
+- **A bulk action** narrows its ids with `visibleIds`.
+- A duplicate warning still says a colleague's record exists, and whose it is, with no details.
+- ⚠️ The clauses name the tables as written (`"company"."id"`). For an `alias()`, a foreign key,
+  or a relational query (`db.query.x.find*` aliases its root table), use
+  `inVisible(kind, column, scope)`.
+- ⚠️ A company's visibility asks per row whether one of its contacts or deals is somebody's:
+  `contact(company_id)`, `deal(company_id)` and `deal(contact_id)` are indexed for it (migration
+  `0072_who_sees_what`).
+- ⚠️⚠️ **`src/lib/record-visibility.inventory.test.ts` reads every server action, dashboard page
+  and route**: one that selects from a customer table without a visibility helper fails it,
+  unless `EXEMPT` names it with the reason.
 
 ### Automation Engine
 

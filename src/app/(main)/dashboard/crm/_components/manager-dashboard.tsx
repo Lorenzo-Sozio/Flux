@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { countOpenDealsWithoutNextStep } from "@/lib/deal-signals";
 import { UNASSIGNED } from "@/lib/pipeline-filters";
+import { recordScope } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 import { KPI_VALUE, Kpi } from "./kpi";
@@ -19,13 +20,16 @@ import { KPI_VALUE, Kpi } from "./kpi";
  * The scorecard's own figures (src/lib/rep-scorecard.ts), so this and the scorecard
  * page can never disagree, plus the one number the scorecard does not carry: how many
  * of the team's open deals have nothing planned. Five statements in all.
+ *
+ * ⚠️ A salesperson may open this dashboard too: every figure is narrowed to the deals they
+ * may see (src/lib/record-visibility.ts), or it would show colleagues' pipelines.
  */
 export async function ManagerDashboard() {
   const t = await getTranslations("crm.dashboards.manager");
-  const db = await getDb();
+  const [db, scope] = await Promise.all([getDb(), recordScope()]);
   const [card, bare] = await Promise.all([
     getRepScorecard().catch(() => null),
-    countOpenDealsWithoutNextStep(db, null).catch(() => 0),
+    countOpenDealsWithoutNextStep(db, null, scope).catch(() => 0),
   ]);
   const totals = card?.totals;
   const period = card?.period ?? "";

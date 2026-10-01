@@ -6,10 +6,19 @@ import { and, eq } from "drizzle-orm";
 
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
 import { requireAdminAccess, requireCapability, requireWriteAccess } from "@/lib/auth-guard";
+import { assertCanSee } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url";
 export type EntityType = "contact" | "lead" | "company" | "deal";
+
+const ENTITY_TYPES: readonly string[] = ["contact", "lead", "company", "deal"];
+
+/** The record the values hang off must be one the person sees; an unknown type is refused outright. */
+async function assertEntityVisible(entityType: EntityType, entityId: string): Promise<void> {
+  if (!ENTITY_TYPES.includes(entityType)) throw new Error("Unknown entity type");
+  await assertCanSee(entityType, entityId);
+}
 
 // ─── Field Definitions ───────────────────────────────────────────────────────
 
@@ -81,6 +90,7 @@ export async function deleteCustomFieldDefinition(id: string) {
 
 export async function getCustomFieldValues(entityType: EntityType, entityId: string) {
   await requireCapability("record:read");
+  await assertEntityVisible(entityType, entityId);
   const db = await getDb();
   return await db
     .select()
@@ -95,6 +105,16 @@ export async function upsertCustomFieldValue(data: {
   value: string;
 }) {
   await requireWriteAccess();
+  await assertEntityVisible(data.entityType, data.entityId);
+  await writeCustomFieldValue(data);
+}
+
+async function writeCustomFieldValue(data: {
+  fieldId: string;
+  entityType: EntityType;
+  entityId: string;
+  value: string;
+}) {
   const db = await getDb();
   // Try update first
   const existing = await db
@@ -114,23 +134,17 @@ export async function upsertCustomFieldValue(data: {
   }
 }
 
-/**
- * Writes several custom fields at once.
- *
- * No guard of its own on purpose: every write goes through
- * `upsertCustomFieldValue`, which asks for `record:write`. Adding a second check
- * here could not change an answer, and a check that cannot fail is defence that
- * has not earned its place — but a reader should not have to follow the call to
- * know that, which is what this note is for.
- */
+/** Writes several custom fields of one record at once, checking the record once. */
 export async function bulkUpsertCustomFieldValues(
   entityType: EntityType,
   entityId: string,
   values: Record<string, string>,
 ) {
+  await requireWriteAccess();
+  await assertEntityVisible(entityType, entityId);
   for (const [fieldId, value] of Object.entries(values)) {
     if (value !== undefined && value !== null) {
-      await upsertCustomFieldValue({ fieldId, entityType, entityId, value: String(value) });
+      await writeCustomFieldValue({ fieldId, entityType, entityId, value: String(value) });
     }
   }
 }

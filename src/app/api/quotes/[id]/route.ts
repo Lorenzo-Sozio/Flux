@@ -14,6 +14,7 @@ import {
   quoteStatusText,
 } from "@/lib/document-language";
 import { can } from "@/lib/permissions";
+import { canSeeRecord, recordScope } from "@/lib/record-visibility";
 import { sellerIdentity } from "@/lib/seller-identity";
 import { getDb } from "@/lib/tenant-context";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
@@ -43,8 +44,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // ⚠️ The WORKSPACE role, not the platform one: the last two lines read
   // `session.user.role`, which is "user" for every customer, so no workspace admin could
   // open a colleague's quote.
+  // …or anybody who sees the quote through its deal or customer (src/lib/record-visibility.ts).
   const canView =
-    session.user.id === q.ownerId || session.user.id === q.deal?.ownerId || can(await getActor(), "user:read");
+    session.user.id === q.ownerId ||
+    session.user.id === q.deal?.ownerId ||
+    can(await getActor(), "user:read") ||
+    (await canSeeRecord(db, "quote", q.id, await recordScope()));
 
   if (!canView) return new NextResponse("Forbidden", { status: 403 });
 

@@ -72,6 +72,12 @@
     "replace": ""
   },
   {
+    "file": "src/lib/api-read-route.ts",
+    "description": "⚠️⚠️ chi è entrato con la sessione legge dall'API i clienti dei colleghi che sulle schermate non vede",
+    "find": "  const page = await listEntity(db as never, entity, parsed.query, visible);",
+    "replace": "  const page = await listEntity(db as never, entity, parsed.query);"
+  },
+  {
     "file": "src/lib/api-read.ts",
     "description": "⚠️ ogni fase si dice aperta: un'integrazione chiude una trattativa spostandola in «Vinta» senza saperlo",
     "find": "        kind: isWon ? \"won\" : isLost ? \"lost\" : \"open\",",

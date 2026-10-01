@@ -8,12 +8,13 @@
  */
 import { type NextRequest, NextResponse } from "next/server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { appointments, users } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { generateFeedICS } from "@/lib/ical";
 import { can } from "@/lib/permissions";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { safeTimeZone } from "@/lib/wall-clock";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
@@ -28,7 +29,8 @@ export async function GET(_req: NextRequest, context: { params: Promise<{ id: st
     .select({ appt: appointments, organizerName: users.name, organizerEmail: users.email })
     .from(appointments)
     .leftJoin(users, eq(appointments.organizerId, users.id))
-    .where(eq(appointments.id, id));
+    // A meeting the person cannot see is one that does not exist, for them.
+    .where(and(eq(appointments.id, id), visibleWhere("appointment", await recordScope())));
   if (!row) return new NextResponse("Not found", { status: 404 });
 
   const a = row.appt;

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { desc, eq, inArray } from "drizzle-orm";
 
 import { invoices, orderPayments, receipts, users } from "@/db/schema";
-import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
 import { paymentDay } from "@/lib/order-payment";
 import {
@@ -20,6 +20,7 @@ import {
   updateReceipt,
 } from "@/lib/receipts";
 import { receivables } from "@/lib/receivables";
+import { assertCanSee } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { toWallDate } from "@/lib/wall-clock";
@@ -38,6 +39,26 @@ type Outcome = { ok: true } | { ok: false; error: string };
 
 async function refusal(reason: ReceiptRefusal | "invalid_date"): Promise<Outcome> {
   return { ok: false, error: (await serverT("serverErrors.invoices"))(`payment.${reason}`) };
+}
+
+/**
+ * The refusal when `check` (an `assertCanSee`) refuses, else null: money recorded on somebody
+ * else's customer would be a way into them. Returned, like every failure here.
+ */
+async function refused(check: Promise<unknown>): Promise<Outcome | null> {
+  try {
+    await check;
+    return null;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+/** The customer a receipt came from, for the visibility check. */
+async function receiptCompany(db: Awaited<ReturnType<typeof getDb>>, receiptId: string): Promise<string | null> {
+  const [row] = await db.select({ companyId: receipts.companyId }).from(receipts).where(eq(receipts.id, receiptId));
+  return row?.companyId ?? null;
 }
 
 function announcePaid(settled: Settled[], actor: string) {
@@ -59,6 +80,7 @@ function refresh(input: { companyId?: string | null; invoiceIds?: string[]; orde
 export async function getCustomerMoney(companyId: string) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
+  await assertCanSee("company", companyId);
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   return tolerateUnmigrated(
     "receipts",
@@ -138,6 +160,13 @@ export async function recordCustomerReceiptAction(
 ): Promise<Outcome> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  const hidden = await refused(
+    Promise.all([
+      assertCanSee("company", companyId),
+      ...data.allocations.map((a) => assertCanSee("invoice", a.invoiceId)),
+    ]),
+  );
+  if (hidden) return hidden;
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const receivedAt = paymentDay(data.paidAt, timeZone);
   if (!receivedAt) return refusal("invalid_date");
@@ -171,6 +200,13 @@ export async function allocateCreditAction(
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
+  const hidden = await refused(
+    Promise.all([
+      assertCanSee("invoice", invoiceId),
+      receiptCompany(db, receiptId).then((c) => (c ? assertCanSee("company", c) : undefined)),
+    ]),
+  );
+  if (hidden) return hidden;
   const result = await allocateCredit(db, { receiptId, invoiceId, amount, by: actor.userId });
   if (!result.ok) return refusal(result.reason);
   announcePaid(result.settled, actor.userId);
@@ -195,6 +231,8 @@ export async function updateReceiptAction(
   if (shares.some((s: { invoiceId: string | null }) => s.invoiceId) || shares.length === 0)
     await requireCapability("invoice:write");
   else await requireCapability("order:write");
+  const hidden = await refused(receiptCompany(db, receiptId).then((c) => (c ? assertCanSee("company", c) : undefined)));
+  if (hidden) return hidden;
 
   const receivedAt = data.paidAt !== undefined ? paymentDay(data.paidAt, timeZone) : undefined;
   if (receivedAt === null) return refusal("invalid_date");
@@ -228,6 +266,13 @@ export async function recordRefundAction(input: {
 }): Promise<Outcome> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  const hidden = await refused(
+    Promise.all([
+      input.invoiceId ? assertCanSee("invoice", input.invoiceId) : undefined,
+      input.companyId ? assertCanSee("company", input.companyId) : undefined,
+    ]),
+  );
+  if (hidden) return hidden;
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const receivedAt = paymentDay(input.paidAt, timeZone);
   if (!receivedAt) return refusal("invalid_date");
@@ -261,6 +306,8 @@ export async function recordRefundAction(input: {
 export async function releaseOverpaymentAction(invoiceId: string): Promise<Outcome & { moved?: number }> {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  const hidden = await refused(assertCanSee("invoice", invoiceId));
+  if (hidden) return hidden;
   const db = await getDb();
   const moved = await releaseOverpayment(db, invoiceId);
   const [invoice] = await db.select({ companyId: invoices.companyId }).from(invoices).where(eq(invoices.id, invoiceId));

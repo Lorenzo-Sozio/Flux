@@ -15,7 +15,7 @@ import {
   orders,
   products,
 } from "@/db/schema";
-import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { together } from "@/lib/db-together";
 import {
   type DocumentLanguage,
@@ -58,6 +58,7 @@ import {
   receivables,
   recordInvoicePayment,
 } from "@/lib/receivables";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { SDI_ATTENTION } from "@/lib/sdi/status";
 import { prepareForSdi, sendToSdi } from "@/lib/sdi/transmit";
@@ -120,6 +121,20 @@ function lineStatements(h: Db, invoiceId: string, lines: DraftInput["lines"]): u
       : []),
     h.delete(invoiceItems).where(and(eq(invoiceItems.invoiceId, invoiceId), gte(invoiceItems.position, lines.length))),
   ];
+}
+
+/**
+ * The refusal in words when `check` (an `assertCanSee`) refuses, else null. Returned, not thrown:
+ * these actions answer with their failures, and a thrown message never reaches the screen.
+ */
+async function refused(check: Promise<unknown>): Promise<string | null> {
+  try {
+    await check;
+    return null;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
 }
 
 async function writeLines(db: Db, invoiceId: string, lines: DraftInput["lines"]) {
@@ -363,6 +378,8 @@ export async function createDepositInvoice(
   const t = await serverT("serverErrors.invoices");
   const gross = parsePaymentAmount(amount);
   if (gross === null) return { ok: false, error: t("depositAmount") };
+  const hidden = await refused(assertCanSee("order", orderId));
+  if (hidden) return { ok: false, error: hidden };
   const db = await getDb();
 
   const [order] = await db
@@ -503,6 +520,8 @@ export async function getInvoices(
 
   const term = params.search.trim();
   const clauses: SQL[] = [];
+  const visible = visibleWhere("invoice", await recordScope());
+  if (visible) clauses.push(visible);
   if (status === "draft" || status === "issued") clauses.push(eq(invoices.status, status));
   // Something a person must do about SDI: a send that failed, a discarded or undelivered invoice (src/lib/sdi/).
   if (status === "sdi") clauses.push(inArray(invoices.sdiStatus, [...SDI_ATTENTION]));
@@ -588,7 +607,12 @@ export async function getInvoice(id: string) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
-  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  // Not visible reads as not there: the page answers 404.
+  const visible = visibleWhere("invoice", await recordScope());
+  const [invoice] = await db
+    .select()
+    .from(invoices)
+    .where(and(eq(invoices.id, id), visible));
   if (!invoice) return null;
   const [items, [company], [issuer]] = await Promise.all([
     db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).orderBy(asc(invoiceItems.position)),
@@ -616,7 +640,7 @@ export async function getInvoice(id: string) {
             total: invoices.total,
           })
           .from(invoices)
-          .where(and(eq(invoices.originalInvoiceId, id), eq(invoices.documentType, "TD04")))
+          .where(and(eq(invoices.originalInvoiceId, id), eq(invoices.documentType, "TD04"), visible))
           .orderBy(asc(invoices.createdAt)),
   ]);
   const draftChecks = draftProblems(
@@ -670,7 +694,7 @@ export async function getInvoice(id: string) {
           await db
             .select({ id: invoices.id, documentNumber: invoices.documentNumber })
             .from(invoices)
-            .where(eq(invoices.id, invoice.deductedInInvoiceId))
+            .where(and(eq(invoices.id, invoice.deductedInInvoiceId), visible))
         )[0] ?? null)
       : null,
     items,
@@ -700,6 +724,7 @@ export async function getNewInvoiceData() {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
+  const scope = await recordScope();
   const [open, companyRows, productRows, [issuer]] = await Promise.all([
     db
       .select({
@@ -722,6 +747,7 @@ export async function getNewInvoiceData() {
           sql`${orders.companyId} IS NOT NULL`,
           // Invoiced is an issued invoice not credited back in full: one that was can be redone.
           sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued' AND i.credited_amount < i.total)`,
+          visibleWhere("order", scope),
         ),
       )
       .orderBy(desc(orders.createdAt))
@@ -743,6 +769,7 @@ export async function getNewInvoiceData() {
         paymentTerms: companies.paymentTerms,
       })
       .from(companies)
+      .where(visibleWhere("company", scope))
       .orderBy(asc(companies.name))
       .limit(2000),
     db
@@ -777,7 +804,10 @@ export async function getOrderForInvoice(orderId: string) {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
-  const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
+  const [order] = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.id, orderId), visibleWhere("order", await recordScope())));
   if (!order) return null;
   const items = await db
     .select({
@@ -818,6 +848,13 @@ export async function createInvoice(
   const cleaned = cleanDraft(input);
   if (!cleaned.ok) return cleaned;
   const { lines, ...header } = cleaned.value;
+  const hidden = await refused(
+    Promise.all([
+      assertCanSee("company", input.companyId),
+      input.orderId ? assertCanSee("order", input.orderId) : undefined,
+    ]),
+  );
+  if (hidden) return { ok: false, error: hidden };
   const db = await getDb();
 
   const [company] = await db
@@ -941,6 +978,8 @@ export async function createCreditNote(
 ): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  const hidden = await refused(assertCanSee("invoice", invoiceId));
+  if (hidden) return { ok: false, error: hidden };
   const db = await getDb();
 
   const room = await creditRoom(db, invoiceId);
@@ -1032,6 +1071,8 @@ export async function saveInvoiceDraft(
   const cleaned = cleanDraft(input);
   if (!cleaned.ok) return cleaned;
   const { lines, ...header } = cleaned.value;
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
   const db = await getDb();
 
   const [current] = await db
@@ -1103,6 +1144,7 @@ export async function saveInvoiceDraft(
 export async function deleteInvoiceDraft(id: string): Promise<{ ok: boolean }> {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  if (await refused(assertCanSee("invoice", id))) return { ok: false };
   const db = await getDb();
   const deleted = await db
     .delete(invoices)
@@ -1295,6 +1337,8 @@ export async function issueInvoiceAction(
 export async function archiveInvoiceAction(id: string): Promise<{ ok: boolean; error?: string }> {
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
   const db = await getDb();
   try {
     const outcome = await archiveInvoice(db, id);
@@ -1409,6 +1453,8 @@ export async function getInvoiceEmailDraftAction(
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const t = await serverT("serverErrors.invoices");
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
   if (!invoice) return { ok: false, error: t("notFound") };
@@ -1455,6 +1501,8 @@ export async function previewInvoiceEmailAction(
   const actor = await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const t = await serverT("serverErrors.invoices");
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
   if (!invoice) return { ok: false, error: t("notFound") };
@@ -1508,6 +1556,8 @@ export async function sendInvoiceCopy(
   const email = typeof to === "string" ? null : to;
   const address = (email ? email.to : (to as string)).trim();
   if (!EMAIL.test(address)) return { ok: false, error: (await serverT("serverErrors.invoices"))("emailInvalid") };
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
 
   const db = await getDb();
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
@@ -1580,6 +1630,8 @@ export async function sendPaymentReminder(
   const email = typeof to === "string" ? null : to;
   const address = (email ? email.to : (to as string)).trim();
   if (!EMAIL.test(address)) return { ok: false, error: t("emailInvalid") };
+  const hidden = await refused(assertCanSee("invoice", id));
+  if (hidden) return { ok: false, error: hidden };
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
   if (!invoice) return { ok: false, error: t("notFound") };
@@ -1653,13 +1705,21 @@ export async function getStampDutySummary(year: number) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+  const scope = await recordScope();
   const rows = await tolerateUnmigrated(
     "invoices",
     () =>
       db
         .select({ issueDate: invoices.issueDate })
         .from(invoices)
-        .where(and(eq(invoices.status, "issued"), eq(invoices.stampDuty, true), eq(invoices.fiscalYear, year))),
+        .where(
+          and(
+            eq(invoices.status, "issued"),
+            eq(invoices.stampDuty, true),
+            eq(invoices.fiscalYear, year),
+            visibleWhere("invoice", scope),
+          ),
+        ),
     [],
   );
   const perQuarter = { 1: 0, 2: 0, 3: 0, 4: 0 };
@@ -1687,7 +1747,7 @@ export async function getInvoicePayments(invoiceId: string) {
       currency: invoices.currency,
     })
     .from(invoices)
-    .where(eq(invoices.id, invoiceId));
+    .where(and(eq(invoices.id, invoiceId), visibleWhere("invoice", await recordScope())));
   if (!invoice) return null;
   const [payments, credits] = await Promise.all([
     tolerateUnmigrated("invoice payments", () => invoicePayments(db, invoiceId), []),
@@ -1719,6 +1779,8 @@ export async function recordInvoicePaymentAction(
   const [db, timeZone] = await Promise.all([getDb(), getWorkspaceTimeZone()]);
   const paidAt = paymentDay(data.paidAt, timeZone);
   if (!paidAt) return { ok: false, error: (await serverT("serverErrors.invoices"))("payment.invalid_date") };
+  const hidden = await refused(assertCanSee("invoice", invoiceId));
+  if (hidden) return { ok: false, error: hidden };
   const result = await recordInvoicePayment(db, {
     invoiceId,
     amount: data.amount,
@@ -1761,10 +1823,10 @@ export async function deleteInvoicePaymentAction(
   await requirePlanModule("sales");
   const db = await getDb();
   const [row] = await db
-    .select({ id: orderPayments.id })
+    .select({ id: orderPayments.id, invoiceId: orderPayments.invoiceId })
     .from(orderPayments)
     .where(and(eq(orderPayments.id, paymentId), sql`${orderPayments.invoiceId} is not null`));
-  if (!row) return { ok: false };
+  if (!row?.invoiceId || (await refused(assertCanSee("invoice", row.invoiceId)))) return { ok: false };
   const removed = await removeAllocation(db, paymentId);
   if (removed.invoiceId) revalidatePath(`${LIST}/${removed.invoiceId}`);
   if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);

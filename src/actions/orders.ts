@@ -38,6 +38,7 @@ import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { closingStageFor } from "@/lib/pipelines";
 import { linkAllocation, recordReceipt, removeAllocation, type Settled } from "@/lib/receipts";
 import { balanceOf } from "@/lib/receivables";
+import { assertCanSee, inVisible, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { dispatchWebhook } from "@/lib/webhook-dispatch";
@@ -166,7 +167,8 @@ export async function getOrderById(id: string) {
     .leftJoin(companies, eq(orders.companyId, companies.id))
     .leftJoin(contacts, eq(orders.contactId, contacts.id))
     .leftJoin(users, eq(orders.ownerId, users.id))
-    .where(eq(orders.id, id));
+    // Not visible reads as not there: the page answers 404, as for an order that does not exist.
+    .where(and(eq(orders.id, id), visibleWhere("order", await recordScope())));
 
   if (!order) return null;
 
@@ -201,6 +203,7 @@ export async function getOrderById(id: string) {
 export async function getOrderStats() {
   await requireCapability("report:read");
   const db = await getDb();
+  const visible = visibleWhere("order", await recordScope());
   const [counts] = await db
     .select({
       total: sql<number>`count(*)::int`,
@@ -209,14 +212,15 @@ export async function getOrderStats() {
       completed: sql<number>`count(*) filter (where ${orders.status} = 'completed')::int`,
       cancelled: sql<number>`count(*) filter (where ${orders.status} = 'cancelled')::int`,
     })
-    .from(orders);
+    .from(orders)
+    .where(visible);
   const revenue = await db
     .select({
       currency: orders.currency,
       amount: sql<string>`coalesce(sum(cast(${orders.totalAmount} as numeric)), 0)`,
     })
     .from(orders)
-    .where(eq(orders.status, "completed"))
+    .where(and(eq(orders.status, "completed"), visible))
     .groupBy(orders.currency);
   return { ...counts, revenue: revenue.map((r) => ({ currency: r.currency, amount: Number(r.amount) })) };
 }
@@ -275,6 +279,13 @@ export async function createOrder(data: z.input<typeof createSchema>) {
   await requirePlanModule("sales");
   const db = await getDb();
   const validated = createSchema.parse(data);
+  // An order for a customer, deal or quote one does not see would be a way into them.
+  await Promise.all([
+    validated.companyId ? assertCanSee("company", validated.companyId) : undefined,
+    validated.contactId ? assertCanSee("contact", validated.contactId) : undefined,
+    validated.dealId ? assertCanSee("deal", validated.dealId) : undefined,
+    validated.quoteId ? assertCanSee("quote", validated.quoteId) : undefined,
+  ]);
 
   // The order keeps the currency it was written in, like a quote does. Converting
   // everything to EUR and discarding the original made the document unreadable to
@@ -360,6 +371,7 @@ export async function createOrder(data: z.input<typeof createSchema>) {
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("order", id);
   const db = await getDb();
 
   // The state it is leaving, read before it is gone. A rule that fires «when an
@@ -461,6 +473,7 @@ export async function addOrderItem(
 ) {
   await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("order", orderId);
   const db = await getDb();
   const t = await getTranslations("validation.orders");
   // Numbers checked here: this is an endpoint, and NaN or a negative price reached the total.
@@ -488,6 +501,7 @@ export async function addOrderItem(
 export async function removeOrderItem(itemId: string, orderId: string) {
   await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("order", orderId);
   const db = await getDb();
   if (await orderInvoiced(db, orderId)) throw new Error((await getTranslations("validation.orders"))("linesFrozen"));
   // Only a line of this order: the id alone deleted a line of any order and recounted this one.
@@ -599,6 +613,7 @@ export async function deleteOrder(id: string) {
 export async function convertQuoteToOrderAction(quoteId: string) {
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("quote", quoteId);
   const db = await getDb();
 
   const [quote] = await db.select().from(quotes).where(eq(quotes.id, quoteId));
@@ -779,9 +794,14 @@ export async function getOrderFormData() {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+  const scope = await recordScope();
 
   const [companyList, contactList, productList, dealList, quoteList] = await Promise.all([
-    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
+    db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(visibleWhere("company", scope))
+      .orderBy(companies.name),
     db
       .select({
         id: contacts.id,
@@ -791,6 +811,7 @@ export async function getOrderFormData() {
         companyId: contacts.companyId,
       })
       .from(contacts)
+      .where(visibleWhere("contact", scope))
       .orderBy(contacts.firstName, contacts.lastName),
     db
       .select({
@@ -807,7 +828,7 @@ export async function getOrderFormData() {
     db
       .select({ id: deals.id, name: deals.name, companyId: deals.companyId, contactId: deals.contactId })
       .from(deals)
-      .where(eq(deals.status, "open"))
+      .where(and(eq(deals.status, "open"), visibleWhere("deal", scope)))
       .orderBy(desc(deals.createdAt))
       .limit(200),
     // Only quotes the customer has accepted: an order for anything else is a
@@ -822,7 +843,7 @@ export async function getOrderFormData() {
         totalAmount: quotes.totalAmount,
       })
       .from(quotes)
-      .where(eq(quotes.status, "accepted"))
+      .where(and(eq(quotes.status, "accepted"), visibleWhere("quote", scope)))
       .orderBy(desc(quotes.createdAt))
       .limit(200),
   ]);
@@ -850,7 +871,7 @@ export async function getOrdersByDeal(dealId: string) {
       orderDate: orders.orderDate,
     })
     .from(orders)
-    .where(eq(orders.dealId, dealId))
+    .where(and(eq(orders.dealId, dealId), visibleWhere("order", await recordScope())))
     .orderBy(desc(orders.createdAt));
 }
 
@@ -880,7 +901,7 @@ export async function getOrderPayments(orderId: string) {
     .leftJoin(users, eq(orderPayments.recordedById, users.id))
     .leftJoin(invoices, eq(invoices.id, orderPayments.invoiceId))
     .leftJoin(receipts, eq(receipts.id, orderPayments.receiptId))
-    .where(eq(orderPayments.orderId, orderId))
+    .where(and(eq(orderPayments.orderId, orderId), inVisible("order", orderPayments.orderId, await recordScope())))
     .orderBy(desc(orderPayments.paidAt));
 }
 
@@ -889,6 +910,7 @@ export async function getOrderInvoicesToPay(orderId: string) {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+  const visible = inVisible("order", invoices.orderId, await recordScope());
   const rows = await tolerateUnmigrated(
     "invoice payments",
     () =>
@@ -897,6 +919,7 @@ export async function getOrderInvoicesToPay(orderId: string) {
         .from(invoices)
         .where(
           and(
+            visible,
             eq(invoices.orderId, orderId),
             eq(invoices.status, "issued"),
             inArray(invoices.documentType, [...RECEIVABLE_TYPES]),
@@ -952,6 +975,7 @@ export async function recordOrderPayment(
   if (amount === null) throw new Error(t("paymentPositive"));
   const paidAt = paymentDay(data.paidAt, await getWorkspaceTimeZone());
   if (!paidAt) throw new Error(t("paymentDate"));
+  await assertCanSee("order", orderId);
 
   const db = await getDb();
   const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
@@ -1028,13 +1052,17 @@ export async function linkOrderPaymentToInvoice(paymentId: string, invoiceId: st
   await requireCapability("order:write");
   await requirePlanModule("sales");
   const db = await getDb();
-  const result = await linkAllocation(db, { allocationId: paymentId, invoiceId });
-  if (!result.ok) throw new Error((await getTranslations("validation.orders"))("notFound"));
-  announcePaid(result.settled, actor.userId);
   const [row] = await db
     .select({ orderId: orderPayments.orderId })
     .from(orderPayments)
     .where(eq(orderPayments.id, paymentId));
+  await Promise.all([
+    assertCanSee("invoice", invoiceId),
+    row?.orderId ? assertCanSee("order", row.orderId) : undefined,
+  ]);
+  const result = await linkAllocation(db, { allocationId: paymentId, invoiceId });
+  if (!result.ok) throw new Error((await getTranslations("validation.orders"))("notFound"));
+  announcePaid(result.settled, actor.userId);
   if (row?.orderId) revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
   revalidatePath(`/dashboard/sales/invoices/${invoiceId}`);
   revalidatePath("/dashboard/sales/finance");
@@ -1059,11 +1087,15 @@ export async function deleteOrderPayment(paymentId: string) {
   const db = await getDb();
 
   const [row] = await db
-    .select({ invoiceId: orderPayments.invoiceId })
+    .select({ invoiceId: orderPayments.invoiceId, orderId: orderPayments.orderId })
     .from(orderPayments)
     .where(eq(orderPayments.id, paymentId));
   if (!row) return { success: true, removed: null };
   if (row.invoiceId) await requireCapability("invoice:write");
+  await Promise.all([
+    row.orderId ? assertCanSee("order", row.orderId) : undefined,
+    row.invoiceId ? assertCanSee("invoice", row.invoiceId) : undefined,
+  ]);
 
   const removed = await removeAllocation(db, paymentId);
   if (removed.orderId) revalidatePath(`/dashboard/sales/orders/${removed.orderId}`);
@@ -1079,6 +1111,7 @@ export async function deleteOrderPayment(paymentId: string) {
 export async function setOrderDelivered(orderId: string, deliveredAt: string | null) {
   await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("order", orderId);
   const db = await getDb();
   await db
     .update(orders)
@@ -1099,6 +1132,7 @@ export async function setOrderShipping(
 ): Promise<{ success: true } | { success: false; error: string }> {
   await requireCapability("order:write");
   await requirePlanModule("sales");
+  await assertCanSee("order", orderId);
   const shipping = cleanShipping(input ?? {});
   if (!shipping) return { success: false, error: (await serverT("serverErrors.orders"))("shippingDateInvalid") };
   const db = await getDb();
@@ -1135,6 +1169,7 @@ export async function listOrders(params: ListParams, status?: string) {
 
   const term = params.search.trim();
   const clauses: (SQL | undefined)[] = [
+    visibleWhere("order", await recordScope()),
     // "to_invoice" is the home's figure of the same name, as a list (src/lib/orders-to-invoice.ts).
     status === "to_invoice" ? stillToInvoice(db) : status && status !== "all" ? eq(orders.status, status) : undefined,
     term

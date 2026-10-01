@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { activities, tasks, users } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { activityTypeFor, outcomeFor, taskTypeOf } from "@/lib/task-kinds";
 import { getDb } from "@/lib/tenant-context";
 
@@ -20,6 +21,7 @@ export async function createActivity(data: {
   dealId?: string;
 }) {
   await requireWriteAccess();
+  await assertLinksVisible(data);
   const db = await getDb();
   const result = await db.insert(activities).values(data).returning();
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
@@ -51,7 +53,7 @@ export async function getActivitiesByLead(leadId: string) {
     })
     .from(activities)
     .leftJoin(users, eq(activities.ownerId, users.id))
-    .where(eq(activities.leadId, leadId))
+    .where(and(eq(activities.leadId, leadId), visibleWhere("activity", await recordScope())))
     .orderBy(desc(activities.createdAt));
 }
 
@@ -70,7 +72,7 @@ export async function getActivitiesByContact(contactId: string) {
     })
     .from(activities)
     .leftJoin(users, eq(activities.ownerId, users.id))
-    .where(eq(activities.contactId, contactId))
+    .where(and(eq(activities.contactId, contactId), visibleWhere("activity", await recordScope())))
     .orderBy(desc(activities.createdAt));
 }
 
@@ -93,7 +95,7 @@ export async function getActivitiesByDeal(dealId: string) {
     })
     .from(activities)
     .leftJoin(users, eq(activities.ownerId, users.id))
-    .where(eq(activities.dealId, dealId))
+    .where(and(eq(activities.dealId, dealId), visibleWhere("activity", await recordScope())))
     .orderBy(desc(activities.createdAt));
 }
 
@@ -112,7 +114,7 @@ export async function getActivitiesByCompany(companyId: string) {
     })
     .from(activities)
     .leftJoin(users, eq(activities.ownerId, users.id))
-    .where(eq(activities.companyId, companyId))
+    .where(and(eq(activities.companyId, companyId), visibleWhere("activity", await recordScope())))
     .orderBy(desc(activities.createdAt));
 }
 
@@ -122,6 +124,9 @@ export async function updateActivity(
   revalidatePathStr?: string,
 ) {
   await requireWriteAccess();
+  await assertCanSee("activity", id);
+  // The new links must be visible too, or an activity could be moved onto a colleague's record.
+  await assertLinksVisible(data);
   const db = await getDb();
   const result = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
@@ -130,9 +135,23 @@ export async function updateActivity(
 
 export async function deleteActivity(id: string, revalidatePathStr?: string) {
   await requireWriteAccess();
+  await assertCanSee("activity", id);
   const db = await getDb();
   await db.delete(activities).where(eq(activities.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
+}
+
+/** Refuses links to a lead, contact, company or deal the person cannot see. */
+async function assertLinksVisible(links: {
+  leadId?: string | null;
+  contactId?: string | null;
+  companyId?: string | null;
+  dealId?: string | null;
+}): Promise<void> {
+  if (links.leadId) await assertCanSee("lead", links.leadId);
+  if (links.contactId) await assertCanSee("contact", links.contactId);
+  if (links.companyId) await assertCanSee("company", links.companyId);
+  if (links.dealId) await assertCanSee("deal", links.dealId);
 }
 
 const CONTACT_TARGETS = { deal: "dealId", lead: "leadId", company: "companyId", contact: "contactId" } as const;
@@ -152,6 +171,7 @@ export async function logContactAction(input: {
   const actor = await requireWriteAccess();
   const column = CONTACT_TARGETS[input.target.entity];
   if (!column || !input.target.id) throw new Error("Invalid record.");
+  await assertCanSee(input.target.entity, input.target.id);
   const db = await getDb();
   const kind = taskTypeOf(input.type);
   const link = { [column]: input.target.id };

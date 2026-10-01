@@ -7,6 +7,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { invoices, sdiSettings } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { sdiChannels, sdiProvider } from "@/lib/sdi/registry";
 import { contextFor, readSdiSettings, refreshSdiStatus, type SendResult, sendToSdi } from "@/lib/sdi/transmit";
@@ -152,7 +153,8 @@ export async function refreshInvoiceSdiStatus(invoiceId: string): Promise<Outcom
       sdiSentAt: invoices.sdiSentAt,
     })
     .from(invoices)
-    .where(eq(invoices.id, invoiceId));
+    // An invoice the person does not see is one they cannot ask about.
+    .where(and(eq(invoices.id, invoiceId), visibleWhere("invoice", await recordScope())));
   if (!invoice) return { ok: false, error: await say("not_sendable") };
   const found = contextFor(db, await readSdiSettings(db));
   if ("reason" in found) return { ok: false, error: await say(found.reason) };

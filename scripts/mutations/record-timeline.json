@@ -50,7 +50,7 @@
   {
     "file": "src/lib/record-timeline.ts",
     "description": "gli eventi dei preventivi spariscono dalla cronologia dell'azienda",
-    "find": "  if (scope.type === \"company\") return eq(quotes.companyId, scope.id);",
+    "find": "  if (scope.type === \"company\") return and(eq(quotes.companyId, scope.id), seen) as SQL;",
     "replace": "  if (scope.type === \"company\") return null;"
   },
   {

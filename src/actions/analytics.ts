@@ -5,6 +5,7 @@ import { and, count, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { contacts, deals, leads, quotes } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { ownerCondition } from "@/lib/pipeline-filters";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 type FunnelStageKey = "leads" | "converted" | "contacts" | "deals" | "quotesSent" | "won";
@@ -20,8 +21,10 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
   await requireCapability("report:read");
   const db = await getDb();
   const since = new Date(Date.now() - periodDays * 86_400_000);
-  const byLead = ownerCondition(leads.ownerId, owners);
-  const byDeal = ownerCondition(deals.ownerId, owners);
+  // Each stage counts only what the person may see (src/lib/record-visibility.ts).
+  const scope = await recordScope();
+  const byLead = and(ownerCondition(leads.ownerId, owners), visibleWhere("lead", scope));
+  const byDeal = and(ownerCondition(deals.ownerId, owners), visibleWhere("deal", scope));
 
   const [[leadsRow], [convertedRow], [contactsRow], [dealsRow], [quotesRow], [wonRow]] = await Promise.all([
     db
@@ -36,7 +39,12 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
       .select({ n: count() })
       .from(contacts)
       .where(
-        and(gte(contacts.createdAt, since), isNotNull(contacts.sourceLeadId), ownerCondition(contacts.ownerId, owners)),
+        and(
+          gte(contacts.createdAt, since),
+          isNotNull(contacts.sourceLeadId),
+          ownerCondition(contacts.ownerId, owners),
+          visibleWhere("contact", scope),
+        ),
       ),
     db
       .select({ n: count() })
@@ -45,7 +53,14 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
     db
       .select({ n: count() })
       .from(quotes)
-      .where(and(gte(quotes.createdAt, since), ne(quotes.status, "draft"), ownerCondition(quotes.ownerId, owners))),
+      .where(
+        and(
+          gte(quotes.createdAt, since),
+          ne(quotes.status, "draft"),
+          ownerCondition(quotes.ownerId, owners),
+          visibleWhere("quote", scope),
+        ),
+      ),
     db
       .select({ n: count() })
       .from(deals)

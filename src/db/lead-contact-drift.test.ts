@@ -33,8 +33,12 @@ function columnsOf(table: string): string[] {
   const src = readFileSync(SCHEMA, "utf8").split("\r\n").join("\n");
   const start = src.indexOf(`export const ${table} = pgTable(`);
   if (start === -1) throw new Error(`table ${table} not found in ${SCHEMA}`);
-  const end = src.indexOf("\n});", start);
-  return [...src.slice(start, end).matchAll(/^ {2}(\w+):/gm)].map((m) => m[1]);
+  // `pgTable("x", { … })`, or — with indexes — `pgTable(\n  "x",\n  { … },\n  (t) => […],\n)`,
+  // where the columns sit one level deeper.
+  const withIndexes = src.startsWith(`export const ${table} = pgTable(\n`, start);
+  const end = src.indexOf(withIndexes ? "\n  },\n" : "\n});", start);
+  const column = withIndexes ? /^ {4}(\w+):/gm : /^ {2}(\w+):/gm;
+  return [...src.slice(start, end).matchAll(column)].map((m) => m[1]);
 }
 
 /** Held by both, and the reason the two tables shadow each other. */

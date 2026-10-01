@@ -8,8 +8,8 @@
   {
     "file": "src/actions/reports.ts",
     "description": "⚠️ il filtro per persona torna a essere ignorato nel dato principale",
-    "find": "  const actConditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];",
-    "replace": "  const actConditions = [...dateRange(period)];"
+    "find": "    ...(userId ? [eq(activities.ownerId, userId)] : []),\n    visibleWhere(\"activity\", scope),\n  ];",
+    "replace": "    visibleWhere(\"activity\", scope),\n  ];"
   },
   {
     "file": "src/actions/reports.ts",

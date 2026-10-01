@@ -7,6 +7,7 @@ import { activities, deals, leads, orders, quotes, tasks, tickets, users } from 
 import { requireCapability } from "@/lib/auth-guard";
 import { currentPeriodKey, parsePeriodKey, periodKey } from "@/lib/calendar-period";
 import { closedBetween, dealEur, orderEur, periodOf, quoteEur, ticketIsOpen, winRatePercent } from "@/lib/metrics";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { repScorecard } from "@/lib/rep-scorecard";
 import { getDb } from "@/lib/tenant-context";
 import { monthStart as workspaceMonthStart } from "@/lib/workspace-day";
@@ -56,8 +57,15 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   const { from, to, userId } = filters;
   const timeZone = await getWorkspaceTimeZone();
   const period = periodOf(from, to, timeZone);
+  // Every figure counts only what the person may see (src/lib/record-visibility.ts); tickets
+  // stay whole, support being a shared queue.
+  const scope = await recordScope();
 
-  const actConditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const actConditions = [
+    ...dateRange(period),
+    ...(userId ? [eq(activities.ownerId, userId)] : []),
+    visibleWhere("activity", scope),
+  ];
 
   // Calls, meetings, emails and notes logged in the period
   const [activityCount] = await db
@@ -72,6 +80,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     ...(from ? [gte(tasks.completedAt!, period.from as Date)] : []),
     ...(to ? [lte(tasks.completedAt!, period.to as Date)] : []),
     ...(userId ? [eq(tasks.assigneeId, userId)] : []),
+    visibleWhere("task", scope),
   ];
   const [tasksCompleted] = await db
     .select({ count: count() })
@@ -79,7 +88,11 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     .where(and(...taskConditions));
 
   // Tasks total (to compute completion rate)
-  const taskTotalConditions = [...taskDateRange(period), ...(userId ? [eq(tasks.assigneeId, userId)] : [])];
+  const taskTotalConditions = [
+    ...taskDateRange(period),
+    ...(userId ? [eq(tasks.assigneeId, userId)] : []),
+    visibleWhere("task", scope),
+  ];
   const [tasksTotal] = await db
     .select({ count: count() })
     .from(tasks)
@@ -90,6 +103,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     ...(from ? [gte(deals.createdAt, period.from as Date)] : []),
     ...(to ? [lte(deals.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(deals.ownerId, userId)] : []),
+    visibleWhere("deal", scope),
   ];
   const [dealsCreated] = await db
     .select({ count: count() })
@@ -97,7 +111,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     .where(dealConditions.length ? and(...dealConditions) : undefined);
 
   // Deals won and lost in the period, dated by when they closed (src/lib/metrics.ts).
-  const mine = userId ? [eq(deals.ownerId, userId)] : [];
+  const mine = [...(userId ? [eq(deals.ownerId, userId)] : []), visibleWhere("deal", scope)];
   const [[dealsWon], [dealsLost]] = await Promise.all([
     db
       .select({ count: count() })
@@ -114,6 +128,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     ...(from ? [gte(leads.createdAt, period.from as Date)] : []),
     ...(to ? [lte(leads.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(leads.ownerId, userId)] : []),
+    visibleWhere("lead", scope),
   ];
   const [leadsCreated] = await db
     .select({ count: count() })
@@ -125,6 +140,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     ...(from ? [gte(quotes.createdAt, period.from as Date)] : []),
     ...(to ? [lte(quotes.createdAt, period.to as Date)] : []),
     ...(userId ? [eq(quotes.ownerId, userId)] : []),
+    visibleWhere("quote", scope),
   ];
   const [quotesCreated] = await db
     .select({ count: count() })
@@ -171,7 +187,7 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
   const timeZone = await getWorkspaceTimeZone();
   const period = periodOf(from, to, timeZone);
 
-  const conditions = dateRange(period);
+  const conditions = [...dateRange(period), visibleWhere("activity", await recordScope())];
 
   const rows = await db
     .select({
@@ -203,7 +219,11 @@ export async function getActivityByAction(filters: ReportFilters = {}) {
   const timeZone = await getWorkspaceTimeZone();
   const period = periodOf(from, to, timeZone);
 
-  const conditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const conditions = [
+    ...dateRange(period),
+    ...(userId ? [eq(activities.ownerId, userId)] : []),
+    visibleWhere("activity", await recordScope()),
+  ];
 
   // By type: call, meeting, email, note.
   const rows = await db
@@ -225,7 +245,11 @@ export async function getDailyActivityTrend(filters: ReportFilters = {}) {
   const timeZone = await getWorkspaceTimeZone();
   const period = periodOf(from, to, timeZone);
 
-  const conditions = [...dateRange(period), ...(userId ? [eq(activities.ownerId, userId)] : [])];
+  const conditions = [
+    ...dateRange(period),
+    ...(userId ? [eq(activities.ownerId, userId)] : []),
+    visibleWhere("activity", await recordScope()),
+  ];
 
   const rows = await db
     .select({
@@ -249,7 +273,7 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
   const { from, to, userId } = filters;
   const timeZone = await getWorkspaceTimeZone();
   const period = periodOf(from, to, timeZone);
-  const mine = userId ? [eq(tasks.assigneeId, userId)] : [];
+  const mine = [...(userId ? [eq(tasks.assigneeId, userId)] : []), visibleWhere("task", await recordScope())];
 
   // ⚠️ Three grouped statements, not three per person: on a Worker every statement is a
   // subrequest, and a team of forty made this tab alone cost a hundred and twenty.
@@ -323,10 +347,12 @@ export async function getSalesReport(filters: ReportFilters = {}) {
   const period = periodOf(from, to, timeZone);
   // ⚠️ The person chosen above the tabs: this tab used to ignore them and show everyone's
   // sales under one person's name.
-  const mineDeals = userId ? [eq(deals.ownerId, userId)] : [];
+  const scope = await recordScope();
+  const mineDeals = [...(userId ? [eq(deals.ownerId, userId)] : []), visibleWhere("deal", scope)];
 
   const quoteConditions = [
     ...(userId ? [eq(quotes.ownerId, userId)] : []),
+    visibleWhere("quote", scope),
     eq(quotes.status, "accepted"),
     ...(period.from ? [gte(quotes.acceptedAt, period.from)] : []),
     ...(period.to ? [lte(quotes.acceptedAt, period.to)] : []),
@@ -334,6 +360,7 @@ export async function getSalesReport(filters: ReportFilters = {}) {
 
   const orderConditions = [
     ...(userId ? [eq(orders.ownerId, userId)] : []),
+    visibleWhere("order", scope),
     eq(orders.status, "completed"),
     ...(period.from ? [gte(orders.orderDate, period.from)] : []),
     ...(period.to ? [lte(orders.orderDate, period.to)] : []),
@@ -402,8 +429,13 @@ export async function getSalesReport(filters: ReportFilters = {}) {
  */
 export async function getRepScorecard(input: { period?: string | null; owners?: string[] } = {}) {
   await requireCapability("report:read");
-  const [db, timeZone, members] = await Promise.all([getDb(), getWorkspaceTimeZone(), getPipelineMembers()]);
+  const [db, timeZone, members, scope] = await Promise.all([
+    getDb(),
+    getWorkspaceTimeZone(),
+    getPipelineMembers(),
+    recordScope(),
+  ]);
   const parsed = parsePeriodKey(input.period);
   const period = parsed ? periodKey(parsed) : currentPeriodKey("month", new Date(), timeZone);
-  return repScorecard(db, { period, timeZone, members, owners: input.owners });
+  return repScorecard(db, { period, timeZone, members, owners: input.owners, scope });
 }

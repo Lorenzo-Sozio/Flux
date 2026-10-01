@@ -33,7 +33,7 @@ import {
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
-import { DuplicateHint } from "@/components/crm/duplicate-hint";
+import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { RecordTabBar } from "@/components/crm/record/record-sections";
 import { Button } from "@/components/ui/button";
@@ -161,6 +161,7 @@ export function CompanyModal({
   const tT = useTranslations("invoices.terms");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
+  const tDup = useTranslations("duplicates");
   const say = useMessageText();
   const [open, setOpen] = useState(false);
   // The open tab, shared by the phone's tab bar and the desktop's tabs.
@@ -441,9 +442,9 @@ export function CompanyModal({
                 titleKey="companyTitle"
                 matches={dupWatch.matches.map((d) => ({
                   id: d.id,
-                  label: d.name,
+                  label: d.restricted ? restrictedLabel(tDup, d.ownerName) : d.name,
                   detail: d.mainEmail ?? d.website,
-                  href: `/dashboard/companies/${d.id}`,
+                  href: d.restricted ? null : `/dashboard/companies/${d.id}`,
                 }))}
                 onDismiss={dupWatch.dismiss}
               />
@@ -765,16 +766,20 @@ export function CompanyModal({
                       key={d.id}
                       className="flex flex-wrap items-center gap-x-2 gap-y-1 text-amber-700 text-sm dark:text-amber-400"
                     >
-                      <Link
-                        href={`/dashboard/companies/${d.id}`}
-                        className="underline underline-offset-2 hover:text-amber-900"
-                        target="_blank"
-                      >
-                        {d.name}
-                      </Link>
+                      {d.restricted ? (
+                        <span>{restrictedLabel(tDup, d.ownerName)}</span>
+                      ) : (
+                        <Link
+                          href={`/dashboard/companies/${d.id}`}
+                          className="underline underline-offset-2 hover:text-amber-900"
+                          target="_blank"
+                        >
+                          {d.name}
+                        </Link>
+                      )}
                       {d.mainEmail && <span className="min-w-0 break-all text-xs opacity-70">{d.mainEmail}</span>}
                       {d.website && <span className="min-w-0 break-all text-xs opacity-70">{d.website}</span>}
-                      {isEditing && company && (
+                      {isEditing && company && !d.restricted && (
                         <Button
                           type="button"
                           size="sm"

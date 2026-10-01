@@ -8,9 +8,46 @@ import type { ApiAuthResult } from "@/lib/api-import-auth";
 import { listEntity, parseListQuery, type ReadableEntity } from "@/lib/api-read";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
+import type { Actor, TenantRole } from "@/lib/permissions";
 import { priceProduct } from "@/lib/price-list";
 import { loadCompanyPriceRules } from "@/lib/price-rules-load";
+import {
+  groupsOf,
+  type RecordScope,
+  readVisibilityMode,
+  SEE_ALL,
+  scopeFor,
+  type VisibleKind,
+  visibleWhere,
+} from "@/lib/record-visibility";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+const KIND: Partial<Record<ReadableEntity, VisibleKind>> = {
+  contacts: "contact",
+  leads: "lead",
+  companies: "company",
+  deals: "deal",
+  orders: "order",
+};
+
+/**
+ * ⚠️⚠️ A signed-in person reads through the API what they see on the screens
+ * (src/lib/record-visibility.ts) — the list pages are not the only way to page through every
+ * customer. A key is a machine and reads everything. Built on the workspace database the route
+ * opened, never `getDb()`.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
+async function readerScope(db: any, who: ApiAuthResult): Promise<RecordScope> {
+  if (who.via !== "session" || !who.userId) return SEE_ALL;
+  const { getActor } = await import("@/lib/auth-guard");
+  const actor: Actor = (await getActor()) ?? {
+    userId: who.userId,
+    tenantRole: who.role as TenantRole,
+    isPlatformStaff: false,
+  };
+  const [mode, groupIds] = await Promise.all([readVisibilityMode(db), groupsOf(db, actor.userId)]);
+  return scopeFor(actor, mode, groupIds);
+}
 
 /**
  * The body of every `GET /api/crm/<entity>`, after the gate (src/lib/api-read.ts).
@@ -39,7 +76,9 @@ export async function listResponse(req: Request, who: ApiAuthResult, entity: Rea
   const tenant = await getTenantById(who.tenantId);
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
-  const page = await listEntity(db as never, entity, parsed.query);
+  const kind = KIND[entity];
+  const visible = kind ? visibleWhere(kind, await readerScope(db, who)) : undefined;
+  const page = await listEntity(db as never, entity, parsed.query, visible);
 
   // ⚠️ A product priced for a customer: the same list and the same rule the salesperson's form
   // uses (src/lib/price-list.ts), so what the assistant quotes is what the quote will say.

@@ -4,6 +4,7 @@ import { getActor, getTenantEntitlements } from "@/lib/auth-guard";
 import { phoneSearchPatterns, workspaceCallingCode } from "@/lib/contact-point";
 import { ENTITIES, type EntityType, entityInPlan } from "@/lib/entities";
 import { can } from "@/lib/permissions";
+import { recordScope } from "@/lib/record-visibility";
 import { SEARCH_PROVIDERS, type SearchHit } from "@/lib/search/providers";
 import { getDb } from "@/lib/tenant-context";
 
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   // without one costs what it always did (src/lib/contact-point.ts, `phoneSearchPatterns`).
   const international = /^\s*(\+|00)/.test(q) && q.replace(/\D/g, "").length >= 4;
   const callingCode = international ? await workspaceCallingCode(db) : null;
-  const terms = { like: `%${q}%`, phoneLike: phoneSearchPatterns(q, callingCode) };
+  const terms = { like: `%${q}%`, phoneLike: phoneSearchPatterns(q, callingCode), scope: await recordScope() };
 
   // One entity failing (a table a workspace has not migrated yet, say) must not
   // blank the whole palette.

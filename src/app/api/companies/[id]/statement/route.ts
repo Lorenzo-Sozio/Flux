@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getLocale } from "next-intl/server";
 import { unparse } from "papaparse";
 
@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth-guard";
 import { customerStatement } from "@/lib/customer-statement";
 import { serverT } from "@/lib/i18n-server";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
@@ -46,7 +47,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     getLocale(),
     serverT("statement"),
   ]);
-  const [company] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, id));
+  // A customer the person does not see is not there for them.
+  const [company] = await db
+    .select({ name: companies.name })
+    .from(companies)
+    .where(and(eq(companies.id, id), visibleWhere("company", await recordScope())));
   if (!company) return new Response("Not found", { status: 404 });
 
   const statements = await customerStatement(db, { companyId: id, timeZone, from, to });

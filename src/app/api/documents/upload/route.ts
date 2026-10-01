@@ -16,8 +16,10 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
-import { EntitlementError, requirePlanLimit } from "@/lib/auth-guard";
+import { EntitlementError, getActor, requirePlanLimit } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { can } from "@/lib/permissions";
+import { canSeeRecord, recordScope, type VisibleKind } from "@/lib/record-visibility";
 import { getStorage, newStorageKey } from "@/lib/storage";
 import { storageBytesUsed } from "@/lib/storage-usage";
 import { getDb } from "@/lib/tenant-context";
@@ -32,6 +34,7 @@ import { checkUpload } from "@/lib/upload-validation";
  * (audit rilievo B-06).
  */
 const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket", "quote", "order"]);
+const VISIBLE_PARENTS = new Set(["contact", "lead", "company", "deal", "quote", "order"]);
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
@@ -41,6 +44,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
   const userId = session.user.id;
+  // Attaching a file is writing to the record: a viewer is read-only everywhere.
+  const actor = await getActor();
+  if (!actor || !can(actor, "record:write")) {
+    return NextResponse.json({ error: (await serverT())("generic.forbidden") }, { status: 403 });
+  }
 
   // ── Parse form data ─────────────────────────────────────────────────────────
   let formData: FormData;
@@ -63,6 +71,13 @@ export async function POST(req: NextRequest) {
   }
   if (!entityId || !/^[a-zA-Z0-9_-]{1,128}$/.test(entityId)) {
     return NextResponse.json({ error: (await serverT("serverErrors.documents"))("invalidEntityId") }, { status: 400 });
+  }
+  // Only to a record the person sees (a ticket is support's queue, outside these rules).
+  if (
+    VISIBLE_PARENTS.has(entityType) &&
+    !(await canSeeRecord(db, entityType as VisibleKind, entityId, await recordScope()))
+  ) {
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("notFound") }, { status: 404 });
   }
 
   // ── Type, extension and magic bytes: the checks every upload shares ─────────

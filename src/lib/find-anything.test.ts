@@ -19,6 +19,7 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { phoneSearchPatterns } from "./contact-point";
 import { buildWhereClause, CONTACT_FIELDS } from "./filter-engine";
 import { matchCommands, navigationCommands, PALETTE_COMMANDS, type PaletteCommand } from "./palette-commands";
+import { SEE_ALL } from "./record-visibility";
 import { SEARCH_PROVIDERS } from "./search/providers";
 import { fold } from "./text-match";
 
@@ -94,7 +95,7 @@ describe("⚠️⚠️ accents do not decide what is found", () => {
   });
 
   it("global search: 'nicolo' finds Nicolò, 'elise' finds ÉLISE — and a contact is found by their company", async () => {
-    const search = (q: string) => SEARCH_PROVIDERS.contact(db, { like: `%${q}%`, phoneLike: null });
+    const search = (q: string) => SEARCH_PROVIDERS.contact(db, { like: `%${q}%`, phoneLike: null, scope: SEE_ALL });
     expect((await search("nicolo")).map((h) => h.id)).toEqual(["c1"]);
     expect((await search("elise")).map((h) => h.id)).toEqual(["c2"]);
     expect((await search("nicolò bianchi")).map((h) => h.id)).toEqual(["c1"]);
@@ -120,7 +121,9 @@ describe("⚠️⚠️ a phone number is found however it was typed, prefix or n
   // from WhatsApp or a signature — used to miss the same number saved as "333 …".
   const patterns = (q: string) => phoneSearchPatterns(q, "39");
   const search = async (q: string) =>
-    (await SEARCH_PROVIDERS.contact(db, { like: `%${q}%`, phoneLike: patterns(q) })).map((h) => h.id).sort();
+    (await SEARCH_PROVIDERS.contact(db, { like: `%${q}%`, phoneLike: patterns(q), scope: SEE_ALL }))
+      .map((h) => h.id)
+      .sort();
 
   beforeAll(async () => {
     await applyTenantMigrations(db as never);

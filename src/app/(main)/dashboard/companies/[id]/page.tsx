@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   BuildingIcon,
   CalendarIcon,
@@ -72,6 +72,7 @@ import { customerGaps } from "@/lib/fiscal-ids";
 import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
 
@@ -133,10 +134,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     ? aiEntries(["summary"] as const, aiViewer(session?.user))
     : Promise.resolve({});
   const db = await getDb();
+  // A colleague's account is not found, rather than refused; on one seen through a deal of one's
+  // own, the people and the figures are only those one may see (src/lib/record-visibility.ts).
+  const scope = await recordScope();
   const companyP = db
     .select()
     .from(companies)
-    .where(eq(companies.id, companyId))
+    .where(and(eq(companies.id, companyId), visibleWhere("company", scope)))
     .then((rows) => rows[0]);
   const restP = Promise.all([
     // What the timeline holds — the company's own, its contacts' and its deals' — for the
@@ -169,7 +173,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         total: sql<number>`(count(*) over ())::int`,
       })
       .from(contacts)
-      .where(eq(contacts.companyId, companyId))
+      .where(and(eq(contacts.companyId, companyId), visibleWhere("contact", scope)))
       .orderBy(asc(contacts.lastName), asc(contacts.firstName))
       .limit(PEOPLE_LOADED),
     // ⚠️ The figures are one aggregate over every deal, not a sum of the rows the
@@ -186,7 +190,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         openTickets: sql<number>`(select count(*)::int from ${tickets} where ${tickets.companyId} = ${companyId} and ${tickets.status} not in ('resolved', 'closed'))`,
       })
       .from(deals)
-      .where(eq(deals.companyId, companyId)),
+      .where(and(eq(deals.companyId, companyId), visibleWhere("deal", scope))),
     // What the customer paid, what it paid, and what is left as their credit (I10). Absent
     // without the sales module, or before the migration: the card is then not drawn.
     // ⚠️ A load that failed is said to have failed; a plan without sales has no card (I14).

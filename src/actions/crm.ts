@@ -54,6 +54,7 @@ import { notify } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { resolvePipelineId } from "@/lib/pipelines";
 import { countRecords } from "@/lib/record-count";
+import { assertCanSee, ownerOnCreate, recordScope, visibleIds, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { matchesText } from "@/lib/text-match";
 import { dispatchWebhook } from "@/lib/webhook-dispatch";
@@ -118,18 +119,19 @@ export async function getLeads(encodedFilter?: string | null) {
   await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const scope = visibleWhere("lead", await recordScope());
   const base = db
     .select({ ...getTableColumns(leads), ownerName: users.name })
     .from(leads)
     .leftJoin(users, eq(leads.ownerId, users.id));
-  if (!tree) return base.orderBy(desc(leads.createdAt));
+  if (!tree) return base.where(scope).orderBy(desc(leads.createdAt));
   const customDefs = await db
     .select()
     .from(customFieldDefinitions)
     .where(eq(customFieldDefinitions.entityType, "lead"));
   const registry = { ...LEAD_FIELDS, ...customFieldsToRegistry(customDefs) };
   const where = buildWhereClause(tree, registry, leads.id);
-  return base.where(where).orderBy(desc(leads.createdAt));
+  return base.where(and(where, scope)).orderBy(desc(leads.createdAt));
 }
 
 /**
@@ -154,7 +156,7 @@ export async function getRecentLeads(limit = 5) {
       createdAt: leads.createdAt,
     })
     .from(leads)
-    .where(eq(leads.isConverted, false))
+    .where(and(eq(leads.isConverted, false), visibleWhere("lead", await recordScope())))
     .orderBy(desc(leads.createdAt))
     .limit(limit);
 }
@@ -164,18 +166,19 @@ export async function getContacts(encodedFilter?: string | null) {
   await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const scope = visibleWhere("contact", await recordScope());
   const base = db
     .select({ ...getTableColumns(contacts), ownerName: users.name })
     .from(contacts)
     .leftJoin(users, eq(contacts.ownerId, users.id));
-  if (!tree) return base.orderBy(desc(contacts.createdAt));
+  if (!tree) return base.where(scope).orderBy(desc(contacts.createdAt));
   const customDefs = await db
     .select()
     .from(customFieldDefinitions)
     .where(eq(customFieldDefinitions.entityType, "contact"));
   const registry = { ...CONTACT_FIELDS, ...customFieldsToRegistry(customDefs) };
   const where = buildWhereClause(tree, registry, contacts.id);
-  return base.where(where).orderBy(desc(contacts.createdAt));
+  return base.where(and(where, scope)).orderBy(desc(contacts.createdAt));
 }
 
 export async function createLead(data: unknown) {
@@ -184,7 +187,8 @@ export async function createLead(data: unknown) {
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
-    const validated = LeadSchema.parse(data);
+    // What a salesperson creates for nobody is theirs (src/lib/record-visibility.ts).
+    const validated = ownerOnCreate(await recordScope(), LeadSchema.parse(data));
     await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = {
       ...validated,
@@ -228,6 +232,7 @@ export async function createLead(data: unknown) {
 export async function updateLead(id: string, data: unknown) {
   return guardedT(async () => {
     const actor = await requireWriteAccess();
+    await assertCanSee("lead", id);
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -282,6 +287,7 @@ export async function updateLead(id: string, data: unknown) {
 
 export async function deleteLead(id: string) {
   await requireWriteAccess();
+  await assertCanSee("lead", id);
   const db = await getDb();
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/dashboard/leads");
@@ -289,6 +295,7 @@ export async function deleteLead(id: string) {
 
 export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   await requireWriteAccess();
+  await assertCanSee("lead", leadId);
   const db = await getDb();
   await requirePlanLimit("maxRecords", await countRecords(db));
 
@@ -489,7 +496,8 @@ export async function createContact(data: unknown) {
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
-    const validated = ContactSchema.parse(data);
+    // What a salesperson creates for nobody is theirs (src/lib/record-visibility.ts).
+    const validated = ownerOnCreate(await recordScope(), ContactSchema.parse(data));
     await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = {
       ...validated,
@@ -524,6 +532,7 @@ export async function createContact(data: unknown) {
 export async function updateContact(id: string, data: unknown) {
   return guardedT(async () => {
     const actor = await requireWriteAccess();
+    await assertCanSee("contact", id);
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -589,6 +598,7 @@ export async function updateContact(id: string, data: unknown) {
 
 export async function deleteContact(id: string) {
   await requireWriteAccess();
+  await assertCanSee("contact", id);
   const db = await getDb();
   await db.delete(contacts).where(eq(contacts.id, id));
   revalidatePath("/dashboard/contacts");
@@ -601,18 +611,19 @@ export async function getCompanies(encodedFilter?: string | null) {
   await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const scope = visibleWhere("company", await recordScope());
   const base = db
     .select({ ...getTableColumns(companies), ownerName: users.name })
     .from(companies)
     .leftJoin(users, eq(companies.ownerId, users.id));
-  if (!tree) return base.orderBy(desc(companies.createdAt));
+  if (!tree) return base.where(scope).orderBy(desc(companies.createdAt));
   const customDefs = await db
     .select()
     .from(customFieldDefinitions)
     .where(eq(customFieldDefinitions.entityType, "company"));
   const registry = { ...COMPANY_FIELDS, ...customFieldsToRegistry(customDefs) };
   const where = buildWhereClause(tree, registry, companies.id);
-  return base.where(where).orderBy(desc(companies.createdAt));
+  return base.where(and(where, scope)).orderBy(desc(companies.createdAt));
 }
 
 export async function createCompany(data: unknown) {
@@ -621,7 +632,8 @@ export async function createCompany(data: unknown) {
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
-    const validated = CompanySchema.parse(data);
+    // What a salesperson creates for nobody is theirs (src/lib/record-visibility.ts).
+    const validated = ownerOnCreate(await recordScope(), CompanySchema.parse(data));
     await requirePlanLimit("maxRecords", await countRecords(db));
     const payload = { ...validated };
     const [newCompany] = await db.insert(companies).values(payload).returning();
@@ -645,6 +657,7 @@ export async function createCompany(data: unknown) {
 export async function updateCompany(id: string, data: unknown) {
   return guardedT(async () => {
     const actor = await requireWriteAccess();
+    await assertCanSee("company", id);
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
     // on the field rather than a Postgres error naming a column (rilievo M-08).
@@ -691,6 +704,7 @@ export async function updateCompany(id: string, data: unknown) {
 
 export async function deleteCompany(id: string): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireWriteAccess();
+  await assertCanSee("company", id);
   const db = await getDb();
   // A customer with invoices or payments is merged, never deleted (src/lib/company-accounts.ts).
   if ((await companiesWithAccounts(db, [id])).size > 0)
@@ -722,13 +736,18 @@ export async function getContactsForSelect() {
   return db
     .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
     .from(contacts)
+    .where(visibleWhere("contact", await recordScope()))
     .orderBy(contacts.firstName, contacts.lastName);
 }
 
 export async function getCompaniesForSelect() {
   await requireCapability("record:read");
   const db = await getDb();
-  return db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name);
+  return db
+    .select({ id: companies.id, name: companies.name })
+    .from(companies)
+    .where(visibleWhere("company", await recordScope()))
+    .orderBy(companies.name);
 }
 
 export async function getLeadsForSelect() {
@@ -737,6 +756,7 @@ export async function getLeadsForSelect() {
   return db
     .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email })
     .from(leads)
+    .where(visibleWhere("lead", await recordScope()))
     .orderBy(leads.firstName, leads.lastName);
 }
 
@@ -770,17 +790,20 @@ export async function checkLeadDuplicates(params: {
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(leads.id, excludeId)) : base;
 
-  return db
+  const found = await db
     .select({
       id: leads.id,
       firstName: leads.firstName,
       lastName: leads.lastName,
       email: leads.email,
       phone: leads.phone,
+      ownerName: users.name,
     })
     .from(leads)
+    .leftJoin(users, eq(leads.ownerId, users.id))
     .where(where)
     .limit(5);
+  return maskHidden(db, "lead", found, (r) => ({ ...r, firstName: "", lastName: "", email: null, phone: null }));
 }
 
 export async function checkContactDuplicates(params: {
@@ -807,17 +830,20 @@ export async function checkContactDuplicates(params: {
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(contacts.id, excludeId)) : base;
 
-  return db
+  const found = await db
     .select({
       id: contacts.id,
       firstName: contacts.firstName,
       lastName: contacts.lastName,
       email: contacts.email,
       phone: contacts.phone,
+      ownerName: users.name,
     })
     .from(contacts)
+    .leftJoin(users, eq(contacts.ownerId, users.id))
     .where(where)
     .limit(5);
+  return maskHidden(db, "contact", found, (r) => ({ ...r, firstName: "", lastName: "", email: null, phone: null }));
 }
 
 export async function checkCompanyDuplicates(params: {
@@ -854,8 +880,10 @@ export async function checkCompanyDuplicates(params: {
       name: companies.name,
       mainEmail: companies.mainEmail,
       website: companies.website,
+      ownerName: users.name,
     })
     .from(companies)
+    .leftJoin(users, eq(companies.ownerId, users.id))
     .where(where)
     .limit(40);
 
@@ -863,7 +891,7 @@ export async function checkCompanyDuplicates(params: {
   const typedHost = hostOf(website);
   const typedEmail = mainEmail?.trim().toLowerCase() ?? "";
 
-  return candidates
+  const matches = candidates
     .filter(
       (c) =>
         (typedName !== "" && isSameCompanyName(c.name, typedName)) ||
@@ -871,6 +899,28 @@ export async function checkCompanyDuplicates(params: {
         (typedEmail !== "" && (c.mainEmail ?? "").toLowerCase() === typedEmail),
     )
     .slice(0, 5);
+  return maskHidden(db, "company", matches, (r) => ({ ...r, name: "", mainEmail: null, website: null }));
+}
+
+/**
+ * A duplicate the person may not open is still said to exist — creating a second record of a
+ * colleague's customer is exactly what must not happen — with whose it is, and nothing else: no
+ * name, address or number, which would hand the customer over through the warning.
+ */
+async function maskHidden<T extends { id: string; ownerName: string | null }>(
+  db: Awaited<ReturnType<typeof getDb>>,
+  kind: "lead" | "contact" | "company",
+  rows: T[],
+  blank: (row: T) => T,
+): Promise<(T & { restricted: boolean })[]> {
+  const scope = await recordScope();
+  const seen = await visibleIds(
+    db,
+    kind,
+    rows.map((r) => r.id),
+    scope,
+  );
+  return rows.map((r) => (seen.has(r.id) ? { ...r, restricted: false } : { ...blank(r), restricted: true }));
 }
 
 /**
@@ -901,6 +951,7 @@ function hostOf(website?: string | null): string {
 
 export async function getLeadForMerge(id: string) {
   await requireWriteAccess();
+  await assertCanSee("lead", id);
   const db = await getDb();
   return db.query.leads.findFirst({ where: eq(leads.id, id) });
 }
@@ -925,6 +976,7 @@ type LeadMergeFields = {
 
 export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMergeFields) {
   await requireWriteAccess();
+  await Promise.all([assertCanSee("lead", keepId), assertCanSee("lead", mergeId)]);
   const db = await getDb();
   await mergeRecords(db, { table: leads, id: leads.id }, LEAD_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/leads");
@@ -932,6 +984,7 @@ export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMe
 
 export async function getContactForMerge(id: string) {
   await requireWriteAccess();
+  await assertCanSee("contact", id);
   const db = await getDb();
   return db.query.contacts.findFirst({
     where: eq(contacts.id, id),
@@ -941,6 +994,7 @@ export async function getContactForMerge(id: string) {
 
 export async function getCompanyForMerge(id: string) {
   await requireWriteAccess();
+  await assertCanSee("company", id);
   const db = await getDb();
   return db.query.companies.findFirst({ where: eq(companies.id, id) });
 }
@@ -965,6 +1019,7 @@ type ContactMergeFields = {
 
 export async function mergeContacts(keepId: string, mergeId: string, fields: ContactMergeFields) {
   await requireWriteAccess();
+  await Promise.all([assertCanSee("contact", keepId), assertCanSee("contact", mergeId)]);
   const db = await getDb();
   await mergeRecords(db, { table: contacts, id: contacts.id }, CONTACT_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/contacts");
@@ -1037,6 +1092,7 @@ async function mergeRecords(
 
 export async function mergeCompanies(keepId: string, mergeId: string, fields: CompanyMergeFields) {
   await requireWriteAccess();
+  await Promise.all([assertCanSee("company", keepId), assertCanSee("company", mergeId)]);
   const db = await getDb();
   await mergeRecords(db, { table: companies, id: companies.id }, COMPANY_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/companies");
@@ -1074,6 +1130,8 @@ async function listWhere(
   searchClause: SQL | undefined,
 ): Promise<SQL | undefined> {
   const tree = params.filter ? decodeFilter(params.filter) : null;
+  // Only what the person may see is listed, counted and searched (src/lib/record-visibility.ts).
+  const visible = visibleWhere(entityType, await recordScope());
 
   let filterClause: SQL | undefined;
   if (tree) {
@@ -1085,8 +1143,7 @@ async function listWhere(
     filterClause = buildWhereClause(tree, registry, idCol);
   }
 
-  if (filterClause && searchClause) return and(filterClause, searchClause);
-  return filterClause ?? searchClause;
+  return and(filterClause, searchClause, visible);
 }
 
 const LEAD_SORTS: Record<string, AnyPgColumn> = {

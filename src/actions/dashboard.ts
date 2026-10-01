@@ -16,6 +16,7 @@ import {
 } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { quoteEur, ticketIsOpen } from "@/lib/metrics";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { dayBounds } from "@/lib/workspace-day";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
@@ -46,6 +47,9 @@ import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 export async function getDashboardStats() {
   await requireCapability("record:read");
   const db = await getDb();
+  // Only what the person may see: a colleague's leads and deals are not theirs to count.
+  // Tickets stay whole — support is a shared queue.
+  const scope = await recordScope();
 
   // The workspace's midnight to midnight — not the server's, which is UTC on Workers.
   const { start: today, end: tomorrow } = dayBounds(new Date(), await getWorkspaceTimeZone());
@@ -58,12 +62,13 @@ export async function getDashboardStats() {
           active: sql<number>`count(*) filter (where ${leads.status} in ('new', 'contacting'))`,
           converted: sql<number>`count(*) filter (where ${leads.status} = 'converted')`,
         })
-        .from(leads),
+        .from(leads)
+        .where(visibleWhere("lead", scope)),
 
       db
         .select({ total: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)` })
         .from(deals)
-        .where(eq(deals.status, "open")),
+        .where(and(eq(deals.status, "open"), visibleWhere("deal", scope))),
 
       db
         .select({
@@ -76,7 +81,7 @@ export async function getDashboardStats() {
         .from(tasks)
         // Everything not done: a task somebody has started is still pending, and counting
         // only `todo` left it out of both figures the moment work began.
-        .where(ne(tasks.status, "done")),
+        .where(and(ne(tasks.status, "done"), visibleWhere("task", scope))),
 
       db
         .select({
@@ -87,7 +92,8 @@ export async function getDashboardStats() {
           // not summed, so the number and the amount on one card described different lists.
           openCount: sql<number>`count(*) filter (where ${quotes.status} in ('sent', 'viewed'))`,
         })
-        .from(quotes),
+        .from(quotes)
+        .where(visibleWhere("quote", scope)),
 
       db
         .select({
@@ -105,12 +111,19 @@ export async function getDashboardStats() {
           value: sql<number>`count(${deals.id})`,
         })
         .from(pipelineStages)
-        .leftJoin(deals, and(eq(deals.stageId, pipelineStages.id), eq(deals.status, "open")))
+        .leftJoin(
+          deals,
+          and(eq(deals.stageId, pipelineStages.id), eq(deals.status, "open"), visibleWhere("deal", scope)),
+        )
         .where(and(eq(pipelineStages.isWon, false), eq(pipelineStages.isLost, false)))
         .groupBy(pipelineStages.id, pipelineStages.name, pipelineStages.color, pipelineStages.order)
         .orderBy(pipelineStages.order),
 
-      db.select({ source: leads.source, count: sql<number>`count(*)` }).from(leads).groupBy(leads.source),
+      db
+        .select({ source: leads.source, count: sql<number>`count(*)` })
+        .from(leads)
+        .where(visibleWhere("lead", scope))
+        .groupBy(leads.source),
     ]);
 
   const totalLeads = Number(leadCounts?.total ?? 0);
@@ -155,7 +168,8 @@ export async function getTopDeals(limit = 5) {
     .from(deals)
     .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
     .leftJoin(companies, eq(deals.companyId, companies.id))
-    .where(eq(deals.status, "open"))
+    // The biggest deals name customers: only those the person may see.
+    .where(and(eq(deals.status, "open"), visibleWhere("deal", await recordScope())))
     .orderBy(desc(sql`CAST(${deals.amount} AS NUMERIC)`))
     .limit(limit);
 
@@ -188,6 +202,7 @@ export async function getRecentActivities(limit = 10) {
     .leftJoin(users, eq(activities.ownerId, users.id))
     .leftJoin(contacts, eq(activities.contactId, contacts.id))
     .leftJoin(companies, eq(activities.companyId, companies.id))
+    .where(visibleWhere("activity", await recordScope()))
     .orderBy(desc(activities.createdAt))
     .limit(limit);
 

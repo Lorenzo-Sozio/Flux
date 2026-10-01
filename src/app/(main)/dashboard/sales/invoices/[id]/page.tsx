@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { getInvoice, getInvoicePayments } from "@/actions/invoices";
@@ -10,6 +10,7 @@ import { orders } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { sdiProvider } from "@/lib/sdi/registry";
 import { readSdiSettings } from "@/lib/sdi/transmit";
@@ -37,7 +38,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       ? db
           .select({ number: orders.orderNumber })
           .from(orders)
-          .where(eq(orders.id, orderId))
+          // One's own invoice can be on a colleague's order: then it names none.
+          .where(and(eq(orders.id, orderId), visibleWhere("order", await recordScope())))
           .then((rows) => rows[0]?.number ?? null)
       : Promise.resolve(null),
     data.invoice.status === "issued" && ["TD01", "TD02"].includes(data.invoice.documentType)

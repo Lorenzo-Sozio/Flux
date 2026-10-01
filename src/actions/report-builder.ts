@@ -25,6 +25,7 @@ import {
 
 import { activities, companies, contacts, deals, leads, quotes, savedReports, tasks } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { recordScope, type VisibleKind, visibleWhere } from "@/lib/record-visibility";
 import {
   type AggregationFn,
   type DateBucket,
@@ -146,6 +147,21 @@ const TABLES: Record<string, any> = {
   tasks,
 };
 
+/**
+ * Which visibility rule each entity's rows follow (src/lib/record-visibility.ts): a report is
+ * up to a thousand rows of names, addresses and amounts, and a salesperson's must not list a
+ * colleague's customers.
+ */
+const KIND: Record<string, VisibleKind> = {
+  deals: "deal",
+  contacts: "contact",
+  companies: "company",
+  leads: "lead",
+  quotes: "quote",
+  activities: "activity",
+  tasks: "task",
+};
+
 // ── Filter builder ─────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -240,8 +256,13 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
   const fieldDefs = entityConfig.fields;
   const limitClamped = Math.min(Math.max(config.limit ?? 200, 1), 1000);
 
-  const conditions = buildFilterConditions(colMap, fieldDefs, config.filters ?? []);
-  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+  const kind = KIND[config.entity];
+  if (!kind) throw new Error("Invalid entity");
+  const conditions = [
+    ...buildFilterConditions(colMap, fieldDefs, config.filters ?? []),
+    visibleWhere(kind, await recordScope()),
+  ];
+  const whereClause = and(...conditions);
 
   /**
    * How many rows match — asked separately, because the row query is capped.

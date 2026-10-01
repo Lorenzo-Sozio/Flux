@@ -38,6 +38,7 @@ import {
 import type { AiEntry } from "@/lib/ai/types";
 import { requireCapability } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { canSeeRecord, recordScope, type VisibleKind } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
@@ -53,11 +54,26 @@ async function failure(reason: string): Promise<AiActionFailure> {
 /** How the copilot's log names the record a proposal is about. */
 const runSubject = (subject: AiSubject) => ({ entityType: subject.type, entityId: subject.id });
 
+/** Records with an owner are read only by whoever may see them; a ticket is support's queue. */
+const VISIBLE_SUBJECTS: ReadonlySet<string> = new Set(["deal", "contact", "company", "lead"]);
+
+/**
+ * Whether the person may see the record — answered, not thrown, because these actions return
+ * their failures. ⚠️ Whatever reaches the model reaches the screen: a record the person cannot
+ * open must not come back to them as a summary.
+ */
+async function visibleSubject(db: Awaited<ReturnType<typeof getDb>>, subject: AiSubject): Promise<boolean> {
+  if (!VISIBLE_SUBJECTS.has(subject.type)) return true;
+  return canSeeRecord(db, subject.type as VisibleKind, subject.id, await recordScope());
+}
+
 /** The record exists and the caller may read it. */
 async function readableContext(subject: AiSubject) {
   if (!subject || typeof subject.id !== "string" || !SUBJECT_TYPES.has(subject.type)) return null;
   await requireCapability(subject.type === "ticket" ? "ticket:read" : "record:read");
-  return loadRecordContext(await getDb(), subject, await getWorkspaceTimeZone());
+  const db = await getDb();
+  if (!(await visibleSubject(db, subject))) return null;
+  return loadRecordContext(db, subject, await getWorkspaceTimeZone());
 }
 
 /** C2: what a record is about, in a few lines. */
@@ -78,9 +94,13 @@ export async function appointmentBriefingAction(
   await requireCapability("record:read");
   const db = await getDb();
   const [appt] = await db.select().from(appointments).where(eq(appointments.id, appointmentId));
-  if (!appt) return failure("not_found");
+  if (!appt || !(await canSeeRecord(db, "appointment", appointmentId, await recordScope()))) {
+    return failure("not_found");
+  }
   const subject = appointmentSubject(appt);
   if (!subject) return failure("no_record");
+  // A meeting one was invited to can be about a record one does not see: no briefing from it.
+  if (!(await visibleSubject(db, subject))) return failure("no_record");
 
   const timeZone = await getWorkspaceTimeZone();
   const ctx = await loadRecordContext(db, subject, timeZone);

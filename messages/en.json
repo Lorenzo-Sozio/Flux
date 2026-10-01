@@ -1729,6 +1729,8 @@
     "start": "Start something here"
   },
   "duplicates": {
+    "restricted": "Already in the CRM, assigned to {owner}",
+    "restrictedColleague": "Already in the CRM, assigned to a colleague",
     "companyTitle": "A company with this name may already be here",
     "contactTitle": "This person may already be a contact",
     "leadTitle": "This person may already be a lead",
@@ -5950,6 +5952,21 @@
     "macros": "Saved replies that may fit"
   },
   "users": {
+    "visibility": {
+      "title": "Who sees which records",
+      "desc": "Leads, contacts, companies and deals, with the quotes, orders, activities and documents about them.",
+      "team": {
+        "label": "Everyone sees their own (recommended)",
+        "desc": "Each user sees the records they own, those assigned to one of their groups and those not yet assigned. Whoever owns a company sees its contacts and deals; whoever works a deal sees its company. A record created with no owner belongs to whoever created it."
+      },
+      "all": {
+        "label": "Everyone sees everything",
+        "desc": "Every user in the workspace sees every record, as before 1 October 2026."
+      },
+      "adminsSeeAll": "Administrators and the owner always see every record.",
+      "saved": "Record visibility updated",
+      "failed": "The choice could not be saved"
+    },
     "title": "Users",
     "teamMembers": "Team Members",
     "subtitle": "Manage users, roles, and invitations.",
@@ -8047,6 +8064,7 @@
   "serverErrors": {
     "generic": {
       "forbidden": "You do not have permission to perform this action.",
+      "recordNotFound": "This record does not exist or is not assigned to you.",
       "unauthenticated": "You must be signed in to continue.",
       "validation": "Some fields need attention.",
       "unknown": "Something went wrong on our side. Please try again."

@@ -21,6 +21,7 @@ import {
   tickets,
 } from "@/db/schema";
 import { DOCUMENT_PARENT_TYPES, type EntityType, entityHref } from "@/lib/entities";
+import { type RecordScope, visibleWhere } from "@/lib/record-visibility";
 import { fold, matchesText as matches } from "@/lib/text-match";
 
 /**
@@ -53,6 +54,11 @@ export interface SearchTerms {
    * when the number was typed with an international prefix (`phoneSearchPatterns`).
    */
   phoneLike: string | readonly string[] | null;
+  /**
+   * Who is searching: a salesperson finds only the customers they may see, and what hangs off
+   * them (src/lib/record-visibility.ts). Tickets are the support desk's shared queue.
+   */
+  scope: RecordScope;
 }
 
 export const PER_ENTITY = 5;
@@ -72,7 +78,7 @@ const name = (first: string | null, last: string | null) => `${first ?? ""} ${la
 type Provider = (db: Db, t: SearchTerms) => Promise<SearchHit[]>;
 
 export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
-  async lead(db, { like, phoneLike }) {
+  async lead(db, { like, phoneLike, scope }) {
     const rows = await db
       .select({
         id: leads.id,
@@ -84,14 +90,17 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(leads)
       .where(
-        or(
-          matches(leads.firstName, like),
-          matches(leads.lastName, like),
-          fullName(leads.firstName, leads.lastName, like),
-          matches(leads.email, like),
-          matches(leads.companyName, like),
-          phone(leads.phone, phoneLike),
-          phone(leads.mobile, phoneLike),
+        and(
+          or(
+            matches(leads.firstName, like),
+            matches(leads.lastName, like),
+            fullName(leads.firstName, leads.lastName, like),
+            matches(leads.email, like),
+            matches(leads.companyName, like),
+            phone(leads.phone, phoneLike),
+            phone(leads.mobile, phoneLike),
+          ),
+          visibleWhere("lead", scope),
         ),
       )
       .orderBy(desc(leads.updatedAt))
@@ -115,7 +124,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     );
   },
 
-  async contact(db, { like, phoneLike }) {
+  async contact(db, { like, phoneLike, scope }) {
     const rows = await db
       .select({
         id: contacts.id,
@@ -127,15 +136,18 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       .from(contacts)
       .leftJoin(companies, eq(companies.id, contacts.companyId))
       .where(
-        or(
-          matches(contacts.firstName, like),
-          matches(contacts.lastName, like),
-          fullName(contacts.firstName, contacts.lastName, like),
-          matches(contacts.email, like),
-          // By the company they work for: "Rossi" finds the people at Rossi Srl too.
-          matches(companies.name, like),
-          phone(contacts.phone, phoneLike),
-          phone(contacts.mobile, phoneLike),
+        and(
+          or(
+            matches(contacts.firstName, like),
+            matches(contacts.lastName, like),
+            fullName(contacts.firstName, contacts.lastName, like),
+            matches(contacts.email, like),
+            // By the company they work for: "Rossi" finds the people at Rossi Srl too.
+            matches(companies.name, like),
+            phone(contacts.phone, phoneLike),
+            phone(contacts.mobile, phoneLike),
+          ),
+          visibleWhere("contact", scope),
         ),
       )
       .orderBy(desc(contacts.updatedAt))
@@ -149,18 +161,21 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     }));
   },
 
-  async company(db, { like, phoneLike }) {
+  async company(db, { like, phoneLike, scope }) {
     const rows = await db
       .select({ id: companies.id, name: companies.name, city: companies.city, industry: companies.industry })
       .from(companies)
       .where(
-        or(
-          matches(companies.name, like),
-          matches(companies.industry, like),
-          matches(companies.vatNumber, like),
-          matches(companies.fiscalCode, like),
-          matches(companies.mainEmail, like),
-          phone(companies.mainPhone, phoneLike),
+        and(
+          or(
+            matches(companies.name, like),
+            matches(companies.industry, like),
+            matches(companies.vatNumber, like),
+            matches(companies.fiscalCode, like),
+            matches(companies.mainEmail, like),
+            phone(companies.mainPhone, phoneLike),
+          ),
+          visibleWhere("company", scope),
         ),
       )
       .orderBy(desc(companies.updatedAt))
@@ -174,7 +189,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     }));
   },
 
-  async deal(db, { like }) {
+  async deal(db, { like, scope }) {
     const rows = await db
       .select({
         id: deals.id,
@@ -186,7 +201,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(deals)
       .leftJoin(companies, eq(companies.id, deals.companyId))
-      .where(or(matches(deals.name, like), matches(companies.name, like)))
+      .where(and(or(matches(deals.name, like), matches(companies.name, like)), visibleWhere("deal", scope)))
       .orderBy(desc(deals.updatedAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -254,7 +269,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     });
   },
 
-  async quote(db, { like }) {
+  async quote(db, { like, scope }) {
     const rows = await db
       .select({
         id: quotes.id,
@@ -266,7 +281,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(quotes)
       .leftJoin(companies, eq(companies.id, quotes.companyId))
-      .where(or(matches(quotes.quoteNumber, like), matches(companies.name, like)))
+      .where(and(or(matches(quotes.quoteNumber, like), matches(companies.name, like)), visibleWhere("quote", scope)))
       .orderBy(desc(quotes.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -282,7 +297,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     );
   },
 
-  async order(db, { like }) {
+  async order(db, { like, scope }) {
     const rows = await db
       .select({
         id: orders.id,
@@ -294,7 +309,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(orders)
       .leftJoin(companies, eq(companies.id, orders.companyId))
-      .where(or(matches(orders.orderNumber, like), matches(companies.name, like)))
+      .where(and(or(matches(orders.orderNumber, like), matches(companies.name, like)), visibleWhere("order", scope)))
       .orderBy(desc(orders.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -310,7 +325,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     );
   },
 
-  async contract(db, { like }) {
+  async contract(db, { like, scope }) {
     const rows = await db
       .select({
         id: contracts.id,
@@ -322,7 +337,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(contracts)
       .leftJoin(companies, eq(companies.id, contracts.companyId))
-      .where(or(matches(contracts.title, like), matches(companies.name, like)))
+      .where(and(or(matches(contracts.title, like), matches(companies.name, like)), visibleWhere("contract", scope)))
       .orderBy(desc(contracts.createdAt))
       .limit(PER_ENTITY);
     return rows.map(
@@ -359,11 +374,11 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     }));
   },
 
-  async task(db, { like }) {
+  async task(db, { like, scope }) {
     const rows = await db
       .select({ id: tasks.id, title: tasks.title, status: tasks.status, due: tasks.dueDate })
       .from(tasks)
-      .where(or(matches(tasks.title, like), matches(tasks.description, like)))
+      .where(and(or(matches(tasks.title, like), matches(tasks.description, like)), visibleWhere("task", scope)))
       .orderBy(desc(tasks.createdAt))
       .limit(PER_ENTITY);
     return rows.map((r: { id: string; title: string; status: string; due: Date | null }) => ({
@@ -376,7 +391,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     }));
   },
 
-  async appointment(db, { like }) {
+  async appointment(db, { like, scope }) {
     const rows = await db
       .select({
         id: appointments.id,
@@ -386,10 +401,13 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       })
       .from(appointments)
       .where(
-        or(
-          matches(appointments.title, like),
-          matches(appointments.location, like),
-          matches(appointments.description, like),
+        and(
+          or(
+            matches(appointments.title, like),
+            matches(appointments.location, like),
+            matches(appointments.description, like),
+          ),
+          visibleWhere("appointment", scope),
         ),
       )
       .orderBy(desc(appointments.startAt))
@@ -459,7 +477,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
     }));
   },
 
-  async document(db, { like }) {
+  async document(db, { like, scope }) {
     const rows = await db
       .select({
         id: documents.id,
@@ -468,7 +486,7 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
         entityId: documents.entityId,
       })
       .from(documents)
-      .where(matches(documents.name, like))
+      .where(and(matches(documents.name, like), visibleWhere("document", scope)))
       .orderBy(desc(documents.createdAt))
       .limit(PER_ENTITY);
     // A document is opened on the record it belongs to; one attached to nothing
@@ -489,9 +507,10 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
   },
 };
 
-async function searchInvoices(db: Db, { like }: SearchTerms, documentTypes: string[]): Promise<SearchHit[]> {
+async function searchInvoices(db: Db, { like, scope }: SearchTerms, documentTypes: string[]): Promise<SearchHit[]> {
   const where: SQL | undefined = and(
     inArray(invoices.documentType, documentTypes),
+    visibleWhere("invoice", scope),
     or(matches(invoices.documentNumber, like), matches(companies.name, like), matches(invoices.notes, like)),
   );
   const rows = await db

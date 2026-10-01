@@ -37,6 +37,7 @@ import { escapeHtml } from "@/lib/escape-html";
 import { getTenantById } from "@/lib/get-tenant";
 import { can } from "@/lib/permissions";
 import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { ticketEventPayload } from "@/lib/ticket-events";
@@ -992,18 +993,21 @@ export async function getOrdersForTicket(ticketId: string) {
     ? eq(orders.companyId, ticket.companyId)
     : eq(orders.contactId, ticket.contactId as string);
 
-  return db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      status: orders.status,
-      totalAmount: orders.totalAmount,
-      orderDate: orders.orderDate,
-    })
-    .from(orders)
-    .where(scope)
-    .orderBy(desc(orders.createdAt))
-    .limit(50);
+  return (
+    db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        status: orders.status,
+        totalAmount: orders.totalAmount,
+        orderDate: orders.orderDate,
+      })
+      .from(orders)
+      // Only the orders the person sees: a ticket is no way into a colleague's customer.
+      .where(and(scope, visibleWhere("order", await recordScope())))
+      .orderBy(desc(orders.createdAt))
+      .limit(50)
+  );
 }
 
 /**

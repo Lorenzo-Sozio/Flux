@@ -44,6 +44,7 @@ import { paymentSummary } from "@/lib/order-payment";
 import { isTerminalStatus } from "@/lib/order-status";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
@@ -92,7 +93,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const canWrite = can(actor, "order:write");
   const canDelete = can(actor, "order:delete");
   const canInvoice = can(actor, "invoice:write");
-  const db = await getDb();
+  const [db, scope] = await Promise.all([getDb(), recordScope()]);
 
   const [
     order,
@@ -147,15 +148,19 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       [],
     ),
     // Where the order came from, by name: the ids have been on the row since the
-    // conversion from a quote was wired up (audit rilievo D-06).
+    // conversion from a quote was wired up (audit rilievo D-06). Only when the person sees
+    // it: one's own order can sit on a colleague's deal. (When the order itself is not
+    // visible, getOrderById is null and none of this is drawn.)
     db
       .select({ id: quotes.id, number: quotes.quoteNumber })
       .from(quotes)
-      .innerJoin(orders, and(eq(orders.quoteId, quotes.id), eq(orders.id, id))),
+      .innerJoin(orders, and(eq(orders.quoteId, quotes.id), eq(orders.id, id)))
+      .where(visibleWhere("quote", scope)),
     db
       .select({ id: deals.id, name: deals.name })
       .from(deals)
-      .innerJoin(orders, and(eq(orders.dealId, deals.id), eq(orders.id, id))),
+      .innerJoin(orders, and(eq(orders.dealId, deals.id), eq(orders.id, id)))
+      .where(visibleWhere("deal", scope)),
     getWorkspaceTimeZone(),
     getTranslations("orders.detail"),
     getTranslations("orders.payments"),

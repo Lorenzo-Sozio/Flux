@@ -14,6 +14,7 @@ import {
   users,
 } from "@/db/schema";
 import { countFieldChanges, type HistoryEntity, readFieldChanges } from "@/lib/field-history";
+import { type RecordScope, recordScope, visibleWhere } from "@/lib/record-visibility";
 import type { getDb } from "@/lib/tenant-context";
 
 /**
@@ -88,18 +89,27 @@ export const TIMELINE_PAGE = 30;
  * summary and the timeline's first page both need it (React's `cache()`, keyed by primitives).
  */
 const relatedOf = cache(async (db: Db, type: TimelineScope["type"], id: string) => {
+  // ⚠️⚠️ Only the contacts and deals the reader may see: a company seen through one's own deal
+  // must not show a colleague's deals there, nor what was written on them (record-visibility.ts).
+  const scope = await recordScope();
   // The company's contacts and its deals at once: two independent reads, one round trip.
   const [contactRows, dealRows] = await Promise.all([
     type === "company"
       ? db
           .select({ id: contacts.id, first: contacts.firstName, last: contacts.lastName })
           .from(contacts)
-          .where(eq(contacts.companyId, id))
+          .where(and(eq(contacts.companyId, id), visibleWhere("contact", scope)))
       : Promise.resolve([] as { id: string; first: string | null; last: string | null }[]),
     type === "company"
-      ? db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.companyId, id))
+      ? db
+          .select({ id: deals.id, name: deals.name })
+          .from(deals)
+          .where(and(eq(deals.companyId, id), visibleWhere("deal", scope)))
       : type === "contact"
-        ? db.select({ id: deals.id, name: deals.name }).from(deals).where(eq(deals.contactId, id))
+        ? db
+            .select({ id: deals.id, name: deals.name })
+            .from(deals)
+            .where(and(eq(deals.contactId, id), visibleWhere("deal", scope)))
         : Promise.resolve([] as { id: string; name: string }[]),
   ]);
   const via = new Map<string, TimelineVia>();
@@ -107,7 +117,7 @@ const relatedOf = cache(async (db: Db, type: TimelineScope["type"], id: string) 
     via.set(`contact:${c.id}`, { type: "contact", id: c.id, name: `${c.first ?? ""} ${c.last ?? ""}`.trim() });
   }
   for (const d of dealRows) via.set(`deal:${d.id}`, { type: "deal", id: d.id, name: d.name });
-  return { contactIds: contactRows.map((c) => c.id), dealIds: dealRows.map((d) => d.id), via };
+  return { contactIds: contactRows.map((c) => c.id), dealIds: dealRows.map((d) => d.id), via, scope };
 });
 
 function related(db: Db, scope: TimelineScope) {
@@ -116,7 +126,7 @@ function related(db: Db, scope: TimelineScope) {
 
 const activityMoment = sql`coalesce(${activities.date}, ${activities.createdAt})`;
 
-function activityScope(scope: TimelineScope, contactIds: string[], dealIds: string[]): SQL {
+function activityScope(scope: TimelineScope, contactIds: string[], dealIds: string[], visible: RecordScope): SQL {
   const own =
     scope.type === "company"
       ? eq(activities.companyId, scope.id)
@@ -128,16 +138,18 @@ function activityScope(scope: TimelineScope, contactIds: string[], dealIds: stri
   const parts: SQL[] = [own];
   if (contactIds.length) parts.push(inArray(activities.contactId, contactIds));
   if (dealIds.length) parts.push(inArray(activities.dealId, dealIds));
-  return or(...parts) as SQL;
+  // A colleague's call on the company itself, about their own deal, stays theirs.
+  return and(or(...parts), visibleWhere("activity", visible)) as SQL;
 }
 
-function quoteScope(scope: TimelineScope, dealIds: string[]): SQL | null {
+function quoteScope(scope: TimelineScope, dealIds: string[], visible: RecordScope): SQL | null {
   if (scope.type === "lead") return null;
-  if (scope.type === "company") return eq(quotes.companyId, scope.id);
-  if (scope.type === "deal") return eq(quotes.dealId, scope.id);
+  const seen = visibleWhere("quote", visible);
+  if (scope.type === "company") return and(eq(quotes.companyId, scope.id), seen) as SQL;
+  if (scope.type === "deal") return and(eq(quotes.dealId, scope.id), seen) as SQL;
   const parts: SQL[] = [eq(quotes.contactId, scope.id)];
   if (dealIds.length) parts.push(inArray(quotes.dealId, dealIds));
-  return or(...parts) as SQL;
+  return and(or(...parts), seen) as SQL;
 }
 
 /** One page of the timeline, newest first, strictly before `before` when given. */
@@ -149,10 +161,10 @@ export async function loadRecordTimeline(
   const limit = opts.limit ?? TIMELINE_PAGE;
   // One more than a page from each source, and room for a save's several field changes.
   const fetch = limit + 20;
-  const { contactIds, dealIds, via } = await related(db, scope);
+  const { contactIds, dealIds, via, scope: visible } = await related(db, scope);
 
   // Activities, field changes and quote events are independent: read side by side, not in turn.
-  const qScope = quoteScope(scope, dealIds);
+  const qScope = quoteScope(scope, dealIds, visible);
   const historyRecords: { type: HistoryEntity; ids: string[] }[] = [
     { type: scope.type, ids: [scope.id] },
     { type: "contact", ids: contactIds },
@@ -175,7 +187,12 @@ export async function loadRecordTimeline(
     })
     .from(activities)
     .leftJoin(users, eq(users.id, activities.ownerId))
-    .where(and(activityScope(scope, contactIds, dealIds), opts.before ? lt(activityMoment, opts.before) : undefined))
+    .where(
+      and(
+        activityScope(scope, contactIds, dealIds, visible),
+        opts.before ? lt(activityMoment, opts.before) : undefined,
+      ),
+    )
     .orderBy(desc(activityMoment))
     .limit(fetch);
 
@@ -340,9 +357,9 @@ export async function recordTimelineSummary(
   scope: TimelineScope,
   now: Date = new Date(),
 ): Promise<{ count: number; lastContactAt: Date | null }> {
-  const { contactIds, dealIds } = await related(db, scope);
-  const where = activityScope(scope, contactIds, dealIds);
-  const qScope = quoteScope(scope, dealIds);
+  const { contactIds, dealIds, scope: visible } = await related(db, scope);
+  const where = activityScope(scope, contactIds, dealIds, visible);
+  const qScope = quoteScope(scope, dealIds, visible);
   // Three independent counts, side by side.
   const [[a], changes, [q]] = await Promise.all([
     db

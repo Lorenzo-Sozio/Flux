@@ -2,10 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { companies, contacts, contracts, users } from "@/db/schema";
-import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import {
   type ContractInput,
   type ContractPhase,
@@ -20,6 +20,7 @@ import {
 } from "@/lib/contract-terms";
 import { serverT } from "@/lib/i18n-server";
 import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 
@@ -44,6 +45,29 @@ function recurringByCurrency(rows: (typeof contracts.$inferSelect)[], on: string
     .map(([currency, list]) => ({ currency, amount: monthlyRecurringRevenue(list.map(termsOf), on) }))
     .filter((g) => g.amount > 0)
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * The customer, person and deal a contract names, each one the person must see: a contract written
+ * on somebody else's customer would be a way into them.
+ */
+function linksVisible(links: { companyId?: string | null; contactId?: string | null; dealId?: string | null }) {
+  return Promise.all([
+    links.companyId ? assertCanSee("company", links.companyId) : undefined,
+    links.contactId ? assertCanSee("contact", links.contactId) : undefined,
+    links.dealId ? assertCanSee("deal", links.dealId) : undefined,
+  ]);
+}
+
+/** The refusal in words when `check` (an `assertCanSee`) refuses, else null. */
+async function refused(check: Promise<unknown>): Promise<{ ok: false; error: string } | null> {
+  try {
+    await check;
+    return null;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, error: err.message };
+    throw err;
+  }
 }
 
 /** The views above the list: a phase, or "active", which also counts contracts not started yet. */
@@ -80,6 +104,7 @@ export async function getContracts(params: ListParams, view = "all"): Promise<Co
   await requirePlanModule("sales");
   const db = await getDb();
   const on = today();
+  const visible = visibleWhere("contract", await recordScope());
 
   const rows = await tolerateUnmigrated(
     "contracts",
@@ -89,6 +114,7 @@ export async function getContracts(params: ListParams, view = "all"): Promise<Co
         .from(contracts)
         .leftJoin(companies, eq(companies.id, contracts.companyId))
         .leftJoin(users, eq(users.id, contracts.ownerId))
+        .where(visible)
         .orderBy(asc(contracts.endDate), asc(contracts.title)),
     [],
   );
@@ -141,9 +167,14 @@ export async function getRecurringRevenueSummary(): Promise<{
   await requireCapability("record:read");
   const db = await getDb();
   const on = today();
+  const visible = visibleWhere("contract", await recordScope());
   const rows = await tolerateUnmigrated(
     "contracts",
-    () => db.select().from(contracts).where(eq(contracts.status, "active")),
+    () =>
+      db
+        .select()
+        .from(contracts)
+        .where(and(eq(contracts.status, "active"), visible)),
     [],
   );
   const terms = rows.map(termsOf);
@@ -159,7 +190,11 @@ export async function getRecurringRevenueSummary(): Promise<{
 export async function getContract(id: string) {
   await requireCapability("record:read");
   const db = await getDb();
-  const [row] = await db.select().from(contracts).where(eq(contracts.id, id));
+  // Not visible reads as not there.
+  const [row] = await db
+    .select()
+    .from(contracts)
+    .where(and(eq(contracts.id, id), visibleWhere("contract", await recordScope())));
   return row ?? null;
 }
 
@@ -173,8 +208,13 @@ export async function getContractFormData() {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+  const scope = await recordScope();
   const [companyList, contactList, userList] = await Promise.all([
-    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(asc(companies.name)),
+    db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(visibleWhere("company", scope))
+      .orderBy(asc(companies.name)),
     db
       .select({
         id: contacts.id,
@@ -183,6 +223,7 @@ export async function getContractFormData() {
         companyId: contacts.companyId,
       })
       .from(contacts)
+      .where(visibleWhere("contact", scope))
       .orderBy(asc(contacts.firstName), asc(contacts.lastName)),
     db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(asc(users.name)),
   ]);
@@ -194,6 +235,8 @@ export async function createContract(input: ContractInput): Promise<ContractResu
   await requirePlanModule("sales");
   const cleaned = cleanContract(input);
   if (!cleaned.ok) return cleaned;
+  const hidden = await refused(linksVisible(cleaned.value));
+  if (hidden) return hidden;
 
   const db = await getDb();
   const [row] = await db
@@ -222,6 +265,8 @@ export async function updateContract(id: string, input: ContractInput): Promise<
     .from(contracts)
     .where(eq(contracts.id, id));
   if (!existing) return { ok: false, error: (await serverT())("contracts.notFound") };
+  const hidden = await refused(Promise.all([assertCanSee("contract", id), linksVisible(cleaned.value)]));
+  if (hidden) return hidden;
 
   const cancelling = cleaned.value.status === "cancelled";
   await db

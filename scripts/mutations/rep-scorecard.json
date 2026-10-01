@@ -62,8 +62,8 @@
   {
     "file": "src/actions/reports.ts",
     "description": "⚠️⚠️ la scheda Vendite mostra le vendite di tutti sotto il nome di una persona",
-    "find": "  const mineDeals = userId ? [eq(deals.ownerId, userId)] : [];",
-    "replace": "  const mineDeals: SQL[] = [];"
+    "find": "  const mineDeals = [...(userId ? [eq(deals.ownerId, userId)] : []), visibleWhere(\"deal\", scope)];",
+    "replace": "  const mineDeals = [visibleWhere(\"deal\", scope)];"
   },
   {
     "file": "src/actions/reports.ts",
@@ -74,8 +74,8 @@
   {
     "file": "src/actions/dashboard.ts",
     "description": "⚠️ la distribuzione in home torna a contare vinte e perse per fase",
-    "find": "        .leftJoin(deals, and(eq(deals.stageId, pipelineStages.id), eq(deals.status, \"open\")))",
-    "replace": "        .leftJoin(deals, eq(deals.stageId, pipelineStages.id))"
+    "find": "          and(eq(deals.stageId, pipelineStages.id), eq(deals.status, \"open\"), visibleWhere(\"deal\", scope)),",
+    "replace": "          and(eq(deals.stageId, pipelineStages.id), visibleWhere(\"deal\", scope)),"
   },
   {
     "file": "src/lib/workload-allocation.ts",

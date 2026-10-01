@@ -414,6 +414,14 @@ export const openApiSpec = {
             description: "Unauthorized",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
           },
+          "403": {
+            description: "Read-only member: attaching a file is a write",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "404": {
+            description: "The record does not exist, or is not one the caller may see",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
           "413": {
             description: "File too large (max 10 MB)",
             content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },

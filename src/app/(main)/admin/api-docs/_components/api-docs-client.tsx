@@ -680,6 +680,16 @@ const GROUPS: ApiGroup[] = [
             example: '{\n  "error": "Unauthorized"\n}',
           },
           {
+            status: 403,
+            description: "Utente in sola lettura: allegare un file è una scrittura",
+            example: '{\n  "error": "Forbidden"\n}',
+          },
+          {
+            status: 404,
+            description: "Il record non esiste o non è assegnato a chi carica il file",
+            example: '{\n  "error": "Not found"\n}',
+          },
+          {
             status: 402,
             description:
               "⚠️ Spazio del piano esaurito: il file non viene salvato finché non si libera spazio o si cambia piano",

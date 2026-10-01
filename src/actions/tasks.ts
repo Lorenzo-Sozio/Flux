@@ -21,6 +21,7 @@ import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { notifyMany } from "@/lib/notify";
 import { can } from "@/lib/permissions";
 import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/queue-window";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { activityTypeFor, outcomeFor, taskTypeOf } from "@/lib/task-kinds";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import { getDb } from "@/lib/tenant-context";
@@ -47,6 +48,8 @@ export async function createTask(data: {
   estimatedHours?: string;
 }) {
   const actor = await requireWriteAccess();
+  await assertLinksVisible(data);
+  if (data.parentId) await assertCanSee("task", data.parentId);
   const db = await getDb();
   let depth = 0;
   if (data.parentId) {
@@ -91,7 +94,9 @@ export async function createSubtask(
   return createTask({ ...data, parentId });
 }
 
-export async function recalcParentProgress(taskId: string): Promise<void> {
+// Not exported: every export of this file is an endpoint, and this one had no guard. Its callers
+// have already checked the task they were handed.
+async function recalcParentProgress(taskId: string): Promise<void> {
   const db = await getDb();
   const children = await db.select({ status: tasks.status }).from(tasks).where(eq(tasks.parentId, taskId));
   if (children.length === 0) return;
@@ -129,12 +134,13 @@ export async function getSubtasks(parentId: string) {
     .from(tasks)
     .leftJoin(creator, eq(tasks.ownerId, creator.id))
     .leftJoin(assignee, eq(tasks.assigneeId, assignee.id))
-    .where(eq(tasks.parentId, parentId))
+    .where(and(eq(tasks.parentId, parentId), visibleWhere("task", await recordScope())))
     .orderBy(tasks.createdAt);
 }
 
 export async function addTaskAssignee(taskId: string, userId: string, role: string) {
   await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const existing = await db
     .select({ id: taskAssignees.id })
@@ -150,12 +156,14 @@ export async function addTaskAssignee(taskId: string, userId: string, role: stri
 
 export async function removeTaskAssignee(taskId: string, userId: string) {
   await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   await db.delete(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
 }
 
 export async function getTaskAssignees(taskId: string) {
   await requireCapability("record:read");
+  await assertCanSee("task", taskId);
   const db = await getDb();
   return await db
     .select({
@@ -233,11 +241,14 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
           ? eq(tasks.dealId, where.dealId)
           : undefined;
 
-  return await query.where(condition).orderBy(desc(tasks.createdAt));
+  return await query.where(and(condition, visibleWhere("task", await recordScope()))).orderBy(desc(tasks.createdAt));
 }
 
 export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
   await requireWriteAccess();
+  await assertCanSee("task", id);
+  // The new links must be visible too, or a task could be moved onto a colleague's record.
+  await assertLinksVisible(data);
   const db = await getDb();
   const clean = data.type !== undefined ? { ...data, type: taskTypeOf(data.type) } : data;
   const result = await db.update(tasks).set(clean).where(eq(tasks.id, id)).returning();
@@ -259,6 +270,7 @@ export interface TaskReport {
 
 export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string, report?: TaskReport) {
   const session = await requireWriteAccess();
+  await assertCanSee("task", id);
   const db = await getDb();
   if (status === "done") {
     const blocking = await checkDependencyViolation(id);
@@ -366,10 +378,24 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
 
 export async function deleteTask(id: string, revalidatePathStr?: string) {
   await requireWriteAccess();
+  await assertCanSee("task", id);
   const db = await getDb();
   await db.delete(tasks).where(eq(tasks.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
+}
+
+/** Refuses links to a lead, contact, company or deal the person cannot see. */
+async function assertLinksVisible(links: {
+  leadId?: string | null;
+  contactId?: string | null;
+  companyId?: string | null;
+  dealId?: string | null;
+}): Promise<void> {
+  if (links.leadId) await assertCanSee("lead", links.leadId);
+  if (links.contactId) await assertCanSee("contact", links.contactId);
+  if (links.companyId) await assertCanSee("company", links.companyId);
+  if (links.dealId) await assertCanSee("deal", links.dealId);
 }
 
 export async function getAllUsers() {
@@ -393,7 +419,7 @@ export async function getCalendarTasks() {
       companyId: tasks.companyId,
     })
     .from(tasks)
-    .where(isNotNull(tasks.dueDate))
+    .where(and(isNotNull(tasks.dueDate), visibleWhere("task", await recordScope())))
     .orderBy(tasks.dueDate);
 }
 
@@ -483,7 +509,12 @@ export async function getAllTasks(options?: { includeDone?: boolean; alwaysInclu
   // task somebody has since finished leads to an empty screen.
   const window = options?.alwaysInclude ? sql`(${recent} OR ${tasks.id} = ${options.alwaysInclude})` : recent;
 
-  const conditions = [isPrivileged ? undefined : mine, options?.includeDone ? undefined : window].filter(Boolean);
+  // `mine` is the stricter rule and already inside the visibility one; the latter is here so the
+  // two cannot drift apart if `isPrivileged` ever stops meaning "sees every record".
+  const visible = visibleWhere("task", await recordScope());
+  const conditions = [isPrivileged ? undefined : mine, visible, options?.includeDone ? undefined : window].filter(
+    Boolean,
+  );
   const result = conditions.length
     ? await base
         .where(and(...(conditions as SQL[])))
@@ -493,7 +524,7 @@ export async function getAllTasks(options?: { includeDone?: boolean; alwaysInclu
 
   // What the window left out, so the screen can say so rather than quietly show
   // a smaller number than the person remembers.
-  const hiddenWhere = [isPrivileged ? undefined : mine, sql`NOT ${window}`].filter(Boolean) as SQL[];
+  const hiddenWhere = [isPrivileged ? undefined : mine, visible, sql`NOT ${window}`].filter(Boolean) as SQL[];
   const [hidden] = options?.includeDone
     ? [{ n: 0 }]
     : await db
@@ -558,7 +589,7 @@ export async function getTasksByTicketId(ticketId: string) {
     .from(tasks)
     .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
     .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
-    .where(eq(tasks.ticketId, ticketId))
+    .where(and(eq(tasks.ticketId, ticketId), visibleWhere("task", await recordScope())))
     .orderBy(desc(tasks.createdAt));
 }
 
@@ -579,6 +610,7 @@ export async function getTasksDueToday() {
 
 export async function getTaskActualHours(taskId: string): Promise<string | null> {
   await requireCapability("record:read");
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const [row] = await db.select({ actualHours: tasks.actualHours }).from(tasks).where(eq(tasks.id, taskId));
   return row?.actualHours ?? null;
@@ -596,6 +628,7 @@ export async function getTaskActualHours(taskId: string): Promise<string | null>
  */
 export async function startTimer(taskId: string, _userId?: string) {
   const session = await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const userId = session.user.id;
 
@@ -661,6 +694,7 @@ export async function stopTimer(logId: string) {
 /** Records hours for the caller. `userId` is ignored — see startTimer. */
 export async function logHoursManual(taskId: string, _userId: string | undefined, hours: number, note?: string) {
   const session = await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const userId = session.user.id;
   if (!(hours > 0) || hours > 24) throw new Error("Enter between 0 and 24 hours.");
@@ -688,6 +722,7 @@ export async function logHoursManual(taskId: string, _userId: string | undefined
 
 export async function getTimeLogs(taskId: string) {
   await requireCapability("record:read");
+  await assertCanSee("task", taskId);
   const db = await getDb();
   return await db
     .select({
@@ -708,8 +743,10 @@ export async function getTimeLogs(taskId: string) {
 
 export async function deleteTimeLog(logId: string, taskId: string) {
   await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
-  await db.delete(taskTimeLogs).where(eq(taskTimeLogs.id, logId));
+  // The log must belong to the task just checked, or naming a visible task would delete any log.
+  await db.delete(taskTimeLogs).where(and(eq(taskTimeLogs.id, logId), eq(taskTimeLogs.taskId, taskId)));
   // recalculate
   const total = await db
     .select({ hours: taskTimeLogs.hours })
@@ -725,6 +762,7 @@ export async function deleteTimeLog(logId: string, taskId: string) {
 
 export async function updateTaskHours(taskId: string, estimatedHours: number | null) {
   await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   await db
     .update(tasks)
@@ -737,6 +775,8 @@ export async function updateTaskHours(taskId: string, estimatedHours: number | n
 
 export async function addDependency(predecessorId: string, successorId: string, type = "FS", lagDays = 0) {
   await requireWriteAccess();
+  await assertCanSee("task", predecessorId);
+  await assertCanSee("task", successorId);
   const db = await getDb();
   if (predecessorId === successorId) throw new Error("A task cannot depend on itself.");
 
@@ -776,12 +816,19 @@ export async function addDependency(predecessorId: string, successorId: string, 
 export async function removeDependency(dependencyId: string) {
   await requireWriteAccess();
   const db = await getDb();
+  const [dep] = await db
+    .select({ successorId: taskDependencies.successorId })
+    .from(taskDependencies)
+    .where(eq(taskDependencies.id, dependencyId));
+  if (!dep) return;
+  await assertCanSee("task", dep.successorId);
   await db.delete(taskDependencies).where(eq(taskDependencies.id, dependencyId));
   revalidatePath("/dashboard/tasks");
 }
 
 export async function getDependencies(taskId: string) {
   await requireCapability("record:read");
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const successor = alias(tasks, "successor");
@@ -817,6 +864,7 @@ export async function getDependencies(taskId: string) {
 
 export async function checkDependencyViolation(taskId: string) {
   await requireCapability("record:read");
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const blocking = await db
@@ -838,9 +886,18 @@ export async function propagateDateShift(
   deltaDays: number,
   visited: Set<string> = new Set(),
 ): Promise<string[]> {
+  await requireWriteAccess();
+  await assertCanSee("task", taskId);
+  return shiftDates(taskId, deltaDays, visited);
+}
+
+/**
+ * Moves a task and, recursively, its FS successors. Unguarded: callers check the task they were
+ * handed; a successor moves with it whoever sees it, because that is what the dependency says.
+ */
+async function shiftDates(taskId: string, deltaDays: number, visited: Set<string>): Promise<string[]> {
   if (visited.has(taskId)) return [];
   visited.add(taskId);
-  await requireWriteAccess();
   const db = await getDb();
   const task = await db.select({ dueDate: tasks.dueDate }).from(tasks).where(eq(tasks.id, taskId)).limit(1);
   if (!task[0]) return [];
@@ -855,7 +912,7 @@ export async function propagateDateShift(
 
   const shifted = [taskId];
   for (const row of successorRows) {
-    const nested = await propagateDateShift(row.successorId, deltaDays, visited);
+    const nested = await shiftDates(row.successorId, deltaDays, visited);
     shifted.push(...nested);
   }
   revalidatePath("/dashboard/tasks");
@@ -866,6 +923,7 @@ export async function propagateDateShift(
 // this propagates the delta to its FS successors only, without re-touching the root.
 export async function propagateSuccessors(taskId: string, deltaDays: number): Promise<number> {
   await requireWriteAccess();
+  await assertCanSee("task", taskId);
   const db = await getDb();
   const successorRows = await db
     .select({ successorId: taskDependencies.successorId })
@@ -875,7 +933,7 @@ export async function propagateSuccessors(taskId: string, deltaDays: number): Pr
   const visited = new Set([taskId]); // root already updated — don't revisit
   let count = 0;
   for (const row of successorRows) {
-    const nested = await propagateDateShift(row.successorId, deltaDays, visited);
+    const nested = await shiftDates(row.successorId, deltaDays, visited);
     count += nested.length;
   }
   return count;
@@ -910,7 +968,7 @@ export async function getTaskById(id: string) {
     .from(tasks)
     .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
     .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
-    .where(eq(tasks.id, id))
+    .where(and(eq(tasks.id, id), visibleWhere("task", await recordScope())))
     .limit(1);
   return task ?? null;
 }
@@ -942,6 +1000,7 @@ export async function getAllTasksForGantt() {
     })
     .from(tasks)
     .leftJoin(users, eq(tasks.assigneeId, users.id))
+    .where(visibleWhere("task", await recordScope()))
     .orderBy(tasks.createdAt);
 
   return rows.map((r) => ({

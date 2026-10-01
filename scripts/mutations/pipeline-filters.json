@@ -38,7 +38,7 @@
   {
     "file": "src/lib/territory-report-queries.ts",
     "description": "⚠️ il report per territorio ignora il filtro agenti sulle trattative",
-    "find": "    .where(ownerCondition(deals.ownerId, owners))\n",
-    "replace": ""
+    "find": "    .where(and(ownerCondition(deals.ownerId, owners), visibleWhere(\"deal\", scope)))\n",
+    "replace": "    .where(visibleWhere(\"deal\", scope))\n"
   }
 ]

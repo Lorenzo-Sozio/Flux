@@ -267,50 +267,56 @@ export const leads = pgTable("lead", {
     .notNull(),
 });
 
-export const contacts = pgTable("contact", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  jobTitle: text("job_title"),
-  department: text("department"),
-  email: text("email"),
-  phone: text("phone"),
-  mobile: text("mobile"),
-  linkedinUrl: text("linkedin_url"),
-  street: text("street"),
-  city: text("city"),
-  state: text("state"),
-  zipCode: text("zip_code"),
-  country: text("country"),
-  status: text("status").default("active").notNull(),
-  source: text("source"),
-  leadScore: integer("lead_score"),
-  notes: text("notes"),
-  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
-  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
-  marketingConsent: boolean("marketing_consent").default(false),
-  consentDate: timestamp("consent_date", { mode: "date" }),
-  // Where the latest consent decision came from (src/lib/consent.ts). Migration 0040.
-  consentSource: text("consent_source"),
-  /** Being worked by an AI assistant since then (set through /api/crm/assistant); null = not. */
-  assistantSince: timestamp("assistant_since", { mode: "date" }),
-  /** The assistant, by the name of the key that marked the person. */
-  assistantName: text("assistant_name"),
-  // The API key that set the mark: only that key clears it (migration 0055).
-  assistantKeyId: text("assistant_key_id"),
-  tags: text("tags").array(),
-  sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
-    .defaultNow()
-    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
-    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
+export const contacts = pgTable(
+  "contact",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    firstName: text("first_name").notNull(),
+    lastName: text("last_name").notNull(),
+    jobTitle: text("job_title"),
+    department: text("department"),
+    email: text("email"),
+    phone: text("phone"),
+    mobile: text("mobile"),
+    linkedinUrl: text("linkedin_url"),
+    street: text("street"),
+    city: text("city"),
+    state: text("state"),
+    zipCode: text("zip_code"),
+    country: text("country"),
+    status: text("status").default("active").notNull(),
+    source: text("source"),
+    leadScore: integer("lead_score"),
+    notes: text("notes"),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+    groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
+    marketingConsent: boolean("marketing_consent").default(false),
+    consentDate: timestamp("consent_date", { mode: "date" }),
+    // Where the latest consent decision came from (src/lib/consent.ts). Migration 0040.
+    consentSource: text("consent_source"),
+    /** Being worked by an AI assistant since then (set through /api/crm/assistant); null = not. */
+    assistantSince: timestamp("assistant_since", { mode: "date" }),
+    /** The assistant, by the name of the key that marked the person. */
+    assistantName: text("assistant_name"),
+    // The API key that set the mark: only that key clears it (migration 0055).
+    assistantKeyId: text("assistant_key_id"),
+    tags: text("tags").array(),
+    sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+      // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  // Who sees which customer (src/lib/record-visibility.ts) asks, per company, whether one of its
+  // contacts is somebody's: without an index that is a scan of the table for every row listed.
+  (t) => [index("contact_company_idx").on(t.companyId)],
+);
 
 export const products = pgTable("product", {
   id: text("id")
@@ -644,57 +650,63 @@ export const pipelineStages = pgTable("pipeline_stage", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const deals = pgTable("deal", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  /** Always EUR: every total, the forecast and every report sum this column. */
-  amount: numeric("amount", { precision: 12, scale: 2 }),
-  /**
-   * The figure as typed, in `currency`. `amount` is that figure converted to EUR at the
-   * rate of the day; editing the deal edits this one and converts again, instead of
-   * re-converting the EUR figure — which shrank a USD deal by the rate on every save.
-   * Null on deals written before it existed. See src/lib/deal-amount.ts.
-   */
-  amountOriginal: numeric("amount_original", { precision: 12, scale: 2 }),
-  currency: text("currency").default("EUR").notNull(),
-  probability: integer("probability").default(0),
-  expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
-  stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
-  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
-  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
-  status: text("status").default("open").notNull(), // open, won, lost
-  // "Won this month" was computed from updatedAt, so re-saving an old deal moved
-  // it into the current month's revenue (audit rilievo C-07).
-  closedAt: timestamp("closed_at", { mode: "date" }),
-  // Without a reason there is no win/loss analysis at all — the product knew how
-  // much was lost and never why. The free-text field stays for the detail a list
-  // cannot hold; the aggregation happens on `lossReasonId`, because "price",
-  // "Price", "too expensive" and "cost" are four rows in any analysis built on
-  // typing (audit rilievo S-09).
-  lostReason: text("lost_reason"),
-  lossReasonId: text("loss_reason_id"),
-  lostCompetitor: text("lost_competitor"),
-  // The stage where the conversation actually stopped. Not derivable from
-  // `stageId`: moving the card into the "Lost" column overwrites it.
-  lostAtStageId: text("lost_at_stage_id"),
-  // ⚠️ Nothing writes or reads this any more. It was recomputed only right after an
-  // edit, so its inactivity penalties never applied; idle days and next step are worked
-  // out on every read instead (src/lib/deal-signals.ts). The column stays because tenant
-  // migrations are additive.
-  healthScore: integer("health_score").default(0),
-  notes: text("notes"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" })
-    .defaultNow()
-    // Every update through Drizzle refreshes it: the read API pages and reconciles by it
-    // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
-    .$onUpdate(() => new Date())
-    .notNull(),
-});
+export const deals = pgTable(
+  "deal",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    /** Always EUR: every total, the forecast and every report sum this column. */
+    amount: numeric("amount", { precision: 12, scale: 2 }),
+    /**
+     * The figure as typed, in `currency`. `amount` is that figure converted to EUR at the
+     * rate of the day; editing the deal edits this one and converts again, instead of
+     * re-converting the EUR figure — which shrank a USD deal by the rate on every save.
+     * Null on deals written before it existed. See src/lib/deal-amount.ts.
+     */
+    amountOriginal: numeric("amount_original", { precision: 12, scale: 2 }),
+    currency: text("currency").default("EUR").notNull(),
+    probability: integer("probability").default(0),
+    expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
+    stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+    ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+    groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
+    status: text("status").default("open").notNull(), // open, won, lost
+    // "Won this month" was computed from updatedAt, so re-saving an old deal moved
+    // it into the current month's revenue (audit rilievo C-07).
+    closedAt: timestamp("closed_at", { mode: "date" }),
+    // Without a reason there is no win/loss analysis at all — the product knew how
+    // much was lost and never why. The free-text field stays for the detail a list
+    // cannot hold; the aggregation happens on `lossReasonId`, because "price",
+    // "Price", "too expensive" and "cost" are four rows in any analysis built on
+    // typing (audit rilievo S-09).
+    lostReason: text("lost_reason"),
+    lossReasonId: text("loss_reason_id"),
+    lostCompetitor: text("lost_competitor"),
+    // The stage where the conversation actually stopped. Not derivable from
+    // `stageId`: moving the card into the "Lost" column overwrites it.
+    lostAtStageId: text("lost_at_stage_id"),
+    // ⚠️ Nothing writes or reads this any more. It was recomputed only right after an
+    // edit, so its inactivity penalties never applied; idle days and next step are worked
+    // out on every read instead (src/lib/deal-signals.ts). The column stays because tenant
+    // migrations are additive.
+    healthScore: integer("health_score").default(0),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      // Every update through Drizzle refreshes it: the read API pages and reconciles by it
+      // (updatedSince), and an edit that left it alone was an edit no integration ever saw.
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  // Who sees which customer asks, per company and per contact, whether one of their deals is
+  // somebody's (src/lib/record-visibility.ts).
+  (t) => [index("deal_company_idx").on(t.companyId), index("deal_contact_idx").on(t.contactId)],
+);
 
 /**
  * The reasons a deal can be lost, as a list rather than a free-text box.

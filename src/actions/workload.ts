@@ -7,6 +7,7 @@ import { and, eq, gte, inArray, isNotNull, isNull, lt, or } from "drizzle-orm";
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { serverT } from "@/lib/i18n-server";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { addDaysToDate, fromWallValue, toWallDate } from "@/lib/wall-clock";
 import { allocateWorkload, DAILY_CAPACITY_HOURS, workingDayKeys } from "@/lib/workload-allocation";
@@ -71,6 +72,7 @@ export async function getWorkloadMatrix(from: string, to: string): Promise<Workl
         isNotNull(tasks.dueDate),
         gte(tasks.dueDate, windowStart),
         or(isNull(tasks.startDate), lt(tasks.startDate, windowEnd)),
+        visibleWhere("task", await recordScope()),
       ),
     );
 
@@ -141,6 +143,7 @@ export async function rescheduleTaskDueDate(
   try {
     const { requireWriteAccess } = await import("@/lib/auth-guard");
     await requireWriteAccess();
+    await assertCanSee("task", taskId);
     const db = await getDb();
     await db.update(tasks).set({ dueDate: newDueDate }).where(eq(tasks.id, taskId));
     revalidatePath("/dashboard/tasks/workload");
@@ -154,6 +157,7 @@ export async function rescheduleTaskDueDate(
 export async function autoScheduleChain(rootTaskId: string): Promise<{ rescheduled: string[]; conflicts: string[] }> {
   const { requireWriteAccess } = await import("@/lib/auth-guard");
   await requireWriteAccess();
+  await assertCanSee("task", rootTaskId);
   const db = await getDb();
 
   const today = new Date();

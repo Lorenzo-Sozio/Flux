@@ -3,6 +3,7 @@
 import { getTerritories } from "@/actions/territories";
 import { requireCapability } from "@/lib/auth-guard";
 import { PERIOD_OPTIONS } from "@/lib/pipeline-filters";
+import { recordScope } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { placeOfDeal, rollUp, type TerritoryRow } from "@/lib/territory-report";
 import { dealsByPlace, leadsByPlace } from "@/lib/territory-report-queries";
@@ -24,11 +25,12 @@ export async function getTerritoryReport(days = 90, owners: string[] = []): Prom
   const period = (PERIOD_OPTIONS as readonly number[]).includes(days) ? days : 90;
   const since = new Date(Date.now() - period * 86_400_000);
   const db = await getDb();
+  const scope = await recordScope();
 
   const [rules, leadRows, dealRows] = await Promise.all([
     getTerritories(),
-    leadsByPlace(db, since, owners),
-    dealsByPlace(db, since, owners),
+    leadsByPlace(db, since, owners, scope),
+    dealsByPlace(db, since, owners, scope),
   ]);
 
   const rows = rollUp(

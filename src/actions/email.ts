@@ -2,11 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { ForbiddenError, requireWriteAccess } from "@/lib/auth-guard";
 import { composeEmail, deliverEmail, type EmailPreview, type SendEmailResult } from "@/lib/email-deliver";
+import { assertCanSee } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 export type { EmailPreview, SendEmailResult };
+
+/**
+ * The records an email is written from and logged on must be ones the person sees. Returned, not
+ * thrown, like every other failure of these actions: a thrown message never reaches the screen.
+ */
+async function refusedLinks(links: {
+  leadId?: string;
+  contactId?: string;
+  companyId?: string;
+  dealId?: string;
+}): Promise<string | null> {
+  try {
+    if (links.leadId) await assertCanSee("lead", links.leadId);
+    if (links.contactId) await assertCanSee("contact", links.contactId);
+    if (links.companyId) await assertCanSee("company", links.companyId);
+    if (links.dealId) await assertCanSee("deal", links.dealId);
+    return null;
+  } catch (err) {
+    if (err instanceof ForbiddenError) return err.message;
+    throw err;
+  }
+}
 
 /**
  * An email a person wrote from a record — a contact, a lead, a company, a deal. The sending
@@ -45,6 +68,8 @@ export async function sendEmailAction({
   signature?: boolean;
 }): Promise<SendEmailResult> {
   const actor = await requireWriteAccess();
+  const refused = await refusedLinks({ leadId, contactId, companyId, dealId });
+  if (refused) return { success: false, error: refused };
   const db = await getDb();
   const result = await deliverEmail(
     db,
@@ -87,6 +112,8 @@ export async function previewEmailAction({
   signature?: boolean;
 }): Promise<EmailPreview> {
   const actor = await requireWriteAccess();
+  const refused = await refusedLinks({ dealId });
+  if (refused) return { ok: false, error: refused };
   const email = await composeEmail(
     await getDb(),
     { userId: actor.user.id },

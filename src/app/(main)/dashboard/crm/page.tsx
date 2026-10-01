@@ -56,6 +56,7 @@ import { closedBetween } from "@/lib/metrics";
 import { rememberLocale } from "@/lib/morning-digest";
 import { showOnboarding } from "@/lib/onboarding";
 import { can } from "@/lib/permissions";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { timeLeft } from "@/lib/time-left";
 import { toWallDate } from "@/lib/wall-clock";
@@ -252,11 +253,15 @@ export default async function CRMPage({
 
     // The leads this person should be working: new or being contacted, theirs or nobody's
     // yet. An unassigned lead is everybody's queue, so it counts for everybody.
+    // ⚠️ And visible: a lead with no owner may still be another group's (src/lib/record-visibility.ts).
     mine
-      ? db
-          .select({ n: count() })
-          .from(leads)
-          .where(and(ACTIVE_LEAD, or(eq(leads.ownerId, mine), isNull(leads.ownerId))))
+      ? recordScope()
+          .then((scope) =>
+            db
+              .select({ n: count() })
+              .from(leads)
+              .where(and(ACTIVE_LEAD, or(eq(leads.ownerId, mine), isNull(leads.ownerId)), visibleWhere("lead", scope))),
+          )
           .then((rows) => Number(rows[0]?.n ?? 0))
           .catch(() => 0)
       : Promise.resolve(0),

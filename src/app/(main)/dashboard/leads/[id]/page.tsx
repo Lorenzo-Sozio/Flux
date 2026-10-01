@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import {
   BotIcon,
   BriefcaseIcon,
@@ -76,6 +76,7 @@ import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { recordTimelineSummary } from "@/lib/record-timeline";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
 
@@ -154,6 +155,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? aiEntries(["summary", "draft"] as const, aiViewer(session?.user))
     : Promise.resolve({});
   const db = await getDb();
+  // A colleague's lead is not found, rather than refused: a refusal would confirm it exists.
+  const scope = await recordScope();
   // Sequences belong to the marketing module: without it the button opens a
   // dialog whose every action is refused by the server.
   const hasMarketingP = getTenantEntitlements()
@@ -188,7 +191,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       db
         .select()
         .from(leads)
-        .where(eq(leads.id, leadId))
+        .where(and(eq(leads.id, leadId), visibleWhere("lead", scope)))
         .then((rows) => rows[0]),
       getComposerTemplates().catch(() => []),
     ]);

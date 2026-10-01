@@ -6,6 +6,7 @@ import { deals, quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { readSignedPdf } from "@/lib/quote-signature";
+import { canSeeRecord, recordScope } from "@/lib/record-visibility";
 import { getStorage } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
@@ -34,7 +35,10 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .where(eq(quotes.id, id));
   if (!q) return new NextResponse("Not found", { status: 404 });
   // Whoever may open the quote's own PDF may open the signed one: the same three as /pdf.
-  const mayView = actor.userId === q.ownerId || actor.userId === q.dealOwnerId || can(actor, "quote:write");
+  const mayView =
+    actor.userId === q.ownerId ||
+    actor.userId === q.dealOwnerId ||
+    (can(actor, "quote:write") && (await canSeeRecord(db, "quote", id, await recordScope())));
   if (!mayView) return new NextResponse("Forbidden", { status: 403 });
 
   const missing = () => NextResponse.json({ error: "No signed file kept." }, { status: 404 });

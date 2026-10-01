@@ -6,6 +6,7 @@ import { quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { buildQuotePdf, loadQuoteForPdf } from "@/lib/quote-pdf-load";
+import { canSeeRecord, recordScope } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 
@@ -48,7 +49,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const actor = await getActor();
     if (!actor) return new NextResponse("Unauthorized", { status: 401 });
 
-    const canView = actor.userId === q.ownerId || actor.userId === q.deal?.ownerId || can(actor, "quote:write");
+    // ⚠️ `quote:write` is every editor's: on its own it opened any colleague's quote. It now needs
+    // the quote to be one the person sees (src/lib/record-visibility.ts).
+    const canView =
+      actor.userId === q.ownerId ||
+      actor.userId === q.deal?.ownerId ||
+      (can(actor, "quote:write") && (await canSeeRecord(db, "quote", id, await recordScope())));
     if (!canView) return new NextResponse("Forbidden", { status: 403 });
   }
 

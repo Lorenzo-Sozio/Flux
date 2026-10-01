@@ -11,6 +11,7 @@ import { dispatchInvites, type InviteResult } from "@/lib/appointment-invites";
 import { mirrorAppointments } from "@/lib/appointment-mirror";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { type BusySlot, busyByUser, inWindow, occurrencesOf } from "@/lib/availability";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { countBefore, formatRRule, parseRRule, rebaseRule } from "@/lib/recurrence";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
@@ -67,6 +68,19 @@ function normaliseRule(raw: string | null | undefined): string | null {
   const rule = parseRRule(raw);
   if (!rule) throw new Error("Unsupported recurrence rule");
   return formatRRule(rule);
+}
+
+/** Refuses links to a lead, contact, company or deal the person cannot see. */
+async function assertLinksVisible(links: {
+  leadId?: string | null;
+  contactId?: string | null;
+  companyId?: string | null;
+  dealId?: string | null;
+}): Promise<void> {
+  if (links.leadId) await assertCanSee("lead", links.leadId);
+  if (links.contactId) await assertCanSee("contact", links.contactId);
+  if (links.companyId) await assertCanSee("company", links.companyId);
+  if (links.dealId) await assertCanSee("deal", links.dealId);
 }
 
 function assertRange(startAt: Date, endAt: Date) {
@@ -186,6 +200,7 @@ export async function createAppointment(data: {
   notifyAttendees?: boolean;
 }) {
   await requireWriteAccess();
+  await assertLinksVisible(data);
   if (!data.title?.trim()) throw new Error("A title is required");
   assertRange(data.startAt, data.endAt);
   const db = await getDb();
@@ -370,6 +385,9 @@ function ruleEndingBefore(existing: AppointmentRow, occurrence: Date, timeZone: 
  */
 export async function updateAppointment(id: string, data: AppointmentUpdate, target?: OccurrenceTarget) {
   await requireWriteAccess();
+  await assertCanSee("appointment", id);
+  // The new links must be visible too, or a meeting could be moved onto a colleague's record.
+  await assertLinksVisible(data);
   const db = await getDb();
 
   const [existing] = await db.select().from(appointments).where(eq(appointments.id, id));
@@ -576,6 +594,7 @@ export async function updateAppointment(id: string, data: AppointmentUpdate, tar
  */
 export async function setAppointmentCompleted(id: string, completed: boolean) {
   await requireWriteAccess();
+  await assertCanSee("appointment", id);
   const db = await getDb();
   await db
     .update(appointments)
@@ -631,6 +650,7 @@ export async function cancelAppointment(
   options: { notifyAttendees?: boolean; target?: OccurrenceTarget } = {},
 ) {
   await requireWriteAccess();
+  await assertCanSee("appointment", id);
   const db = await getDb();
   const notify = options.notifyAttendees !== false;
 
@@ -672,6 +692,7 @@ export async function cancelAppointment(
 /** Puts a cancelled appointment back on the calendar, and says so to whoever was invited. */
 export async function restoreAppointment(id: string, options: { notifyAttendees?: boolean } = {}) {
   await requireWriteAccess();
+  await assertCanSee("appointment", id);
   const db = await getDb();
   const [existing] = await db
     .select({ sequence: appointments.sequence, status: appointments.status })
@@ -693,6 +714,7 @@ export async function restoreAppointment(id: string, options: { notifyAttendees?
 /** Sends the invitation again, as it stands, to everybody on it. */
 export async function resendInvitations(id: string) {
   await requireWriteAccess();
+  await assertCanSee("appointment", id);
   return { inviteStatus: await dispatchInvites(id, "REQUEST", { isUpdate: true }) };
 }
 
@@ -710,6 +732,7 @@ export async function deleteAppointment(
   options: { notifyAttendees?: boolean; target?: OccurrenceTarget } = {},
 ) {
   await requireCapability("record:delete");
+  await assertCanSee("appointment", id);
   const db = await getDb();
   const notify = options.notifyAttendees !== false;
 
@@ -802,6 +825,12 @@ export async function setAttendeeStatus(attendeeId: string, status: "accepted" |
   await requireWriteAccess();
   if (!["accepted", "declined", "tentative", "pending"].includes(status)) throw new Error("Unknown status");
   const db = await getDb();
+  const [row] = await db
+    .select({ appointmentId: appointmentAttendees.appointmentId })
+    .from(appointmentAttendees)
+    .where(eq(appointmentAttendees.id, attendeeId));
+  if (!row) return;
+  await assertCanSee("appointment", row.appointmentId);
   await db
     .update(appointmentAttendees)
     .set({ status, responseAt: status === "pending" ? null : new Date() })
@@ -881,7 +910,7 @@ export async function getAppointments(filterUserIds?: string[] | null, range?: {
     .leftJoin(companies, eq(appointments.companyId, companies.id))
     .leftJoin(deals, eq(appointments.dealId, deals.id))
     .leftJoin(leads, eq(appointments.leadId, leads.id))
-    .where(and(userFilter, range ? inWindow(range) : undefined));
+    .where(and(userFilter, range ? inWindow(range) : undefined, visibleWhere("appointment", await recordScope())));
 
   return rows;
 }
@@ -913,7 +942,7 @@ export async function getAppointmentById(id: string) {
     .leftJoin(companies, eq(appointments.companyId, companies.id))
     .leftJoin(deals, eq(appointments.dealId, deals.id))
     .leftJoin(leads, eq(appointments.leadId, leads.id))
-    .where(eq(appointments.id, id));
+    .where(and(eq(appointments.id, id), visibleWhere("appointment", await recordScope())));
 
   if (!row) return null;
   const appt = row.appt;
@@ -946,7 +975,10 @@ export async function getAppointmentById(id: string) {
 export async function getAppointmentStart(id: string): Promise<Date | null> {
   await requireCapability("record:read");
   const db = await getDb();
-  const [row] = await db.select({ startAt: appointments.startAt }).from(appointments).where(eq(appointments.id, id));
+  const [row] = await db
+    .select({ startAt: appointments.startAt })
+    .from(appointments)
+    .where(and(eq(appointments.id, id), visibleWhere("appointment", await recordScope())));
   return row?.startAt ?? null;
 }
 
@@ -976,6 +1008,7 @@ export async function getOverlappingAppointments(startAt: Date, endAt: Date, exc
         eq(appointments.allDay, false),
         ...(excludeId ? [ne(appointments.id, excludeId)] : []),
         inWindow(range),
+        visibleWhere("appointment", await recordScope()),
       ),
     );
   const zone = await getWorkspaceTimeZone();
@@ -1054,7 +1087,7 @@ export async function getContactsForPicker() {
       email: contacts.email,
     })
     .from(contacts)
-    .where(eq(contacts.status, "active"))
+    .where(and(eq(contacts.status, "active"), visibleWhere("contact", await recordScope())))
     .limit(500);
 }
 

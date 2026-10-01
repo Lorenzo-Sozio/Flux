@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { eq } from "drizzle-orm";
 import { unparse } from "papaparse";
 
 import { auth } from "@/auth";
 import { leads } from "@/db/schema";
-import { getActor } from "@/lib/auth-guard";
-import { can } from "@/lib/permissions";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 export async function GET() {
@@ -14,16 +12,12 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ⚠️⚠️ The WORKSPACE role. `session.user.role` is Flux's own staff scale and reads
-  // "user" for every customer, so this comparison was always false: the export returned
-  // only the caller's own rows, to a workspace owner too. A CSV quietly incomplete is
-  // worse than one that fails. See the two role scales in CLAUDE.md.
-  const isPrivileged = can(await getActor(), "user:read");
+  // ⚠️⚠️ What the person may see, by the rules every list follows (src/lib/record-visibility.ts):
+  // an export is the list in a file. It used to be "your own rows unless you are an administrator",
+  // a rule of its own that left out the group's records and the unassigned ones.
+  const visible = visibleWhere("lead", await recordScope());
 
-  // Admins/owners export all leads; regular users export only their own.
-  const rows = isPrivileged
-    ? await db.select().from(leads)
-    : await db.select().from(leads).where(eq(leads.ownerId, session.user.id));
+  const rows = await db.select().from(leads).where(visible);
 
   const csvData = rows.map((r) => ({
     ...r,

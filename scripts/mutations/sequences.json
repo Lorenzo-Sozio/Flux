@@ -116,8 +116,8 @@
   {
     "file": "src/actions/sequences.ts",
     "description": "⚠️⚠️ chiunque puo' iscrivere un record a una sequenza",
-    "find": "  const actor = await requireCapability(\"record:write\");\n  await requirePlanModule(\"marketing\");\n  const db = await getDb();\n  const result = await enroll(",
-    "replace": "  const actor = { userId: \"x\" };\n  await requirePlanModule(\"marketing\");\n  const db = await getDb();\n  const result = await enroll("
+    "find": "  const actor = await requireCapability(\"record:write\");\n  await requirePlanModule(\"marketing\");\n  await assertCanSee(entity === \"lead\" ? \"lead\" : \"contact\", recordId);\n  const db = await getDb();\n  const result = await enroll(",
+    "replace": "  const actor = { userId: \"x\" };\n  await requirePlanModule(\"marketing\");\n  await assertCanSee(entity === \"lead\" ? \"lead\" : \"contact\", recordId);\n  const db = await getDb();\n  const result = await enroll("
   },
   {
     "file": "src/actions/sequences.ts",

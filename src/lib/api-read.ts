@@ -15,7 +15,7 @@
  * ⚠️ A deleted record is simply absent. Reconciliation sees what is there; what went away is
  * told by the `*.deleted` webhooks.
  */
-import { and, asc, eq, gt, gte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, or, type SQL, sql } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 import { companies, contacts, deals, leads, orders, pipelineStages, pipelines, products } from "@/db/schema";
@@ -271,10 +271,19 @@ export interface ListPage {
   nextCursor: string | null;
 }
 
-export async function listEntity(db: AnyDb, entity: ReadableEntity, query: ListQuery): Promise<ListPage> {
+/**
+ * One page of `entity`. `visible` narrows it to what the caller may see — a signed-in person's
+ * scope (src/lib/record-visibility.ts); a key reads everything and passes nothing.
+ */
+export async function listEntity(
+  db: AnyDb,
+  entity: ReadableEntity,
+  query: ListQuery,
+  visible?: SQL,
+): Promise<ListPage> {
   const reader = READERS[entity];
   const t = reader.table;
-  const conditions = [];
+  const conditions: (SQL | undefined)[] = [visible];
   if (query.updatedSince) conditions.push(gte(t.updatedAt, query.updatedSince));
   if (query.after) {
     const at = sql`${query.after.at}::timestamp`;
@@ -286,7 +295,7 @@ export async function listEntity(db: AnyDb, entity: ReadableEntity, query: ListQ
     .$dynamic();
   if (reader.join) q = reader.join(q);
   const rows: Row[] = await q
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(asc(t.updatedAt), asc(t.id))
     .limit(query.limit + 1);
 

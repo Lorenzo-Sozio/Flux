@@ -37,7 +37,7 @@ import {
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
-import { DuplicateHint } from "@/components/crm/duplicate-hint";
+import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import {
@@ -138,6 +138,7 @@ export function LeadModal({
   const t = useTranslations("leads");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
+  const tDup = useTranslations("duplicates");
   const say = useMessageText();
   const [innerOpen, setInnerOpen] = useState(false);
   const open = openProp ?? innerOpen;
@@ -398,9 +399,11 @@ export function LeadModal({
                 titleKey="leadTitle"
                 matches={dupWatch.matches.map((d) => ({
                   id: d.id,
-                  label: [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
+                  label: d.restricted
+                    ? restrictedLabel(tDup, d.ownerName)
+                    : [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
                   detail: d.email ?? d.phone,
-                  href: `/dashboard/leads/${d.id}`,
+                  href: d.restricted ? null : `/dashboard/leads/${d.id}`,
                 }))}
                 onDismiss={dupWatch.dismiss}
               />
@@ -637,15 +640,19 @@ export function LeadModal({
                       key={d.id}
                       className="flex flex-wrap items-center gap-x-2 gap-y-1 text-amber-700 text-sm dark:text-amber-400"
                     >
-                      <Link
-                        href={`/dashboard/leads/${d.id}`}
-                        className="underline underline-offset-2 hover:text-amber-900"
-                        target="_blank"
-                      >
-                        {d.firstName} {d.lastName}
-                      </Link>
+                      {d.restricted ? (
+                        <span>{restrictedLabel(tDup, d.ownerName)}</span>
+                      ) : (
+                        <Link
+                          href={`/dashboard/leads/${d.id}`}
+                          className="underline underline-offset-2 hover:text-amber-900"
+                          target="_blank"
+                        >
+                          {d.firstName} {d.lastName}
+                        </Link>
+                      )}
                       {d.email && <span className="min-w-0 break-all text-xs opacity-70">{d.email}</span>}
-                      {isEditing && lead && (
+                      {isEditing && lead && !d.restricted && (
                         <Button
                           type="button"
                           size="sm"

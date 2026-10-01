@@ -2,6 +2,7 @@ import { and, eq, isNotNull, ne, sql } from "drizzle-orm";
 
 import { activities, deals, tasks } from "@/db/schema";
 import { daysBetween, THRESHOLDS } from "@/lib/next-actions";
+import { type RecordScope, SEE_ALL, visibleWhere } from "@/lib/record-visibility";
 
 /**
  * Two facts about an open deal, worked out when it is read rather than stored.
@@ -92,11 +93,13 @@ export function dealSignals(
 
 /**
  * How many open deals have nothing planned: one owner's — the home's own number — or,
- * with `null`, the whole team's (the sales manager's dashboard).
+ * with `null`, the whole team's (the sales manager's dashboard) — narrowed to `scope`, the
+ * reader's (src/lib/record-visibility.ts), so a salesperson's "team" is the deals they may see.
  */
 export async function countOpenDealsWithoutNextStep(
   db: AnyDb,
   ownerId: string | null,
+  scope: RecordScope = SEE_ALL,
   now: Date = new Date(),
 ): Promise<number> {
   const next = nextStepByDeal(db, now);
@@ -105,7 +108,12 @@ export async function countOpenDealsWithoutNextStep(
     .from(deals)
     .leftJoin(next, eq(next.dealId, deals.id))
     .where(
-      and(eq(deals.status, "open"), ownerId === null ? undefined : eq(deals.ownerId, ownerId), sql`${next.n} is null`),
+      and(
+        eq(deals.status, "open"),
+        ownerId === null ? undefined : eq(deals.ownerId, ownerId),
+        visibleWhere("deal", scope),
+        sql`${next.n} is null`,
+      ),
     );
   return Number(row?.n ?? 0);
 }

@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ un amministratore vede solo i propri clienti",
+    "find": "  if (mode === \"all\" || can(actor, \"record:manageAny\")) return SEE_ALL;",
+    "replace": "  if (mode === \"all\") return SEE_ALL;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ un commerciale vede i clienti di tutti",
+    "find": "  return { all: false, userId: actor.userId, groupIds: [...new Set(groupIds)] };",
+    "replace": "  return SEE_ALL;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ se la lettura dell'impostazione fallisce, tutti vedono tutto",
+    "find": "  } catch {\n    return \"team\";\n  }",
+    "replace": "  } catch {\n    return \"all\";\n  }"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "i record assegnati al gruppo spariscono per i suoi membri",
+    "find": "  if (scope.groupIds.length === 0) return owner;",
+    "replace": "  return owner;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "i record non assegnati non li vede più nessuno",
+    "find": "  const own = sql`${mine(t, scope)} OR ${unassigned(t)}`;",
+    "replace": "  const own = sql`${mine(t, scope)}`;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "chi segue una trattativa non vede più l'azienda del cliente",
+    "find": "        OR EXISTS (SELECT 1 FROM \"deal\" \"v\" WHERE \"v\".\"company_id\" = ${id} AND ${mine(\"v\", scope)}))`;",
+    "replace": "        )`;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ un'azienda non assegnata apre i contatti dei colleghi archiviati sotto di essa",
+    "find": "        OR EXISTS (SELECT 1 FROM \"company\" \"v\" WHERE \"v\".\"id\" = ${ident(t, \"company_id\")} AND ${mine(\"v\", scope)})\n        OR EXISTS (SELECT 1 FROM \"deal\" \"v\" WHERE \"v\".\"contact_id\" = ${id} AND ${mine(\"v\", scope)}))`;",
+    "replace": "        OR EXISTS (SELECT 1 FROM \"company\" \"v\" WHERE \"v\".\"id\" = ${ident(t, \"company_id\")} AND (${mine(\"v\", scope)} OR ${unassigned(\"v\")}))\n        OR EXISTS (SELECT 1 FROM \"deal\" \"v\" WHERE \"v\".\"contact_id\" = ${id} AND ${mine(\"v\", scope)}))`;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ le chiamate di un collega sulla sua trattativa si vedono attraverso l'azienda",
+    "find": "      return sql`(${ident(t, \"owner_id\")} = ${me}\n        OR ${throughLink(t, [\"deal\", \"contact\", \"lead\", \"company\"], scope, sql`TRUE`)})`;",
+    "replace": "      return sql`(${ident(t, \"owner_id\")} = ${me}\n        OR ${throughLink(t, [\"company\", \"deal\", \"contact\", \"lead\"], scope, sql`TRUE`)})`;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️ un'attività assegnata a me su un cliente del collega non la vedo",
+    "find": "      return sql`(${ident(t, \"owner_id\")} = ${me} OR ${ident(t, \"assignee_id\")} = ${me}",
+    "replace": "      return sql`(${ident(t, \"owner_id\")} = ${me}"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ un amministratore che crea un record senza titolare se lo vede assegnato",
+    "find": "  if (scope.all || values.ownerId || values.groupId) return values;",
+    "replace": "  if (values.ownerId || values.groupId) return values;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "⚠️⚠️ ciò che un commerciale crea senza titolare finisce nella lista di tutti",
+    "find": "  return { ...values, ownerId: scope.userId };",
+    "replace": "  return values;"
+  },
+  {
+    "file": "src/lib/record-visibility.ts",
+    "description": "visibleIds restituisce anche gli id che non si vedono",
+    "find": "  if (scope.all) return new Set(ids);\n  const where = visibleWhere(kind, scope);",
+    "replace": "  return new Set(ids);\n  const where = visibleWhere(kind, scope);"
+  }
+]

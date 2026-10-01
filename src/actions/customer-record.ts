@@ -4,6 +4,7 @@ import { and, desc, eq, notInArray, type SQL } from "drizzle-orm";
 
 import { deals, orders, quotes, tickets } from "@/db/schema";
 import { getTenantEntitlements, requireCapability } from "@/lib/auth-guard";
+import { assertCanSee, recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 
 /**
@@ -75,6 +76,10 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
 
   const clause = where({ companyId: deals.companyId, contactId: deals.contactId });
   if (!clause) return EMPTY;
+  // The customer must be one the person sees, and of what was sold to them only what they may
+  // see: a company seen through one's own deal does not open a colleague's (record-visibility.ts).
+  await assertCanSee(scope.companyId ? "company" : "contact", (scope.companyId ?? scope.contactId) as string);
+  const visible = await recordScope();
 
   // The plan and the database at once, then the four lists at once: they never depended on
   // one another, and read in turn they were five round trips before the customer card drew.
@@ -94,7 +99,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       expectedCloseDate: deals.expectedCloseDate,
     })
     .from(deals)
-    .where(where({ companyId: deals.companyId, contactId: deals.contactId }))
+    .where(and(where({ companyId: deals.companyId, contactId: deals.contactId }), visibleWhere("deal", visible)))
     .orderBy(desc(deals.createdAt))
     .limit(PAGE + 1);
 
@@ -108,7 +113,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
           currency: quotes.currency,
         })
         .from(quotes)
-        .where(where({ companyId: quotes.companyId, contactId: quotes.contactId }))
+        .where(and(where({ companyId: quotes.companyId, contactId: quotes.contactId }), visibleWhere("quote", visible)))
         .orderBy(desc(quotes.createdAt))
         .limit(PAGE + 1)
     : Promise.resolve([]);
@@ -123,7 +128,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
           currency: orders.currency,
         })
         .from(orders)
-        .where(where({ companyId: orders.companyId, contactId: orders.contactId }))
+        .where(and(where({ companyId: orders.companyId, contactId: orders.contactId }), visibleWhere("order", visible)))
         .orderBy(desc(orders.createdAt))
         .limit(PAGE + 1)
     : Promise.resolve([]);

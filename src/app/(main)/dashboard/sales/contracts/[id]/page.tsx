@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { MailIcon } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
@@ -13,6 +13,7 @@ import { currentTermEnd } from "@/lib/contract-terms";
 import { documentLanguage, formatDocumentDate, formatDocumentMoney } from "@/lib/document-language";
 import { documentValues } from "@/lib/email-placeholders";
 import { requirePageCapability } from "@/lib/page-guard";
+import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { toWallDate } from "@/lib/wall-clock";
 import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
@@ -27,13 +28,14 @@ export default async function EditContractPage({ params }: { params: Promise<{ i
 
   // Who to write to about it — the contact, else the company's own address — and what the email
   // knows: its title and the end of the term now running, renewals included.
-  const db = await getDb();
+  // Only a person or customer one sees: one's own contract can name a colleague's.
+  const [db, scope] = await Promise.all([getDb(), recordScope()]);
   const [[contact], [company], timeZone, tR] = await Promise.all([
     contract.contactId
       ? db
           .select({ firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
           .from(contacts)
-          .where(eq(contacts.id, contract.contactId))
+          .where(and(eq(contacts.id, contract.contactId), visibleWhere("contact", scope)))
       : Promise.resolve([]),
     contract.companyId
       ? db
@@ -44,7 +46,7 @@ export default async function EditContractPage({ params }: { params: Promise<{ i
             country: companies.country,
           })
           .from(companies)
-          .where(eq(companies.id, contract.companyId))
+          .where(and(eq(companies.id, contract.companyId), visibleWhere("company", scope)))
       : Promise.resolve([]),
     getWorkspaceTimeZone(),
     getTranslations("record"),

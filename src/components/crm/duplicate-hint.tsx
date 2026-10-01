@@ -11,7 +11,16 @@ export interface DuplicateMatch {
   id: string;
   label: string;
   detail?: string | null;
-  href: string;
+  /** Null for a colleague's record: said to exist, not opened (src/lib/record-visibility.ts). */
+  href: string | null;
+}
+
+/** What a duplicate the person may not see says instead of its name. */
+export function restrictedLabel(
+  t: (key: "restricted" | "restrictedColleague", values?: { owner: string }) => string,
+  ownerName: string | null,
+): string {
+  return ownerName ? t("restricted", { owner: ownerName }) : t("restrictedColleague");
 }
 
 /**
@@ -45,14 +54,20 @@ export function DuplicateHint({
           <ul className="mt-1 space-y-0.5">
             {matches.map((m) => (
               <li key={m.id} className="flex items-center gap-1.5 text-sm">
-                <Link
-                  href={m.href}
-                  target="_blank"
-                  className="min-w-0 truncate text-amber-800 underline underline-offset-2 hover:text-amber-950 dark:text-amber-300"
-                >
-                  {m.label}
-                </Link>
-                <ExternalLink className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-500" />
+                {m.href ? (
+                  <>
+                    <Link
+                      href={m.href}
+                      target="_blank"
+                      className="min-w-0 truncate text-amber-800 underline underline-offset-2 hover:text-amber-950 dark:text-amber-300"
+                    >
+                      {m.label}
+                    </Link>
+                    <ExternalLink className="h-3 w-3 shrink-0 text-amber-600 dark:text-amber-500" />
+                  </>
+                ) : (
+                  <span className="min-w-0 truncate text-amber-800 dark:text-amber-300">{m.label}</span>
+                )}
                 {m.detail && (
                   <span className="min-w-0 truncate text-amber-700/70 text-xs dark:text-amber-400/70">{m.detail}</span>
                 )}

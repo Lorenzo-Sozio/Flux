@@ -11,6 +11,16 @@ import { applyTenantMigrations } from "@/db/migrate-tenant";
 
 const db = drizzle(new PGlite());
 
+// Who is signed in, for a request made with a session.
+const signedIn = vi.hoisted(() => ({
+  actor: null as null | {
+    userId: string;
+    tenantRole: "owner" | "admin" | "editor" | "viewer";
+    isPlatformStaff: boolean;
+  },
+}));
+vi.mock("@/lib/auth-guard", () => ({ getActor: async () => signedIn.actor }));
+
 vi.mock("@/db", () => ({ createTenantDb: () => db }));
 vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbUrl: "x" }) }));
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
@@ -94,5 +104,33 @@ describe("the stages this business uses", () => {
       { id: "w", name: "Vinta", order: 3, probability: 100, staleAfterDays: null, kind: "won" },
     ]);
     expect(data[1].stages.map((st) => st.kind)).toEqual(["lost"]);
+  });
+});
+
+describe("⚠️⚠️ a signed-in person reads what they see on the screens", () => {
+  beforeAll(async () => {
+    await db.execute(sql`insert into "user" (id, email, name) values ('anna', 'anna@x.it', 'Anna'), ('bruno', 'bruno@x.it', 'Bruno')
+      on conflict do nothing`);
+    await db.execute(sql`insert into lead (id, first_name, last_name, owner_id) values
+      ('l-anna', 'A', 'A', 'anna'), ('l-bruno', 'B', 'B', 'bruno'), ('l-pool', 'P', 'P', null)`);
+  });
+
+  const leadIds = async (who: Parameters<typeof listResponse>[1]) => {
+    const res = await listResponse(new Request("https://x.test/api/crm/leads"), who, "leads");
+    return ((await res.json()).data as { id: string }[]).map((l) => l.id).sort();
+  };
+  const session = (userId: string, role: "admin" | "editor") => {
+    signedIn.actor = { userId, tenantRole: role, isPlatformStaff: false };
+    return { via: "session", userId, role, tenantId: "t1", scopes: null, key: null } as const;
+  };
+
+  it("a salesperson pages through their own and the unassigned, never a colleague's", async () => {
+    expect(await leadIds(session("anna", "editor"))).toEqual(["l-anna", "l-pool"]);
+  });
+
+  it("an administrator reads them all; so does a key, which is a machine", async () => {
+    expect(await leadIds(session("anna", "admin"))).toEqual(["l-anna", "l-bruno", "l-pool"]);
+    signedIn.actor = null;
+    expect(await leadIds(WHO)).toEqual(["l-anna", "l-bruno", "l-pool"]);
   });
 });

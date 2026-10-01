@@ -4,6 +4,7 @@ import { activities, deals, salesTargets } from "@/db/schema";
 import { monthKeysOf, parsePeriodKey, periodBounds, periodKey, targetFor } from "@/lib/calendar-period";
 import { closedBetween, dealEur, winRatePercent } from "@/lib/metrics";
 import { ownerCondition, UNASSIGNED } from "@/lib/pipeline-filters";
+import { type RecordScope, SEE_ALL, visibleWhere } from "@/lib/record-visibility";
 
 /**
  * One row per salesperson for a calendar period: the view a sales manager asks for first
@@ -21,6 +22,10 @@ import { ownerCondition, UNASSIGNED } from "@/lib/pipeline-filters";
  *   times as much in play as still needs winning. Null with no target, or none left to win.
  * - **Cycle** is the average days from creation to win, over the deals won in the period.
  * - **Open** is what is open now, whatever the period: pipeline has no past.
+ *
+ * ⚠️ `scope` is the reader's (src/lib/record-visibility.ts): a salesperson opening the
+ * scorecard counts only the deals and activities they may see. Targets are not records and
+ * stay whole.
  */
 
 // biome-ignore lint/suspicious/noExplicitAny: Drizzle's database types differ per driver
@@ -61,12 +66,19 @@ const COUNTED_ACTIVITIES = ["call", "meeting", "email"] as const;
 
 export async function repScorecard(
   db: AnyDb,
-  input: { period: string; timeZone: string; members: readonly ScorecardMember[]; owners?: readonly string[] },
+  input: {
+    period: string;
+    timeZone: string;
+    members: readonly ScorecardMember[];
+    owners?: readonly string[];
+    scope?: RecordScope;
+  },
 ): Promise<{ period: string; rows: ScorecardRow[]; totals: ScorecardRow } | null> {
   const parsed = parsePeriodKey(input.period);
   const bounds = periodBounds(input.period, input.timeZone);
   if (!parsed || !bounds) return null;
   const owners = input.owners ?? [];
+  const scope = input.scope ?? SEE_ALL;
   const last = new Date(bounds.to.getTime() - 1);
 
   // Every key a target for this period could be written under.
@@ -94,6 +106,7 @@ export async function repScorecard(
         and(
           sql`(${closedBetween("won", bounds.from, last)} or ${closedBetween("lost", bounds.from, last)})`,
           ownerCondition(deals.ownerId, owners),
+          visibleWhere("deal", scope),
         ),
       )
       .groupBy(deals.ownerId),
@@ -104,7 +117,7 @@ export async function repScorecard(
         openValue: sql<number>`coalesce(sum(${dealEur}), 0)`,
       })
       .from(deals)
-      .where(and(eq(deals.status, "open"), ownerCondition(deals.ownerId, owners)))
+      .where(and(eq(deals.status, "open"), ownerCondition(deals.ownerId, owners), visibleWhere("deal", scope)))
       .groupBy(deals.ownerId),
     db
       .select({ ownerId: activities.ownerId, type: activities.type, n: sql<number>`count(*)::int` })
@@ -115,6 +128,7 @@ export async function repScorecard(
           gte(sql`coalesce(${activities.date}, ${activities.createdAt})`, bounds.from),
           lt(sql`coalesce(${activities.date}, ${activities.createdAt})`, bounds.to),
           ownerCondition(activities.ownerId, owners),
+          visibleWhere("activity", scope),
         ),
       )
       .groupBy(activities.ownerId, activities.type),

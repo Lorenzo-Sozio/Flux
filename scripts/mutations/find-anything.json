@@ -38,7 +38,7 @@
   {
     "file": "src/lib/search/providers.ts",
     "description": "⚠️ un contatto non si trova più con il nome della sua azienda",
-    "find": "          // By the company they work for: \"Rossi\" finds the people at Rossi Srl too.\n          matches(companies.name, like),",
+    "find": "            // By the company they work for: \"Rossi\" finds the people at Rossi Srl too.\n            matches(companies.name, like),",
     "replace": ""
   },
   {
