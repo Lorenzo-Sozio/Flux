@@ -2130,7 +2130,11 @@ auto-migration as everything else.
     Back has something to do and disarmed on the home with nothing open. Never one per layer:
     Chrome groups the watchers a page makes without a fresh tap and closes a group on one Back.
     The dialogs register in `backLayers` (`useBackDismiss`, in the primitives: a new dialog has it).
-    Re-arming after each Back needs no tap (checked in Chrome: six Backs, six closes).
+    Re-arming after each Back needs no tap on desktop Chrome (six Escapes, six closes), but on a
+    phone the first Back worked and every later one did nothing: a watcher armed without a tap is
+    **made again at the next tap** (`withTap`, `navigator.userActivation`).
+  - `?backdebug=1` shows a log of what the controller does at the top of the screen, on a real
+    phone; `?backdebug=0` hides it (kept in localStorage).
   - What is behind the current entry is mirrored (`createHistoryMirror`): `pushState` and
     `replaceState` are wrapped (Next patches them too; both run).
   - **Without CloseWatcher** (Safari, Firefox) only the layers are handled, by the history entries
