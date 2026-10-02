@@ -165,9 +165,16 @@ export function customerSnapshot(c: {
   state: string | null;
   country: string | null;
   language?: string | null;
+  personFirstName?: string | null;
+  personLastName?: string | null;
 }) {
+  // A private customer is a person: both names, or neither (src/lib/fatturapa/xml.ts).
+  const firstName = c.personFirstName?.trim() || null;
+  const lastName = c.personLastName?.trim() || null;
+  const person = firstName && lastName ? { firstName, lastName } : {};
   return {
     name: c.name,
+    ...person,
     vatNumber: c.vatNumber ? normaliseVat(c.vatNumber) : null,
     fiscalCode: c.fiscalCode?.replace(/\s+/g, "").toUpperCase() || null,
     sdiCode: c.sdiCode?.trim().toUpperCase() || null,

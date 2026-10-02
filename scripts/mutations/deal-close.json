@@ -82,5 +82,29 @@
     "description": "⚠️ sulla lavagna un'attività aperta senza scadenza non conta come passo successivo",
     "find": "hasNextStep: (nextStepCount ?? 0) > 0 },",
     "replace": "hasNextStep: nextStepAt != null },"
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️⚠️ la trattativa vinta convertendo il preventivo in ordine non fa scattare le regole su «vinta»",
+    "find": "    if (wonHere && dealDopo) {\n      await runAutomations({",
+    "replace": "    if (false) {\n      await runAutomations({"
+  },
+  {
+    "file": "src/actions/orders.ts",
+    "description": "⚠️ una trattativa già vinta fa scattare di nuovo le regole quando il preventivo diventa ordine",
+    "find": "  const wonHere = dealPrima && dealPrima.status !== \"won\" ? dealPrima : undefined;",
+    "replace": "  const wonHere = dealPrima;"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ «Crea attività» scrive il segnaposto del titolare come assegnatario e la regola fallisce",
+    "find": "      assigneeId === \"entity_owner\" ? await this.resolveEntityOwner(context) : assigneeId ? assigneeId : null;",
+    "replace": "      assigneeId ? assigneeId : null;"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ «Crea attività» non assegnata scrive \"\" come assegnatario e la regola fallisce",
+    "find": "      assigneeId === \"entity_owner\" ? await this.resolveEntityOwner(context) : assigneeId ? assigneeId : null;",
+    "replace": "      assigneeId === \"entity_owner\" ? await this.resolveEntityOwner(context) : assigneeId ?? null;"
   }
 ]

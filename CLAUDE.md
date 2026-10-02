@@ -344,6 +344,11 @@ handed every key from before scopes each new write scope — `webhooks:write` am
 and a subscription to every event is a way to read everything. A scope added later is for
 keys made later; `api-keys.test.ts` pins the eight.
 
+⚠️⚠️ **An update keeps the source the record has.** The insert builders default `source` to `"api"`;
+every update path goes through `asUpdate` ([src/lib/api-import-validators.ts](src/lib/api-import-validators.ts)),
+which leaves it out when the caller sent none — a Meta lead sent again by Zapier used to become an
+"api" lead. `api-import-validators.test.ts` holds the six routes to it.
+
 #### Who wrote a row, and where that is NOT recorded
 
 Every route here records one line per successful request in `api_write_log`
@@ -1220,6 +1225,61 @@ writes into the database it is handed (`notifyManyIn`): on the API there is no s
 reads one. The bulk import routes and the CSV import tell nobody, like they run no rules.
 `src/lib/lead-assignment.test.ts` (PGlite); `scripts/mutations/lead-assignment.json`.
 
+### From a lead to a won deal (tappa 1 of docs/processo-operativo-2026-10.md)
+
+**Where a customer came from is one list** ([src/lib/record-sources.ts](src/lib/record-sources.ts),
+table `record_source`, migration `0073_where_they_came_from`), managed at Settings → Lists.
+- ⚠️⚠️ **A record stores the source's key, never its label.** A built-in source has `name` null and is
+  read as `common.sources.<key>` in the reader's language; renaming one moves no record and splits no
+  report. Retired, never deleted. Merging (`mergeRecordSourceAction`) moves lead, contact, company,
+  deal and order in one transaction; a value on records that nobody listed is shown there to list
+  or merge.
+- The deal carries `source` too, copied from its lead on conversion: "won by source" on the funnel
+  and the report builder read it.
+- Forms use `SourceSelect` ([source-select.tsx](src/components/crm/source-select.tsx)), filters get the
+  list as `lookupOptions` (`sourceFilterOptions`), server pages and reports label with `sourceLabeller`.
+  ⚠️ A form shows the record's own source even when it is retired or unlisted (`sourceChoices`):
+  opening and saving must never erase it.
+
+**The work queue** ([src/actions/next-actions.ts](src/actions/next-actions.ts)) also lists:
+- `call_due`: call tasks due today (on the workspace's clock) or late up to 30 days, for whoever is
+  assigned, or the owner when nobody is. Completed from the row as a call (`taskType`).
+- `lead_new`: a lead in status `new` nobody has spoken to (a call, email or meeting — a note does
+  not count), younger than `leadUntouchedDays`, the person's own, their group's or nobody's. Older,
+  it is the owner's `lead_untouched`. ⚠️ One row per lead: a call planned on it stands for it.
+
+**Converting a lead** (`convertLead(id, createDeal, { pipelineId, privateCustomer })`, the dialog
+[convert-lead-dialog.tsx](src/components/crm/convert-lead-dialog.tsx), shared by the lead page and
+the list): the deal opens in the chosen pipeline's first *open* stage with its probability; owner and
+group are the lead's (the converter's when it had none); the source, appointments, documents and
+custom fields (same slug *and* kind) move with it; the rules run (deal `onCreate`, lead `onUpdate`).
+- ⚠️⚠️ **A private customer is a company in their own name** (`privateCustomer`, on by default for a
+  lead with no company): a quote requires a company and an invoice is made out to one. Never matched
+  by name; a person who is a contact already keeps their company.
+- ⚠️⚠️ **A person is named, not denominated.** The private customer's company carries
+  `person_first_name` / `person_last_name` (migration `0074_a_person_not_a_company`, the billing tab,
+  filled by the conversion); with both, `customerSnapshot` freezes them and the FatturaPA buyer is
+  `<Nome>` + `<Cognome>` instead of `<Denominazione>` (`anagrafica` in `fatturapa/xml.ts`), and Fatture
+  in Cloud gets `type: "person"`. One name alone stays a Denominazione. ⚠️ A customer with a personal
+  codice fiscale and no partita IVA is not invoiced without both names (`customerGaps`, field
+  `personName`): a private customer filed before the columns existed would otherwise be a business.
+
+**The tappa 0 configuration is a script**, `npx tsx scripts/setup-processo-operativo.ts <subdomain>`
+([src/lib/workspace-setup/processo-operativo.ts](src/lib/workspace-setup/processo-operativo.ts)): a preview unless
+`--applica`. ⚠️⚠️ It creates only what is missing, by name, and adapts only values still exactly as
+`seedWorkspace` wrote them (a stage keeps its id); rules are created switched off, priceless products
+inactive. A preview that wrote anything, or a run that overwrote a choice, would break the one promise
+that makes it safe to run on a live workspace.
+
+**Rules on "won"** fire from `convertQuoteToOrderAction` too (deal `onUpdate`, once, only when this
+conversion won it), with the owner's `deal_won` notification and `deal.stage_changed`. A rule's
+"create task" resolves `entity_owner` and stores "unassigned" as null: both used to break the
+foreign key and fail the rule on every run.
+
+`src/actions/next-actions.test.ts`, `src/actions/record-sources.test.ts`, `src/lib/record-sources.test.ts`,
+`src/actions/convert-lead.test.ts`, `src/components/crm/automation/create-task.test.ts`,
+`src/actions/pipeline-close.test.ts`; `scripts/mutations/{next-actions,record-sources,lead-conversion,deal-close}.json`.
+
 ### A record's timeline
 
 [src/lib/record-timeline.ts](src/lib/record-timeline.ts), drawn by `<RecordTimeline scope=… />`
@@ -1895,19 +1955,21 @@ navy tile it is every icon in `public/icons/`, the 18 launch images, the opening
 - The name in `public/brand/` is Plus Jakarta Sans (SIL OFL) converted to paths; the script that set
   it is not in the repository (it needs opentype.js), so those files are the source for the name.
 
-**The opening screen is one gradient from the system to the page.**
-- Android paints the manifest's `background_color`, the tile's navy, not white.
+**One opening screen: the system's.** The mark alone on navy (`#15224d`), on both platforms.
+- Android paints the manifest's `background_color` with the icon in the middle.
+  ⚠️ The manifest's icons are filled flat with that same colour (`LAUNCH_BG` in
+  `scripts/generate-pwa-icons.mjs`): a tile with its own gradient read as a square
+  of another blue stuck on the screen.
 - iOS shows an `apple-touch-startup-image` for the exact screen size. There are
   18 of them in `public/splash/`, generated by `npm run generate:icons` from
   `src/config/splash-screens.json`. Without one iOS opens on white.
-- Then the page's own splash takes over
-  ([splash-screen.tsx](src/components/pwa/splash-screen.tsx)). It is plain
-  HTML/CSS plus an inline script in the root layout, so it paints before any
-  JavaScript. It shows once per tab session and lifts on `load`.
-
-⚠️ The splash can never trap anyone. A timer lifts it at 5s, and a CSS animation
-hides it at 6s even if the script never runs. A splash written as React
-components would appear only after the very wait it is meant to cover.
+- ⚠️ The page draws no splash of its own (removed on 2 October 2026). After the
+  system's, a second one read as two splashes, and it also covered a desktop tab at
+  every new session.
+- The home-screen icon on iOS (`apple-touch-icon.png`) and the favicon keep the
+  gradient tile; only what Android draws on its launch screen is flat.
+- Changing an icon means bumping `VERSION` in `public/sw.js`: the worker serves
+  `/icons/` by name from its cache.
 
 ⚠️ **A maskable icon is different artwork, not the same PNG relabelled.** The
 launcher crops the outer 20% to whatever shape the device draws, so the mark has
@@ -2061,6 +2123,13 @@ auto-migration as everything else.
     refreshes the page at once, and the refresh was thrown away; a link from the Menu was cancelled.
     A closed layer's entry stays, *spent*: the next layer on the same page takes it over, and a Back
     with nothing open skips the spent entries and the page's own with one `history.go(-n)`.
+  - ⚠️⚠️ **Spent entries are counted per page**, and the skip happens only for a Back pressed *on*
+    the page. Kept for one page at a time, a layer closed on a second page forgot the first's, and
+    coming back took a Back that did nothing; coming back from another page lands on the newest
+    spent entry, which shows the page, and skips nothing. To know where a Back came from,
+    `pushState`/`replaceState` are wrapped (Next patches them too; both run).
+  - A screen that is a layer without being a dialog uses the hook directly: an open conversation in
+    the chat, on a phone, is one (`BackToList`), so Back returns to the list instead of leaving.
   - ⚠️ The full-screen panel draws its close button in its own header (`ownCloseButton`); the
     dialog's default one is `z-20` and moves up on a touchscreen, where every button is 44px tall.
 - **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).

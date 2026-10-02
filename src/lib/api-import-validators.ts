@@ -254,6 +254,19 @@ function consentStamp(consent: boolean | null | undefined, source: ConsentSource
   return consent === true ? { consentDate: new Date(), consentSource: source } : {};
 }
 
+/**
+ * A payload built for an insert, made fit for an update.
+ *
+ * ⚠️⚠️ `source` defaults to "api" so that a record an integration creates says where it came
+ * from. On an update the same default overwrote the source the record already had: a lead from
+ * Meta ads, sent again by Zapier or Make without a source, became an "api" lead, and the
+ * report by source counted it under the wrong channel. Sent, it is written; not sent, the
+ * record keeps its own (`undefined` is left alone by Drizzle's `.set`).
+ */
+export function asUpdate<T extends { source?: string | null }>(payload: T, sent: { source?: string | null }): T {
+  return { ...payload, source: sent.source ?? undefined };
+}
+
 export function buildLeadPayload(data: LeadInput, ownerId: string | null, consentSource: ConsentSource = "api") {
   return {
     firstName: data.firstName,

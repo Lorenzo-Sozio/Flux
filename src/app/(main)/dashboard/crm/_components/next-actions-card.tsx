@@ -15,10 +15,12 @@ import {
   FileWarning,
   ListStart,
   MoreHorizontal,
+  PhoneCall,
   Reply,
   ShoppingCart,
   Snowflake,
   TrendingDown,
+  UserPlus,
   UserX,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -100,6 +102,16 @@ const PRESENTATION: Record<NextActionKind, { key: string; icon: React.ReactNode;
     key: "quoteToOrder",
     icon: <ShoppingCart className="h-4 w-4" />,
     tone: "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-400",
+  },
+  call_due: {
+    key: "callDue",
+    icon: <PhoneCall className="h-4 w-4" />,
+    tone: "text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400",
+  },
+  lead_new: {
+    key: "leadNew",
+    icon: <UserPlus className="h-4 w-4" />,
+    tone: "text-teal-600 bg-teal-50 dark:bg-teal-950/40 dark:text-teal-400",
   },
 };
 
@@ -216,7 +228,7 @@ export function NextActionsCard({
                       {a.taskId && canWrite && (
                         <DropdownMenuItem onSelect={() => setReplying(a)}>
                           <CheckCircle2 className="size-4" aria-hidden />
-                          {t("replied")}
+                          {t(a.taskType === "call" ? "callLogged" : "replied")}
                         </DropdownMenuItem>
                       )}
                       {followUp && canWrite && (
@@ -258,7 +270,7 @@ export function NextActionsCard({
       )}
       {replying?.taskId && (
         <TaskOutcomeDialog
-          task={{ id: replying.taskId, title: replying.title, type: "email" }}
+          task={{ id: replying.taskId, title: replying.title, type: replying.taskType ?? "email" }}
           open
           onOpenChange={(v) => {
             if (!v) setReplying(null);

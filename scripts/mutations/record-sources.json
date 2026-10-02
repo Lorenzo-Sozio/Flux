@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/actions/record-sources.ts",
+    "description": "⚠️⚠️ unire due provenienze lascia le trattative sotto quella vecchia: il report delle vendite si divide",
+    "find": "    db.update(deals).set({ source: intoKey }).where(eq(deals.source, from)),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/record-sources.ts",
+    "description": "⚠️ unire due provenienze lascia la vecchia nell'elenco",
+    "find": "    db.delete(recordSources).where(eq(recordSources.key, from)),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/record-sources.ts",
+    "description": "⚠️⚠️ aprire e salvare un record cancella la sua provenienza disattivata o fuori elenco",
+    "find": "  if (current && !active.some((s) => s.key === current)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/record-sources.ts",
+    "description": "⚠️ il nome dato dall'azienda a una provenienza non si vede: resta l'etichetta standard",
+    "find": "  if (named) return named;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/record-sources.ts",
+    "description": "⚠️ una nuova provenienza prende la chiave di una già esistente e ne eredita i record",
+    "find": "  if (!taken.has(base)) return base;",
+    "replace": "  return base;"
+  }
+]

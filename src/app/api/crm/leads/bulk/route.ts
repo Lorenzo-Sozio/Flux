@@ -8,6 +8,7 @@ import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { gateApiRequest } from "@/lib/api-import-auth";
 import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
+  asUpdate,
   buildLeadPayload,
   type OnDuplicate,
   parseOnDuplicate,
@@ -181,7 +182,7 @@ export async function POST(req: NextRequest) {
           continue;
         }
         if (onDuplicate === "update") {
-          toUpdate.push({ id: existingId, values: buildLeadPayload(data, authResult.userId) });
+          toUpdate.push({ id: existingId, values: asUpdate(buildLeadPayload(data, authResult.userId), data) });
           results[index] = { index, status: "updated", id: existingId };
           updated++;
           continue;

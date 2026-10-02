@@ -52,5 +52,11 @@
     "description": "⚠️⚠️ la modifica salva un contratto rifiutato dalla validazione",
     "find": "  await requireCapability(\"contract:write\");\n  await requirePlanModule(\"sales\");\n  const cleaned = cleanContract(input);\n  if (!cleaned.ok) return cleaned;\n\n  const db = await getDb();\n  const [existing]",
     "replace": "  await requireCapability(\"contract:write\");\n  await requirePlanModule(\"sales\");\n  const cleaned = cleanContract(input);\n\n  const db = await getDb();\n  const [existing]"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ modificare un contratto cancella il collegamento alla trattativa su cui è stato firmato",
+    "find": "      dealId: input.dealId === undefined ? undefined : input.dealId || null,",
+    "replace": "      dealId: input.dealId || null,"
   }
 ]

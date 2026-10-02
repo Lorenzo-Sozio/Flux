@@ -13,9 +13,12 @@
  * API. It becomes a problem the day something else also writes it, which is why it is
  * still a note.
  */
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  asUpdate,
   buildCompanyPayload,
   buildLeadPayload,
   digitsForMatching,
@@ -210,5 +213,29 @@ describe("a company can be put on a price list", () => {
     const { errors } = validateCompanyInput({ name: "Rossi SpA", priceListId: 7 });
 
     expect(errors.map((e) => e.field)).toContain("priceListId");
+  });
+});
+
+describe("⚠️⚠️ an update keeps the source the record already has", () => {
+  it("leaves it out when the caller sent none, and writes it when they did", () => {
+    const payload = { firstName: "Mario", source: "api" };
+    expect(asUpdate(payload, { source: null }).source).toBeUndefined();
+    expect(asUpdate(payload, {}).source).toBeUndefined();
+    expect(asUpdate({ ...payload, source: "ads_meta" }, { source: "ads_meta" }).source).toBe("ads_meta");
+  });
+
+  it("on every route that updates a lead, a contact or a company", () => {
+    // Each update path builds its row with the insert's builder, whose source defaults to
+    // "api": one path that forgets `asUpdate` turns every record it touches into an API one.
+    const routes = ["leads", "contacts", "companies"].flatMap((e) => [
+      `src/app/api/crm/${e}/route.ts`,
+      `src/app/api/crm/${e}/bulk/route.ts`,
+    ]);
+    for (const file of routes) {
+      const source = readFileSync(file, "utf8");
+      // One builder call creates, one updates: the update is the one inside asUpdate.
+      expect(source.match(/build(Lead|Contact|Company)Payload\(/g)?.length, file).toBe(2);
+      expect(source.match(/asUpdate\(build(Lead|Contact|Company)Payload\(/g)?.length, file).toBe(1);
+    }
   });
 });

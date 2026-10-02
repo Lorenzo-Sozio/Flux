@@ -250,7 +250,10 @@ export function cleanContract(input: ContractInput): { ok: true; value: CleanCon
       autoRenew: input.autoRenew,
       renewalTermMonths,
       contactId: input.contactId || null,
-      dealId: input.dealId || null,
+      // ⚠️⚠️ Not sent is not "none": the form has no deal field, and turning its absence into
+      // null cut every contract from the deal it was signed on at its first edit. Sent empty,
+      // the link is removed; not sent, the contract keeps the one it has.
+      dealId: input.dealId === undefined ? undefined : input.dealId || null,
       ownerId: input.ownerId || null,
       notes: input.notes?.trim().slice(0, 5000) || null,
     },

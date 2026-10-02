@@ -1,6 +1,7 @@
 "use server";
 
 import { and, desc, eq, gte, lt, ne, sql } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 
 import {
   activities,
@@ -16,6 +17,7 @@ import {
 } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { quoteEur, ticketIsOpen } from "@/lib/metrics";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
 import { dayBounds } from "@/lib/workspace-day";
@@ -126,6 +128,9 @@ export async function getDashboardStats() {
         .groupBy(leads.source),
     ]);
 
+  // By the workspace's name for each source, not its stored key (src/lib/record-sources.ts).
+  const [label, tSources] = await Promise.all([sourceLabeller(db), getTranslations("common.sources")]);
+  const notRecorded = tSources("unknown");
   const totalLeads = Number(leadCounts?.total ?? 0);
   const convertedLeads = Number(leadCounts?.converted ?? 0);
   const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
@@ -141,7 +146,7 @@ export async function getDashboardStats() {
       value: Number(stage.value),
       color: stage.color || "#3b82f6",
     })),
-    leadsBySource: sources.map((r) => ({ name: r.source || "Other", value: Number(r.count) })),
+    leadsBySource: sources.map((r) => ({ name: label(r.source) ?? notRecorded, value: Number(r.count) })),
     quotesPipelineValue: Number(quoteFigures?.pipelineValue ?? 0),
     quotesOpenCount: Number(quoteFigures?.openCount ?? 0),
     openTicketsCount: Number(ticketCounts?.open ?? 0),

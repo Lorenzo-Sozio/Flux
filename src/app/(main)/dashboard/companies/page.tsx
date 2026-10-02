@@ -16,6 +16,8 @@ import { hasCapability } from "@/lib/auth-guard";
 import { COMPANY_FIELDS, customFieldsToMetaMap, toFieldMetaMap } from "@/lib/filter-engine";
 import { countActive, decodeFilter } from "@/lib/filter-types";
 import { parseListParams } from "@/lib/pagination";
+import { sourceFilterOptions } from "@/lib/record-sources-load";
+import { getDb } from "@/lib/tenant-context";
 
 import { CompaniesTable } from "./_components/companies-table";
 import { CompanyModal } from "./_components/company-modal";
@@ -32,6 +34,10 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   // only fail (audit rilievo U-02).
   const [canEdit, canImport] = await Promise.all([hasCapability("record:write"), hasCapability("record:import")]);
 
+  // Started beside the list: the filter offers the workspace's own sources, by name.
+  const sourceOptions = getDb()
+    .then(sourceFilterOptions)
+    .catch(() => []);
   const [pageResult, savedFilters, customDefs, users, categories, companyTypes, priceLists] = await Promise.all([
     listCompanies(listParams),
     getSavedViews("companies").catch(() => []),
@@ -56,6 +62,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
       lookupOptions: users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })),
     };
   }
+  if (fields.source) fields.source = { ...fields.source, lookupOptions: await sourceOptions };
 
   if (fields.companyCategoryId) {
     fields.companyCategoryId = {

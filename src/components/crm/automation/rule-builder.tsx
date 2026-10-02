@@ -40,6 +40,7 @@ import {
   TARGET_ENTITIES,
   TRIGGER_EVENTS,
 } from "@/components/crm/automation/types";
+import { useRecordSources } from "@/components/crm/source-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,6 +51,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { sourceChoices, sourceLabel } from "@/lib/record-sources";
 import { isOwnedEntity } from "@/lib/round-robin";
 import { NO_VALUE_OPERATORS } from "@/lib/rule-conditions";
 import { cn } from "@/lib/utils";
@@ -72,16 +74,8 @@ type UpdField = {
   options?: { value: string; label?: string; emoji?: string }[];
 };
 
-const SOURCE_OPTIONS = [
-  "website",
-  "referral",
-  "linkedin",
-  "cold_outreach",
-  "trade_show",
-  "advertisement",
-  "email_campaign",
-  "other",
-].map((value) => ({ value }));
+/** Filled with the workspace's own list (Settings → Lists) when the builder opens. */
+const SOURCE_OPTIONS: UpdField["options"] = [];
 
 const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
   deal: [
@@ -100,6 +94,7 @@ const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
         { value: "GBP", label: "GBP (£)" },
       ],
     },
+    { value: "source", kind: "enum", options: SOURCE_OPTIONS },
     { value: "notes", kind: "textarea" },
   ],
   lead: [
@@ -405,6 +400,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const t = useTranslations("automation.ruleBuilder");
   const tAutomation = useTranslations("automation");
   const tCommon = useTranslations("common");
+  // Where a customer came from: the workspace's list, active ones offered (src/lib/record-sources.ts).
+  const recordSources = useRecordSources();
+  const sourceOptions = sourceChoices(recordSources, null).map((s) => ({ value: s.key }));
   const formMessage = useRuleFormMessage();
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
@@ -496,7 +494,16 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
         }
       : f.key === "ownerId" && f.type === "enum"
         ? { ...f, options: userList.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })) }
-        : f,
+        : f.key === "source"
+          ? {
+              ...f,
+              type: "enum" as const,
+              options: sourceOptions.map((o) => ({
+                value: o.value,
+                label: sourceLabel(o.value, recordSources, (k) => tCommon(`sources.${k}`)) ?? o.value,
+              })),
+            }
+          : f,
   );
 
   // Labels: the registry in types.ts carries English labels; a translation wins when one exists.
@@ -505,8 +512,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const optionLabel = (field: string, opt: { value: string; label?: string; emoji?: string }) => {
     const key = `options.${targetEntity}.${field}.${opt.value}`;
     const text =
-      field === "source" && tCommon.has(`sources.${opt.value}`)
-        ? tCommon(`sources.${opt.value}`)
+      field === "source"
+        ? (sourceLabel(opt.value, recordSources, (k) => tCommon(`sources.${k}`)) ?? opt.value)
         : t.has(key)
           ? t(key)
           : (opt.label ?? opt.value);
@@ -976,7 +983,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   const actionErrs = (e.actions as any)?.[index]?.params;
 
                   // For update_field: derive the selected field def and its kind
-                  const updFields = UPDATE_FIELDS_BY_ENTITY[targetEntity] ?? UPDATE_FIELDS_BY_ENTITY.deal;
+                  const updFields = (UPDATE_FIELDS_BY_ENTITY[targetEntity] ?? UPDATE_FIELDS_BY_ENTITY.deal).map((f) =>
+                    f.value === "source" ? { ...f, options: sourceOptions } : f,
+                  );
                   // biome-ignore lint/suspicious/noExplicitAny: dynamic field path
                   const selectedUpd = watch(`actions.${index}.params.field` as any) as string;
                   const updFieldDef = updFields.find((f) => f.value === selectedUpd) ?? updFields[0];
@@ -999,7 +1008,12 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   if (v === "create_task")
                                     updateAction(index, {
                                       type: "create_task",
-                                      params: { title: "", priority: "normal", dueDateDays: 3, assigneeId: "" },
+                                      params: {
+                                        title: "",
+                                        priority: "normal",
+                                        dueDateDays: 3,
+                                        assigneeId: "entity_owner",
+                                      },
                                     });
                                   else if (v === "send_notification")
                                     updateAction(index, {
@@ -1095,13 +1109,14 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               name={`actions.${index}.params.assigneeId` as any}
                               render={({ field: f }) => (
                                 <Select
-                                  value={f.value ?? "__unassigned__"}
+                                  value={f.value || "__unassigned__"}
                                   onValueChange={(v) => f.onChange(v === "__unassigned__" ? "" : v)}
                                 >
                                   <SelectTrigger className="h-8 bg-background text-sm">
                                     <SelectValue placeholder={t("task.unassigned")} />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="entity_owner">👤 {t("notification.recordOwner")}</SelectItem>
                                     <SelectItem value="__unassigned__">{t("task.unassigned")}</SelectItem>
                                     {userList.map((u) => (
                                       <SelectItem key={u.id} value={u.id}>
@@ -1751,7 +1766,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   onClick={() =>
                     addAction({
                       type: "create_task",
-                      params: { title: "", priority: "normal", dueDateDays: 3, assigneeId: "" },
+                      params: { title: "", priority: "normal", dueDateDays: 3, assigneeId: "entity_owner" },
                     } as any)
                   }
                 >

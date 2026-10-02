@@ -145,7 +145,30 @@ describe("the customer", () => {
   });
 
   it("⚠️ a private person with only a codice fiscale is delivered without either", () => {
-    expect(customerGaps({ ...customer, vatNumber: "", sdiCode: "", fiscalCode: "RSSMRA85T10A562S" })).toEqual([]);
+    expect(
+      customerGaps({
+        ...customer,
+        vatNumber: "",
+        sdiCode: "",
+        fiscalCode: "RSSMRA85T10A562S",
+        personFirstName: "Mario",
+        personLastName: "Rossi",
+      }),
+    ).toEqual([]);
+  });
+
+  it("⚠️⚠️ a private person is not invoiced until their first and last name are known", () => {
+    // Without them the e-invoice would name the person as a business (Denominazione).
+    const person = { ...customer, vatNumber: "", sdiCode: "", fiscalCode: "RSSMRA85T10A562S" };
+    expect(customerGaps(person)).toEqual([{ field: "personName", problem: "missing" }]);
+    expect(customerGaps({ ...person, personFirstName: "Mario" })).toEqual([
+      { field: "personName", problem: "missing" },
+    ]);
+    // A business identified by an 11-digit codice fiscale is not a person.
+    expect(customerGaps({ ...customer, vatNumber: "", fiscalCode: "00488410010" })).not.toContainEqual({
+      field: "personName",
+      problem: "missing",
+    });
   });
 
   it("⚠️⚠️ needs a partita IVA or a codice fiscale when Italian", () => {

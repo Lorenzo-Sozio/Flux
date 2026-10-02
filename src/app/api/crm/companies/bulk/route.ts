@@ -8,6 +8,7 @@ import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { gateApiRequest } from "@/lib/api-import-auth";
 import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
+  asUpdate,
   buildCompanyPayload,
   type OnDuplicate,
   parseOnDuplicate,
@@ -193,7 +194,7 @@ export async function POST(req: NextRequest) {
           // ⚠️ By id. The update used to repeat the `ILIKE` as its own `WHERE`, so
           // two companies whose names differ only in case were both rewritten by
           // one record, and the response named whichever came back first.
-          toUpdate.push({ id: existingId, values: buildCompanyPayload(data, authResult.userId) });
+          toUpdate.push({ id: existingId, values: asUpdate(buildCompanyPayload(data, authResult.userId), data) });
           results[index] = { index, status: "updated", id: existingId };
           updated++;
           continue;

@@ -19,12 +19,15 @@ import {
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   activities,
+  appointments,
   companies,
   companyCategories,
   companyTypes,
   contacts,
   customFieldDefinitions,
+  customFieldValues,
   deals,
+  documents,
   leads,
   pipelineStages,
   tasks,
@@ -293,8 +296,22 @@ export async function deleteLead(id: string) {
   revalidatePath("/dashboard/leads");
 }
 
-export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
-  await requireWriteAccess();
+/**
+ * How a lead is converted, as chosen in the dialog. Every field is optional: the API and older
+ * callers convert into the first pipeline, with a company only when the lead names one.
+ */
+export interface ConvertLeadOptions {
+  /** The pipeline the deal opens in; its first open stage. Absent: the first pipeline. */
+  pipelineId?: string | null;
+  /**
+   * A private customer: with no company on the lead, the customer is filed under a company in
+   * the person's own name, because a quote and an invoice are made out to a company (S4).
+   */
+  privateCustomer?: boolean;
+}
+
+export async function convertLead(leadId: string, shouldCreateDeal: boolean, options: ConvertLeadOptions = {}) {
+  const actor = await requireWriteAccess();
   await assertCanSee("lead", leadId);
   const db = await getDb();
   await requirePlanLimit("maxRecords", await countRecords(db));
@@ -305,6 +322,10 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
   const tLeads = await getTranslations("leads");
   const dealName = tLeads("dealForName", { firstName: lead.firstName, lastName: lead.lastName });
+  // ⚠️ The same agent on every record the lead becomes; a lead nobody owned becomes the
+  // converter's, as anything they create for nobody does (src/lib/record-visibility.ts).
+  const ownerId = lead.ownerId ?? actor.user.id;
+  const personName = [lead.firstName, lead.lastName].filter(Boolean).join(" ").trim();
 
   // Everything this function writes is collected first and committed together.
   //
@@ -319,13 +340,54 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   // hence the ids below are chosen here rather than by the database default.
   const writes: unknown[] = [];
 
+  // The same person converted twice is one contact: the duplicate check existed in this very
+  // file and was never called from here.
+  const duplicate = lead.email
+    ? (
+        await db
+          .select({ id: contacts.id, companyId: contacts.companyId })
+          .from(contacts)
+          .where(eq(contacts.email, lead.email))
+          .limit(1)
+      )[0]
+    : undefined;
+
   // 1. Create or find Company.
   //
   // Matching on the exact name is why "ACME Srl" and "Acme S.r.l." became two
   // companies. A normalised comparison catches the ordinary variations; the VAT
   // number catches the rest, and is the only truly reliable key.
   let companyId: string | null = null;
-  if (lead.companyName) {
+  if (!lead.companyName && options.privateCustomer) {
+    // ⚠️⚠️ A private customer is filed under a company in their own name: quotes require one,
+    // and an invoice is made out to it. Never matched by name — two people called Mario Rossi
+    // are two customers — but the company the same person already has is theirs again.
+    if (duplicate?.companyId) {
+      companyId = duplicate.companyId;
+    } else {
+      companyId = crypto.randomUUID();
+      writes.push(
+        db.insert(companies).values({
+          id: companyId,
+          name: personName || lead.email || dealName,
+          // A person, not a business: the e-invoice names them with <Nome> and <Cognome>.
+          personFirstName: lead.firstName || undefined,
+          personLastName: lead.lastName || undefined,
+          mainEmail: lead.email ?? undefined,
+          mainPhone: lead.mobile ?? lead.phone ?? undefined,
+          street: lead.street ?? undefined,
+          city: lead.city ?? undefined,
+          state: lead.state ?? undefined,
+          zipCode: lead.zipCode ?? undefined,
+          country: lead.country ?? undefined,
+          source: lead.source ?? undefined,
+          ownerId,
+          groupId: lead.groupId ?? undefined,
+          sourceLeadId: lead.id,
+        }),
+      );
+    }
+  } else if (lead.companyName) {
     const normalized = normalizeCompanyName(lead.companyName);
     const candidates = await db
       .select({ id: companies.id, name: companies.name, sourceLeadId: companies.sourceLeadId })
@@ -352,7 +414,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
           zipCode: lead.zipCode ?? undefined,
           country: lead.country ?? undefined,
           source: lead.source ?? undefined,
-          ownerId: lead.ownerId,
+          ownerId,
+          groupId: lead.groupId ?? undefined,
           sourceLeadId: lead.id,
           companyTypeId: lead.leadTypeId ?? undefined,
           companyCategoryId: lead.leadCategoryId ?? undefined,
@@ -361,14 +424,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
     }
   }
 
-  // 2. Create Contact from full lead profile.
-  //
-  // Converting the same person twice used to produce two contacts: the duplicate
-  // check existed in this very file and was never called from here.
-  const duplicate = lead.email
-    ? (await db.select({ id: contacts.id }).from(contacts).where(eq(contacts.email, lead.email)).limit(1))[0]
-    : undefined;
-
+  // 2. Create Contact from full lead profile, unless the person is one already (above).
   const contactId = duplicate?.id ?? crypto.randomUUID();
 
   if (!duplicate) {
@@ -388,7 +444,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         country: lead.country ?? undefined,
         source: lead.source ?? undefined,
         notes: lead.notes ?? undefined,
-        ownerId: lead.ownerId,
+        ownerId,
+        groupId: lead.groupId ?? undefined,
         companyId: companyId ?? undefined,
         // The lead's decision, with its own date and source: converting is not consenting.
         marketingConsent: lead.marketingConsent,
@@ -419,11 +476,18 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   // 6. Optionally create Deal
   let dealId: string | null = null;
   if (shouldCreateDeal) {
-    // The first stage of the first pipeline: a lead converts into new business.
+    // The first open stage of the pipeline chosen (the first pipeline when none was): a lead
+    // converts into new business, never straight into a won or lost column.
     const [firstStage] = await db
-      .select({ id: pipelineStages.id })
+      .select({ id: pipelineStages.id, probability: pipelineStages.defaultProbability })
       .from(pipelineStages)
-      .where(eq(pipelineStages.pipelineId, await resolvePipelineId(db, null)))
+      .where(
+        and(
+          eq(pipelineStages.pipelineId, await resolvePipelineId(db, options.pipelineId ?? null)),
+          eq(pipelineStages.isWon, false),
+          eq(pipelineStages.isLost, false),
+        ),
+      )
       .orderBy(pipelineStages.order)
       .limit(1);
     if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
@@ -436,13 +500,42 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         amount: "0",
         currency: "EUR",
         stageId: firstStage.id,
+        probability: firstStage.probability ?? undefined,
         companyId: companyId ?? undefined,
         contactId,
-        ownerId: lead.ownerId,
+        ownerId,
+        groupId: lead.groupId ?? undefined,
+        // ⚠️⚠️ Where the customer came from travels to the sale: without it a deal can be
+        // counted by nothing but its lead (S1, migration 0073).
+        source: lead.source ?? undefined,
         status: "open",
       }),
     );
   }
+
+  // 6b. Appointments and documents follow the person: on the lead's page they were the
+  // visit booked and the papers collected, and after conversion that page is closed.
+  writes.push(
+    db
+      .update(appointments)
+      .set({
+        leadId: null,
+        contactId: sql`coalesce(${appointments.contactId}, ${contactId})`,
+        companyId: sql`coalesce(${appointments.companyId}, ${companyId})`,
+        dealId: sql`coalesce(${appointments.dealId}, ${dealId})`,
+      })
+      .where(eq(appointments.leadId, leadId)),
+  );
+  writes.push(
+    db
+      .update(documents)
+      .set(dealId ? { entityType: "deal", entityId: dealId } : { entityType: "contact", entityId: contactId })
+      .where(and(eq(documents.entityType, "lead"), eq(documents.entityId, leadId))),
+  );
+
+  // 6c. Custom fields carry over where the contact or the deal has a field of the same name and
+  // kind (its slug): "Tipo di intervento" typed on the lead is not typed again on the deal.
+  writes.push(...(await carryCustomFields(db, leadId, { contact: duplicate ? null : contactId, deal: dealId })));
 
   // 7. Mark lead as converted with full traceability
   writes.push(
@@ -487,7 +580,78 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   revalidatePath("/dashboard/companies");
   revalidatePath("/dashboard/pipeline");
 
+  // The same rules as the same records made by hand: a deal created, a lead that changed.
+  after(async () => {
+    if (dealId) {
+      const [deal] = await db.select().from(deals).where(eq(deals.id, dealId));
+      if (deal) {
+        await runAutomations({
+          entityType: "deal",
+          entityId: dealId,
+          event: "onCreate",
+          oldData: {},
+          newData: deal as Record<string, unknown>,
+          currentUserId: actor.user.id,
+        });
+      }
+    }
+    const [converted] = await db.select().from(leads).where(eq(leads.id, leadId));
+    if (converted) {
+      await runAutomations({
+        entityType: "lead",
+        entityId: leadId,
+        event: "onUpdate",
+        oldData: lead as Record<string, unknown>,
+        newData: converted as Record<string, unknown>,
+        currentUserId: actor.user.id,
+      });
+    }
+  });
+
   return result;
+}
+
+/**
+ * The inserts that copy a lead's custom field values onto the contact and the deal it becomes:
+ * a field is the same when its slug and its kind are. Read now, written with the conversion.
+ *
+ * ⚠️ A contact that already existed keeps its own values (`contact: null`): the conversion of
+ * a lead must not overwrite what is known about a customer.
+ */
+async function carryCustomFields(
+  db: Awaited<ReturnType<typeof getDb>>,
+  leadId: string,
+  targets: { contact: string | null; deal: string | null },
+) {
+  const kinds = (["contact", "deal"] as const).filter((k) => targets[k]);
+  if (kinds.length === 0) return [];
+  const values = await db
+    .select({
+      slug: customFieldDefinitions.slug,
+      type: customFieldDefinitions.fieldType,
+      value: customFieldValues.value,
+    })
+    .from(customFieldValues)
+    .innerJoin(customFieldDefinitions, eq(customFieldDefinitions.id, customFieldValues.fieldId))
+    .where(and(eq(customFieldValues.entityType, "lead"), eq(customFieldValues.entityId, leadId)));
+  const filled = values.filter((v) => v.value !== null && v.value !== "");
+  if (filled.length === 0) return [];
+  const fields = await db
+    .select({
+      id: customFieldDefinitions.id,
+      entityType: customFieldDefinitions.entityType,
+      slug: customFieldDefinitions.slug,
+      type: customFieldDefinitions.fieldType,
+    })
+    .from(customFieldDefinitions)
+    .where(inArray(customFieldDefinitions.entityType, [...kinds]));
+  const rows = kinds.flatMap((kind) =>
+    filled.flatMap((v) => {
+      const field = fields.find((f) => f.entityType === kind && f.slug === v.slug && f.type === v.type);
+      return field ? [{ fieldId: field.id, entityType: kind, entityId: targets[kind] as string, value: v.value }] : [];
+    }),
+  );
+  return rows.length ? [db.insert(customFieldValues).values(rows)] : [];
 }
 
 export async function createContact(data: unknown) {
@@ -734,7 +898,14 @@ export async function getContactsForSelect() {
   await requireCapability("record:read");
   const db = await getDb();
   return db
-    .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
+    .select({
+      id: contacts.id,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
+      email: contacts.email,
+      // A picker beside a company one narrows to that company's people with it.
+      companyId: contacts.companyId,
+    })
     .from(contacts)
     .where(visibleWhere("contact", await recordScope()))
     .orderBy(contacts.firstName, contacts.lastName);

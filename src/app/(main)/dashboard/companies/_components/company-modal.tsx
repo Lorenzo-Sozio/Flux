@@ -36,6 +36,7 @@ import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combo
 import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { RecordTabBar } from "@/components/crm/record/record-sections";
+import { SourceSelect } from "@/components/crm/source-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -90,6 +91,8 @@ const companySchema = z.object({
   vatNumber: z.string().optional(),
   sdiCode: z.string().optional(),
   fiscalCode: z.string().optional(),
+  personFirstName: z.string().optional(),
+  personLastName: z.string().optional(),
   pec: z.string().optional(),
   language: z.string().optional(),
   paymentTerms: z.string().optional(),
@@ -139,7 +142,7 @@ const TAB_FIELDS: Record<CompanyTab, string[]> = {
   ],
   crm: ["source", "leadScore", "tags"],
   address: ["street", "city", "state", "zipCode", "country"],
-  billing: ["vatNumber", "sdiCode", "fiscalCode", "pec"],
+  billing: ["vatNumber", "sdiCode", "fiscalCode", "personFirstName", "personLastName", "pec"],
 };
 
 export function CompanyModal({
@@ -186,17 +189,6 @@ export function CompanyModal({
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
 
-  const sourceOptions = [
-    { value: "website", label: tc("sources.website") },
-    { value: "referral", label: tc("sources.referral") },
-    { value: "linkedin", label: tc("sources.linkedin") },
-    { value: "cold_outreach", label: tc("sources.cold_outreach") },
-    { value: "trade_show", label: tc("sources.trade_show") },
-    { value: "advertisement", label: tc("sources.advertisement") },
-    { value: "email_campaign", label: tc("sources.email_campaign") },
-    { value: "other", label: tc("sources.other") },
-  ];
-
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
@@ -227,6 +219,8 @@ export function CompanyModal({
       vatNumber: company?.vatNumber || "",
       sdiCode: company?.sdiCode || "",
       fiscalCode: company?.fiscalCode || "",
+      personFirstName: company?.personFirstName || "",
+      personLastName: company?.personLastName || "",
       pec: company?.pec || "",
       language: company?.language || "auto",
       paymentTerms: company?.paymentTerms || NO_TERMS,
@@ -292,6 +286,8 @@ export function CompanyModal({
         vatNumber: company.vatNumber || "",
         sdiCode: company.sdiCode || "",
         fiscalCode: company.fiscalCode || "",
+        personFirstName: company.personFirstName || "",
+        personLastName: company.personLastName || "",
         pec: company.pec || "",
         language: company.language || "auto",
         paymentTerms: company.paymentTerms || NO_TERMS,
@@ -618,18 +614,11 @@ export function CompanyModal({
                       control={control}
                       name="source"
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("form.selectSource")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {sourceOptions.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SourceSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder={t("form.selectSource")}
+                        />
                       )}
                     />
                   </F>
@@ -672,6 +661,13 @@ export function CompanyModal({
                   </F>
                   <F label={t("form.fiscalCode")} error={e.fiscalCode?.message}>
                     <Input {...register("fiscalCode")} placeholder="01234567890" />
+                  </F>
+                  {/* A private customer: a person's own name, so the e-invoice names them as one. */}
+                  <F label={t("form.personFirstName")} error={e.personFirstName?.message}>
+                    <Input {...register("personFirstName")} placeholder={t("form.personHint")} />
+                  </F>
+                  <F label={t("form.personLastName")} error={e.personLastName?.message}>
+                    <Input {...register("personLastName")} placeholder={t("form.personHint")} />
                   </F>
                   <F label={t("form.pec")} error={e.pec?.message}>
                     <Input {...register("pec")} type="email" placeholder="fatture@pec.azienda.it" />

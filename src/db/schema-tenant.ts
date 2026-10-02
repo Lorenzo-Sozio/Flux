@@ -120,6 +120,8 @@ export {
   quoteItemsRelations,
   quotes,
   quotesRelations,
+  // Where customers come from
+  recordSources,
   // Finance
   salesTargets,
   salesTargetsRelations,

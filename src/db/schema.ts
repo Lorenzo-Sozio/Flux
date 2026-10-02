@@ -197,6 +197,11 @@ export const companies = pgTable("company", {
   // invoice needs to reach this customer. Checked when issuing, not when saving.
   fiscalCode: text("fiscal_code"),
   pec: text("pec"),
+  // A private customer: the person's own name, when this record is a person rather than a
+  // business (migration 0074). With both set the e-invoice names the buyer with <Nome> and
+  // <Cognome> instead of <Denominazione>, as the specifications ask of a natural person.
+  personFirstName: text("person_first_name"),
+  personLastName: text("person_last_name"),
   // "it" | "en": the language of this customer's documents. Null reads it from the
   // country — see src/lib/document-language.ts.
   language: text("language"),
@@ -689,6 +694,9 @@ export const deals = pgTable(
     // The stage where the conversation actually stopped. Not derivable from
     // `stageId`: moving the card into the "Lost" column overwrites it.
     lostAtStageId: text("lost_at_stage_id"),
+    // Where the customer came from: a key of `record_source`, copied from the lead it was
+    // converted from (migration 0073). Without it a sale is counted by nothing but its leads.
+    source: text("source"),
     // ⚠️ Nothing writes or reads this any more. It was recomputed only right after an
     // edit, so its inactivity penalties never applied; idle days and next step are worked
     // out on every read instead (src/lib/deal-signals.ts). The column stays because tenant
@@ -707,6 +715,20 @@ export const deals = pgTable(
   // somebody's (src/lib/record-visibility.ts).
   (t) => [index("deal_company_idx").on(t.companyId), index("deal_contact_idx").on(t.contactId)],
 );
+
+/**
+ * Where customers come from, as one list per workspace (src/lib/record-sources.ts,
+ * migration 0073). Records store the **key**; the name is null for a built-in source read in
+ * the reader's language until a workspace renames it. Retired rather than deleted, like a
+ * loss reason.
+ */
+export const recordSources = pgTable("record_source", {
+  key: text("key").primaryKey(),
+  name: text("name"),
+  order: integer("order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
 
 /**
  * The reasons a deal can be lost, as a list rather than a free-text box.

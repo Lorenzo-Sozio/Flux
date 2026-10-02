@@ -25,6 +25,17 @@ const db = Object.assign(pg, {
 });
 
 const actor = { userId: "u1", tenantRole: "admin", isPlatformStaff: false };
+// What runs after the response, and what the rules were handed: a rule on "deal won" is a
+// deal onUpdate with the status changed to won, and only the call says one would fire.
+const { afterQueue, ruleCalls } = vi.hoisted(() => ({
+  afterQueue: [] as (() => unknown)[],
+  ruleCalls: [] as {
+    entityType: string;
+    event: string;
+    oldData: Record<string, unknown>;
+    newData: Record<string, unknown>;
+  }[],
+}));
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => db, getCurrentTenantId: async () => "t1" }));
 vi.mock("@/lib/auth-guard", () => ({
   requireWriteAccess: async () => ({ user: { id: actor.userId, role: actor.tenantRole } }),
@@ -35,10 +46,12 @@ vi.mock("@/lib/auth-guard", () => ({
 }));
 vi.mock("@/lib/exchange-rates", () => ({ getExchangeRates: async () => ({ rates: {} }) }));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
-vi.mock("next/server", () => ({ after: () => undefined }));
+vi.mock("next/server", () => ({ after: (fn: () => unknown) => void afterQueue.push(fn) }));
 vi.mock("next-intl/server", () => ({ getTranslations: async () => (k: string) => k, getFormatter: async () => ({}) }));
 vi.mock("@/lib/webhook-dispatch", () => ({ dispatchWebhook: async () => undefined }));
-vi.mock("@/components/crm/automation/rule-engine", () => ({ runAutomations: async () => undefined }));
+vi.mock("@/components/crm/automation/rule-engine", () => ({
+  runAutomations: async (c: (typeof ruleCalls)[number]) => void ruleCalls.push(c),
+}));
 vi.mock("@/lib/notify", () => ({ notify: async () => undefined, notifyMany: async () => undefined }));
 vi.mock("@/lib/contact-reach", () => ({ contactReach: async () => ({}) }));
 vi.mock("@/lib/workspace-time-zone", () => ({ getWorkspaceTimeZone: async () => "Europe/Rome" }));
@@ -162,6 +175,47 @@ describe("⚠️ converting a quote into an order", () => {
 
     const [r] = (await db.execute(sql`select stage_id, status, probability from deal where id = 'd1'`)).rows;
     expect(r).toMatchObject({ stage_id: "won", status: "won", probability: 100 });
+  });
+
+  it("⚠️⚠️ sets off the deal's rules, as winning it from the board does", async () => {
+    await deal("d1", "s2");
+    await db.execute(sql`insert into company (id, name) values ('c1', 'Rossi Srl')`);
+    await db.execute(sql`insert into "user" (id, email) values ('u1', 'u1@example.com') on conflict do nothing`);
+    await db.execute(sql`
+      insert into quote (id, quote_number, company_id, deal_id, status, subtotal, total_amount)
+      values ('q1', 'Q-1', 'c1', 'd1', 'accepted', '100', '122')`);
+    await db.execute(sql`
+      insert into quote_item (id, quote_id, description, quantity, unit_price, total_price)
+      values (gen_random_uuid()::text, 'q1', 'Riga', '1', '100', '100')`);
+    afterQueue.length = 0;
+    ruleCalls.length = 0;
+
+    await convertQuoteToOrderAction("q1");
+    for (const fn of afterQueue.splice(0)) await fn();
+
+    const onDeal = ruleCalls.filter((c) => c.entityType === "deal");
+    expect(onDeal).toHaveLength(1);
+    expect(onDeal[0]).toMatchObject({ event: "onUpdate", oldData: { status: "open" }, newData: { status: "won" } });
+  });
+
+  it("⚠️ and not again for a deal that was already won", async () => {
+    await deal("d1", "s2");
+    await db.execute(sql`update deal set status = 'won' where id = 'd1'`);
+    await db.execute(sql`insert into company (id, name) values ('c1', 'Rossi Srl')`);
+    await db.execute(sql`insert into "user" (id, email) values ('u1', 'u1@example.com') on conflict do nothing`);
+    await db.execute(sql`
+      insert into quote (id, quote_number, company_id, deal_id, status, subtotal, total_amount)
+      values ('q1', 'Q-1', 'c1', 'd1', 'accepted', '100', '122')`);
+    await db.execute(sql`
+      insert into quote_item (id, quote_id, description, quantity, unit_price, total_price)
+      values (gen_random_uuid()::text, 'q1', 'Riga', '1', '100', '100')`);
+    afterQueue.length = 0;
+    ruleCalls.length = 0;
+
+    await convertQuoteToOrderAction("q1");
+    for (const fn of afterQueue.splice(0)) await fn();
+
+    expect(ruleCalls.filter((c) => c.entityType === "deal")).toEqual([]);
   });
 });
 

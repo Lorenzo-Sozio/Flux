@@ -123,7 +123,7 @@ export function BoardSkeleton() {
     <Busy>
       <div className="flex gap-4 overflow-hidden">
         {[0, 1, 2, 3].map((col) => (
-          <div key={col} className="w-72 shrink-0 space-y-3 rounded-xl bg-muted/40 p-3">
+          <div key={col} className="w-[85vw] max-w-72 shrink-0 space-y-3 rounded-xl bg-muted/40 p-3 sm:w-72">
             <Skeleton className="h-5 w-32" />
             {[0, 1, 2].map((card) => (
               <div key={card} className="space-y-2 rounded-lg border bg-background p-3">

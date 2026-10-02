@@ -31,9 +31,9 @@ export default function manifest(): MetadataRoute.Manifest {
     // Chrome uses this when the display mode is unavailable; a browser tab is a
     // working CRM, so it is a reasonable place to fall back to.
     display_override: ["standalone", "minimal-ui", "browser"],
-    // The navy of the app tile, not white: Android paints its launch screen in this colour
-    // and then hands over to the page's own splash, which opens on the same navy
-    // (scripts/generate-pwa-icons.mjs). White here was a flash between the two.
+    // Android's launch screen: this colour with the icon in the middle. The icons are filled with
+    // exactly this colour (LAUNCH_BG in scripts/generate-pwa-icons.mjs), so only the mark shows; a
+    // tile of another blue read as a square stuck on it. It is the only launch screen.
     background_color: "#15224d",
     theme_color: "#1447e6",
     lang: "it",

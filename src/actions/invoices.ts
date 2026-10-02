@@ -765,6 +765,8 @@ export async function getNewInvoiceData() {
         city: companies.city,
         province: companies.state,
         country: companies.country,
+        personFirstName: companies.personFirstName,
+        personLastName: companies.personLastName,
         // Their usual terms, which a new invoice to them starts with (I12).
         paymentTerms: companies.paymentTerms,
       })

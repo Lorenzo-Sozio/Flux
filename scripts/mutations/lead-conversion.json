@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ la pipeline scelta nella conversione viene ignorata: la trattativa finisce nella prima",
+    "find": "await resolvePipelineId(db, options.pipelineId ?? null)",
+    "replace": "await resolvePipelineId(db, null)"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ il lead convertito apre la trattativa già nella colonna «Vinta»",
+    "find": "          eq(pipelineStages.isWon, false),\n          eq(pipelineStages.isLost, false),\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ la provenienza del lead non arriva alla trattativa: le vendite non si contano per provenienza",
+    "find": "        source: lead.source ?? undefined,\n        status: \"open\",",
+    "replace": "        status: \"open\","
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ il cliente privato resta senza azienda: nessun preventivo può essere intestato",
+    "find": "  if (!lead.companyName && options.privateCustomer) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️ un cliente privato già noto riceve una seconda azienda a suo nome",
+    "find": "    if (duplicate?.companyId) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️ un lead senza titolare diventa un cliente di nessuno",
+    "find": "  const ownerId = lead.ownerId ?? actor.user.id;",
+    "replace": "  const ownerId = lead.ownerId;"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️ l'appuntamento fissato col lead resta sul lead convertito",
+    "find": "      .where(eq(appointments.leadId, leadId)),",
+    "replace": "      .where(sql`false`),"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️ i documenti raccolti sul lead restano sul lead convertito",
+    "find": "      .where(and(eq(documents.entityType, \"lead\"), eq(documents.entityId, leadId))),",
+    "replace": "      .where(sql`false`),"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️ un campo personalizzato passa a un campo dello stesso nome ma di altro tipo",
+    "find": "f.entityType === kind && f.slug === v.slug && f.type === v.type",
+    "replace": "f.entityType === kind && f.slug === v.slug"
+  },
+  {
+    "file": "src/actions/crm.ts",
+    "description": "⚠️⚠️ l'azienda del cliente privato nasce senza nome e cognome: la fattura lo scrive come azienda",
+    "find": "          personFirstName: lead.firstName || undefined,\n",
+    "replace": ""
+  }
+]

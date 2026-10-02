@@ -19,6 +19,12 @@ export default defineConfig({
     // No global test APIs: an explicit `import { describe, it, expect } from "vitest"`
     // keeps a test file readable on its own, which matters more here than brevity.
     globals: false,
+    // ⚠️ Twenty seconds, not the default five. A test running on PGlite pays for its first
+    // queries after the migrations, and with two hundred files in parallel that alone went
+    // past five seconds now and then: the first test of record-timeline and of ai/context
+    // failed once in several full runs and never alone. A wrong answer still fails at once;
+    // only a slow machine stops failing.
+    testTimeout: 20_000,
   },
   // Native since Vite 7 — resolves the `@/*` alias from tsconfig.json, so the tests import
   // exactly what the application imports. No plugin needed.

@@ -11,6 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const emessi: { evento: string; origin: unknown }[] = [];
 let esistente: { id: string }[] = [];
 const regole: { tenantId: string; ctx: Record<string, unknown> }[] = [];
+const scritti: { op: "insert" | "update"; values: Record<string, unknown> }[] = [];
 
 vi.mock("@/lib/webhook-dispatch", () => ({
   dispatchWebhook: (evento: string, _p: unknown, origin: unknown) => {
@@ -43,8 +44,18 @@ vi.mock("@/lib/billing/usage", () => ({
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
     select: () => ({ from: () => ({ where: async () => esistente }) }),
-    insert: () => ({ values: () => ({ returning: async () => [{ id: "nuovo" }] }) }),
-    update: () => ({ set: () => ({ where: () => ({ returning: async () => [{ id: "vecchio" }] }) }) }),
+    insert: () => ({
+      values: (values: Record<string, unknown>) => {
+        scritti.push({ op: "insert", values });
+        return { returning: async () => [{ id: "nuovo" }] };
+      },
+    }),
+    update: () => ({
+      set: (values: Record<string, unknown>) => {
+        scritti.push({ op: "update", values });
+        return { where: () => ({ returning: async () => [{ id: "vecchio" }] }) };
+      },
+    }),
   }),
 }));
 
@@ -62,7 +73,30 @@ function richiesta(body: Record<string, unknown>) {
 beforeEach(() => {
   emessi.length = 0;
   regole.length = 0;
+  scritti.length = 0;
   esistente = [];
+});
+
+describe("⚠️⚠️ where the lead came from, when the API writes it again", () => {
+  it('is "api" for a lead the API creates without saying', async () => {
+    await POST(richiesta({ phone: "+39 333 111 2223" }));
+    expect(scritti[0]).toMatchObject({ op: "insert", values: { source: "api" } });
+  });
+
+  it("⚠️⚠️ stays what it was when a duplicate is updated without one", async () => {
+    // A lead from Meta ads, sent again by Zapier without a source, used to become an "api"
+    // lead, and the report by source moved it to the wrong channel.
+    esistente = [{ id: "gia-la" }];
+    await POST(richiesta({ phone: "+39 333 111 2223", onDuplicate: "update" }));
+    expect(scritti[0].op).toBe("update");
+    expect(scritti[0].values.source).toBeUndefined();
+  });
+
+  it("is written when the update says it", async () => {
+    esistente = [{ id: "gia-la" }];
+    await POST(richiesta({ phone: "+39 333 111 2223", source: "ads_meta", onDuplicate: "update" }));
+    expect(scritti[0]).toMatchObject({ op: "update", values: { source: "ads_meta" } });
+  });
 });
 
 describe("who the events from this route say caused them", () => {

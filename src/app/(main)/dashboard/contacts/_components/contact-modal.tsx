@@ -33,6 +33,7 @@ import {
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
+import { SourceSelect } from "@/components/crm/source-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -147,17 +148,6 @@ export function ContactModal({
       getCompaniesForSelect().then(setCompanies);
     }
   }, [open]);
-
-  const sourceOptions = [
-    { value: "website", label: tc("sources.website") },
-    { value: "referral", label: tc("sources.referral") },
-    { value: "linkedin", label: tc("sources.linkedin") },
-    { value: "cold_outreach", label: tc("sources.cold_outreach") },
-    { value: "trade_show", label: tc("sources.trade_show") },
-    { value: "advertisement", label: tc("sources.advertisement") },
-    { value: "email_campaign", label: tc("sources.email_campaign") },
-    { value: "other", label: tc("sources.other") },
-  ];
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
@@ -497,18 +487,11 @@ export function ContactModal({
                       control={control}
                       name="source"
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("form.selectSource")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {sourceOptions.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SourceSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder={t("form.selectSource")}
+                        />
                       )}
                     />
                   </F>

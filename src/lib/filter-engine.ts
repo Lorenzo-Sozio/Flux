@@ -18,6 +18,7 @@ import type {
   FilterValue,
 } from "@/lib/filter-types";
 import { NO_VALUE_OPERATORS } from "@/lib/filter-types";
+import { BUILT_IN_SOURCES } from "@/lib/record-sources";
 import { matchesText } from "@/lib/text-match";
 
 // ─── Field registry (server-only, includes Drizzle cols) ─────────────────────
@@ -60,7 +61,8 @@ export const LEAD_FIELDS: FieldRegistry = {
     label: "Source",
     type: "enum",
     col: leads.source,
-    options: ["organic", "referral", "outbound", "event", "website", "social", "other"],
+    // The workspace's own list, injected by the page (sourceFilterOptions); these are the built-in keys.
+    options: [...BUILT_IN_SOURCES],
   },
   leadScore: { label: "Lead Score", type: "number", col: leads.leadScore },
   marketingConsent: { label: "Marketing Consent", type: "boolean", col: leads.marketingConsent },
@@ -93,7 +95,8 @@ export const CONTACT_FIELDS: FieldRegistry = {
     label: "Source",
     type: "enum",
     col: contacts.source,
-    options: ["organic", "referral", "outbound", "event", "website", "social", "other"],
+    // The workspace's own list, injected by the page (sourceFilterOptions); these are the built-in keys.
+    options: [...BUILT_IN_SOURCES],
   },
   leadScore: { label: "Lead Score", type: "number", col: contacts.leadScore },
   marketingConsent: { label: "Marketing Consent", type: "boolean", col: contacts.marketingConsent },
@@ -125,16 +128,8 @@ export const COMPANY_FIELDS: FieldRegistry = {
     label: "Source",
     type: "enum",
     col: companies.source,
-    options: [
-      "website",
-      "referral",
-      "linkedin",
-      "cold_outreach",
-      "trade_show",
-      "advertisement",
-      "email_campaign",
-      "other",
-    ],
+    // The workspace's own list, injected by the page (sourceFilterOptions); these are the built-in keys.
+    options: [...BUILT_IN_SOURCES],
   },
   employeeCount: { label: "Employees", type: "number", col: companies.employeeCount },
   annualRevenue: { label: "Annual Revenue", type: "number", col: companies.annualRevenue },

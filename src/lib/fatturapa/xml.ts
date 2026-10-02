@@ -22,6 +22,9 @@ const NS = "http://ivaservizi.agenziaentrate.gov.it/docs/xsd/fatture/v1.2";
 
 export interface XmlParty {
   name?: string | null;
+  /** A natural person: with both, the buyer is <Nome> and <Cognome>, not <Denominazione>. */
+  firstName?: string | null;
+  lastName?: string | null;
   legalName?: string | null;
   vatNumber?: string | null;
   fiscalCode?: string | null;
@@ -162,6 +165,19 @@ function cedente(p: XmlParty): string {
   );
 }
 
+/**
+ * ⚠️⚠️ A natural person is named, not denominated. The schema offers <Denominazione> or
+ * <Nome> + <Cognome>; a private customer is filed under a company record in their own name,
+ * and writing that as a Denominazione described a person as a business. Both names, or the
+ * Denominazione: one name alone is not a person the schema accepts.
+ */
+function anagrafica(p: XmlParty): string {
+  const first = p.firstName?.trim();
+  const last = p.lastName?.trim();
+  if (first && last) return el("Nome", latin(first, 60)) + el("Cognome", latin(last, 60));
+  return el("Denominazione", latin(p.name, 80));
+}
+
 function cessionario(p: XmlParty): string {
   const nation = countryCode(p.country) ?? "IT";
   const vat = p.vatNumber ? normaliseVat(p.vatNumber).replace(new RegExp(`^${nation}`), "") : "";
@@ -176,9 +192,7 @@ function cessionario(p: XmlParty): string {
     "CessionarioCommittente",
     block(
       "DatiAnagrafici",
-      idFiscale +
-        (nation === "IT" ? el("CodiceFiscale", p.fiscalCode ?? "") : "") +
-        block("Anagrafica", el("Denominazione", latin(p.name, 80))),
+      idFiscale + (nation === "IT" ? el("CodiceFiscale", p.fiscalCode ?? "") : "") + block("Anagrafica", anagrafica(p)),
     ) + sede(p),
   );
 }

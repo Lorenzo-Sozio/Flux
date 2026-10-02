@@ -71,6 +71,7 @@ import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { customerGaps } from "@/lib/fiscal-ids";
 import { failed, loadedValue, loadOutcome } from "@/lib/load-outcome";
 import { can } from "@/lib/permissions";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
@@ -134,6 +135,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     ? aiEntries(["summary"] as const, aiViewer(session?.user))
     : Promise.resolve({});
   const db = await getDb();
+  // The workspace's own name for a source, else the built-in label (src/lib/record-sources.ts).
+  const sourceLabelP = sourceLabeller(db);
   // A colleague's account is not found, rather than refused; on one seen through a deal of one's
   // own, the people and the figures are only those one may see (src/lib/record-visibility.ts).
   const scope = await recordScope();
@@ -531,6 +534,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     </Card>
   );
 
+  const sourceLabel = await sourceLabelP;
   const details = (
     <Card>
       <CardHeader>
@@ -623,9 +627,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </Field>
             <Field label={t("form.category")}>{categoryName}</Field>
             <Field label={t("form.companyType")}>{activityTypeName}</Field>
-            <Field label={tD("fieldSource")}>
-              {company.source && <span className="capitalize">{company.source}</span>}
-            </Field>
+            <Field label={tD("fieldSource")}>{sourceLabel(company.source)}</Field>
             <Field label={tD("fieldScore")}>{company.leadScore != null && String(company.leadScore)}</Field>
             <Field label={tD("fieldLinkedIn")}>
               {company.linkedinUrl && (

@@ -74,6 +74,7 @@ import { companies, contacts } from "@/db/schema";
 import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
@@ -231,8 +232,8 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   const statusLabel = t.has(`statuses.${cData.status}` as never)
     ? t(`statuses.${cData.status}` as never)
     : cData.status;
-  const sourceLabel =
-    cData.source && t.has(`sources.${cData.source}` as never) ? t(`sources.${cData.source}` as never) : cData.source;
+  // The workspace's own name for it, else the built-in label (src/lib/record-sources.ts).
+  const sourceLabel = (await sourceLabeller(db))(cData.source);
   const address = [
     cData.street,
     [cData.zipCode, cData.city, cData.state].filter(Boolean).join(" "),

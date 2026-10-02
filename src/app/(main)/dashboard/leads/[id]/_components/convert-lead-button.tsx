@@ -1,36 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
-
-import { useRouter } from "next/navigation";
-
-import {
-  ActivityIcon,
-  ArrowRightIcon,
-  BuildingIcon,
-  CheckSquareIcon,
-  Loader2Icon,
-  SparklesIcon,
-  UserIcon,
-} from "lucide-react";
+import { SparklesIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { toast } from "sonner";
 
-import { convertLead } from "@/actions/crm";
+import { ConvertLeadDialog } from "@/components/crm/convert-lead-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
 
 interface ConvertLeadButtonProps {
   leadId: string;
@@ -42,131 +16,19 @@ interface ConvertLeadButtonProps {
 
 export function ConvertLeadButton({ leadId, leadName, companyName, activityCount, taskCount }: ConvertLeadButtonProps) {
   const t = useTranslations("leads");
-  const [open, setOpen] = useState(false);
-  const [shouldCreateDeal, setShouldCreateDeal] = useState(true);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-
-  const handleConvert = () => {
-    startTransition(async () => {
-      try {
-        const result = await convertLead(leadId, shouldCreateDeal);
-        toast.success(t("convertSuccessToast"));
-        setOpen(false);
-        if (result.dealId) {
-          router.push(`/dashboard/pipeline/${result.dealId}`);
-        } else {
-          router.push(`/dashboard/contacts/${result.contactId}`);
-        }
-      } catch (error) {
-        console.error("Failed to convert lead:", error);
-        toast.error(t("convertErrorToast"));
-      }
-    });
-  };
-
-  const hasHistory = activityCount > 0 || taskCount > 0;
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {/* The page's key action while the lead is open, so it is the one filled
-          button in the hero — and the same height as the outlined Call and Email
-          beside it, which is what `size="sm"` is for. */}
-      <DialogTrigger asChild>
-        <Button size="sm" disabled={isPending}>
-          {isPending ? (
-            <Loader2Icon className="size-3.5 animate-spin" aria-hidden />
-          ) : (
-            <SparklesIcon className="size-3.5" aria-hidden />
-          )}
+    <ConvertLeadDialog
+      lead={{ id: leadId, name: leadName, companyName }}
+      activityCount={activityCount}
+      taskCount={taskCount}
+      trigger={
+        // The page's key action while the lead is open, so it is the one filled button in the
+        // hero — and the same height as the outlined Call and Email beside it.
+        <Button size="sm">
+          <SparklesIcon className="size-3.5" aria-hidden />
           {t("convertLead")}
         </Button>
-      </DialogTrigger>
-
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("convertLead")}</DialogTitle>
-          <DialogDescription>{t("convertLeadDesc")}</DialogDescription>
-        </DialogHeader>
-
-        {/* What will be created */}
-        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-            {t("convert.willCreate")}
-          </p>
-          <div className="flex items-center gap-2">
-            <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            <span>
-              {t.rich("convert.contactLine", {
-                name: leadName,
-                b: (chunks) => <span className="font-medium">{chunks}</span>,
-              })}
-            </span>
-          </div>
-          {companyName && (
-            <div className="flex items-center gap-2">
-              <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-              <span>
-                {t.rich("convert.companyLine", {
-                  name: companyName,
-                  b: (chunks) => <span className="font-medium">{chunks}</span>,
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* History migration notice */}
-        {hasHistory && (
-          <div className="space-y-1.5 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30">
-            <p className="font-semibold text-blue-600 text-xs uppercase tracking-wider dark:text-blue-400">
-              {t("convert.historyMigrated")}
-            </p>
-            {activityCount > 0 && (
-              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                <ActivityIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>{t("convert.activityCount", { count: activityCount })}</span>
-              </div>
-            )}
-            {taskCount > 0 && (
-              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                <CheckSquareIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>{t("convert.taskCount", { count: taskCount })}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <Separator />
-
-        {/* Deal toggle */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 space-y-0.5">
-            <Label htmlFor="create-deal" className="font-medium text-sm">
-              {t("convertCreateDeal")}
-            </Label>
-            <p className="text-muted-foreground text-xs">{t("convert.createDealHint")}</p>
-          </div>
-          <Switch
-            id="create-deal"
-            checked={shouldCreateDeal}
-            onCheckedChange={setShouldCreateDeal}
-            disabled={isPending}
-          />
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isPending}>
-              {t("convertCancel")}
-            </Button>
-          </DialogClose>
-          <Button type="button" onClick={handleConvert} disabled={isPending} className="gap-2">
-            {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <ArrowRightIcon className="h-4 w-4" />}
-            {t("convertConfirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      }
+    />
   );
 }

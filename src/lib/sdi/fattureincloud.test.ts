@@ -88,6 +88,19 @@ const XML_BACK = () =>
   new Response('<?xml version="1.0"?><p:FatturaElettronica>FiC</p:FatturaElettronica>', { status: 200 });
 
 describe("⚠️⚠️ the document Fatture in Cloud is asked to create", () => {
+  it("⚠️ names a private customer as a person, or its own XML would say Denominazione", () => {
+    const doc = ficDocument(
+      invoice({
+        customer: { name: "Mario Rossi", firstName: "Mario", lastName: "Rossi", fiscalCode: "RSSMRA85T10A562S" },
+      } as Partial<OutgoingInvoice["document"]>).document,
+      [
+        { id: 0, value: 22, ei_type: null },
+        { id: 21, value: 0, ei_type: "N2.2" },
+      ],
+    );
+    expect(doc.body.data.entity).toMatchObject({ type: "person", first_name: "Mario", last_name: "Rossi" });
+  });
+
   it("carries Flux's number, date, customer, lines with the workspace's VAT ids, and the total as payment", () => {
     const doc = ficDocument(invoice().document, [
       { id: 0, value: 22, ei_type: null },
@@ -104,6 +117,7 @@ describe("⚠️⚠️ the document Fatture in Cloud is asked to create", () => 
       ei_data: { payment_method: "MP05", bank_iban: "IT60X0542811101000000123456" },
       payments_list: [{ amount: 152, due_date: "2026-10-29", status: "not_paid" }],
     });
+    expect(doc.body.data.entity).not.toHaveProperty("type");
     expect(doc.body.data.items_list).toEqual([
       { name: "Consulenza", qty: 2, net_price: 50, discount: 0, vat: { id: 0 } },
       { name: "Formazione esente", qty: 1, net_price: 30, discount: 0, vat: { id: 21 } },

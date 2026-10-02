@@ -969,4 +969,25 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nCREATE INDEX IF NOT EXISTS "deal_contact_idx" ON "deal" USING btree ("contact_id");\n',
     ],
   },
+  {
+    tag: "0073_where_they_came_from",
+    folderMillis: 1794268800000,
+    hash: "40c8f8c1821a8ea1e7168386ccd36cbe168dcd29fc7e9b9e44e7e5602df7e55d",
+    sql: [
+      '-- Where a customer came from, as one list (S1, src/lib/record-sources.ts).\n--\n-- The value on a record is the source\'s key; the name is what people read, null for a\n-- built-in source until a workspace renames it (then it is translated). Retired, never\n-- deleted: records filed under a source keep saying so after the campaign ends.\n--\n-- A deal carries its own source, copied from the lead it was converted from: without it a\n-- sale could not be counted by where it came from, only the leads.\n--\n-- Additive and re-runnable, like every tenant migration. The seed never overwrites a\n-- workspace\'s own changes: an existing key is left as it is.\nCREATE TABLE IF NOT EXISTS "record_source" (\n\t"key" text PRIMARY KEY NOT NULL,\n\t"name" text,\n\t"order" integer DEFAULT 0 NOT NULL,\n\t"is_active" boolean DEFAULT true NOT NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      "\nINSERT INTO \"record_source\" (\"key\", \"order\") VALUES\n\t('ads_meta', 1),\n\t('ads_google', 2),\n\t('website', 3),\n\t('agent', 4),\n\t('referral', 5),\n\t('trade_show', 6),\n\t('linkedin', 7),\n\t('cold_outreach', 8),\n\t('advertisement', 9),\n\t('email_campaign', 10),\n\t('other', 11)\nON CONFLICT (\"key\") DO NOTHING;\n",
+      '\nALTER TABLE "deal" ADD COLUMN IF NOT EXISTS "source" text;\n',
+      '\nCREATE INDEX IF NOT EXISTS "deal_source_idx" ON "deal" USING btree ("source") WHERE "source" IS NOT NULL;\n',
+    ],
+  },
+  {
+    tag: "0074_a_person_not_a_company",
+    folderMillis: 1794355200000,
+    hash: "986d95aff9f74804d28411a926a515fbb1d87824b9ceb53fa4f6deb09348a2da",
+    sql: [
+      '-- A private customer is filed under a company record in their own name, because quotes and\n-- invoices are made out to a company. The e-invoice must still name a natural person with\n-- <Nome> and <Cognome>, not <Denominazione>: these two columns say who the person is\n-- (src/lib/fatturapa/xml.ts). Filled by the lead conversion for a private customer, editable\n-- on the company\'s billing tab.\n--\n-- Additive and re-runnable, like every tenant migration.\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "person_first_name" text;\n',
+      '\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "person_last_name" text;\n',
+      '\n-- Private customers converted before these columns existed: a company made from a lead with\n-- no company name carries that lead\'s full name. Only those, only once, and only when no\n-- VAT number says it is a business.\nUPDATE "company" AS c\nSET "person_first_name" = l."first_name", "person_last_name" = l."last_name"\nFROM "lead" AS l\nWHERE c."source_lead_id" = l."id"\n  AND c."person_first_name" IS NULL\n  AND c."person_last_name" IS NULL\n  AND (c."vat_number" IS NULL OR c."vat_number" = \'\')\n  AND (l."company_name" IS NULL OR l."company_name" = \'\')\n  AND c."name" = trim(coalesce(l."first_name", \'\') || \' \' || coalesce(l."last_name", \'\'));\n',
+    ],
+  },
 ];

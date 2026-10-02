@@ -70,5 +70,23 @@
     "description": "⚠️ un regime fiscale ritirato (RF03) viene accettato",
     "find": "  else if (!Object.hasOwn(TAX_REGIMES, p.taxRegime ?? \"\")) gaps.push({ field: \"taxRegime\", problem: \"invalid\" });",
     "replace": ""
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ un cliente privato senza nome e cognome viene fatturato come azienda («Denominazione»)",
+    "find": "  if (!hasVat && personalCf && (blank(c.personFirstName) || blank(c.personLastName))) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ basta il nome, senza cognome, per fatturare un cliente privato",
+    "find": "  if (!hasVat && personalCf && (blank(c.personFirstName) || blank(c.personLastName))) {",
+    "replace": "  if (!hasVat && personalCf && blank(c.personFirstName)) {"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ un'azienda con codice fiscale numerico viene trattata come persona e le si chiede nome e cognome",
+    "find": "  const personalCf = hasCf && !/^\\d{11}$/.test((c.fiscalCode ?? \"\").replace(/\\s+/g, \"\"));",
+    "replace": "  const personalCf = hasCf;"
   }
 ]

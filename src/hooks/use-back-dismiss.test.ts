@@ -150,6 +150,34 @@ describe("⚠️⚠️ Back on a phone", () => {
     expect(h.href()).toBe("/dashboard/contacts/c1");
   });
 
+  it("⚠️⚠️ layers closed on two pages: coming back through both, no Back does nothing", () => {
+    const h = fakeWindow();
+    const back = createBackDismiss(h.win);
+    // A dialog on the contact, closed by its X; then on to a deal, another dialog closed there.
+    back.open(vi.fn())();
+    h.navigate("/dashboard/pipeline/d1");
+    back.moved();
+    back.open(vi.fn())();
+    h.back();
+    expect(h.href()).toBe("/dashboard/contacts/c1");
+    h.back();
+    expect(h.href()).toBe("/dashboard/leads");
+  });
+
+  it("⚠️ coming back to a page from another one shows the page, and skips nothing", () => {
+    const h = fakeWindow();
+    const back = createBackDismiss(h.win);
+    back.open(vi.fn())();
+    h.navigate("/dashboard/chat");
+    back.moved();
+    h.back();
+    expect(h.href()).toBe("/dashboard/contacts/c1");
+    // Landed on the entry the closed layer left: no second move on top of the Back.
+    expect(h.depth()).toBe(3);
+    h.back();
+    expect(h.href()).toBe("/dashboard/leads");
+  });
+
   it("a page reached anew by a link forgets what was left on it before", () => {
     const h = fakeWindow();
     const back = createBackDismiss(h.win);

@@ -29,6 +29,7 @@ import { computeDocument } from "@/lib/document-totals";
 import { recordFieldChanges } from "@/lib/field-history";
 import { serverT } from "@/lib/i18n-server";
 import { RECEIVABLE_TYPES } from "@/lib/invoice-rules";
+import { notify } from "@/lib/notify";
 import { nextOrderNumber } from "@/lib/order-number";
 import { parsePaymentAmount, paymentDay } from "@/lib/order-payment";
 import { cleanShipping } from "@/lib/order-shipping";
@@ -713,9 +714,10 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
 
   // The deal's own history says it was won here, and by whom (src/lib/field-history.ts).
-  if (dealPrima && dealPrima.status !== "won") {
-    const [dealDopo] = await db.select().from(deals).where(eq(deals.id, dealPrima.id));
-    await recordFieldChanges(db, "deal", dealPrima.id, dealPrima, dealDopo, actor.userId);
+  const wonHere = dealPrima && dealPrima.status !== "won" ? dealPrima : undefined;
+  const [dealDopo] = wonHere ? await db.select().from(deals).where(eq(deals.id, wonHere.id)) : [undefined];
+  if (wonHere && dealDopo) {
+    await recordFieldChanges(db, "deal", wonHere.id, wonHere, dealDopo, actor.userId);
   }
 
   dispatchWebhook("order.created", {
@@ -724,22 +726,43 @@ export async function convertQuoteToOrderAction(quoteId: string) {
     total: quote.totalAmount,
     currency: quote.currency,
     fromQuoteId: quote.id,
-  });
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+  }).catch(() => {});
 
   // ⚠️⚠️ Turning an accepted quote into an order is the commonest way a deal is won in a
   // quote-driven business, and it was the one way that announced nothing: the pipeline
   // moved and every subscriber stayed on the previous state. An integration counting won
   // business was therefore missing exactly the deals that came through a quote.
-  if (dealPrima && dealPrima.status !== "won") {
-    const reach = await contactReach(db, dealPrima.contactId);
+  if (wonHere) {
+    const reach = await contactReach(db, wonHere.contactId);
+    if (dealDopo && dealDopo.stageId !== wonHere.stageId) {
+      dispatchWebhook("deal.stage_changed", {
+        id: dealDopo.id,
+        name: dealDopo.name,
+        stageId: dealDopo.stageId,
+        probability: dealDopo.probability,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+      }).catch(() => {});
+    }
     dispatchWebhook("deal.won", {
-      id: dealPrima.id,
-      name: dealPrima.name,
-      amount: dealPrima.amount,
-      currency: dealPrima.currency,
+      id: wonHere.id,
+      name: wonHere.name,
+      amount: wonHere.amount,
+      currency: wonHere.currency,
       ...reach,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
+    // The owner hears it as from the pipeline: the deal is theirs, won either way.
+    if (wonHere.ownerId) {
+      notify({
+        userId: wonHere.ownerId,
+        type: "deal_won",
+        key: "dealWon",
+        params: { name: wonHere.name },
+        link: `/dashboard/pipeline/${wonHere.id}`,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+      }).catch(() => {});
+    }
   }
 
   revalidatePath("/dashboard/sales/quotes");
@@ -778,6 +801,19 @@ export async function convertQuoteToOrderAction(quoteId: string) {
       },
       currentUserId: actor.userId,
     });
+    // ⚠️⚠️ The deal's rules too. A rule on "deal won" is a deal onUpdate with status
+    // changed to won, and this is the commonest way a deal is won: without this call
+    // every such rule stayed silent for exactly the deals that came through a quote.
+    if (wonHere && dealDopo) {
+      await runAutomations({
+        entityType: "deal",
+        entityId: wonHere.id,
+        event: "onUpdate",
+        oldData: wonHere as Record<string, unknown>,
+        newData: dealDopo as Record<string, unknown>,
+        currentUserId: actor.userId,
+      });
+    }
   });
 
   return { success: true, orderId, orderNumber };

@@ -15,6 +15,7 @@ import {
   mergeListEntryAction,
   renameListEntryAction,
 } from "@/actions/lists";
+import type { SourceUsage } from "@/actions/record-sources";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,12 +31,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { RecordSource } from "@/lib/record-sources";
+
+import { SourcesCard } from "./sources-card";
 
 /**
- * Settings → Lists: the values people pick from on a company, kept tidy in one place.
+ * Settings → Lists: the values people pick from — where a customer came from, and a company's
+ * category and type — kept tidy in one place.
  * Loss reasons live beside the pipeline stages they belong to, and are linked from here.
  */
-export function ListsClient({ lists }: { lists: Record<ListKind, ListEntry[]> }) {
+export function ListsClient({
+  lists,
+  sources,
+  sourceUsage,
+}: {
+  lists: Record<ListKind, ListEntry[]>;
+  sources: RecordSource[];
+  sourceUsage: SourceUsage[];
+}) {
   const t = useTranslations("settings.lists");
   return (
     <div className="space-y-6">
@@ -43,6 +56,7 @@ export function ListsClient({ lists }: { lists: Record<ListKind, ListEntry[]> })
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
+      <SourcesCard initial={sources} usage={sourceUsage} />
       <ListCard kind="category" initial={lists.category} />
       <ListCard kind="type" initial={lists.type} />
       <Link href="/dashboard/settings/pipeline">

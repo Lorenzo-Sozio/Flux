@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -15,10 +15,12 @@ import { z } from "zod";
 import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { createDeal, updateDeal } from "@/actions/pipeline";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { SourceSelect } from "@/components/crm/source-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -38,6 +40,7 @@ const dealSchema = z.object({
   ownerId: z.string().optional().nullable(),
   groupId: z.string().optional().nullable(),
   assigneeValue: z.string().optional(),
+  source: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -73,6 +76,14 @@ function F({
   );
 }
 
+type DealContactOption = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email?: string | null;
+  companyId?: string | null;
+};
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export function DealModal({
   deal,
@@ -101,7 +112,7 @@ export function DealModal({
   // of the workspace used to travel with each visit to the board and to every deal, for a
   // dialog most visits never open.
   companies?: { id: string; name: string }[];
-  contacts?: { id: string; firstName: string | null; lastName: string | null }[];
+  contacts?: DealContactOption[];
   children?: React.ReactNode;
   onSuccess?: () => void;
 }) {
@@ -117,7 +128,7 @@ export function DealModal({
   // The two lists, asked for the first time the dialog opens when the page did not hand them over.
   const [fetched, setFetched] = useState<{
     companies: { id: string; name: string }[];
-    contacts: { id: string; firstName: string | null; lastName: string | null }[];
+    contacts: DealContactOption[];
   } | null>(null);
   useEffect(() => {
     if (!open || fetched || (companies && contacts)) return;
@@ -161,6 +172,7 @@ export function DealModal({
       ownerId: deal?.ownerId || null,
       groupId: deal?.groupId || null,
       assigneeValue: encodeAssignee(deal?.ownerId, deal?.groupId),
+      source: deal?.source || "",
       notes: deal?.notes || "",
     },
   });
@@ -173,9 +185,30 @@ export function DealModal({
   } = form;
   const e = errors;
 
+  // The pickers the quote, order and contract forms use: searchable, the contact narrowed to the
+  // chosen company. A deal may have neither, so each list opens on "none".
+  const companyId = form.watch("companyId");
+  const companyName = useMemo(() => new Map(companyOptions.map((c) => [c.id, c.name])), [companyOptions]);
+  const companyChoices = useMemo(
+    () => [{ value: "", label: t("modal.noCompany") }, ...companyOptions.map((c) => ({ value: c.id, label: c.name }))],
+    [companyOptions, t],
+  );
+  const contactChoices = useMemo(() => {
+    const scoped = companyId ? contactOptions.filter((c) => c.companyId === companyId) : contactOptions;
+    return [
+      { value: "", label: t("modal.noContact") },
+      ...scoped.map((c) => ({
+        value: c.id,
+        label: [c.firstName, c.lastName].filter(Boolean).join(" ") || c.email || c.id,
+        // Who they work for when every contact is listed; their address when only one company's are.
+        sublabel: (companyId ? c.email : c.companyId ? companyName.get(c.companyId) : c.email) ?? undefined,
+      })),
+    ];
+  }, [contactOptions, companyId, companyName, t]);
+
   const tabErrors = {
-    deal: !!(e.name || e.amount || e.currency),
-    details: !!(e.stageId || e.probability || e.expectedCloseDate || e.companyId || e.contactId),
+    deal: !!(e.name || e.amount || e.currency || e.companyId || e.contactId),
+    details: !!(e.stageId || e.probability || e.expectedCloseDate),
     notes: !!e.notes,
   };
 
@@ -190,6 +223,8 @@ export function DealModal({
         ownerId,
         groupId,
         assigneeValue: undefined,
+        // Left alone when nobody picked one: the form cannot clear a source, only change it.
+        source: data.source || undefined,
       };
 
       if (isEditing) {
@@ -226,11 +261,14 @@ export function DealModal({
         )}
       </DialogTrigger>
 
-      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[640px]">
+      {/* ⚠️ A fixed height from sm up: the tabs hold different amounts, and a dialog that took each
+          one's height moved its own tab bar under the pointer at every switch. Header, tab bar and
+          footer stay put; only the fields scroll. Below sm the dialog is the whole screen anyway. */}
+      <DialogContent className="flex flex-col gap-0 p-0 sm:h-[min(580px,calc(100dvh-4rem))] sm:max-w-[640px]">
         {/* ⚠️ `pr-12`: the dialog's own close button is absolutely placed in this
             corner, and the "open full record" button used to sit right under it —
             two targets in one spot, and on a phone the one you hit is a guess. */}
-        <DialogHeader className="border-b px-4 pt-6 pr-12 pb-4 md:px-6 md:pr-12">
+        <DialogHeader className="shrink-0 border-b px-4 pt-6 pr-12 pb-4 md:px-6 md:pr-12">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="min-w-0 break-words text-lg">
               {isEditing ? t("modal.editTitle", { name: deal.name ?? "" }) : t("modal.newTitle")}
@@ -253,9 +291,9 @@ export function DealModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
-            <Tabs defaultValue="deal">
-              <TabsList className="mb-5 w-full">
+          <Tabs defaultValue="deal" className="flex min-h-0 flex-1 flex-col gap-0">
+            <div className="shrink-0 px-4 pt-4 md:px-6">
+              <TabsList className="w-full">
                 <TabsTrigger value="deal" className="relative flex-1 gap-1.5">
                   <DollarSignIcon className="h-3.5 w-3.5" />
                   {t("modal.tabDeal")}
@@ -272,14 +310,59 @@ export function DealModal({
                   <TabDot has={tabErrors.notes} />
                 </TabsTrigger>
               </TabsList>
+            </div>
 
-              {/* ── Deal Tab ──────────────────────────────────────────────── */}
-              <TabsContent value="deal" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+              {/* ── Deal: what it is and who it is for ───────────────────── */}
+              <TabsContent value="deal" className="mt-0 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldDealName")} required error={e.name ? t("dealModal.nameRequired") : undefined}>
                     <Input {...register("name")} placeholder={t("modal.namePlaceholder")} />
                   </F>
                 </div>
+                <F label={t("modal.fieldCompany")} error={e.companyId?.message}>
+                  <Controller
+                    control={control}
+                    name="companyId"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={companyChoices}
+                        value={field.value ?? ""}
+                        onChange={(v) => {
+                          field.onChange(v || null);
+                          // A contact from the previous company is worse than none.
+                          const contact = contactOptions.find((c) => c.id === form.getValues("contactId"));
+                          if (v && contact && contact.companyId !== v) form.setValue("contactId", null);
+                        }}
+                        placeholder={t("modal.companyPlaceholder")}
+                        searchPlaceholder={t("modal.searchPlaceholder")}
+                        emptyText={t("modal.companyEmpty")}
+                      />
+                    )}
+                  />
+                </F>
+                <F label={t("modal.fieldContact")} error={e.contactId?.message}>
+                  <Controller
+                    control={control}
+                    name="contactId"
+                    render={({ field }) => (
+                      <SearchableSelect
+                        options={contactChoices}
+                        value={field.value ?? ""}
+                        onChange={(v) => {
+                          field.onChange(v || null);
+                          // Picked first, the person brings their company along.
+                          const contact = contactOptions.find((c) => c.id === v);
+                          if (contact?.companyId && !form.getValues("companyId"))
+                            form.setValue("companyId", contact.companyId);
+                        }}
+                        placeholder={t("modal.contactPlaceholder")}
+                        searchPlaceholder={t("modal.searchPlaceholder")}
+                        emptyText={companyId ? t("modal.contactEmptyAtCompany") : t("modal.contactEmpty")}
+                      />
+                    )}
+                  />
+                </F>
                 <F label={t("modal.fieldAmount")} error={e.amount?.message}>
                   <Input {...register("amount")} type="number" placeholder="0.00" min={0} step="0.01" />
                 </F>
@@ -305,8 +388,8 @@ export function DealModal({
                 </F>
               </TabsContent>
 
-              {/* ── Pipeline Tab ──────────────────────────────────────────── */}
-              <TabsContent value="details" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+              {/* ── Pipeline: where it stands and whose it is ─────────────── */}
+              <TabsContent value="details" className="mt-0 grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <div className="col-span-1 sm:col-span-2">
                   <F
                     label={t("modal.fieldStageLabel")}
@@ -355,6 +438,20 @@ export function DealModal({
                 <F label={t("modal.fieldExpectedClose")} error={e.expectedCloseDate?.message}>
                   <Input {...register("expectedCloseDate")} type="date" />
                 </F>
+                {/* Where the customer came from: the lead's, copied on conversion (src/lib/record-sources.ts). */}
+                <F label={t("modal.fieldSource")}>
+                  <Controller
+                    control={control}
+                    name="source"
+                    render={({ field }) => (
+                      <SourceSelect
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder={t("modal.selectSource")}
+                      />
+                    )}
+                  />
+                </F>
                 <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldAssignedTo")}>
                     <Controller
@@ -364,70 +461,30 @@ export function DealModal({
                     />
                   </F>
                 </div>
-                <F label={t("modal.fieldCompany")} error={e.companyId?.message}>
-                  <Controller
-                    control={control}
-                    name="companyId"
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
-                        value={field.value ?? "__none__"}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("modal.noneOption")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
-                          {companyOptions.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </F>
-                <F label={t("modal.fieldContact")} error={e.contactId?.message}>
-                  <Controller
-                    control={control}
-                    name="contactId"
-                    render={({ field }) => (
-                      <Select
-                        onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
-                        value={field.value ?? "__none__"}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("modal.noneOption")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
-                          {contactOptions.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.firstName} {c.lastName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </F>
               </TabsContent>
 
-              {/* ── Notes Tab ─────────────────────────────────────────────── */}
-              <TabsContent value="notes" className="mt-0">
-                <F label={t("modal.fieldNotes")} error={e.notes?.message}>
-                  <Textarea
-                    {...register("notes")}
-                    placeholder={t("modal.notesPlaceholder")}
-                    className="min-h-[180px] resize-y"
-                  />
-                </F>
+              {/* ── Notes ──────────────────────────────────────────────────── */}
+              {/* The text box takes whatever height the panel has left, rather than a height of its
+                  own: a fixed one plus the label ran past the panel and scrolled an empty note. */}
+              <TabsContent value="notes" className="mt-0 flex h-full flex-col gap-1.5">
+                <Label
+                  htmlFor="deal-notes"
+                  className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
+                >
+                  {t("modal.fieldNotes")}
+                </Label>
+                <Textarea
+                  id="deal-notes"
+                  {...register("notes")}
+                  placeholder={t("modal.notesPlaceholder")}
+                  className="field-sizing-fixed min-h-[160px] flex-1 resize-none"
+                />
+                {e.notes?.message && <p className="text-destructive text-xs">{e.notes.message}</p>}
               </TabsContent>
-            </Tabs>
-          </div>
+            </div>
+          </Tabs>
 
-          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
+          <DialogFooter className="shrink-0 border-t bg-muted/30 px-4 py-4 md:px-6">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("modal.cancel")}
             </Button>

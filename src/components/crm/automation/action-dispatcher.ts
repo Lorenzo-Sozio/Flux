@@ -326,6 +326,12 @@ export class ActionDispatcher {
       else if (order.companyId) link.companyId = order.companyId;
     }
 
+    // ⚠️ `assignee_id` is a foreign key to a user. The builder stores "" for
+    // "unassigned" and every recipe stores the "entity_owner" sentinel: written as
+    // they were, both broke the key and the rule failed on every run.
+    const assignee =
+      assigneeId === "entity_owner" ? await this.resolveEntityOwner(context) : assigneeId ? assigneeId : null;
+
     const db = await getDb();
     await db.insert(tasks).values({
       title,
@@ -333,7 +339,7 @@ export class ActionDispatcher {
       priority: priority ?? "normal",
       dueDate: dueDate ?? null,
       status: "todo",
-      assigneeId: assigneeId ?? null,
+      assigneeId: assignee,
       ownerId: context.currentUserId ?? null,
       ...link,
     } as any);

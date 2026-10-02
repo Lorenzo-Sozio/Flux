@@ -1,8 +1,35 @@
 "use server";
 
-import { and, desc, eq, gt, inArray, isNotNull, isNull, like, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  lte,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 
-import { activities, companies, deals, leads, nextActionSnoozes, quotes, tasks, tickets } from "@/db/schema";
+import {
+  activities,
+  companies,
+  deals,
+  leads,
+  nextActionSnoozes,
+  quotes,
+  tasks,
+  tickets,
+  userGroupMembers,
+} from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { dealSignals, lastActivityByDeal, nextStepByDeal } from "@/lib/deal-signals";
 import { REPLY_TASK_PREFIX } from "@/lib/inbound-sales-reply";
@@ -18,11 +45,16 @@ import {
 } from "@/lib/next-actions";
 import { type ReachKey, reachFor } from "@/lib/record-reach";
 import { getDb } from "@/lib/tenant-context";
+import { dayBounds, dayStart } from "@/lib/workspace-day";
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
 
 const DAY_MS = 86_400_000;
 
 /** Everything that is not an answer yet. */
 const OPEN_TICKET_STATES = ["resolved", "closed"];
+
+/** What counts as having spoken to a lead. A note is somebody writing, not somebody answering. */
+const CONTACT_ACTIVITY = ["call", "email", "meeting"];
 
 /**
  * The work list: what needs doing now, drawn from data already in the schema.
@@ -44,6 +76,11 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
   const nextStep = nextStepByDeal(db, new Date(now));
 
   const leadCutoff = new Date(now - THRESHOLDS.leadUntouchedDays * DAY_MS);
+  // "Today" is the workspace's, never the server's: on Workers the server is UTC, and a
+  // call planned for nine in the morning in Rome is due on Rome's day.
+  const timeZone = await getWorkspaceTimeZone();
+  const today = dayBounds(new Date(now), timeZone);
+  const callLookBack = dayStart(new Date(now), timeZone, -THRESHOLDS.callLookBackDays);
   const quietCutoff = new Date(now - THRESHOLDS.customerQuietDays * DAY_MS);
   const companyLastActivity = db
     .select({
@@ -57,7 +94,7 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
 
   // Seven independent reads, started together: they used to run one after another, and the
   // home page waited for all seven in turn before it could draw its first card.
-  const [liveTickets, liveQuotes, openDeals, coldLeads, quietCustomers, replies, snoozes] = await Promise.all([
+  const [liveTickets, liveQuotes, openDeals, coldLeads, quietCustomers, replies, snoozes, calls] = await Promise.all([
     db
       .select({
         id: tickets.id,
@@ -107,6 +144,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
       .leftJoin(nextStep, eq(nextStep.dealId, deals.id))
       .where(and(eq(deals.status, "open"), eq(deals.ownerId, mine)))
       .limit(100),
+    // Leads nobody has spoken to. Mine at any age; a new one also when it is my group's or
+    // nobody's yet: the call centre works the pool as it arrives, not after it is handed out.
     db
       .select({
         id: leads.id,
@@ -115,19 +154,43 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
         companyName: leads.companyName,
         createdAt: leads.createdAt,
         leadScore: leads.leadScore,
+        // A call already planned on it surfaces as that call, on the day it is due.
+        planned: sql<boolean>`exists (select 1 from "task" where "task"."lead_id" = ${leads.id} and "task"."status" <> 'done')`,
       })
       .from(leads)
-      .leftJoin(activities, eq(activities.leadId, leads.id))
+      .leftJoin(activities, and(eq(activities.leadId, leads.id), inArray(activities.type, CONTACT_ACTIVITY)))
       .where(
         and(
           eq(leads.isConverted, false),
           notInArray(leads.status, ["unqualified"]),
-          lt(leads.createdAt, leadCutoff),
-          eq(leads.ownerId, mine),
           isNull(activities.id),
+          or(
+            and(lt(leads.createdAt, leadCutoff), eq(leads.ownerId, mine)),
+            and(
+              gte(leads.createdAt, leadCutoff),
+              eq(leads.status, "new"),
+              or(
+                eq(leads.ownerId, mine),
+                and(
+                  isNull(leads.ownerId),
+                  or(
+                    isNull(leads.groupId),
+                    inArray(
+                      leads.groupId,
+                      db
+                        .select({ id: userGroupMembers.groupId })
+                        .from(userGroupMembers)
+                        .where(eq(userGroupMembers.userId, mine)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       )
-      .limit(30),
+      .orderBy(asc(leads.createdAt))
+      .limit(50),
     db
       .select({ id: companies.id, name: companies.name, last: companyLastActivity.last })
       .from(companies)
@@ -164,6 +227,34 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
       .from(nextActionSnoozes)
       .where(and(eq(nextActionSnoozes.userId, mine), gt(nextActionSnoozes.until, new Date(now))))
       .catch(() => []),
+    // Calls due today or already late that are this person's to make: assigned to them, or
+    // theirs with nobody else assigned. A call they asked a colleague to make is the colleague's.
+    db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        dueDate: tasks.dueDate,
+        leadId: tasks.leadId,
+        dealId: tasks.dealId,
+        contactId: tasks.contactId,
+        companyId: tasks.companyId,
+      })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.type, "call"),
+          ne(tasks.status, "done"),
+          gte(tasks.dueDate, callLookBack),
+          lt(tasks.dueDate, today.end),
+          or(
+            eq(tasks.assigneeId, mine),
+            and(isNull(tasks.assigneeId), eq(tasks.ownerId, mine)),
+            sql`exists (select 1 from "task_assignee" where "task_assignee"."task_id" = ${tasks.id} and "task_assignee"."user_id" = ${mine})`,
+          ),
+        ),
+      )
+      .orderBy(asc(tasks.dueDate))
+      .limit(50),
   ]);
 
   const found: NextAction[] = [];
@@ -317,10 +408,60 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
     }
   }
 
+  // ── Calls planned for today, or already late ────────────────────────────────
+
+  const leadsWithCallDue = new Set<string>();
+  for (const c of calls) {
+    if (!c.dueDate) continue;
+    // Late is counted in the workspace's days: a call for yesterday evening is one day late
+    // this morning, not zero because fewer than twenty-four hours went by.
+    const late =
+      c.dueDate < today.start ? Math.max(1, Math.ceil((today.start.getTime() - c.dueDate.getTime()) / DAY_MS)) : 0;
+    if (c.leadId) leadsWithCallDue.add(c.leadId);
+    found.push({
+      kind: "call_due",
+      entity: "task",
+      id: c.id,
+      title: c.title,
+      detailKey: late > 0 ? "callLate" : "callToday",
+      detailValue: late,
+      href: c.dealId
+        ? `/dashboard/pipeline/${c.dealId}`
+        : c.leadId
+          ? `/dashboard/leads/${c.leadId}`
+          : c.contactId
+            ? `/dashboard/contacts/${c.contactId}`
+            : c.companyId
+              ? `/dashboard/companies/${c.companyId}`
+              : "/dashboard/tasks",
+      urgency: urgencyOf("call_due", late),
+      taskId: c.id,
+      taskType: "call",
+    });
+  }
+
   // ── Leads nobody has answered ──────────────────────────────────────────────
 
   for (const l of coldLeads) {
     const quiet = daysBetween(l.createdAt, now);
+    // ⚠️ Fresh, it is the first call to make and it rises by the hour; past the threshold it
+    // is a cold lead, and only its owner hears of it. One row per lead, never both.
+    if (l.createdAt >= leadCutoff) {
+      if (l.planned || leadsWithCallDue.has(l.id)) continue;
+      const hours = Math.max(0, (now - l.createdAt.getTime()) / 3_600_000);
+      found.push({
+        kind: "lead_new",
+        entity: "lead",
+        id: l.id,
+        title: [l.firstName, l.lastName].filter(Boolean).join(" ") || (l.companyName ?? "Lead"),
+        detailKey: hours < 1 ? "arrivedJustNow" : hours < 24 ? "arrivedHoursAgo" : "arrivedDaysAgo",
+        detailValue: hours < 24 ? Math.floor(hours) : quiet,
+        href: `/dashboard/leads/${l.id}`,
+        urgency: urgencyOf("lead_new", hours / 24 + leadScoreWeight(l.leadScore)),
+        followUp: { entity: "lead", id: l.id },
+      });
+      continue;
+    }
     found.push({
       kind: "lead_untouched",
       entity: "lead",
@@ -372,6 +513,7 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
           : "/dashboard/tasks",
       urgency: urgencyOf("reply_due", waiting),
       taskId: r.id,
+      taskType: "email",
     });
   }
 

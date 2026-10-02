@@ -8,8 +8,8 @@
   {
     "file": "src/hooks/use-back-dismiss.ts",
     "description": "⚠️⚠️ chiudere una scheda dopo il salvataggio torna indietro nella cronologia e Next scarta l'aggiornamento della pagina",
-    "find": "        spent += 1;\n      };",
-    "replace": "        spent += 1;\n        win.history.go(-1);\n      };"
+    "find": "        spent.set(href, (spent.get(href) ?? 0) + 1);\n      };",
+    "replace": "        spent.set(href, (spent.get(href) ?? 0) + 1);\n        win.history.go(-1);\n      };"
   },
   {
     "file": "src/hooks/use-back-dismiss.ts",
@@ -20,7 +20,7 @@
   {
     "file": "src/hooks/use-back-dismiss.ts",
     "description": "⚠️ ogni apertura aggiunge una voce alla cronologia e Indietro va premuto più volte",
-    "find": "      if (spent > 0 && spentHref === href) {",
+    "find": "      if (left > 0) {",
     "replace": "      if (false) {"
   },
   {
@@ -28,5 +28,17 @@
     "description": "⚠️ la voce del pannello perde lo stato di Next, e Indietro non ritrova la pagina",
     "find": "        win.history.pushState(win.history.state, \"\");",
     "replace": "        win.history.pushState({}, \"\");"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️⚠️ chiusa una finestra su una seconda pagina, tornando alla prima un Indietro non fa nulla",
+    "find": "        spent.set(href, (spent.get(href) ?? 0) + 1);",
+    "replace": "        const mine = (spent.get(href) ?? 0) + 1;\n        spent.clear();\n        spent.set(href, mine);"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️ tornando a una pagina da un'altra, Indietro salta oltre invece di fermarsi sulla pagina",
+    "find": "    if (steps > 0 && from === here) {",
+    "replace": "    if (steps > 0) {"
   }
 ]

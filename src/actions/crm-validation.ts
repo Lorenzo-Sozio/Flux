@@ -23,6 +23,14 @@ const optionalText = z
   .optional()
   .nullable();
 
+/** Like optionalText, except that an empty value clears what was there. */
+const clearableText = z
+  .string()
+  .trim()
+  .transform((v) => (v === "" ? null : v))
+  .optional()
+  .nullable();
+
 const optionalEmail = z
   .string()
   .trim()
@@ -178,6 +186,10 @@ export const CompanySchema = z.object({
   vatNumber: optionalText,
   sdiCode: optionalText,
   fiscalCode: optionalText,
+  // A private customer's own name (migration 0074). Clearable: emptied, the record is a
+  // business again and the e-invoice says Denominazione.
+  personFirstName: clearableText,
+  personLastName: clearableText,
   pec: optionalEmail,
   // Empty means "from the country"; undefined leaves a partial update alone.
   language: z

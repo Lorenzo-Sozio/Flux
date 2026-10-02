@@ -152,7 +152,16 @@ export async function reachFor(db: AnyDb, keys: ReachKey[]): Promise<Map<string,
       );
     } else if (k.entity === "task") {
       const t = taskRows.find((r: { id: string }) => r.id === k.id);
-      out.set(key, contactOf(t?.contactId ?? null) ?? leadOf(t?.leadId ?? null) ?? NOBODY);
+      // A call planned on a deal dials the deal's person: the task names only the deal.
+      const d = t?.dealId ? dealRows.find((r: { id: string }) => r.id === t.dealId) : undefined;
+      out.set(
+        key,
+        contactOf(t?.contactId ?? null) ??
+          leadOf(t?.leadId ?? null) ??
+          contactOf(d?.contactId ?? null) ??
+          companyOf(d?.companyId ?? null) ??
+          NOBODY,
+      );
     } else if (k.entity === "ticket") {
       const t = ticketRows.find((r: { id: string }) => r.id === k.id);
       out.set(key, contactOf(t?.contactId ?? null) ?? NOBODY);

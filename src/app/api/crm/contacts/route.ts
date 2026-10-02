@@ -7,7 +7,7 @@ import { contacts } from "@/db/schema";
 import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { gateApiRequest } from "@/lib/api-import-auth";
-import { buildContactPayload, parseOnDuplicate, validateContactInput } from "@/lib/api-import-validators";
+import { asUpdate, buildContactPayload, parseOnDuplicate, validateContactInput } from "@/lib/api-import-validators";
 import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
           if (onDuplicate === "update") {
             const [updated] = await db
               .update(contacts)
-              .set(buildContactPayload(data, authResult.userId))
+              .set(asUpdate(buildContactPayload(data, authResult.userId), data))
               .where(eq(contacts.id, existing.id))
               .returning();
             dispatchWebhook("contact.updated", { contact: updated }, API_ORIGIN, db);

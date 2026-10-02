@@ -61,6 +61,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useBackDismiss } from "@/hooks/use-back-dismiss";
 import { useLivePoll } from "@/hooks/use-live-poll";
 import { cn } from "@/lib/utils";
 
@@ -145,6 +146,12 @@ function mergeMessages(prev: Message[], newest: Message[]): Message[] {
   const firstNew = new Date(newest[0].createdAt).getTime();
   const older = prev.filter((m) => new Date(m.createdAt).getTime() < firstNew && !newest.some((n) => n.id === m.id));
   return [...older, ...newest];
+}
+
+/** While a conversation is open on a phone, Back returns to the list. Renders nothing. */
+function BackToList({ onBack }: { onBack: () => void }) {
+  useBackDismiss(onBack);
+  return null;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -405,7 +412,11 @@ export function ChatClient({ userId }: { userId: string }) {
         a phone. Below md it is **one pane at a time**: the list, and then the
         conversation with a way back — which is what every messaging app on a
         phone does, and the only arrangement in which either is readable.
+
+        ⚠️ The way back is the phone's Back too: an open conversation is a layer, like a dialog
+        (src/hooks/use-back-dismiss.ts). Without it Back left the chat for the page before it.
       */}
+      {activeConv && <BackToList onBack={() => setActiveConv(null)} />}
       <div className={cn("flex w-full shrink-0 flex-col border-r md:w-72", activeConv && "hidden md:flex")}>
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="font-semibold text-base">{t("messages")}</h2>

@@ -2,6 +2,8 @@ import { cookies, headers } from "next/headers";
 
 import { getRequestConfig } from "next-intl/server";
 
+import { getWorkspaceTimeZone } from "@/lib/workspace-time-zone";
+
 import { defaultLocale, LOCALE_COOKIE, type Locale, locales } from "./config";
 
 /**
@@ -53,7 +55,14 @@ export default getRequestConfig(async () => {
     locale = pickFromAcceptLanguage(headerList?.get("accept-language") ?? null) ?? defaultLocale;
   }
 
-  const messages = (await import(`../../messages/${locale}.json`)).default;
+  // ⚠️⚠️ Every date and time is shown on the workspace's clock (Settings → General), the one the
+  // calendar and the reports already use. With no zone given, next-intl took the server's — UTC on
+  // Workers — and handed it to the browser too: a chat message sent at 10:00 in Rome read 08:00.
+  // Outside a workspace, before its calendar exists, or if the read fails: Rome.
+  const [messages, timeZone] = await Promise.all([
+    import(`../../messages/${locale}.json`).then((m) => m.default),
+    getWorkspaceTimeZone().catch(() => "Europe/Rome"),
+  ]);
 
   // A missing message falls back to the default locale instead of rendering the
   // key path to the user.
@@ -61,6 +70,7 @@ export default getRequestConfig(async () => {
 
   return {
     locale,
+    timeZone,
     messages: locale === defaultLocale ? messages : deepMerge(fallback, messages),
     // Keep the page rendering when a key is absent from BOTH files. next-intl's
     // default is to throw in development and log in production; neither helps the

@@ -15,6 +15,8 @@ import { hasCapability } from "@/lib/auth-guard";
 import { CONTACT_FIELDS, customFieldsToMetaMap, toFieldMetaMap } from "@/lib/filter-engine";
 import { countActive, decodeFilter } from "@/lib/filter-types";
 import { parseListParams } from "@/lib/pagination";
+import { sourceFilterOptions } from "@/lib/record-sources-load";
+import { getDb } from "@/lib/tenant-context";
 
 import { ContactModal } from "./_components/contact-modal";
 import { ContactsTable } from "./_components/contacts-table";
@@ -31,6 +33,10 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   // only fail (audit rilievo U-02).
   const [canEdit, canImport] = await Promise.all([hasCapability("record:write"), hasCapability("record:import")]);
 
+  // Started beside the list: the filter offers the workspace's own sources, by name.
+  const sourceOptions = getDb()
+    .then(sourceFilterOptions)
+    .catch(() => []);
   const [pageResult, savedFilters, customDefs, users] = await Promise.all([
     listContacts(listParams),
     getSavedViews("contacts").catch(() => []),
@@ -50,6 +56,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
       lookupOptions: users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })),
     };
   }
+  if (fields.source) fields.source = { ...fields.source, lookupOptions: await sourceOptions };
 
   return (
     <div>

@@ -16,6 +16,7 @@ import { reachFor } from "@/lib/record-reach";
 const db = drizzle(new PGlite());
 
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => db }));
+vi.mock("@/lib/workspace-time-zone", () => ({ getWorkspaceTimeZone: async () => "Europe/Rome" }));
 vi.mock("@/lib/auth-guard", () => ({
   requireCapability: async () => ({ userId: "anna", tenantRole: "editor", isPlatformStaff: false }),
   requireWriteAccess: async () => ({ user: { id: "anna", role: "editor" } }),

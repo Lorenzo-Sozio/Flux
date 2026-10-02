@@ -106,6 +106,28 @@ describe("the issue date", () => {
 });
 
 describe("the customer as frozen on the invoice", () => {
+  it("⚠️⚠️ freezes a private customer's own name, both parts or neither", () => {
+    const person = {
+      name: "Mario Rossi",
+      vatNumber: null,
+      fiscalCode: "RSSMRA85T10A562S",
+      sdiCode: null,
+      pec: null,
+      street: null,
+      zipCode: null,
+      city: null,
+      state: null,
+      country: "IT",
+    };
+    expect(customerSnapshot({ ...person, personFirstName: " Mario ", personLastName: "Rossi" })).toMatchObject({
+      firstName: "Mario",
+      lastName: "Rossi",
+    });
+    const half = customerSnapshot({ ...person, personFirstName: "Mario", personLastName: null });
+    expect(half).not.toHaveProperty("firstName");
+    expect(half).not.toHaveProperty("lastName");
+  });
+
   it("⚠️ stores identifiers in the form FatturaPA wants", () => {
     expect(
       customerSnapshot({

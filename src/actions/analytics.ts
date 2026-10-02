@@ -5,7 +5,9 @@ import { and, count, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { contacts, deals, leads, quotes } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { ownerCondition } from "@/lib/pipeline-filters";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordScope, visibleWhere } from "@/lib/record-visibility";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 
 type FunnelStageKey = "leads" | "converted" | "contacts" | "deals" | "quotesSent" | "won";
@@ -91,6 +93,20 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
     .where(and(gte(leads.createdAt, since), byLead))
     .groupBy(leads.source);
 
+  // What was sold, by where the customer came from: the deal carries its lead's source
+  // (migration 0073). Amounts are the deal's stored EUR figure, as on the scorecard.
+  const wonSourceRows = await tolerateUnmigrated(
+    "deal source (0073)",
+    () =>
+      db
+        .select({ source: deals.source, n: count(), value: sql<string>`coalesce(sum(${deals.amount}), 0)` })
+        .from(deals)
+        .where(and(gte(deals.createdAt, since), eq(deals.status, "won"), byDeal))
+        .groupBy(deals.source),
+    [] as { source: string | null; n: number; value: string }[],
+  );
+  const label = await sourceLabeller(db);
+
   const totalLeads = leadsRow.n;
   const totalConverted = convertedRow.n;
   const totalContacts = contactsRow.n;
@@ -124,7 +140,12 @@ export async function getFunnelData(periodDays = 90, owners: string[] = []) {
     conversionRates,
     avgLeadConversionDays: Math.round(Number(convTimeRow?.avgDays ?? 0)),
     avgDealCycleDays: Math.round(Number(dealCycleRow?.avgDays ?? 0)),
-    sourceBreakdown: sourceRows.map((r) => ({ source: r.source, count: r.n })).sort((a, b) => b.count - a.count),
+    sourceBreakdown: sourceRows
+      .map((r) => ({ source: r.source, label: label(r.source), count: r.n }))
+      .sort((a, b) => b.count - a.count),
+    wonBySource: wonSourceRows
+      .map((r) => ({ source: r.source, label: label(r.source), count: Number(r.n), value: Number(r.value) }))
+      .sort((a, b) => b.value - a.value || b.count - a.count),
     periodDays,
     totals: { totalLeads, totalConverted, totalContacts, totalDeals, totalQuotesSent, totalWon },
   };

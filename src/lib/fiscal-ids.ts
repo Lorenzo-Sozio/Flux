@@ -213,6 +213,9 @@ export interface CustomerFiscal extends AddressFields {
   fiscalCode?: string | null;
   sdiCode?: string | null;
   pec?: string | null;
+  /** A private customer's own name: the e-invoice names a person with Nome and Cognome. */
+  personFirstName?: string | null;
+  personLastName?: string | null;
 }
 
 /**
@@ -233,6 +236,13 @@ export function customerGaps(c: CustomerFiscal): Gap[] {
   if (hasVat && !isValidPartitaIva(c.vatNumber)) gaps.push({ field: "vatNumber", problem: "invalid" });
   if (hasCf && !isValidCodiceFiscale(c.fiscalCode)) gaps.push({ field: "fiscalCode", problem: "invalid" });
   if (!hasVat && !hasCf) gaps.push({ field: "vatNumber", problem: "missing" });
+  // ⚠️⚠️ A person — a personal codice fiscale and no partita IVA — is named on the e-invoice with
+  // Nome and Cognome, never as a Denominazione. A private customer filed before those fields
+  // existed has neither, and would be invoiced as a business: asked for here, before issuing.
+  const personalCf = hasCf && !/^\d{11}$/.test((c.fiscalCode ?? "").replace(/\s+/g, ""));
+  if (!hasVat && personalCf && (blank(c.personFirstName) || blank(c.personLastName))) {
+    gaps.push({ field: "personName", problem: "missing" });
+  }
 
   const hasSdi = !blank(c.sdiCode);
   const hasPec = !blank(c.pec);

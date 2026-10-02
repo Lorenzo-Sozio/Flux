@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  ArrowRightIcon,
   ArrowUpRightIcon,
-  BuildingIcon,
   EyeIcon,
   FileTextIcon,
   GitMerge,
@@ -28,7 +26,6 @@ import { z } from "zod";
 
 import {
   checkLeadDuplicates,
-  convertLead,
   createCompanyCategory,
   createCompanyType,
   createLead,
@@ -36,9 +33,11 @@ import {
   updateLead,
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { ConvertLeadDialog } from "@/components/crm/convert-lead-dialog";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { DuplicateHint, restrictedLabel } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
+import { SourceSelect } from "@/components/crm/source-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -53,7 +52,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -164,17 +162,6 @@ export function LeadModal({
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setInnerOpen(true);
   }, [isEditing, searchParams]);
-
-  const sourceOptions = [
-    { value: "website", label: tc("sources.website") },
-    { value: "referral", label: tc("sources.referral") },
-    { value: "linkedin", label: tc("sources.linkedin") },
-    { value: "cold_outreach", label: tc("sources.cold_outreach") },
-    { value: "trade_show", label: tc("sources.trade_show") },
-    { value: "advertisement", label: tc("sources.advertisement") },
-    { value: "email_campaign", label: tc("sources.email_campaign") },
-    { value: "other", label: tc("sources.other") },
-  ];
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -503,18 +490,11 @@ export function LeadModal({
                       control={control}
                       name="source"
                       render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                          <SelectTrigger>
-                            <SelectValue placeholder={t("form.selectSource")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {sourceOptions.map((o) => (
-                              <SelectItem key={o.value} value={o.value}>
-                                {o.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SourceSelect
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder={t("form.selectSource")}
+                        />
                       )}
                     />
                   </F>
@@ -779,100 +759,15 @@ export function DeleteLeadButton({ lead, redirectTo }: { lead: any; redirectTo?:
 
 function QuickConvertButton({ lead }: { lead: any }) {
   const t = useTranslations("leads");
-  const [open, setOpen] = useState(false);
-  const [shouldCreateDeal, setShouldCreateDeal] = useState(true);
-  const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-
-  const handleConvert = () => {
-    startTransition(async () => {
-      try {
-        const result = await convertLead(lead.id, shouldCreateDeal);
-        toast.success(t("convertSuccessToast"));
-        setOpen(false);
-        if (result.dealId) {
-          router.push(`/dashboard/pipeline/${result.dealId}`);
-        } else {
-          router.push(`/dashboard/contacts/${result.contactId}`);
-        }
-      } catch {
-        toast.error(t("convertErrorToast"));
-      }
-    });
-  };
-
-  const leadName = `${lead.firstName} ${lead.lastName}`;
-
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" title={t("convertLead")} aria-label={t("convertLead")} disabled={isPending}>
-          {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
+    <ConvertLeadDialog
+      lead={{ id: lead.id, name: `${lead.firstName} ${lead.lastName}`, companyName: lead.companyName }}
+      trigger={
+        <Button variant="ghost" size="icon" title={t("convertLead")} aria-label={t("convertLead")}>
+          <SparklesIcon className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t("convertLead")}</DialogTitle>
-          <DialogDescription>{t("convertLeadDesc")}</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
-            {t("convert.willCreate")}
-          </p>
-          <div className="flex items-center gap-2">
-            <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-            <span>
-              {t.rich("convert.contactLine", {
-                name: leadName,
-                b: (chunks) => <span className="font-medium">{chunks}</span>,
-              })}
-            </span>
-          </div>
-          {lead.companyName && (
-            <div className="flex items-center gap-2">
-              <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-              <span>
-                {t.rich("convert.companyLine", {
-                  name: lead.companyName,
-                  b: (chunks) => <span className="font-medium">{chunks}</span>,
-                })}
-              </span>
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <Label htmlFor="quick-create-deal" className="font-medium text-sm">
-              {t("convertCreateDeal")}
-            </Label>
-            <p className="text-muted-foreground text-xs">{t("convert.createDealHint")}</p>
-          </div>
-          <Switch
-            id="quick-create-deal"
-            checked={shouldCreateDeal}
-            onCheckedChange={setShouldCreateDeal}
-            disabled={isPending}
-          />
-        </div>
-
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button variant="outline" disabled={isPending}>
-              {t("convertCancel")}
-            </Button>
-          </DialogClose>
-          <Button type="button" onClick={handleConvert} disabled={isPending} className="gap-2">
-            {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <ArrowRightIcon className="h-4 w-4" />}
-            {t("convertConfirm")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      }
+    />
   );
 }
 

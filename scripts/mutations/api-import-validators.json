@@ -58,5 +58,23 @@
     "description": "il numero viene riscritto normalizzato anche in ciò che si conserva: il titolare vede un numero che non ha scritto nessuno",
     "find": "      ...nomeDaRecapito(b),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,\n      phone: str(b.phone),",
     "replace": "      ...nomeDaRecapito(b),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,\n      phone: digitsForMatching(b.phone) ?? str(b.phone),"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "⚠️⚠️ aggiornare un lead via API senza provenienza la sovrascrive con «api»",
+    "find": "  return { ...payload, source: sent.source ?? undefined };",
+    "replace": "  return payload;"
+  },
+  {
+    "file": "src/app/api/crm/leads/route.ts",
+    "description": "⚠️⚠️ la rotta dei lead aggiorna un doppione senza proteggere la provenienza (il percorso delle ADS da Zapier)",
+    "find": ".set(asUpdate(buildLeadPayload(data, authResult.userId), data))",
+    "replace": ".set(buildLeadPayload(data, authResult.userId))"
+  },
+  {
+    "file": "src/app/api/crm/contacts/bulk/route.ts",
+    "description": "⚠️ l'import in blocco dei contatti aggiorna senza proteggere la provenienza",
+    "find": "            values: asUpdate(buildContactPayload(data, authResult.userId), data),",
+    "replace": "            values: buildContactPayload(data, authResult.userId),"
   }
 ]

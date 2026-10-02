@@ -29,7 +29,11 @@ export type NextActionKind =
   // A customer wrote to their owner and is waiting for the answer (V1.4's reply task).
   | "reply_due"
   // Accepted and not yet an order: the win is not booked until it is.
-  | "quote_to_order";
+  | "quote_to_order"
+  // A call somebody planned for today, or one already late: the call centre's day (S2).
+  | "call_due"
+  // A lead that has just arrived and nobody has spoken to yet (S2).
+  | "lead_new";
 
 export type NextActionEntity = "ticket" | "quote" | "deal" | "lead" | "company" | "task";
 
@@ -56,9 +60,13 @@ export interface NextAction {
    * quote belongs to. Absent when there is nothing to plan on (a ticket, a reply task).
    */
   followUp?: { entity: "deal" | "lead" | "company"; id: string };
-  /** The task behind a `reply_due` row, completed from the row itself. */
+  /** The task behind a `reply_due` or `call_due` row, completed from the row itself. */
   taskId?: string;
+  /** What kind of task that is, so completing it asks the right outcomes. */
+  taskType?: TaskType;
 }
+
+import type { TaskType } from "@/lib/task-kinds";
 
 /**
  * The thresholds, in one place.
@@ -78,8 +86,13 @@ export const THRESHOLDS = {
   quoteExpiringDays: 3,
   /** A ticket with this little of its SLA window left is about to breach. */
   slaRemainingFraction: 0.2,
-  /** A new lead left alone this long has gone cold. */
+  /**
+   * A new lead left alone this long has gone cold. Before that it is `lead_new`, near the top:
+   * a lead is worth most in its first hours, and one answered after three days was not answered.
+   */
   leadUntouchedDays: 3,
+  /** How far back a late call is still worth listing: older than this it was abandoned, not delayed. */
+  callLookBackDays: 30,
   /** A customer with no recorded contact for this long has gone quiet. */
   customerQuietDays: 90,
 } as const;
@@ -130,6 +143,10 @@ const BASE_URGENCY: Record<NextActionKind, number> = {
   quote_to_order: 64,
   // Below a stalled deal: nothing planned is a warning, a fortnight of silence is a fact.
   deal_no_next_step: 32,
+  // A call promised for today is a promise: under a reply owed, over an expiring quote.
+  call_due: 70,
+  // Just above a call due: somebody asked to be contacted and is waiting by the phone.
+  lead_new: 72,
 };
 
 /**

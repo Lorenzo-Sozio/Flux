@@ -180,6 +180,16 @@ describe("saving a contract", () => {
   it("refuses a contract with no company", () => {
     expect(cleanContract({ ...input, companyId: "" }).ok).toBe(false);
   });
+
+  it("⚠️⚠️ keeps the deal it was signed on when the form does not send one", () => {
+    // The form has no deal field: an edit that read "not sent" as "none" cut the link.
+    const kept = cleanContract(input);
+    expect(kept.ok && kept.value.dealId).toBeUndefined();
+    const linked = cleanContract({ ...input, dealId: "d1" });
+    expect(linked.ok && linked.value.dealId).toBe("d1");
+    const cleared = cleanContract({ ...input, dealId: "" });
+    expect(cleared.ok && cleared.value.dealId).toBeNull();
+  });
 });
 
 describe("reading a stored row", () => {

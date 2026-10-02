@@ -161,11 +161,33 @@ export default async function FunnelPage({
                 return (
                   <div key={s.source ?? "unknown"} className="rounded-lg border p-3 text-center">
                     <div className="font-bold text-lg">{format.number(s.count)}</div>
-                    <div className="text-muted-foreground text-xs capitalize">{s.source ?? t("unknownSource")}</div>
+                    <div className="text-muted-foreground text-xs">{s.label ?? t("unknownSource")}</div>
                     <div className="font-medium text-primary text-xs">{pct}%</div>
                   </div>
                 );
               })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* What was sold, by where the customer came from: the deal keeps its lead's source. */}
+      {data.wonBySource.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t("wonBySource")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              {data.wonBySource.map((s) => (
+                <div key={s.source ?? "unknown"} className="rounded-lg border p-3 text-center">
+                  <div className="font-bold text-lg">
+                    {format.number(s.value, { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
+                  </div>
+                  <div className="text-muted-foreground text-xs">{s.label ?? t("unknownSource")}</div>
+                  <div className="font-medium text-primary text-xs">{t("wonCount", { count: s.count })}</div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

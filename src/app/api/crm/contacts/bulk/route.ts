@@ -8,6 +8,7 @@ import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { gateApiRequest } from "@/lib/api-import-auth";
 import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
+  asUpdate,
   buildContactPayload,
   type OnDuplicate,
   parseOnDuplicate,
@@ -186,7 +187,11 @@ export async function POST(req: NextRequest) {
           continue;
         }
         if (onDuplicate === "update") {
-          toUpdate.push({ index, id: existingId, values: buildContactPayload(data, authResult.userId) });
+          toUpdate.push({
+            index,
+            id: existingId,
+            values: asUpdate(buildContactPayload(data, authResult.userId), data),
+          });
           results[index] = { index, status: "updated", id: existingId };
           updated++;
           continue;

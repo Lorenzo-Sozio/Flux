@@ -68,6 +68,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { can } from "@/lib/permissions";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
@@ -129,9 +130,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     ? aiEntries(["summary", "draft"] as const, aiViewer(session?.user))
     : Promise.resolve({});
   const db = await getDb();
+  // The workspace's own name for a source, else the built-in label (src/lib/record-sources.ts).
+  const sourceLabelP = sourceLabeller(db);
   const timelineSummaryP = recordTimelineSummary(db, { type: "deal", id: dealId });
   // Rejections are read where each is awaited; until then they must not surface as unhandled.
-  for (const pending of [aiP, timelineSummaryP]) pending.catch(() => undefined);
+  for (const pending of [aiP, timelineSummaryP, sourceLabelP]) pending.catch(() => undefined);
 
   const [
     row,
@@ -533,6 +536,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               </div>
             )}
           </Field>
+          <Field label={t("modal.fieldSource")}>{(await sourceLabelP)(deal.source)}</Field>
           <Field label={tX("fieldCreated")}>
             <FormattedDate date={deal.createdAt} />
           </Field>

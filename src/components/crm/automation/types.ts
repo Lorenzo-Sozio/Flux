@@ -343,6 +343,7 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
     { key: "expectedCloseDate", label: "Expected close date", type: "date" },
     // Worked out for the daily scheduled run (src/lib/scheduled-rules.ts), not stored.
     { key: "idleDays", label: "Days without activity", type: "number" },
+    { key: "source", label: "Source", type: "enum", options: [] },
     { key: "notes", label: "Notes", type: "text" },
   ],
   lead: [
@@ -371,7 +372,8 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
       ],
     },
     { key: "leadScore", label: "Lead Score", type: "number" },
-    { key: "source", label: "Source", type: "text" },
+    // Options are the workspace's own list, filled by the builder.
+    { key: "source", label: "Source", type: "enum", options: [] },
     { key: "isConverted", label: "Converted", type: "boolean" },
   ],
   contact: [
@@ -379,7 +381,8 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
     { key: "lastName", label: "Last Name", type: "text" },
     { key: "status", label: "Status", type: "text" },
     { key: "leadScore", label: "Lead Score", type: "number" },
-    { key: "source", label: "Source", type: "text" },
+    // Options are the workspace's own list, filled by the builder.
+    { key: "source", label: "Source", type: "enum", options: [] },
   ],
   company: [
     { key: "name", label: "Name", type: "text" },

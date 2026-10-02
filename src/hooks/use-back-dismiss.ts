@@ -33,11 +33,19 @@ export function createBackDismiss(win: BackDismissWindow) {
   const stack: { close: () => void }[] = [];
   let ownBacks = 0;
   let listening = false;
-  /** Entries left by closed layers on top of this page's own, and the page they belong to. */
-  let spent = 0;
-  let spentHref: string | null = null;
+  /**
+   * Entries left by closed layers on top of each page's own, by page.
+   *
+   * ⚠️⚠️ Per page, not one page at a time. Kept for the last page only, a layer closed on a second
+   * page forgot the entries left on the first, and coming back to it took a Back that did nothing.
+   */
+  const spent = new Map<string, number>();
+  /** Where the history stood before the latest move: what a popstate came from. */
+  let here = win.location.href;
 
   const onPop = () => {
+    const from = here;
+    here = win.location.href;
     // The skip this module made.
     if (ownBacks > 0) {
       ownBacks -= 1;
@@ -49,12 +57,13 @@ export function createBackDismiss(win: BackDismissWindow) {
       top.close();
       return;
     }
-    // Back with nothing open, landing on this page's spent entries: past them and past the page's
+    // Back with nothing open, pressed ON a page with spent entries: past them and past the page's
     // own entry, so the press does what it says instead of landing on the same page.
-    if (spent > 0 && win.location.href === spentHref) {
-      const steps = spent;
-      spent = 0;
-      spentHref = null;
+    // Coming back to the page from another one lands on its newest spent entry, which shows the
+    // page: that is the arrival, and nothing is skipped.
+    const steps = spent.get(here) ?? 0;
+    if (steps > 0 && from === here) {
+      spent.delete(here);
       ownBacks += 1;
       win.history.go(-steps);
     }
@@ -68,9 +77,11 @@ export function createBackDismiss(win: BackDismissWindow) {
         listening = true;
       }
       const href = win.location.href;
-      if (spent > 0 && spentHref === href) {
+      here = href;
+      const left = spent.get(href) ?? 0;
+      if (left > 0) {
         // An entry a closed layer left on this page: this layer takes it over.
-        spent -= 1;
+        spent.set(href, left - 1);
       } else {
         // The page's own state, copied: Next reads it on Back and must find the page it left.
         win.history.pushState(win.history.state, "");
@@ -85,20 +96,18 @@ export function createBackDismiss(win: BackDismissWindow) {
         stack.splice(index, 1);
         // Closed by its button, a choice made in it, or a link followed from it: the entry stays,
         // spent, on the page the layer was opened on.
-        if (spentHref !== href) {
-          spentHref = href;
-          spent = 0;
-        }
-        spent += 1;
+        spent.set(href, (spent.get(href) ?? 0) + 1);
       };
+    },
+
+    /** The history moved without a popstate: a link, router.push, a redirect. */
+    moved() {
+      here = win.location.href;
     },
 
     /** A link is followed to this page anew: what was left on it before is history, not spent. */
     arriving(href: string) {
-      if (href === spentHref) {
-        spent = 0;
-        spentHref = null;
-      }
+      spent.delete(href);
     },
   };
 }
@@ -109,6 +118,17 @@ function sharedBackDismiss() {
   if (!shared) {
     const instance = createBackDismiss(window);
     shared = instance;
+    // ⚠️ Every move the router makes, so a later Back knows which page it left: a popstate alone
+    // says where the history went, not where it came from. Wrapped, not replaced — Next patches
+    // these two as well, and both patches run.
+    for (const method of ["pushState", "replaceState"] as const) {
+      const original = window.history[method];
+      window.history[method] = function (this: History, ...args: Parameters<History["pushState"]>) {
+        const result = original.apply(this, args);
+        instance.moved();
+        return result;
+      };
+    }
     document.addEventListener(
       "click",
       (event) => {

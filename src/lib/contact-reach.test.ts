@@ -131,6 +131,7 @@ describe("⚠️⚠️ an accepted quote announces the deal it wins", () => {
     // report whether it changed anything. Announcing regardless would tell every subscriber
     // that a deal closed today when it closed last month — and `webhook-retry` makes events
     // at-least-once, so a duplicate is a story someone will believe.
-    expect(sorgente).toContain('if (dealPrima && dealPrima.status !== "won")');
+    expect(sorgente).toContain('const wonHere = dealPrima && dealPrima.status !== "won" ? dealPrima : undefined;');
+    expect(sorgente).toContain("  if (wonHere) {");
   });
 });

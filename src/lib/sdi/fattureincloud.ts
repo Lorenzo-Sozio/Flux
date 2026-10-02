@@ -174,6 +174,10 @@ export function ficDocument(document: OutgoingInvoice["document"], vatTypes: Vat
         currency: { id: document.currency },
         entity: {
           name: customer.name ?? "",
+          // A private customer is a person to Fatture in Cloud too, or its own XML says Denominazione.
+          ...(customer.firstName && customer.lastName
+            ? { type: "person", first_name: customer.firstName, last_name: customer.lastName }
+            : {}),
           vat_number: customer.vatNumber ?? "",
           tax_code: customer.fiscalCode ?? "",
           address_street: customer.street ?? "",

@@ -75,6 +75,7 @@ import { companies, contacts, deals, leads } from "@/db/schema";
 import { aiEntries, aiViewer } from "@/lib/ai/access";
 import { getTenantEntitlements } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
+import { sourceLabeller } from "@/lib/record-sources-load";
 import { recordTimelineSummary } from "@/lib/record-timeline";
 import { recordScope, visibleWhere } from "@/lib/record-visibility";
 import { getDb } from "@/lib/tenant-context";
@@ -268,7 +269,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const statusLabel = (s: string) =>
     s === "converted" ? t("converted") : t.has(`statuses.${s}` as never) ? t(`statuses.${s}` as never) : s;
   const ratingLabel = (r: string) => (t.has(`ratings.${r}` as never) ? t(`ratings.${r}` as never) : r);
-  const sourceLabel = (s: string) => (tc.has(`sources.${s}` as never) ? tc(`sources.${s}` as never) : s);
+  // The workspace's own name for it, else the built-in label (src/lib/record-sources.ts).
+  const sourceLabel = await sourceLabeller(db);
   const status = lead.isConverted ? "converted" : lead.status;
   const rating = lead.rating ? RATING[lead.rating] : null;
 

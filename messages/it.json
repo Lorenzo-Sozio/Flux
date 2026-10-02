@@ -28,7 +28,9 @@
         "won": "Vinte"
       },
       "daysShort": "{days} g",
-      "unknownSource": "Origine sconosciuta"
+      "unknownSource": "Origine sconosciuta",
+      "wonBySource": "Vinte per provenienza",
+      "wonCount": "{count, plural, one {# vinta} other {# vinte}}"
     }
   },
   "appointment": {
@@ -1210,13 +1212,22 @@
     "showing": "Visualizzazione {from}–{to} di {total}",
     "sources": {
       "website": "Sito web",
-      "referral": "Referral",
+      "referral": "Segnalazione",
       "linkedin": "LinkedIn",
       "cold_outreach": "Cold Outreach",
-      "trade_show": "Fiera",
+      "trade_show": "Fiera o evento",
       "advertisement": "Pubblicità",
       "email_campaign": "Campagna Email",
-      "other": "Altro"
+      "other": "Altro",
+      "ads_meta": "ADS Meta",
+      "ads_google": "ADS Google",
+      "agent": "Agente",
+      "api": "API",
+      "import": "Importazione",
+      "web_form": "Modulo web",
+      "booking": "Prenotazione online",
+      "sample": "Dati di esempio",
+      "unknown": "Non indicata"
     },
     "state": "Stato / Provincia",
     "status": "Stato",
@@ -1330,6 +1341,9 @@
       "selectIndustry": "Seleziona settore",
       "selectSize": "Seleziona dimensione",
       "fiscalCode": "Codice fiscale",
+      "personFirstName": "Nome (cliente privato)",
+      "personLastName": "Cognome (cliente privato)",
+      "personHint": "Solo per una persona fisica",
       "pec": "PEC",
       "language": "Lingua dei documenti",
       "languageAuto": "Automatica dal paese",
@@ -2265,7 +2279,12 @@
       "historyMigrated": "Storico trasferito al nuovo cliente",
       "activityCount": "{count, plural, one {# attività} other {# attività}}",
       "taskCount": "{count, plural, one {# task} other {# task}}",
-      "createDealHint": "Crea un'opportunità nella pipeline collegata a questo cliente"
+      "createDealHint": "Crea un'opportunità nella pipeline collegata a questo cliente",
+      "description": "Il lead diventa cliente: contatto, azienda e trattativa. Attività, appuntamenti e documenti passano a loro, con la provenienza e i campi personalizzati.",
+      "privateCompanyLine": "Intestatario: <b>{name}</b> (cliente privato)",
+      "privateCustomer": "Cliente privato",
+      "privateCustomerHint": "Senza azienda: preventivi e fatture saranno intestati alla persona.",
+      "pipeline": "Pipeline della trattativa"
     },
     "detail": {
       "convertedTo": "Convertito in",
@@ -3041,7 +3060,15 @@
     "snoozeWeek": "Fra una settimana",
     "snoozed": "Rimandato di {days, plural, one {un giorno} other {# giorni}}.",
     "actionFailed": "Non è stato possibile.",
-    "startQueue": "Lavorali in fila"
+    "startQueue": "Lavorali in fila",
+    "callDue": "Chiama",
+    "leadNew": "Chiamalo adesso",
+    "callToday": "Da fare oggi",
+    "callLate": "In ritardo di {n} g",
+    "arrivedJustNow": "Appena arrivato, mai contattato",
+    "arrivedHoursAgo": "Arrivato {n} h fa, mai contattato",
+    "arrivedDaysAgo": "Arrivato {n} g fa, mai contattato",
+    "callLogged": "Registra la chiamata"
   },
   "orders": {
     "title": "Ordini",
@@ -3441,6 +3468,8 @@
       "fieldStageLabel": "Fase",
       "fieldProbability": "Probabilità (%)",
       "fieldExpectedClose": "Data di chiusura prevista",
+      "fieldSource": "Provenienza",
+      "selectSource": "Da dove arriva il cliente",
       "fieldAssignedTo": "Assegnato a",
       "fieldCompany": "Azienda",
       "fieldContact": "Contatto",
@@ -3454,7 +3483,15 @@
       "cancel": "Annulla",
       "saveChanges": "Salva modifiche",
       "createDeal": "Crea trattativa",
-      "saveError": "Errore nel salvataggio della trattativa."
+      "saveError": "Errore nel salvataggio della trattativa.",
+      "noCompany": "Nessuna azienda",
+      "noContact": "Nessun contatto",
+      "companyPlaceholder": "Cerca un'azienda…",
+      "contactPlaceholder": "Cerca un contatto…",
+      "searchPlaceholder": "Scrivi per cercare…",
+      "companyEmpty": "Nessuna azienda trovata.",
+      "contactEmpty": "Nessun contatto trovato.",
+      "contactEmptyAtCompany": "Nessun contatto in questa azienda."
     },
     "forecast": {
       "title": "Previsione ricavi",
@@ -5125,7 +5162,22 @@
     },
     "lists": {
       "title": "Elenchi",
-      "subtitle": "Categorie e tipi di azienda: rinominali, unisci i doppioni, togli quelli non usati.",
+      "subtitle": "Provenienze, categorie e tipi di azienda: rinominali, unisci i doppioni, togli quelli non usati.",
+      "sources": {
+        "title": "Provenienza",
+        "help": "Da dove arrivano i clienti: gli stessi valori su lead, contatti, aziende, trattative e ordini, e nei report. Rinominare non sposta nessun record; una provenienza disattivata non è più proposta ma resta sui record che la portano.",
+        "records": "{count, plural, =0 {nessun record} one {# record} other {# record}}",
+        "retired": "Disattivata",
+        "active": "{name} proposta nei moduli",
+        "moveUp": "Sposta su",
+        "moveDown": "Sposta giù",
+        "add": "Aggiungi",
+        "newPlaceholder": "Nuova provenienza, es. ADS TikTok",
+        "unlistedTitle": "Valori fuori elenco",
+        "unlistedHelp": "Scritti a mano prima dell'elenco o inviati da un'integrazione. Aggiungili all'elenco così come sono, oppure uniscili a una provenienza esistente.",
+        "addToList": "Aggiungi all'elenco",
+        "mergeHelp": "{count, plural, =0 {Nessun record la porta.} one {Il suo # record passa alla provenienza che scegli.} other {I suoi # record passano alla provenienza che scegli.}} Poi viene tolta dall'elenco."
+      },
       "category": {
         "title": "Categorie di azienda",
         "help": "Che tipo di attività è un'azienda."
@@ -6605,6 +6657,7 @@
       "invalid": "non valido"
     },
     "fields": {
+      "personName": "Nome e cognome del cliente privato",
       "legalName": "Denominazione",
       "vatNumber": "Partita IVA",
       "fiscalCode": "Codice fiscale",

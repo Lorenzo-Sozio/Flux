@@ -512,6 +512,20 @@
       "when": 1794182400000,
       "tag": "0072_who_sees_what",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1794268800000,
+      "tag": "0073_where_they_came_from",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1794355200000,
+      "tag": "0074_a_person_not_a_company",
+      "breakpoints": true
     }
   ]
 }

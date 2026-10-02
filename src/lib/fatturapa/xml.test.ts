@@ -172,6 +172,34 @@ describe("a valid FatturaPA", () => {
     expect(xml).not.toContain("<IdFiscaleIVA><IdPaese>IT</IdPaese><IdCodice></IdCodice>");
   });
 
+  it("⚠️⚠️ for a private customer, named with Nome and Cognome rather than as a business", async () => {
+    const xml = buildFatturaPaXml({
+      ...base,
+      customer: {
+        ...base.customer,
+        name: "Mario Rossi",
+        firstName: "Mario",
+        lastName: "De Rossi",
+        vatNumber: null,
+        sdiCode: null,
+        fiscalCode: "RSSMRA85T10A562S",
+      },
+    });
+    expect(await validate(xml)).toEqual([]);
+    const buyer = xml.slice(xml.indexOf("<CessionarioCommittente>"), xml.indexOf("</CessionarioCommittente>"));
+    expect(buyer).toContain("<Anagrafica><Nome>Mario</Nome><Cognome>De Rossi</Cognome></Anagrafica>");
+    expect(buyer).not.toContain("<Denominazione>");
+  });
+
+  it("a single name is not a person the schema accepts: the record is still a Denominazione", async () => {
+    const xml = buildFatturaPaXml({
+      ...base,
+      customer: { ...base.customer, name: "Mario Rossi", firstName: "Mario", lastName: "  ", vatNumber: null },
+    });
+    expect(await validate(xml)).toEqual([]);
+    expect(xml).toContain("<Anagrafica><Denominazione>Mario Rossi</Denominazione></Anagrafica>");
+  });
+
   it("⚠️⚠️ with mixed rates and a document discount written as negative lines", async () => {
     const xml = buildFatturaPaXml({
       ...base,

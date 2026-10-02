@@ -15,6 +15,8 @@ import { hasCapability } from "@/lib/auth-guard";
 import { customFieldsToMetaMap, LEAD_FIELDS, toFieldMetaMap } from "@/lib/filter-engine";
 import { countActive, decodeFilter } from "@/lib/filter-types";
 import { parseListParams } from "@/lib/pagination";
+import { sourceFilterOptions } from "@/lib/record-sources-load";
+import { getDb } from "@/lib/tenant-context";
 
 import { LeadModal } from "./_components/lead-modal";
 import { LeadsTable } from "./_components/leads-table";
@@ -31,6 +33,10 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   // only fail (audit rilievo U-02).
   const [canEdit, canImport] = await Promise.all([hasCapability("record:write"), hasCapability("record:import")]);
 
+  // Started beside the list: the filter offers the workspace's own sources, by name.
+  const sourceOptions = getDb()
+    .then(sourceFilterOptions)
+    .catch(() => []);
   const [pageResult, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
     listLeads(listParams),
     getSavedViews("leads").catch(() => []),
@@ -52,6 +58,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
       lookupOptions: users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id })),
     };
   }
+  if (fields.source) fields.source = { ...fields.source, lookupOptions: await sourceOptions };
 
   if (fields.leadTypeId) {
     fields.leadTypeId = {

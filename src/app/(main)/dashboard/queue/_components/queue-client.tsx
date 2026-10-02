@@ -61,7 +61,8 @@ export function QueueClient({ items, canWrite }: { items: Item[]; canWrite: bool
   // A fresh form for every record.
   // biome-ignore lint/correctness/useExhaustiveDependencies: reset on moving to the next item only
   useEffect(() => {
-    setType(item?.taskId ? "email" : "call");
+    // The task's own kind: a planned call is logged as a call, a reply owed as an email.
+    setType(item?.taskType ?? (item?.taskId ? "email" : "call"));
     setOutcome(null);
     setNote("");
     setNextTitle("");
@@ -82,7 +83,7 @@ export function QueueClient({ items, canWrite }: { items: Item[]; canWrite: bool
         : null;
       try {
         if (item.taskId) {
-          // A reply owed is a task already: completing it is the record of the answer.
+          // A reply owed or a planned call is a task already: completing it is the record.
           await updateTaskStatus(item.taskId, "done", undefined, { outcome, note, next });
         } else if (item.reach?.target) {
           await logContactAction({ target: item.reach.target, type, outcome, note, next });
@@ -292,4 +293,6 @@ const PRESENTATION_KEY: Record<NextAction["kind"], string> = {
   deal_no_next_step: "dealNoNextStep",
   reply_due: "replyDue",
   quote_to_order: "quoteToOrder",
+  call_due: "callDue",
+  lead_new: "leadNew",
 };

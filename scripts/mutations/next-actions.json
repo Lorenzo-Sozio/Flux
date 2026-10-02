@@ -52,5 +52,47 @@
     "description": "⚠️ un rinvio scaduto continua a nascondere la riga",
     "find": "  const hidden = new Set(snoozes.filter((s) => s.until.getTime() > now).map((s) => `${s.kind}:${s.entityId}`));",
     "replace": "  const hidden = new Set(snoozes.map((s) => `${s.kind}:${s.entityId}`));"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ le chiamate del giorno non compaiono nella coda",
+    "find": "          eq(tasks.type, \"call\"),",
+    "replace": "          eq(tasks.type, \"none\"),"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ la chiamata affidata a un collega compare anche a chi l'ha creata",
+    "find": "            and(isNull(tasks.assigneeId), eq(tasks.ownerId, mine)),",
+    "replace": "            eq(tasks.ownerId, mine),"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️⚠️ un lead appena arrivato e senza titolare non compare a nessuno",
+    "find": "                    isNull(leads.groupId),",
+    "replace": "                    sql`false`,"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ il lead di un gruppo compare anche a chi non ne fa parte",
+    "find": "                        .where(eq(userGroupMembers.userId, mine)),",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ una nota basta a togliere il lead dalla coda, come se fosse stato chiamato",
+    "find": "      .leftJoin(activities, and(eq(activities.leadId, leads.id), inArray(activities.type, CONTACT_ACTIVITY)))",
+    "replace": "      .leftJoin(activities, eq(activities.leadId, leads.id))"
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ lo stesso lead compare due volte: nuovo e con la chiamata in programma",
+    "find": "      if (l.planned || leadsWithCallDue.has(l.id)) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/next-actions.ts",
+    "description": "⚠️ un lead freddo senza titolare compare nella coda di tutti",
+    "find": "            and(lt(leads.createdAt, leadCutoff), eq(leads.ownerId, mine)),",
+    "replace": "            lt(leads.createdAt, leadCutoff),"
   }
 ]

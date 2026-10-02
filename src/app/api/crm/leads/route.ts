@@ -7,7 +7,13 @@ import { leads } from "@/db/schema";
 import { runRulesAfterApiWrite } from "@/lib/api-automations";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { gateApiRequest } from "@/lib/api-import-auth";
-import { buildLeadPayload, digitsForMatching, parseOnDuplicate, validateLeadInput } from "@/lib/api-import-validators";
+import {
+  asUpdate,
+  buildLeadPayload,
+  digitsForMatching,
+  parseOnDuplicate,
+  validateLeadInput,
+} from "@/lib/api-import-validators";
 import { listResponse } from "@/lib/api-read-route";
 import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
@@ -154,7 +160,7 @@ export async function POST(req: NextRequest) {
           if (onDuplicate === "update") {
             const [updated] = await db
               .update(leads)
-              .set(buildLeadPayload(data, authResult.userId))
+              .set(asUpdate(buildLeadPayload(data, authResult.userId), data))
               .where(eq(leads.id, existing.id))
               .returning();
             dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);

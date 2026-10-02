@@ -44,7 +44,8 @@ const EXEMPT: Record<string, string> = {
     "private; propagateDateShift checks the root task, and its successors move because the dependency says so",
   "src/actions/today.ts#getTodayView":
     "the person's own agenda: tasks they own or are assigned, activities they own, appointments through the filtered getAppointments",
-  "src/actions/next-actions.ts#getNextActions": "every query is already narrowed to the person's own records",
+  "src/actions/next-actions.ts#getNextActions":
+    "every query is narrowed to the person's own records; new leads also to their groups' and to nobody's, which visibleWhere('lead') shows them anyway",
 
   // Through a helper of their own file that applies the rules.
   "src/actions/crm.ts#listLeads": "listWhere ANDs visibleWhere into the list and its count",

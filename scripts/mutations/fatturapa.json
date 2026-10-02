@@ -106,5 +106,23 @@
     "description": "⚠️ un cliente di San Marino riceve il codice dell'estero",
     "find": "  if (nation === \"SM\") return { code: \"2R4GTO8\", pec: null };",
     "replace": ""
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ un cliente privato viene scritto in fattura come «Denominazione», come se fosse un'azienda",
+    "find": "  if (first && last) return el(\"Nome\", latin(first, 60)) + el(\"Cognome\", latin(last, 60));\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️⚠️ nome e cognome del cliente privato non vengono congelati sulla fattura emessa",
+    "find": "  const person = firstName && lastName ? { firstName, lastName } : {};",
+    "replace": "  const person = {};"
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️ un solo nome viene congelato come persona: l'XML lo scriverebbe a metà",
+    "find": "  const person = firstName && lastName ? { firstName, lastName } : {};",
+    "replace": "  const person = firstName || lastName ? { firstName, lastName } : {};"
   }
 ]
