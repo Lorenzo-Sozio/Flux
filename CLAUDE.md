@@ -2170,6 +2170,9 @@ auto-migration as everything else.
     `pushState`/`replaceState` are wrapped (Next patches them too; both run).
   - A screen that is a layer without being a dialog uses the hook directly: an open conversation in
     the chat, on a phone, is one (`BackToList`), so Back returns to the list instead of leaving.
+  - ⚠️ **A panel built by hand registers itself** with `<BackDismiss>`: the floating chat widget
+    (the panel, then the conversation inside it). Unregistered, Back saw nothing open and, from the
+    home, closed the app.
   - ⚠️ The full-screen panel draws its close button in its own header (`ownCloseButton`); the
     dialog's default one is `z-20` and moves up on a touchscreen, where every button is 44px tall.
 - **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).

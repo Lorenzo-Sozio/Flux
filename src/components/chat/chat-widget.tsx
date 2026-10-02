@@ -61,6 +61,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BackDismiss } from "@/hooks/use-back-dismiss";
 import { useLivePoll } from "@/hooks/use-live-poll";
 import { cn } from "@/lib/utils";
 
@@ -660,6 +661,11 @@ export function ChatWidget({ userId }: { userId: string }) {
 
       {/* ── Chat panel ── */}
       {open && <div aria-hidden="true" className="fixed inset-0 z-50 bg-background md:hidden" />}
+      {/* ⚠️ A panel of its own, not a dialog primitive: it tells Back itself what is open — the
+          panel, then a conversation (or a new one being started) inside it. Without these the
+          phone's Back saw nothing open and, from the home, closed the app. */}
+      {open && <BackDismiss onBack={() => setOpen(false)} />}
+      {open && view.kind !== "list" && <BackDismiss onBack={() => setView({ kind: "list" })} />}
       {open && (
         <div className={panelClass}>
           {/* ─ Header ─ */}
