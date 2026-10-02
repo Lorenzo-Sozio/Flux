@@ -5,7 +5,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import { type BackDismissWindow, createBackDismiss, openLayer } from "./use-back-dismiss";
+import { type BackDismissWindow, createBackDismiss, createLayerStack } from "./use-back-dismiss";
 
 /** A browser history in miniature: entries, a cursor, a URL, and popstate on Back. */
 function fakeWindow() {
@@ -195,65 +195,28 @@ describe("⚠️⚠️ Back on a phone", () => {
   });
 });
 
-/** The browser's CloseWatcher in miniature: a stack, and Back closes its top. */
-function fakeWatchers() {
-  const live: { onclose: (() => void) | null; destroy(): void }[] = [];
-  class Watcher {
-    onclose: (() => void) | null = null;
-    constructor() {
-      live.push(this);
-    }
-    destroy() {
-      const i = live.indexOf(this);
-      if (i !== -1) live.splice(i, 1);
-    }
-  }
-  return {
-    Watcher,
-    live,
-    /** The system's Back. */
-    back: () => {
-      const top = live.pop();
-      top?.onclose?.();
-    },
-  };
-}
-
-describe("⚠️⚠️ Back on a phone, where the browser has CloseWatcher (Chrome on Android)", () => {
-  it("Back closes the layer through the watcher, and never touches the history", () => {
-    const w = fakeWatchers();
-    const fallback = vi.fn(() => () => undefined);
-    const close = vi.fn();
-    openLayer(w.Watcher, close, fallback);
-    w.back();
-    expect(close).toHaveBeenCalledTimes(1);
-    expect(fallback).not.toHaveBeenCalled();
-  });
-
-  it("closes only the top layer of two", () => {
-    const w = fakeWatchers();
+describe("⚠️⚠️ the layers Back closes, where the browser has CloseWatcher", () => {
+  it("Back closes the top layer, and only it; a second Back the next one", () => {
+    const stack = createLayerStack();
     const closeDialog = vi.fn();
     const closeList = vi.fn();
-    openLayer(w.Watcher, closeDialog, () => () => undefined);
-    openLayer(w.Watcher, closeList, () => () => undefined);
-    w.back();
+    stack.add(closeDialog);
+    stack.add(closeList);
+    stack.closeTop();
     expect(closeList).toHaveBeenCalledTimes(1);
     expect(closeDialog).not.toHaveBeenCalled();
+    stack.closeTop();
+    expect(closeDialog).toHaveBeenCalledTimes(1);
+    expect(stack.count).toBe(0);
   });
 
-  it("⚠️⚠️ a layer closed by its own button gives Back back to the page", () => {
-    const w = fakeWatchers();
-    const close = vi.fn();
-    const detach = openLayer(w.Watcher, close, () => () => undefined);
-    detach();
-    expect(w.live).toHaveLength(0);
-    w.back();
-    expect(close).not.toHaveBeenCalled();
-  });
-
-  it("without CloseWatcher, the history entries take over", () => {
-    const fallback = vi.fn(() => () => undefined);
-    openLayer(undefined, vi.fn(), fallback);
-    expect(fallback).toHaveBeenCalledTimes(1);
+  it("a layer closed by its own X leaves the stack, and tells whoever listens", () => {
+    const stack = createLayerStack();
+    const heard = vi.fn();
+    stack.subscribe(heard);
+    const remove = stack.add(vi.fn());
+    remove();
+    expect(stack.count).toBe(0);
+    expect(heard).toHaveBeenCalledTimes(2);
   });
 });

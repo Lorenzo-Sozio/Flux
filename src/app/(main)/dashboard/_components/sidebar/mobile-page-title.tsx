@@ -9,19 +9,8 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { APP_CONFIG } from "@/config/app-config";
-import { ENTITIES } from "@/lib/entities";
 import { cn } from "@/lib/utils";
-import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
-
-type Place = { url: string; titleKey: string; parent?: string };
-
-/** Every place the menu names, sub-items with their parent. */
-const PLACES: Place[] = sidebarItems.flatMap((group) =>
-  group.items.flatMap((item) => [
-    { url: item.url, titleKey: item.titleKey },
-    ...(item.subItems ?? []).map((sub) => ({ url: sub.url, titleKey: sub.titleKey, parent: item.url })),
-  ]),
-);
+import { locate } from "@/navigation/back-target";
 
 /**
  * The left of the phone's top bar: where you are, and the way back.
@@ -36,8 +25,8 @@ const PLACES: Place[] = sidebarItems.flatMap((group) =>
  *   not list) shows what it is and a back arrow to the place above it.
  * - A menu sub-item (Pipeline › Forecast) shows its name and goes back to its parent.
  *
- * Read from the menu itself — the unfiltered list only for naming, never for
- * access: a page that is open was already allowed by the server.
+ * ⚠️ The way back is `locate` (src/navigation/back-target.ts), the same the phone's Back button
+ * follows (src/lib/back-plan.ts): the arrow and the button must never disagree.
  */
 export function MobilePageTitle({ className }: { className?: string }) {
   const pathname = usePathname();
@@ -46,20 +35,11 @@ export function MobilePageTitle({ className }: { className?: string }) {
   const tm = useTranslations("nav.mobile");
 
   const { title, back } = useMemo(() => {
-    const match = PLACES.filter((p) => pathname === p.url || pathname.startsWith(`${p.url}/`)).sort(
-      (a, b) => b.url.length - a.url.length,
-    )[0];
-    if (!match) return { title: APP_CONFIG.name, back: null as string | null };
-
-    if (pathname !== match.url) {
-      // Below a listed place: a record, or a page the menu does not list.
-      const entity = ENTITIES.filter((e) => pathname.startsWith(`${e.list}/`)).sort(
-        (a, b) => b.list.length - a.list.length,
-      )[0];
-      const title = entity ? te(`types.${entity.type}.one` as never) : t(`items.${match.titleKey}` as never);
-      return { title, back: match.url };
-    }
-    return { title: t(`items.${match.titleKey}` as never), back: match.parent ?? null };
+    const { place, entity, above } = locate(pathname);
+    if (!place) return { title: APP_CONFIG.name, back: null as string | null };
+    // Below a listed place, a record names its kind; anything else, the place.
+    const title = entity ? te(`types.${entity.type}.one` as never) : t(`items.${place.titleKey}` as never);
+    return { title, back: above };
   }, [pathname, t, te]);
 
   return (

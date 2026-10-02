@@ -8,6 +8,7 @@ import { and, eq } from "drizzle-orm";
 import { getNotificationsAction } from "@/actions/auth";
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { auth } from "@/auth";
+import { BackController } from "@/components/back-controller";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { WorkspaceScopeProvider } from "@/components/crm/workspace-scope";
@@ -126,6 +127,8 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
         <Suspense fallback={null}>
           <NavigationProgress />
         </Suspense>
+        {/* The phone's Back: close what is open, else up a level, else home (src/lib/back-plan.ts). */}
+        <BackController />
         <SidebarProvider defaultOpen={defaultOpen}>
           <AppSidebar
             user={user}

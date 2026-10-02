@@ -2114,15 +2114,27 @@ auto-migration as everything else.
   is one target — tapping opens what it is about and marks it read — grouped by day, with "To
   read" as a filter. A new panel in that bar uses the same component: a 320px dropdown on a phone
   is a third of the screen with the page still under it to tap by mistake.
-- ⚠️⚠️ **Back closes what is open, not the page** ([use-back-dismiss.ts](src/hooks/use-back-dismiss.ts)):
-  below md every Dialog, AlertDialog, Sheet and Drawer — the record edit forms, confirmations, the
-  panels, the Menu — closes when Back is pressed, one layer at a time (the template list closes, the
-  email dialog under it stays). It is in the primitives, so a new dialog has it without asking.
-  - ⚠️⚠️ **Through `CloseWatcher` where the browser has it** (Chrome on Android, the installed app
-    included): the system Back fires the watcher's `close` and touches no history. Until 2 October
-    2026 every layer pushed a history entry, and on Android that fought Next's router and Chrome's
-    guard against pages that add entries: Back closed nothing, or left the page with the dialog.
-    The history entries below are only the fallback, for Safari and Firefox (`openLayer`).
+- ⚠️⚠️ **Back is an app's, not a browser's** ([back-plan.ts](src/lib/back-plan.ts),
+  [back-controller.tsx](src/components/back-controller.tsx)). In order:
+  1. something open on top (dialog, sheet, panel, the Menu, a chat conversation) closes, one layer
+     at a time;
+  2. else the page's back arrow — the top bar's, from `locate` in
+     [back-target.ts](src/navigation/back-target.ts), so arrow and button never disagree;
+  3. else, anywhere but the home, the home;
+  4. on the home, the system's Back: the app closes.
+  - ⚠️⚠️ Back used to walk the history, which is the order things were tapped: it went to an
+    unrelated section, and when the history ran out on a page other than the home it closed the
+    app (reported 2 October 2026). Going up still uses the history when the page above is right
+    behind (`go`), else *replaces* the page, so the home ends at the bottom of the history.
+  - ⚠️⚠️ **One CloseWatcher for the whole app**, in `BackController` (dashboard layout), armed whenever
+    Back has something to do and disarmed on the home with nothing open. Never one per layer:
+    Chrome groups the watchers a page makes without a fresh tap and closes a group on one Back.
+    The dialogs register in `backLayers` (`useBackDismiss`, in the primitives: a new dialog has it).
+    Re-arming after each Back needs no tap (checked in Chrome: six Backs, six closes).
+  - What is behind the current entry is mirrored (`createHistoryMirror`): `pushState` and
+    `replaceState` are wrapped (Next patches them too; both run).
+  - **Without CloseWatcher** (Safari, Firefox) only the layers are handled, by the history entries
+    below; page-to-page Back stays the browser's.
   - ⚠️⚠️ **The open layers are counted in memory, never written into `history.state`**: Next's router
     rewrites the current entry's state on every refresh, and the first version lost its layers there.
   - ⚠️⚠️ **Closing a layer never moves the history.** A `history.back()` on close is a navigation to

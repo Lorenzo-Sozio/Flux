@@ -141,40 +141,59 @@ function sharedBackDismiss() {
   return shared;
 }
 
-/** The part of the CloseWatcher API this uses (Chrome 120+, Android's Back). */
-interface CloseWatcherLike {
-  onclose: (() => void) | null;
-  destroy(): void;
-}
-type CloseWatcherCtor = new () => CloseWatcherLike;
-
 /**
- * Opens one layer, by the best means the browser has. Returns what to call when it closes.
+ * The layers open now, innermost last, where the browser has CloseWatcher (Chrome on Android, the
+ * installed app included). One BackController (src/components/back-controller.tsx) holds the only
+ * watcher and, on Back, closes the top layer — or, with none open, goes up a level.
  *
- * ⚠️⚠️ **CloseWatcher first.** It is the browser's own answer to "Back closes the dialog": the
- * system Back fires its `close` and does not navigate, and no history entry is involved. The
- * history entries below fought two things on Android — Next's router, which handles every
- * popstate, and Chrome's own guard against pages that pile entries up, which may skip entries
- * a page pushed — and on a phone Back closed nothing, or left the page with the dialog. The
- * entries are kept only for browsers without CloseWatcher (Safari, Firefox).
+ * ⚠️⚠️ **One watcher for the whole app, never one per layer.** Chrome groups the watchers a page
+ * makes without a fresh tap and closes a whole group on one Back; one per dialog was closed in
+ * bunches, or not at all. And with no layer open Back walked the history, which is the order
+ * things were tapped, not the way up: see src/lib/back-plan.ts.
  */
-export function openLayer(Watcher: CloseWatcherCtor | undefined, close: () => void, fallback: () => () => void) {
-  if (!Watcher) return fallback();
-  let watcher: CloseWatcherLike;
-  try {
-    watcher = new Watcher();
-  } catch {
-    return fallback();
-  }
-  let closedByBack = false;
-  watcher.onclose = () => {
-    closedByBack = true;
-    close();
+export function createLayerStack() {
+  const layers: { close: () => void }[] = [];
+  const listeners = new Set<() => void>();
+  const changed = () => {
+    for (const listener of listeners) listener();
   };
-  return () => {
-    // Closed by its button, a choice or a link: the watcher goes, and Back is the page's again.
-    if (!closedByBack) watcher.destroy();
+  return {
+    get count() {
+      return layers.length;
+    },
+    /** Adds a layer; returns what removes it when it closes by itself (its X, a choice, a link). */
+    add(close: () => void): () => void {
+      const layer = { close };
+      layers.push(layer);
+      changed();
+      return () => {
+        const index = layers.indexOf(layer);
+        if (index === -1) return;
+        layers.splice(index, 1);
+        changed();
+      };
+    },
+    /** Back: the innermost layer, and only it. Taken off at once, so a second Back reaches the next. */
+    closeTop() {
+      const top = layers.pop();
+      if (!top) return;
+      changed();
+      top.close();
+    },
+    subscribe(listener: () => void): () => void {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
   };
+}
+
+export const backLayers = createLayerStack();
+
+/** Whether Back is the BackController's here: a phone, with CloseWatcher. */
+export function backIsControlled(): boolean {
+  return typeof window !== "undefined" && window.matchMedia(PHONE).matches && "CloseWatcher" in window;
 }
 
 /**
@@ -186,7 +205,9 @@ export function openLayer(Watcher: CloseWatcherCtor | undefined, close: () => vo
  * Mounted with the layer's content (which exists only while it is open). Layers nest: Back closes
  * the template list and leaves the email dialog under it open.
  *
- * Desktop is left alone: there Back is a page's, and Escape and the overlay close a dialog.
+ * With CloseWatcher the layer joins `backLayers`; without it (Safari, Firefox) it falls back to the
+ * history entries above. Desktop is left alone: there Back is a page's, and Escape and the overlay
+ * close a dialog.
  */
 export function useBackDismiss(close: () => void) {
   const closeRef = useRef(close);
@@ -194,11 +215,7 @@ export function useBackDismiss(close: () => void) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia(PHONE).matches) return;
-    const Watcher = (window as unknown as { CloseWatcher?: CloseWatcherCtor }).CloseWatcher;
-    return openLayer(
-      Watcher,
-      () => closeRef.current(),
-      () => sharedBackDismiss().open(() => closeRef.current()),
-    );
+    if (backIsControlled()) return backLayers.add(() => closeRef.current());
+    return sharedBackDismiss().open(() => closeRef.current());
   }, []);
 }

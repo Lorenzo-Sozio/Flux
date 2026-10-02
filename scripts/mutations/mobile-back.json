@@ -43,14 +43,38 @@
   },
   {
     "file": "src/hooks/use-back-dismiss.ts",
-    "description": "⚠️⚠️ su Android il tasto Indietro torna a passare per la cronologia invece che per CloseWatcher",
-    "find": "  if (!Watcher) return fallback();",
-    "replace": "  return fallback();"
+    "description": "⚠️⚠️ il tasto Indietro chiude la finestra sotto invece di quella aperta sopra",
+    "find": "      const top = layers.pop();",
+    "replace": "      const top = layers.shift();"
   },
   {
-    "file": "src/hooks/use-back-dismiss.ts",
-    "description": "⚠️⚠️ una finestra chiusa con la X lascia il CloseWatcher attivo e il successivo Indietro non fa nulla",
-    "find": "    if (!closedByBack) watcher.destroy();",
-    "replace": "    if (closedByBack) watcher.destroy();"
+    "file": "src/lib/back-plan.ts",
+    "description": "⚠️⚠️ con una finestra aperta, Indietro cambia pagina invece di chiuderla",
+    "find": "  if (s.layers > 0) return { kind: \"close\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/back-plan.ts",
+    "description": "⚠️⚠️ da una sezione aperta all'avvio Indietro chiude l'app invece di andare alla home",
+    "find": "  const target = s.above(s.pathname) ?? s.home;",
+    "replace": "  const target = s.above(s.pathname);\n  if (!target) return { kind: \"system\" };"
+  },
+  {
+    "file": "src/lib/back-plan.ts",
+    "description": "⚠️⚠️ Indietro torna alla pagina toccata prima invece che a quella sopra",
+    "find": "    if (s.entries[j] === target) return { kind: \"go\", delta: j - s.index };",
+    "replace": "    return { kind: \"go\", delta: -1 };"
+  },
+  {
+    "file": "src/lib/back-plan.ts",
+    "description": "⚠️ sulla home con della cronologia sotto, Indietro esce subito invece di tornare all'inizio",
+    "find": "    return s.index > 0 ? { kind: \"go\", delta: -s.index, finish: \"home\" } : { kind: \"system\" };",
+    "replace": "    return { kind: \"system\" };"
+  },
+  {
+    "file": "src/lib/back-plan.ts",
+    "description": "lo specchio della cronologia non taglia le voci avanti dopo un passo indietro",
+    "find": "      entries = [...entries.slice(0, index + 1), pathname];",
+    "replace": "      entries = [...entries, pathname];"
   }
 ]

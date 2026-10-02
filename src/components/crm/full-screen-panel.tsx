@@ -16,8 +16,11 @@ import { cn } from "@/lib/utils";
  * the screen, targets a finger misses, and the rest of the page still under it to tap by mistake.
  *
  * ⚠️ Built on the Dialog, which below `sm` already takes the whole screen between the safe-area
- * insets and always draws its close button (top right: the header leaves room for it). The header
- * and footer are sticky inside the dialog's own scroll box, so the list is what scrolls.
+ * insets and always draws its close button (top right: the header leaves room for it).
+ *
+ * ⚠️ The list is the scroll box, not the dialog: header and footer sit at its two ends and never
+ * move. They used to be `sticky` inside the dialog's own scroll box, where the footer (the
+ * notifications' "Notification settings") scrolled away with the list.
  */
 export function FullScreenPanel({
   open,
@@ -46,7 +49,7 @@ export function FullScreenPanel({
         {/* ⚠️ The close button is the header's own, centred with the title and the action: the
             dialog's default one is pinned 12px from the top, and on a touchscreen — where every
             control grows to 44px — it sat lower than everything beside it. */}
-        <div className="sticky top-0 z-10 flex min-h-14 shrink-0 items-center gap-2 border-b bg-background py-2 pr-2 pl-4">
+        <div className="z-10 flex min-h-14 shrink-0 items-center gap-2 border-b bg-background py-2 pr-2 pl-4">
           <div className="min-w-0 flex-1">
             <DialogTitle className="truncate text-base">{title}</DialogTitle>
             <DialogDescription className="sr-only">{description}</DialogDescription>
@@ -58,8 +61,8 @@ export function FullScreenPanel({
             </Button>
           </DialogClose>
         </div>
-        <div className="min-h-0 flex-1">{children}</div>
-        {footer && <div className="sticky bottom-0 shrink-0 border-t bg-background">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+        {footer && <div className="shrink-0 border-t bg-background">{footer}</div>}
       </DialogContent>
     </Dialog>
   );
