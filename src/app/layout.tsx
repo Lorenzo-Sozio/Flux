@@ -7,6 +7,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 
 import { SessionProvider } from "@/components/providers/session-provider";
+import { LaunchAnimation } from "@/components/pwa/launch-animation";
 import { ServiceWorkerRegistrar } from "@/components/pwa/service-worker-registrar";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -102,6 +103,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <ThemeBootScript nonce={nonce} />
       </head>
       <body className={`${fontVars} min-h-dvh antialiased`}>
+        {/* First in the body, so it paints before anything else has loaded. */}
+        <LaunchAnimation nonce={nonce} />
         <SessionProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <TooltipProvider>

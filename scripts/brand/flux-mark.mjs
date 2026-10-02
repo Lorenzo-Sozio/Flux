@@ -34,6 +34,14 @@ const b = 12 + H;
 /** Where the drawing reaches, stroke included: the mark's square on the 24 grid. */
 export const EXTENT = { lo: a - 2 * R - W / 2, hi: b + 2 * R + W / 2 };
 
+/**
+ * One ribbon as a plain stroke on the 24 grid — down from the top crossing, round the bottom-right
+ * loop, back to the crossing; the other three are it turned by 90°, 180°, 270° about (12, 12). What
+ * the opening screen draws line by line before the finished mark settles over it.
+ */
+export const RIBBON_PATH = `M${b} ${a}V${b + R}A${R} ${R} 0 1 0 ${b + R} ${b}H${b}`;
+export const STROKE_WIDTH = W;
+
 // ── Colour, blended in OKLab so a blend between two tones stays bright ──────
 
 const toLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
