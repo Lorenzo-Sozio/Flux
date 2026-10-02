@@ -28,7 +28,7 @@
  * of what "feels like an app" actually means.
  */
 
-const VERSION = "v6";
+const VERSION = "v7";
 const SHELL_CACHE = `flux-shell-${VERSION}`;
 const ASSET_CACHE = `flux-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";

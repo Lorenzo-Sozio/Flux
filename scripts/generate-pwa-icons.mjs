@@ -127,6 +127,73 @@ for (const icon of ICONS) {
   console.log(`launch-final-512.png       ${size}×${size}  ${(png.length / 1024).toFixed(1)} kB`);
 }
 
+// The line of the opening animation, as an animated WebP: the ribbons drawn one after the other,
+// with the glow baked in.
+//
+// ⚠️⚠️ An image, not a CSS animation of `stroke-dashoffset`. That property is animated on the main
+// thread, the one busy starting the app at that very moment: with it blocked the drawing froze
+// (measured in Chrome: one picture in 1.4 s), and on a phone it stuttered. An animated image is
+// advanced by the compositor, main thread busy or not (28 pictures in the same 1.4 s). Timing and
+// easing are the ones the CSS had; the opening's other parts are opacity and transform only.
+{
+  const PX = 312; // 104 CSS px at 3x
+  const FPS = 50;
+  const LEAD = 0.2; // the line starts after this
+  // [start, duration, easing] per ribbon, from the start of the drawing.
+  const bezier = (x1, y1, x2, y2) => (t) => {
+    // Solve x(u) = t by bisection, return y(u).
+    const at = (a, b, u) => 3 * a * u * (1 - u) ** 2 + 3 * b * u ** 2 * (1 - u) + u ** 3;
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (at(x1, x2, mid) < t) lo = mid;
+      else hi = mid;
+    }
+    return at(y1, y2, (lo + hi) / 2);
+  };
+  const linear = (t) => t;
+  const RIBBONS = [
+    [0, 0.34, bezier(0.55, 0, 1, 0.45)],
+    [0.34, 0.26, linear],
+    [0.6, 0.26, linear],
+    [0.86, 0.34, bezier(0, 0.55, 0.45, 1)],
+  ];
+  const END = LEAD + 0.86 + 0.34;
+  // The ribbon's length: a straight run, three quarters of a circle, a short run back.
+  const [, a, v, R, , , , , x, , h] = RIBBON_PATH.match(/-?[\d.]+/g).map(Number);
+  const LENGTH = Math.abs(v - a) + 1.5 * Math.PI * R + Math.abs(x - h);
+  const lo = EXTENT.lo;
+  const side = EXTENT.hi - EXTENT.lo;
+  // The glow the CSS drew as drop-shadow(0 0 2.5px rgba(150,170,255,.75)), on the 24 grid.
+  const glow = (2.5 / 104) * side;
+
+  const frames = [];
+  for (let f = 0; f * (1 / FPS) <= END + 1e-9; f++) {
+    const t = f / FPS - LEAD;
+    const paths = TONES.dark
+      .map((tone, q) => {
+        const [start, duration, ease] = RIBBONS[q];
+        const k = Math.max(0, Math.min(1, (t - start) / duration));
+        if (k <= 0) return "";
+        const drawn = ease(k) * LENGTH;
+        return `<path d="${RIBBON_PATH}" transform="rotate(${q * 90} 12 12)" stroke="${tone}" stroke-dasharray="${drawn.toFixed(4)} ${(2 * LENGTH).toFixed(4)}"/>`;
+      })
+      .join("");
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${PX}" height="${PX}" viewBox="${lo} ${lo} ${side} ${side}">
+  <defs><filter id="g" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="0" stdDeviation="${glow.toFixed(4)}" flood-color="rgb(150,170,255)" flood-opacity="0.75"/></filter></defs>
+  <g fill="none" stroke-width="${STROKE_WIDTH}" stroke-linecap="round" stroke-linejoin="round" filter="url(#g)">${paths}</g>
+</svg>`;
+    frames.push(await sharp(Buffer.from(svg)).png().toBuffer());
+  }
+  const webp = await sharp(frames, { join: { animated: true } })
+    // Once, ending on the drawn mark, which the finished mark then settles over.
+    .webp({ loop: 1, delay: frames.map(() => Math.round(1000 / FPS)), quality: 82, alphaQuality: 90, effort: 6 })
+    .toBuffer();
+  await writeFile(path.join(OUT, "launch-draw.webp"), webp);
+  console.log(`launch-draw.webp           ${PX}×${PX}  ${frames.length} frames  ${(webp.length / 1024).toFixed(1)} kB`);
+}
+
 // The same drawing for the page: the opening animation draws the ribbons as plain strokes and
 // lays the finished mark over them, so it needs the geometry the icons were drawn from.
 await writeFile(

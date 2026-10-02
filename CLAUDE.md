@@ -1979,6 +1979,12 @@ navy tile it is every icon in `public/icons/`, the 18 launch images, the opening
   lifted on `load`, by a 5 s timer, hidden at 6 s by CSS, and never shown without its script;
   reduced motion gets the finished mark at once. The strokes and the final image come from the same
   geometry (`launch-mark.generated.ts`, written by the generator) — never edit one by hand.
+  - ⚠️⚠️ **Nothing in it may move on the main thread**: it plays while that thread starts the app.
+    The line was a CSS animation of `stroke-dashoffset` (main thread) and stuttered; it is now an
+    animated WebP (`launch-draw.webp`, generated with the same geometry, timing, easing and glow),
+    which the compositor advances. Measured in Chrome with the main thread busy: 21 frames in 0.95 s
+    before, 58 after. Everything else is opacity and transform with `will-change`, and the CSS clock
+    waits for the image to be decoded (`data-launch-go`). A new moving part follows the same rule.
 - The home-screen icon on iOS (`apple-touch-icon.png`) and the favicon keep the
   gradient tile; only what Android draws on its launch screen is flat.
 - Changing an icon means bumping `VERSION` in `public/sw.js`: the worker serves
