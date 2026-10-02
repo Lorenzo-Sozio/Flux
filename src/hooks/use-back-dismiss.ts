@@ -141,11 +141,47 @@ function sharedBackDismiss() {
   return shared;
 }
 
+/** The part of the CloseWatcher API this uses (Chrome 120+, Android's Back). */
+interface CloseWatcherLike {
+  onclose: (() => void) | null;
+  destroy(): void;
+}
+type CloseWatcherCtor = new () => CloseWatcherLike;
+
+/**
+ * Opens one layer, by the best means the browser has. Returns what to call when it closes.
+ *
+ * ⚠️⚠️ **CloseWatcher first.** It is the browser's own answer to "Back closes the dialog": the
+ * system Back fires its `close` and does not navigate, and no history entry is involved. The
+ * history entries below fought two things on Android — Next's router, which handles every
+ * popstate, and Chrome's own guard against pages that pile entries up, which may skip entries
+ * a page pushed — and on a phone Back closed nothing, or left the page with the dialog. The
+ * entries are kept only for browsers without CloseWatcher (Safari, Firefox).
+ */
+export function openLayer(Watcher: CloseWatcherCtor | undefined, close: () => void, fallback: () => () => void) {
+  if (!Watcher) return fallback();
+  let watcher: CloseWatcherLike;
+  try {
+    watcher = new Watcher();
+  } catch {
+    return fallback();
+  }
+  let closedByBack = false;
+  watcher.onclose = () => {
+    closedByBack = true;
+    close();
+  };
+  return () => {
+    // Closed by its button, a choice or a link: the watcher goes, and Back is the page's again.
+    if (!closedByBack) watcher.destroy();
+  };
+}
+
 /**
  * On a phone, the system's Back button closes what is open on top of the page — a full-screen
- * dialog, an edit form, a confirmation, the notifications, the recents, a sheet, the Menu hub —
- * instead of leaving the page under it. That is what Back does in every app, and an installed PWA
- * has no other.
+ * dialog, an edit form, a confirmation, the notifications, the recents, a sheet, the Menu hub, an
+ * open chat conversation — instead of leaving the page under it. That is what Back does in every
+ * app, and an installed PWA has no other.
  *
  * Mounted with the layer's content (which exists only while it is open). Layers nest: Back closes
  * the template list and leaves the email dialog under it open.
@@ -158,6 +194,11 @@ export function useBackDismiss(close: () => void) {
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia(PHONE).matches) return;
-    return sharedBackDismiss().open(() => closeRef.current());
+    const Watcher = (window as unknown as { CloseWatcher?: CloseWatcherCtor }).CloseWatcher;
+    return openLayer(
+      Watcher,
+      () => closeRef.current(),
+      () => sharedBackDismiss().open(() => closeRef.current()),
+    );
   }, []);
 }

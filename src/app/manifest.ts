@@ -31,17 +31,19 @@ export default function manifest(): MetadataRoute.Manifest {
     // Chrome uses this when the display mode is unavailable; a browser tab is a
     // working CRM, so it is a reasonable place to fall back to.
     display_override: ["standalone", "minimal-ui", "browser"],
-    // Android's launch screen: this colour with the icon in the middle. The icons are filled with
-    // exactly this colour (LAUNCH_BG in scripts/generate-pwa-icons.mjs), so only the mark shows; a
-    // tile of another blue read as a square stuck on it. It is the only launch screen.
+    // Android's launch screen: this colour with the icon in the middle — the mark alone, so nothing
+    // sits on the navy but the mark; the maskable icons are flat in this colour for Android 12+,
+    // which draws them in a circle (LAUNCH_BG in scripts/generate-pwa-icons.mjs).
     background_color: "#15224d",
     theme_color: "#1447e6",
     lang: "it",
     dir: "ltr",
     categories: ["business", "productivity"],
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+      // The mark alone, on transparency: Android draws it in the middle of its launch screen, and
+      // anything behind the mark showed as a square on the navy.
+      { src: "/icons/launch-mark-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icons/launch-mark-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
       // Cropped by the launcher to whatever shape the device draws. Separate
       // artwork, with the mark pulled inside the safe zone.
       { src: "/icons/icon-maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },

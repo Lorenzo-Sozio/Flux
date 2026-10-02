@@ -40,5 +40,17 @@
     "description": "⚠️ tornando a una pagina da un'altra, Indietro salta oltre invece di fermarsi sulla pagina",
     "find": "    if (steps > 0 && from === here) {",
     "replace": "    if (steps > 0) {"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️⚠️ su Android il tasto Indietro torna a passare per la cronologia invece che per CloseWatcher",
+    "find": "  if (!Watcher) return fallback();",
+    "replace": "  return fallback();"
+  },
+  {
+    "file": "src/hooks/use-back-dismiss.ts",
+    "description": "⚠️⚠️ una finestra chiusa con la X lascia il CloseWatcher attivo e il successivo Indietro non fa nulla",
+    "find": "    if (!closedByBack) watcher.destroy();",
+    "replace": "    if (closedByBack) watcher.destroy();"
   }
 ]

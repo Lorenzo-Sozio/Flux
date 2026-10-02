@@ -38,8 +38,8 @@ const LAUNCH_BG = "#15224d";
  * - `inset`: the fraction of the canvas left empty around the mark. The maskable variants use a
  *   much larger one: the launcher may crop anything outside the middle 80%.
  * - `steps`: slices per ribbon; fewer make a lighter file, which only the favicon needs.
- * - `flat`: the launch screen's colour, no gradient and no shine — the icons Android draws on its
- *   launch screen, so the tile disappears into it and only the mark shows.
+ * - `flat`: the launch screen's colour, no gradient and no shine — the maskable icons, which
+ *   Android 12+ shows in a circle on its launch screen: the circle disappears into it.
  */
 function tileSvg({ size, inset, shape, steps = 240, points = 360, flat = false }) {
   const mark = size * (1 - inset * 2);
@@ -61,6 +61,17 @@ function tileSvg({ size, inset, shape, steps = 240, points = 360, flat = false }
 }
 
 /**
+ * The mark alone, on transparency: what Android draws in the middle of its launch screen. Any
+ * background of its own — a tile, even one of the launch colour — showed as a square on it.
+ */
+function markSvg(size, inset) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <title>Flux CRM</title>
+  ${markAt({ x: size * inset, y: size * inset, size: size * (1 - inset * 2), tones: TONES.dark })}
+</svg>`;
+}
+
+/**
  * ⚠️ The notification badge is a *mask*, not a picture. Android keeps only the alpha channel and
  * paints the result in the status bar's own colour, so a coloured tile would arrive as a solid
  * blob. Hence one colour on transparency: what shows is the mark's silhouette and nothing else.
@@ -72,9 +83,14 @@ function badgeSvg(size, inset) {
 }
 
 const ICONS = [
-  // The manifest's icons, which Android also draws on its launch screen: flat, in its colour.
-  { file: "icon-192.png", svg: tileSvg({ size: 192, inset: 0.19, shape: "squircle", flat: true }) },
-  { file: "icon-512.png", svg: tileSvg({ size: 512, inset: 0.19, shape: "squircle", flat: true }) },
+  // The tile, for notifications and wherever an icon needs its own ground.
+  { file: "icon-192.png", svg: tileSvg({ size: 192, inset: 0.19, shape: "squircle" }) },
+  { file: "icon-512.png", svg: tileSvg({ size: 512, inset: 0.19, shape: "squircle" }) },
+  // The manifest's "any" icons, which Android draws on its launch screen: the mark alone.
+  // ⚠️ New names, not the old ones redrawn: an installed app keeps the icons it fetched by URL,
+  // and a changed file under the same name may never reach it.
+  { file: "launch-mark-192.png", svg: markSvg(192, 0.12) },
+  { file: "launch-mark-512.png", svg: markSvg(512, 0.12) },
   // Maskable: square edge to edge, the mark well inside the safe zone.
   { file: "icon-maskable-192.png", svg: tileSvg({ size: 192, inset: 0.27, shape: "square", flat: true }) },
   { file: "icon-maskable-512.png", svg: tileSvg({ size: 512, inset: 0.27, shape: "square", flat: true }) },
