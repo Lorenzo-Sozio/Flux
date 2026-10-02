@@ -220,3 +220,16 @@ describe("⚠️⚠️ the layers Back closes, where the browser has CloseWatche
     expect(heard).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("⚠️⚠️ only an open dialog is a layer", () => {
+  it("the primitives register through <BackDismiss> inside the Content, never in the wrapper", async () => {
+    const { readFileSync } = await import("node:fs");
+    for (const file of ["dialog", "sheet", "alert-dialog", "drawer"]) {
+      const src = readFileSync(`src/components/ui/${file}.tsx`, "utf8");
+      // The wrapper (DialogContent, SheetContent…) is mounted whenever the dialog is in the tree,
+      // open or not: a hook there made every closed dialog an open layer.
+      expect(src, file).not.toMatch(/\buseBackDismiss\(/);
+      expect(src, file).toMatch(/<BackDismiss onBack=/);
+    }
+  });
+});

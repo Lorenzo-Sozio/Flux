@@ -5,7 +5,7 @@ import { Dialog as DialogPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { useBackDismiss } from "@/hooks/use-back-dismiss"
+import { BackDismiss } from "@/hooks/use-back-dismiss"
 import { XIcon } from "lucide-react"
 
 function Dialog({
@@ -64,7 +64,6 @@ function DialogContent({
 }) {
   // On a phone the system's Back closes the dialog, through its own close button: see the hook.
   const closeRef = React.useRef<HTMLButtonElement>(null)
-  useBackDismiss(() => closeRef.current?.click())
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -114,6 +113,8 @@ function DialogContent({
         <div className="flex min-h-0 flex-1 flex-col gap-[inherit] overflow-y-auto overscroll-contain">
           {children}
         </div>
+        {/* Inside the Content, so it exists only while the dialog is open: see BackDismiss. */}
+        <BackDismiss onBack={() => closeRef.current?.click()} />
         {/*
           ⚠️⚠️ Below sm the close button is **not optional**, whatever the caller
           asked for. A dialog that fills the screen has no outside to tap and a

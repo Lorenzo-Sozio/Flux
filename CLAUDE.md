@@ -2130,6 +2130,13 @@ auto-migration as everything else.
     Back has something to do and disarmed on the home with nothing open. Never one per layer:
     Chrome groups the watchers a page makes without a fresh tap and closes a group on one Back.
     The dialogs register in `backLayers` (`useBackDismiss`, in the primitives: a new dialog has it).
+  - ⚠️⚠️ **Only an open dialog is a layer: `<BackDismiss>` sits inside Radix's Content.** The shadcn
+    wrapper (`DialogContent`, `SheetContent`…) is mounted whenever the dialog is in the tree, open
+    or closed; the hook used to be called there, so every closed dialog on a page was an "open"
+    layer — four on the home before anything opened — and Back closed those ghosts while the real
+    panel stayed open (the `?backdebug=1` log showed it, 2 October 2026). The history versions before
+    had the same root: a history entry per closed dialog, pushed at every page load. Checked in
+    Chrome at phone width with the real primitives; `use-back-dismiss.test.ts` holds the placement.
     Re-arming after each Back needs no tap on desktop Chrome (six Escapes, six closes), but on a
     phone the first Back worked and every later one did nothing: a watcher armed without a tap is
     **made again at the next tap** (`withTap`, `navigator.userActivation`).

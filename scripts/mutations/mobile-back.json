@@ -76,5 +76,11 @@
     "description": "lo specchio della cronologia non taglia le voci avanti dopo un passo indietro",
     "find": "      entries = [...entries.slice(0, index + 1), pathname];",
     "replace": "      entries = [...entries, pathname];"
+  },
+  {
+    "file": "src/components/ui/dialog.tsx",
+    "description": "⚠️⚠️ ogni finestra chiusa nella pagina conta come aperta e Indietro chiude fantasmi invece della finestra",
+    "find": "  const closeRef = React.useRef<HTMLButtonElement>(null)\n",
+    "replace": "  const closeRef = React.useRef<HTMLButtonElement>(null)\n  useBackDismiss(() => closeRef.current?.click())\n"
   }
 ]

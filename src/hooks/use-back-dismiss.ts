@@ -219,3 +219,18 @@ export function useBackDismiss(close: () => void) {
     return sharedBackDismiss().open(() => closeRef.current());
   }, []);
 }
+
+/**
+ * `useBackDismiss` as an element, to put **inside** the part of a dialog that exists only while it
+ * is open (Radix's Content). Renders nothing.
+ *
+ * ⚠️⚠️ Never call the hook in the shadcn wrapper (`DialogContent`, `SheetContent`…): that wrapper
+ * is mounted whenever the dialog is in the tree, open or closed — only Radix's inner Content comes
+ * and goes. Every closed dialog on a page registered as an open layer: four on the home before
+ * anything was opened, and Back closed those ghosts one by one while the real panel stayed open.
+ * Before CloseWatcher the same mistake pushed a history entry per closed dialog at every page load.
+ */
+export function BackDismiss({ onBack }: { onBack: () => void }) {
+  useBackDismiss(onBack);
+  return null;
+}

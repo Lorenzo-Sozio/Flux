@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
-import { useBackDismiss } from "@/hooks/use-back-dismiss"
+import { BackDismiss } from "@/hooks/use-back-dismiss"
 import { cn } from "@/lib/utils"
 
 function Drawer({
@@ -53,7 +53,6 @@ function DrawerContent({
 }: React.ComponentProps<typeof DrawerPrimitive.Content>) {
   // On a phone the system's Back closes the drawer (the Menu hub, the Create sheet): see the hook.
   const closeRef = React.useRef<HTMLButtonElement>(null)
-  useBackDismiss(() => closeRef.current?.click())
   return (
     <DrawerPortal data-slot="drawer-portal">
       <DrawerOverlay />
@@ -68,6 +67,8 @@ function DrawerContent({
         <div className="mx-auto mt-4 hidden h-1.5 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
         <DrawerPrimitive.Close ref={closeRef} className="hidden" tabIndex={-1} aria-hidden />
+        {/* Inside the Content, so it exists only while the drawer is open: see BackDismiss. */}
+        <BackDismiss onBack={() => closeRef.current?.click()} />
       </DrawerPrimitive.Content>
     </DrawerPortal>
   )
